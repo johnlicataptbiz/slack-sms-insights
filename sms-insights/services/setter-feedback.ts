@@ -57,17 +57,20 @@ const getPostingClients = (botClient: WebClient): PostingClient[] => {
 const buildFeedbackPrompt = ({
   assistant,
   setterName,
+  setterUserId,
   messageBody,
   contactName,
 }: {
   assistant: AssistantTarget;
   setterName: string;
+  setterUserId?: string;
   messageBody: string;
   contactName: string;
 }): string => {
+  const setterTag = setterUserId ? `<@${setterUserId}>` : setterName;
   return [
     FEEDBACK_REQUEST_MARKER,
-    `<@${assistant.userId}>, please provide quick, supportive coaching to ${setterName} on their message to ${contactName}.`,
+    `<@${assistant.userId}>, please provide quick, supportive coaching to ${setterTag} on their message to ${contactName}.`,
     "",
     "Rules:",
     "1. Be extremely supportive and high-energy.",
@@ -108,6 +111,10 @@ export const requestSetterFeedback = async ({
   if (!isJack && !isBrandon) return;
 
   const setterName = isJack ? "Jack" : "Brandon";
+  const setterUserId = isJack
+    ? process.env.ALOWARE_WATCHER_JACK_USER_ID
+    : process.env.ALOWARE_WATCHER_BRANDON_USER_ID;
+
   const assistants = getAssistantTargets();
   if (assistants.length === 0) return;
 
@@ -120,6 +127,7 @@ export const requestSetterFeedback = async ({
   const text = buildFeedbackPrompt({
     assistant,
     setterName,
+    setterUserId,
     messageBody: fields.body,
     contactName: fields.contactName,
   });

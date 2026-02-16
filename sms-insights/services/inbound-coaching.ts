@@ -27,14 +27,17 @@ const buildCoachingPrompt = ({
   assistant,
   messageBody,
   contactName,
+  assigneeUserId,
 }: {
   assistant: AssistantTarget;
   messageBody: string;
   contactName: string;
+  assigneeUserId?: string;
 }): string => {
+  const assigneeTag = assigneeUserId ? `<@${assigneeUserId}>` : "the team";
   return [
     INBOUND_COACHING_MARKER,
-    `<@${assistant.userId}>, this hot lead (${contactName}) just messaged us. Suggest the perfect response to secure the booking.`,
+    `<@${assistant.userId}>, this hot lead (${contactName}) just messaged us. Suggest the perfect response to secure the booking for ${assigneeTag}.`,
     "",
     "Message:",
     `"${messageBody}"`,
@@ -51,12 +54,14 @@ export const requestInboundCoaching = async ({
   logger,
   ts,
   channelId,
+  assigneeUserId,
 }: {
   client: WebClient;
   fields: AlowareMessageFields;
   logger: Logger;
   ts: string;
   channelId: string;
+  assigneeUserId?: string;
 }): Promise<void> => {
   const assistants = getAssistantTargets();
   if (assistants.length === 0) return;
@@ -70,6 +75,7 @@ export const requestInboundCoaching = async ({
     assistant,
     messageBody: fields.body,
     contactName: fields.contactName,
+    assigneeUserId,
   });
 
   try {

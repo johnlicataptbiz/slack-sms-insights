@@ -209,6 +209,7 @@ const sampleMessageCallback = async ({
           logger,
           ts: message.ts,
           channelId: alert.channelId,
+          assigneeUserId: alert.assigneeUserId,
         });
       }
     }

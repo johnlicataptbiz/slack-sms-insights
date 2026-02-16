@@ -85,10 +85,13 @@ export const parseAlowareMessage = (
   };
 
   // 1. Direction
-  const lowerText = text.toLowerCase();
-  if (/\b(received|inbound|incoming)\b/i.test(lowerText)) {
+  const attachmentRef = attachments?.[0];
+  const combinedText =
+    `${text} ${attachmentRef?.fallback || ""} ${attachmentRef?.title || ""}`.toLowerCase();
+
+  if (/\b(received|inbound|incoming)\b/i.test(combinedText)) {
     fields.direction = "inbound";
-  } else if (/\b(sent|outbound|outgoing)\b/i.test(lowerText)) {
+  } else if (/\b(sent|outbound|outgoing)\b/i.test(combinedText)) {
     fields.direction = "outbound";
   }
 

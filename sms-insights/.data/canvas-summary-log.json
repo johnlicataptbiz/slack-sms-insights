@@ -1,7 +1,52 @@
 {
   "version": 1,
-  "updated_at": 1771201102,
+  "updated_at": 1771269260,
   "entries": [
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771269130.423809",
+      "isDailySummary": false,
+      "text": "_Win:_ Brandon's framing of this as a \"working session\" — not a sales call — is a masterclass in lowering resistance. Blake can say yes without feeling pressure. Smart play! :raised_hands:  _Move:_ The message is strong but slightly long — consider cutting the last two sentences (\"It's not a hard pitch…\") since the credibility build already handles objections. Shorter = faster reply.  _Energy:_ :fire:",
+      "threadTs": "1771268569.836149",
+      "ts": 1771269130
+    },
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771269106.922339",
+      "isDailySummary": false,
+      "text": "_Recommended Script:_ \"Hi William, I sincerely apologize for the scheduling mix-up — that's completely on us. I want to make this right. What days and times work best for you this week or next?\"  _Why this works:_ Taking full accountability immediately disarms frustration and shifts William's focus from the problem to a solution, keeping him engaged rather than disqualified.",
+      "threadTs": "1771247982.514069",
+      "ts": 1771269106
+    },
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771269100.512189",
+      "isDailySummary": false,
+      "text": "_Win:_ You owned it immediately and kept the tone warm — no defensiveness, just action. That builds trust fast! :muscle:  _Move:_ Cut \"not sure how I ended up messing this one up\" — it lingers on the mistake instead of the fix. Replace with a direct rebook offer: _\"Does Wednesday still work, or want to grab a new time right now?\"_ Give him one action, make it frictionless.  _Energy:_ :zap:",
+      "threadTs": "1771249706.559619",
+      "ts": 1771269100
+    },
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771269100.878919",
+      "isDailySummary": false,
+      "text": "_Win:_ Love how you're owning the potential confusion head-on — calling out the \"rogue message\" keeps William trusting you instead of second-guessing the invite.  _Move:_ Tighten the close — end with a direct confirmation ask like \"Can you reply with a quick 'confirmed' so I know we're locked in for Wednesday at 3 PM?\" so William has one clear action to take.  _Energy:_ :zap:",
+      "threadTs": "1771249849.754279",
+      "ts": 1771269100
+    },
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771269093.340239",
+      "isDailySummary": false,
+      "text": "_Win:_ Brandon nailed the casual, friendly tone — keeping it low-pressure makes Sammie way more likely to keep the convo going! :raised_hands:  _Move:_ Drop a quick proof point before the question to plant the seed early — try _\"That's awesome! We've been helping PT owners in all kinds of settings get fully booked. What setting are you currently in?\"_ Now she's curious AND answering a qualifying question.  _Energy:_ :zap:",
+      "threadTs": "1771267457.355589",
+      "ts": 1771269093
+    },
     {
       "assistantLabel": "Claude",
       "channelId": "C09ULGH1BEC",

@@ -1,7 +1,16 @@
 {
   "version": 1,
-  "updated_at": 1771269303,
+  "updated_at": 1771269419,
   "entries": [
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771269134.277569",
+      "isDailySummary": false,
+      "text": "_Recommended Script:_ No worries at all, William! While I have you though — I actually did want to reach out to you about how we help physical therapists grow their patient base. Would you be open to a quick 15-minute call this week?  _Why this works:_ Turns an awkward moment into a natural \"while I have you\" pivot that feels conversational rather than a cold pitch — lowering resistance and making it easy for him to say yes.",
+      "threadTs": "1771250371.235429",
+      "ts": 1771269134
+    },
     {
       "assistantLabel": "Claude",
       "channelId": "C09ULGH1BEC",
@@ -28,6 +37,15 @@
       "text": "_Recommended Script:_ \"Hi William, I sincerely apologize for the scheduling mix-up — that's completely on us. I want to make this right. What days and times work best for you this week or next?\"  _Why this works:_ Taking full accountability immediately disarms frustration and shifts William's focus from the problem to a solution, keeping him engaged rather than disqualified.",
       "threadTs": "1771247982.514069",
       "ts": 1771269106
+    },
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771269102.143509",
+      "isDailySummary": false,
+      "text": "_Recommended Script:_ No worries at all, William! While I have you though — I actually did want to reach out to you about how we help physical therapists grow their patient base. Would you be open to a quick 15-minute call this week?  _Why this works:_ Turns an awkward moment into a low-pressure \"while I have you\" pivot, which feels natural and conversational rather than a cold sales pitch — lowering resistance and increasing the chance he says yes.",
+      "threadTs": "1771250371.235429",
+      "ts": 1771269102
     },
     {
       "assistantLabel": "Claude",

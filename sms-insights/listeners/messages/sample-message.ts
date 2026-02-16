@@ -193,7 +193,7 @@ const sampleMessageCallback = async ({
         await client.chat.postMessage({
           channel: alert.channelId,
           thread_ts: alert.threadTs || message.ts,
-          text: `🔗 *HubSpot Contact:* https://app.hubspot.com/contacts/${hsConfig.portalId}/contact/${contactId}/`,
+          text: `🔗 *HubSpot Contact:* https://app.hubspot.com/contacts/${hsConfig.portalId}/record/0-1/${contactId}`,
         });
       }
 

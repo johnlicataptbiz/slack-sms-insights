@@ -2,6 +2,7 @@ import { App, LogLevel } from "@slack/bolt";
 import "dotenv/config";
 import registerListeners from "./listeners/index.js";
 import { createServer } from "node:http";
+import { reportError } from "./services/error-reporter.js";
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 
@@ -30,6 +31,11 @@ const app = new App({
 /** Register Listeners */
 registerListeners(app);
 
+/** Global Error Handler */
+app.error(async (error) => {
+  await reportError(app, error, "Global App Error");
+});
+
 /** Start Bolt App */
 (async () => {
   try {
@@ -46,6 +52,6 @@ registerListeners(app);
     await app.start();
     app.logger.info("⚡️ Bolt app is running via Socket Mode!");
   } catch (error) {
-    app.logger.error("Unable to start App", error);
+    await reportError(app, error, "Startup Failure");
   }
 })();

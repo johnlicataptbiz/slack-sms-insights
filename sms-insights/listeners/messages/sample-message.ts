@@ -2,6 +2,7 @@ import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from "@slack/bolt";
 import { isAlowareChannel } from "../../services/aloware-policy.js";
 import { isChannelAllowed } from "../../services/channel-access.js";
 import {
+  buildDailyReportBlocks,
   buildDailyReportSummary,
   isDailySnapshotReport,
 } from "../../services/daily-report-summary.js";
@@ -97,6 +98,13 @@ const sampleMessageCallback = async ({
       if (isDailySnapshot) {
         const replyThreadTs = message.thread_ts || message.ts;
         if (replyThreadTs) {
+          await client.chat.postMessage({
+            channel: message.channel!,
+            thread_ts: replyThreadTs,
+            text: "Here is today's summary statistics.",
+            blocks: buildDailyReportBlocks(message.text || ""),
+          });
+
           await requestDailyAnalysisHandoff({
             botClient: client,
             channelId: message.channel!,

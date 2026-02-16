@@ -40,7 +40,10 @@ const sumRegexMatches = (input: string, pattern: RegExp): number => {
 const sumFromPatterns = (input: string, patterns: RegExp[]): number => {
   for (const pattern of patterns) {
     const sum = sumRegexMatches(input, pattern);
-    const nonGlobalPattern = new RegExp(pattern.source, pattern.flags.replace(/g/g, ""));
+    const nonGlobalPattern = new RegExp(
+      pattern.source,
+      pattern.flags.replace(/g/g, ""),
+    );
     if (sum > 0 || nonGlobalPattern.test(input)) {
       return sum;
     }
@@ -148,4 +151,92 @@ export const buildDailyReportSummary = (report: string): string => {
   }
 
   return lines.join("\n");
+};
+
+export const buildDailyReportBlocks = (report: string): any[] => {
+  const booked = sumFromPatterns(report, BOOKINGS_PATTERNS);
+  const optOuts = sumFromPatterns(report, OPTOUTS_PATTERNS);
+  const sequences = aggregateSequenceRows(report);
+
+  const messagesSent = sequences.reduce(
+    (sum, row) => sum + row.messagesSent,
+    0,
+  );
+  const repliesReceived = sequences.reduce(
+    (sum, row) => sum + row.repliesReceived,
+    0,
+  );
+  const replyRatePct =
+    messagesSent > 0 ? (repliesReceived / messagesSent) * 100 : 0;
+
+  const topSequences = sequences.slice(0, 3);
+
+  const blocks: any[] = [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: "📊 Daily SMS Performance Snapshot",
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Total Messages:*\n${messagesSent.toLocaleString()}`,
+        },
+        {
+          type: "mrkdwn",
+          text: `*Reply Rate:*\n${replyRatePct.toFixed(1)}% (${repliesReceived.toLocaleString()} replies)`,
+        },
+        {
+          type: "mrkdwn",
+          text: `*Calls Booked:*\n${booked > 0 ? `🚀 *${booked}*` : "0"}`,
+        },
+        {
+          type: "mrkdwn",
+          text: `*Opt-Outs:*\n${optOuts > 0 ? `⚠️ ${optOuts}` : "0"}`,
+        },
+      ],
+    },
+  ];
+
+  if (topSequences.length > 0) {
+    blocks.push({ type: "divider" });
+    blocks.push({
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "*🔥 Top Performing Sequences*",
+      },
+    });
+
+    for (const row of topSequences) {
+      const rate =
+        row.messagesSent > 0
+          ? (row.repliesReceived / row.messagesSent) * 100
+          : 0;
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*${row.label}*\n${row.messagesSent} sent • ${rate.toFixed(1)}% reply • ${row.booked} booked`,
+        },
+      });
+    }
+  }
+
+  blocks.push({
+    type: "context",
+    elements: [
+      {
+        type: "mrkdwn",
+        text: "📈 _Data extracted from PT Biz Daily Snapshot_",
+      },
+    ],
+  });
+
+  return blocks;
 };

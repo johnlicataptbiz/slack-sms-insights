@@ -79,6 +79,7 @@ export type LeadWatcherAlert = {
   channelId: string;
   signalType: LeadSignalType;
   text: string;
+  blocks?: any[];
   threadTs: string;
 };
 
@@ -456,6 +457,84 @@ const buildAlertText = ({
   ].join("\n");
 };
 
+const buildAlertBlocks = ({
+  assigneeUserId,
+  contactLabel,
+  messageBody,
+  signalAssessment,
+}: {
+  assigneeUserId: string;
+  contactLabel: string;
+  messageBody: string;
+  signalAssessment: LeadSignalAssessment;
+}): any[] => {
+  const isBooking = signalAssessment.signalType === "booking";
+  const headerText = isBooking
+    ? "📅 Booking Opportunity Detected"
+    : "👀 Engaged Lead Detected";
+  const snippet =
+    messageBody.length > 300 ? `${messageBody.slice(0, 297)}...` : messageBody;
+
+  return [
+    {
+      type: "header",
+      text: {
+        type: "plain_text",
+        text: headerText,
+        emoji: true,
+      },
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Lead Contact:*\n${contactLabel}`,
+        },
+        {
+          type: "mrkdwn",
+          text: `*Assigned To:*\n<@${assigneeUserId}>`,
+        },
+      ],
+    },
+    {
+      type: "divider",
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Why flagged:*\n${signalAssessment.reason}`,
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*Suggested Next Step:*\n${signalAssessment.nextStep}`,
+      },
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: `> ${snippet.replace(/\n/g, "\n> ")}`,
+        },
+      ],
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: "🤖 *SMS Insights AI*",
+        },
+      ],
+    },
+  ];
+};
+
 export const isLeadWatcherEnabledForChannel = (channelId?: string): boolean => {
   const config = getConfig();
   if (!config.enabled || !channelId) {
@@ -520,6 +599,12 @@ export const buildLeadWatcherAlert = (
     threadTs,
     signalType: signalAssessment.signalType,
     text: buildAlertText({
+      assigneeUserId,
+      contactLabel,
+      messageBody,
+      signalAssessment,
+    }),
+    blocks: buildAlertBlocks({
       assigneeUserId,
       contactLabel,
       messageBody,

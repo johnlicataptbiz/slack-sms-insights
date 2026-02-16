@@ -67,14 +67,13 @@ const sampleMessageCallback = async ({
     }
 
     const isAloware = isAlowareChannel(message.channel);
-    const isDailySnapshot = isAloware && isDailySnapshotReport(message.text || "");
+    const isDailySnapshot =
+      isAloware && isDailySnapshotReport(message.text || "");
     const isFromSelf =
-      typeof context.botUserId === "string" && message.user === context.botUserId;
+      typeof context.botUserId === "string" &&
+      message.user === context.botUserId;
 
-    if (
-      isFromSelf &&
-      !isDailySnapshot
-    ) {
+    if (isFromSelf && !isDailySnapshot) {
       return;
     }
 
@@ -139,6 +138,7 @@ const sampleMessageCallback = async ({
       channel: alert.channelId,
       reply_broadcast: shouldBroadcastLeadWatcherAlerts(),
       text: alert.text,
+      blocks: alert.blocks,
       thread_ts: alert.threadTs,
     });
     seenMessageEventTs.set(eventTs, nowSeconds);

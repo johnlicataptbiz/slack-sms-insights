@@ -3301,7 +3301,7 @@ const buildReportFromRawMessages = ({
   }
 
   const replyWindowSeconds = WEEK_SECONDS;
-  console.log(`[DEBUG] replyWindowSeconds: ${replyWindowSeconds}`);
+
   const summaries = buildConversationSummaries(messages, replyWindowSeconds);
   const pipeline = buildPipelineMetrics(summaries, dayStart);
   const outreachTouches = buildOutreachTouches(messages, replyWindowSeconds);

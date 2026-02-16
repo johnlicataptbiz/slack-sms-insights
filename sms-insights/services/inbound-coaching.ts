@@ -37,14 +37,15 @@ const buildCoachingPrompt = ({
   const assigneeTag = assigneeUserId ? `<@${assigneeUserId}>` : "the team";
   return [
     INBOUND_COACHING_MARKER,
-    `<@${assistant.userId}>, this hot lead (${contactName}) just messaged us. Suggest the perfect response to secure the booking for ${assigneeTag}.`,
+    `Hey <@${assistant.userId}>, acts as a high-performance sales coach for ${assigneeTag}.`,
+    `A "Hot Lead" (${contactName}) just messaged us. Give us the best direct-response script to secure a strategy call booking.`,
     "",
-    "Message:",
-    `"${messageBody}"`,
+    "*Lead's Message:*",
+    `> "${messageBody}"`,
     "",
-    "Format:",
-    "*Recommended Script:* <exact text to send>",
-    "*Why this works:* <one sentence psychological trigger>",
+    "*Format:*",
+    "*Recommended Script:* <exact text for the setter to copy/paste>",
+    "*Psychological Trigger:* <why this conversational pivot converts>",
   ].join("\n");
 };
 

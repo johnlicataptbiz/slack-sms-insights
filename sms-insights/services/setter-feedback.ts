@@ -70,20 +70,22 @@ const buildFeedbackPrompt = ({
   const setterTag = setterUserId ? `<@${setterUserId}>` : setterName;
   return [
     FEEDBACK_REQUEST_MARKER,
-    `<@${assistant.userId}>, please provide quick, supportive coaching to ${setterTag} on their message to ${contactName}.`,
+    `Hey <@${assistant.userId}>, high-performance sales coach mode: Give ${setterTag} a quick 'Score' on this message to ${contactName}.`,
+    "",
+    "*Context:* This is a Physical Therapy business coaching lead. We want strategy call bookings.",
     "",
     "Rules:",
-    "1. Be extremely supportive and high-energy.",
-    "2. Be tactical—what could they change to get a faster booking?",
-    "3. Keep it to 3 short bullets total.",
+    "1. Supportive, punchy, and obsessed with conversational speed to booking.",
+    "2. Be tactical—one specific pivot they can make next time.",
+    "3. Maximum 3 bullet points.",
     "",
-    "Format:",
-    "*Win:* <specific compliment>",
-    "*Move:* <specific optimization tip>",
+    "*Message Sent:*",
+    `> "${messageBody}"`,
+    "",
+    "*Format:*",
+    "*Win:* <tactical compliment>",
+    "*Move:* <one specific pivot to drive a booking>",
     "*Energy:* 🔥 / ⚡️ / 💎",
-    "",
-    "Message:",
-    `"${messageBody}"`,
   ].join("\n");
 };
 

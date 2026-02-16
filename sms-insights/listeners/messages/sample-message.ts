@@ -7,7 +7,10 @@ import {
   buildDailyReportSummary,
   isDailySnapshotReport,
 } from "../../services/daily-report-summary.js";
-import { syncLeadNoteToHubSpot } from "../../services/hubspot-sync.js";
+import {
+  getHubSpotConfig,
+  syncLeadNoteToHubSpot,
+} from "../../services/hubspot-sync.js";
 import {
   buildLeadWatcherAlert,
   getHubSpotSyncData,
@@ -15,6 +18,7 @@ import {
   shouldBroadcastLeadWatcherAlerts,
 } from "../../services/lead-watcher.js";
 import { parseAlowareMessage } from "../../services/aloware-parser.js";
+import { requestInboundCoaching } from "../../services/inbound-coaching.js";
 import { requestSetterFeedback } from "../../services/setter-feedback.js";
 import { appendAssistantSummaryToCanvas } from "../../services/summary-canvas.js";
 
@@ -175,13 +179,38 @@ const sampleMessageCallback = async ({
       text: message.text,
     });
     if (syncData?.phoneNumber) {
-      await syncLeadNoteToHubSpot({
+      const contactId = await syncLeadNoteToHubSpot({
         phoneNumber: syncData.phoneNumber,
         contactName: syncData.contactLabel,
         noteContent: syncData.messageBody,
         tags: syncData.tags,
         logger,
       });
+
+      if (contactId && alert.channelId) {
+        const hsConfig = getHubSpotConfig();
+        // Post the HubSpot link as a follow-up
+        await client.chat.postMessage({
+          channel: alert.channelId,
+          thread_ts: alert.threadTs || message.ts,
+          text: `🔗 *HubSpot Contact:* https://app.hubspot.com/contacts/${hsConfig.portalId}/contact/${contactId}/`,
+        });
+      }
+
+      // 🚀 INBOUND COACHING for Hot Leads
+      if (alert.channelId && message.ts) {
+        const fields = parseAlowareMessage(
+          message.text || "",
+          message.attachments,
+        );
+        await requestInboundCoaching({
+          client,
+          fields,
+          logger,
+          ts: message.ts,
+          channelId: alert.channelId,
+        });
+      }
     }
 
     seenMessageEventTs.set(eventTs, nowSeconds);

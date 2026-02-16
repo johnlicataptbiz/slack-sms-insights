@@ -220,25 +220,35 @@ export const extractOwnerHint = (
 const chooseAssignee = (
   fields: AlowareMessageFields,
   config: LeadWatcherConfig,
-): string | undefined => {
+): { userId: string | undefined; reason: string } => {
   const ownerHint = extractOwnerHint(fields.user + " " + fields.line);
   if (ownerHint === "brandon" && config.brandonUserId)
-    return config.brandonUserId;
-  if (ownerHint === "jack" && config.jackUserId) return config.jackUserId;
+    return { userId: config.brandonUserId, reason: "Direct owner hint" };
+  if (ownerHint === "jack" && config.jackUserId)
+    return { userId: config.jackUserId, reason: "Direct owner hint" };
 
   if (config.defaultAssignee === "brandon" && config.brandonUserId)
-    return config.brandonUserId;
+    return { userId: config.brandonUserId, reason: "Default assignee" };
   if (config.defaultAssignee === "jack" && config.jackUserId)
-    return config.jackUserId;
+    return { userId: config.jackUserId, reason: "Default assignee" };
 
   if (config.brandonUserId && config.jackUserId) {
     const key = fields.contactPhone || fields.contactName.toLowerCase();
     let hash = 0;
     for (const char of key) hash = (hash + char.charCodeAt(0)) % 2147483647;
-    return hash % 2 === 0 ? config.brandonUserId : config.jackUserId;
+    const selection = hash % 2 === 0 ? "brandon" : "jack";
+    return {
+      userId:
+        selection === "brandon" ? config.brandonUserId : config.jackUserId,
+      reason: "Balanced round-robin",
+    };
   }
 
-  return config.brandonUserId || config.jackUserId || undefined;
+  const fallback = config.brandonUserId || config.jackUserId || undefined;
+  return {
+    userId: fallback,
+    reason: fallback ? "Fallback" : "No users configured",
+  };
 };
 
 const buildAlertBlocks = ({
@@ -246,11 +256,15 @@ const buildAlertBlocks = ({
   contactLabel,
   messageBody,
   signalAssessment,
+  contactId,
+  assigneeReason,
 }: {
   assigneeUserId: string;
   contactLabel: string;
   messageBody: string;
   signalAssessment: LeadSignalAssessment;
+  contactId?: string;
+  assigneeReason?: string;
 }): any[] => {
   const isBooking = signalAssessment.signalType === "booking";
   const headerText = isBooking
@@ -259,7 +273,7 @@ const buildAlertBlocks = ({
   const snippet =
     messageBody.length > 500 ? `${messageBody.slice(0, 497)}...` : messageBody;
 
-  return [
+  const blocks: any[] = [
     {
       type: "header",
       text: { type: "plain_text", text: headerText, emoji: true },
@@ -268,7 +282,7 @@ const buildAlertBlocks = ({
       type: "section",
       text: {
         type: "mrkdwn",
-        text: `*Lead Contact:* ${contactLabel}\n*Assigned To:* <@${assigneeUserId}>\n*Tags:* ${signalAssessment.tags.map((t) => `\`${t}\``).join(" ")}`,
+        text: `*Lead Contact:* ${contactLabel}\n*Assigned To:* <@${assigneeUserId}> _(${assigneeReason})_\n*Tags:* ${signalAssessment.tags.map((t) => `\`${t}\``).join(" ")}`,
       },
     },
     { type: "divider" },
@@ -286,11 +300,28 @@ const buildAlertBlocks = ({
         text: `> ${snippet.replace(/\n/g, "\n> ")}`,
       },
     },
-    {
-      type: "context",
-      elements: [{ type: "mrkdwn", text: "🤖 *Aloware SMS Insights Tagger*" }],
-    },
   ];
+
+  if (contactId) {
+    blocks.push({
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "View in Aloware ⚡️", emoji: true },
+          url: `https://app.aloware.com/contacts/${contactId}`,
+          action_id: "view_aloware_contact",
+        },
+      ],
+    });
+  }
+
+  blocks.push({
+    type: "context",
+    elements: [{ type: "mrkdwn", text: "🤖 *Aloware SMS Insights Tagger*" }],
+  });
+
+  return blocks;
 };
 
 export const isLeadWatcherEnabledForChannel = (channelId?: string): boolean => {
@@ -319,7 +350,10 @@ export const buildLeadWatcherAlert = (
   if (!signalAssessment) return undefined;
 
   // 3. Must have an assignee
-  const assigneeUserId = chooseAssignee(parsed, config);
+  const { userId: assigneeUserId, reason: assigneeReason } = chooseAssignee(
+    parsed,
+    config,
+  );
   if (!assigneeUserId) return undefined;
 
   const contactLabel = parsed.contactPhone
@@ -338,6 +372,8 @@ export const buildLeadWatcherAlert = (
       contactLabel,
       messageBody: parsed.body,
       signalAssessment,
+      contactId: parsed.contactId,
+      assigneeReason,
     }),
   };
 };

@@ -1,0 +1,151 @@
+const DAILY_SNAPSHOT_TITLE_PATTERN = /PT BIZ - DAILY SMS SNAPSHOT/i;
+const OUTBOUND_CONVERSATIONS_PATTERNS = [
+  /- Outbound conversations started\s*\(24h\):\s*(\d+)/gi,
+  /- Outbound Conversations:\s*(\d+)/gi,
+];
+const BOOKINGS_PATTERNS = [
+  /Calls\s+booked\s*\(24h\):\s*(\d+)/gi,
+  /- Bookings:\s*(\d+)/gi,
+];
+const OPTOUTS_PATTERNS = [
+  /Total opt-out conversations\s*\(24h\):\s*(\d+)/gi,
+  /- Opt[-\s]?Outs?:\s*(\d+)/gi,
+];
+const SEQUENCE_LINE_PATTERN =
+  /^-\s*(.+?):\s*sent\s+(\d+).*?(?:replies(?:\s+received)?|replied)\s+(\d+)\s*\(([0-9.]+)%[^)]*\).*?book(?:ings?|ed)\s+(\d+).*?opt-outs\s+(\d+)/i;
+
+type SequenceRow = {
+  booked: number;
+  label: string;
+  messagesSent: number;
+  optOuts: number;
+  repliesReceived: number;
+};
+
+const sumRegexMatches = (input: string, pattern: RegExp): number => {
+  const flags = pattern.flags.includes("g")
+    ? pattern.flags
+    : `${pattern.flags}g`;
+  const globalPattern = new RegExp(pattern.source, flags);
+  let sum = 0;
+  for (const match of input.matchAll(globalPattern)) {
+    const parsed = Number.parseInt(match[1] || "", 10);
+    if (!Number.isNaN(parsed)) {
+      sum += parsed;
+    }
+  }
+  return sum;
+};
+
+const sumFromPatterns = (input: string, patterns: RegExp[]): number => {
+  for (const pattern of patterns) {
+    const sum = sumRegexMatches(input, pattern);
+    const nonGlobalPattern = new RegExp(pattern.source, pattern.flags.replace(/g/g, ""));
+    if (sum > 0 || nonGlobalPattern.test(input)) {
+      return sum;
+    }
+  }
+  return 0;
+};
+
+const aggregateSequenceRows = (report: string): SequenceRow[] => {
+  const byLabel = new Map<string, SequenceRow>();
+  for (const rawLine of report.split("\n")) {
+    const line = rawLine.trim();
+    const match = line.match(SEQUENCE_LINE_PATTERN);
+    if (!match) {
+      continue;
+    }
+
+    const label = (match[1] || "").trim();
+    const messagesSent = Number.parseInt(match[2] || "", 10);
+    const repliesReceived = Number.parseInt(match[3] || "", 10);
+    const booked = Number.parseInt(match[5] || "", 10);
+    const optOuts = Number.parseInt(match[6] || "", 10);
+    if (
+      !label ||
+      [messagesSent, repliesReceived, booked, optOuts].some((value) =>
+        Number.isNaN(value),
+      )
+    ) {
+      continue;
+    }
+
+    const current = byLabel.get(label) || {
+      label,
+      messagesSent: 0,
+      repliesReceived: 0,
+      booked: 0,
+      optOuts: 0,
+    };
+    current.messagesSent += messagesSent;
+    current.repliesReceived += repliesReceived;
+    current.booked += booked;
+    current.optOuts += optOuts;
+    byLabel.set(label, current);
+  }
+
+  return [...byLabel.values()].sort((a, b) => {
+    if (b.messagesSent !== a.messagesSent) {
+      return b.messagesSent - a.messagesSent;
+    }
+    if (b.repliesReceived !== a.repliesReceived) {
+      return b.repliesReceived - a.repliesReceived;
+    }
+    return a.label.localeCompare(b.label);
+  });
+};
+
+export const isDailySnapshotReport = (report: string): boolean => {
+  return DAILY_SNAPSHOT_TITLE_PATTERN.test(report);
+};
+
+export const buildDailyReportSummary = (report: string): string => {
+  const booked = sumFromPatterns(report, BOOKINGS_PATTERNS);
+  const optOuts = sumFromPatterns(report, OPTOUTS_PATTERNS);
+  const outboundConversations = sumFromPatterns(
+    report,
+    OUTBOUND_CONVERSATIONS_PATTERNS,
+  );
+  const sequences = aggregateSequenceRows(report);
+  const messagesSent = sequences.reduce(
+    (sum, row) => sum + row.messagesSent,
+    0,
+  );
+  const repliesReceived = sequences.reduce(
+    (sum, row) => sum + row.repliesReceived,
+    0,
+  );
+  const replyRatePct =
+    messagesSent > 0 ? (repliesReceived / messagesSent) * 100 : 0;
+  const topSequences = sequences.slice(0, 3);
+
+  const lines = [
+    "*Daily Summary (Canvas Only)*",
+    `- Messages sent: ${messagesSent}`,
+    `- Replies received: ${repliesReceived} (${replyRatePct.toFixed(1)}%)`,
+    `- Calls booked: ${booked}`,
+    `- Opt-outs: ${optOuts}`,
+  ];
+
+  if (outboundConversations > 0) {
+    lines.push(`- Outbound conversations: ${outboundConversations}`);
+  }
+
+  if (topSequences.length > 0) {
+    lines.push("- Top sequences by volume:");
+    for (const row of topSequences) {
+      const sequenceRate =
+        row.messagesSent > 0
+          ? (row.repliesReceived / row.messagesSent) * 100
+          : 0;
+      lines.push(
+        `  - ${row.label}: ${row.messagesSent} sent, ${row.repliesReceived} replies (${sequenceRate.toFixed(
+          1,
+        )}%), ${row.booked} booked, ${row.optOuts} opt-outs`,
+      );
+    }
+  }
+
+  return lines.join("\n");
+};

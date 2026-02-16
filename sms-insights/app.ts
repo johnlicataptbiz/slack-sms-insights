@@ -1,0 +1,51 @@
+import { App, LogLevel } from "@slack/bolt";
+import "dotenv/config";
+import registerListeners from "./listeners/index.js";
+import { createServer } from "node:http";
+
+const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
+
+const getLogLevel = (): LogLevel => {
+  const configured = process.env.APP_LOG_LEVEL?.trim().toUpperCase();
+  if (configured === "DEBUG") {
+    return LogLevel.DEBUG;
+  }
+  if (configured === "WARN") {
+    return LogLevel.WARN;
+  }
+  if (configured === "ERROR") {
+    return LogLevel.ERROR;
+  }
+  return DEFAULT_APP_LOG_LEVEL;
+};
+
+/** Initialization */
+const app = new App({
+  token: process.env.SLACK_BOT_TOKEN,
+  socketMode: true,
+  appToken: process.env.SLACK_APP_TOKEN,
+  logLevel: getLogLevel(),
+});
+
+/** Register Listeners */
+registerListeners(app);
+
+/** Start Bolt App */
+(async () => {
+  try {
+    // Start a simple HTTP server FIRST for health checks (required by Railway)
+    const port = parseInt(process.env.PORT || "3000", 10);
+    createServer((req: any, res: any) => {
+      res.writeHead(200);
+      res.end("Health check: OK");
+    }).listen(port, "0.0.0.0", () => {
+      app.logger.info(`Health check server listening on port ${port}`);
+    });
+
+    // Start Bolt App
+    await app.start();
+    app.logger.info("⚡️ Bolt app is running via Socket Mode!");
+  } catch (error) {
+    app.logger.error("Unable to start App", error);
+  }
+})();

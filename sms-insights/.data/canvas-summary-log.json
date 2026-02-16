@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "updated_at": 1771201102,
+  "entries": [
+    {
+      "assistantLabel": "Claude",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "1771198009.948249",
+      "isDailySummary": false,
+      "text": "Here's the analysis of your Feb 15 SMS snapshot:  ──────────  *Best &amp; Worst Sequence Performance*  Best: *Hiring Guide - 2026 v1.0* — 5 sent, 40% reply rate, 1 booking (50% conversion per conversation). This is your standout performer today and WTD. The week-to-date data also shows Cash-Based PT Hiring Guide running at 100% booking per conversation, confirming this content angle is your highest-intent audience.  Worst: *Cash Practice Field Manual - 2026 v1.0* — 22 sent (your highest volume), only 1 reply (4.5%), 0 bookings. You spent the most messages on the sequence returning the least engagement. The old RAISE YOUR RATES CHEATSHEET (non-2026 version) also went 3-for-0 with no replies at all — worth retiring or replacing entirely.  ──────────  *Booking Conversion Opportunities by Message Structure*  Your WTD data shows Follow-Up Reminder hitting 50% booking-when-replied — meaning when someone replies to a follow-up, they're converting at a high rate. The problem is volume: you're not sending enough follow-ups to capitalize on it. Manual/direct messages are showing 33.3% reply rate today, the highest of any bucket, suggesting personalized outreach is punching above its weight. Direct Call Invites had the highest volume by message type but 0% booking-when-replied — people aren't converting from the invite alone, they need the sequence warmth first.  ──────────  *Opt-Out Risk Signals*  Clean today — 0 opt-outs across all sequences. However, the WTD flag is worth watching: *Hiring Guide - 2026 v1.0 has a 50% opt-out rate week-to-date*. That's a small sample creating a misleading rate, but monitor it closely as volume scales. The old-format sequences (non-2026 versions) are dead weight — no replies, no bookings, and every message sent to a cold contact is a latent opt-out risk.  ──────────  *3 Specific Actions for Tomorrow*  1. *Shift volume from Cash Practice Field Manual to Hiring Guide* — your highest-volume sequence is your worst performer. Even a partial reallocation toward Hiring Guide contacts should move your booking rate meaningfully.  2. *Send follow-up reminders to anyone who replied but didn't book this week* — WTD data shows 50% booking-when-replied on follow-ups. You have warm contacts sitting in your pipeline right now.  3. *Retire the legacy sequence versions* — RAISE YOUR RATES CHEATSHEET (old) and STANDALONE SPACE GUIDE (old) are generating zero engagement. Remove them from rotation to keep your sending reputation clean and focus effort on the 2026 versions that are actually working.",
+      "threadTs": "1771192805.584309",
+      "ts": 1771198009
+    },
+    {
+      "assistantLabel": "Daily Report Summary",
+      "channelId": "C09ULGH1BEC",
+      "entryId": "daily_summary_latest",
+      "isDailySummary": true,
+      "text": "*Daily Summary (Canvas Only)*\n- Messages sent: 63\n- Replies received: 10 (15.9%)\n- Calls booked: 2\n- Opt-outs: 0\n- Outbound conversations: 52\n- Top sequences by volume:\n  - Cash Practice Field Manual - 2026 v1.0: 22 sent, 1 replies (4.5%), 0 booked, 0 opt-outs\n  - Raise Your Rates Cheatsheet - 2026 v1.0: 14 sent, 2 replies (14.3%), 0 booked, 0 opt-outs\n  - Standalone Space Guide - 2026 v1.0: 8 sent, 1 replies (12.5%), 0 booked, 0 opt-outs",
+      "threadTs": "1771192805.584309",
+      "ts": 1771192811
+    }
+  ]
+}

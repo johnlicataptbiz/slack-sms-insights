@@ -2,7 +2,7 @@ import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
 import type { AlowareMessageFields } from './aloware-parser.js';
 
-const FEEDBACK_REQUEST_MARKER = '*Setter Coaching Feedback Request*';
+export const FEEDBACK_REQUEST_MARKER = '*Setter Coaching Feedback Request*';
 const DEFAULT_FEEDBACK_ENABLED = true;
 
 type AssistantTarget = {

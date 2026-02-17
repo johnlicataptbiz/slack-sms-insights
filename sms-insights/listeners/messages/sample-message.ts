@@ -12,7 +12,7 @@ import {
   type LeadWatcherAttachment,
   shouldBroadcastLeadWatcherAlerts,
 } from '../../services/lead-watcher.js';
-import { requestSetterFeedback } from '../../services/setter-feedback.js';
+import { FEEDBACK_REQUEST_MARKER, requestSetterFeedback } from '../../services/setter-feedback.js';
 
 const IGNORED_SUBTYPES = new Set(['message_changed', 'message_deleted', 'channel_join', 'channel_leave']);
 const DEDUPE_WINDOW_SECONDS = 6 * 60 * 60;
@@ -59,9 +59,16 @@ const sampleMessageCallback = async ({
       return;
     }
 
+    // Suppress feedback loops: if the message is itself a feedback request, ignore it.
+    if (message.text?.includes(FEEDBACK_REQUEST_MARKER)) {
+      return;
+    }
+
     const isAloware = isAlowareChannel(message.channel);
     const isDailySnapshot = isAloware && isDailySnapshotReport(message.text || '');
-    const isFromSelf = typeof context.botUserId === 'string' && message.user === context.botUserId;
+    const isFromSelf =
+      (typeof context.botUserId === 'string' && message.user === context.botUserId) ||
+      (typeof message.user === 'string' && message.user === process.env.ALOWARE_WATCHER_JACK_USER_ID);
 
     // Ignore messages posted by OTHER Slack apps/bots — those are automated and
     // should not trigger watcher alerts or setter-feedback. However, allow

@@ -78,7 +78,7 @@ describe('commands', () => {
 
     const callArgs = fakeRespond.mock.calls[0]?.arguments[0] as string;
     assert(callArgs.includes('*SMS Insights Core KPI Report*'));
-    assert(callArgs.includes('*1) REQUIRED: REPLY RATES BY MESSAGE (7d)*'));
+    assert(callArgs.includes('*1) REQUIRED: REPLY RATES BY MESSAGE (24h)*'));
   });
 
   it('should prompt for usage when command text is missing', async () => {
@@ -187,7 +187,15 @@ describe('commands', () => {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ output_text: 'AI answer' }),
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: 'AI answer',
+              },
+            },
+          ],
+        }),
       } as Response;
     });
     const historySpy = mock.method(fakeClient.conversations, 'history', async () => ({

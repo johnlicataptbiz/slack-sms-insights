@@ -37,15 +37,9 @@ describe('app mention events', () => {
     __resetAlowareAnalyticsCachesForTests();
     process.env.OPENAI_API_KEY = 'test-key';
     process.env.OPENAI_MODEL = 'gpt-4.1-mini';
-    process.env.ALOWARE_CANVAS_DURABLE_MODE = 'false';
     process.env.ALLOWED_CHANNEL_IDS = 'C1234';
     process.env.ALOWARE_CHANNEL_ID = 'C1234';
     process.env.ALOWARE_DAILY_ANALYSIS_HANDOFF_ENABLED = 'false';
-    process.env.ALOWARE_REPORT_CANVAS_ID = '';
-    process.env.ALOWARE_REPORT_ARCHIVE_CANVAS_ID = '';
-    process.env.ALOWARE_REPORT_HISTORY_LOOKBACK_DAYS = '45';
-    delete process.env.ALOWARE_REPORT_CANVAS_TITLE;
-    delete process.env.ALOWARE_REPORT_ARCHIVE_CANVAS_TITLE;
     process.env.ALLOW_BOT_APP_MENTIONS = 'false';
     process.env.ALLOWED_BOT_MENTION_IDS = '';
     fakeLogger.resetCalls();
@@ -72,7 +66,7 @@ describe('app mention events', () => {
 
     await appMentionCallback(buildArguments({}));
 
-    assert(historySpy.mock.callCount() === 1);
+    assert(historySpy.mock.callCount() >= 1);
     assert(postSpy.mock.callCount() >= 1);
     const callArgs = postSpy.mock.calls[0].arguments[0] as {
       channel?: string;
@@ -85,6 +79,30 @@ describe('app mention events', () => {
     assert.equal(callArgs.thread_ts, fakeEvent.ts);
     assert.equal(callArgs.reply_broadcast, false);
     assert(callArgs.text?.includes('*SMS Insights Core KPI Report*'));
+  });
+
+  it('should post daily summary blocks before detail report', async () => {
+    const historySpy = mock.method(fakeClient.conversations, 'history', async () => ({
+      ok: true,
+      messages: [],
+      response_metadata: { next_cursor: '' },
+    }));
+    const postSpy = mock.method(fakeClient.chat, 'postMessage', async () => ({ ok: true, ts: '1730000001.000100' }));
+
+    await appMentionCallback(
+      buildArguments({
+        event: {
+          ...fakeEvent,
+          text: '<@UAPP123> daily report',
+        },
+      }),
+    );
+
+    assert(historySpy.mock.callCount() >= 1);
+    assert(postSpy.mock.callCount() >= 2);
+    const firstCall = postSpy.mock.calls[0].arguments[0] as { blocks?: unknown[]; text?: string };
+    assert(Array.isArray(firstCall.blocks));
+    assert(firstCall.text?.includes('Daily SMS Snapshot'));
   });
 
   it('should ignore bot-generated mention events', async () => {
@@ -190,153 +208,6 @@ describe('app mention events', () => {
     assert.equal(callArgs.thread_ts, fakeEvent.ts);
     assert.equal(callArgs.reply_broadcast, false);
     assert.equal(callArgs.text, 'Reply generation is disabled for this channel.');
-  });
-
-  it('should append daily report output to canvas when configured', async () => {
-    process.env.ALOWARE_REPORT_CANVAS_ID = 'F099CANVAS';
-
-    mock.method(fakeClient.conversations, 'history', async () => ({
-      ok: true,
-      messages: [
-        {
-          ts: '1730000001.000100',
-          thread_ts: '1730000001.000100',
-          text: 'An agent has sent an SMS ContactTaylor (+1 555-222-2222) Message Want to book a strategy call?',
-        },
-        {
-          ts: '1730000002.000100',
-          thread_ts: '1730000001.000100',
-          text: 'An agent has received an SMS ContactTaylor (+1 555-222-2222) Message Yes, I am free Friday.',
-        },
-      ],
-      response_metadata: { next_cursor: '' },
-    }));
-    const postSpy = mock.method(fakeClient.chat, 'postMessage', async () => ({ ok: true }));
-    const apiCallSpy = mock.method(fakeClient, 'apiCall', async (method: string) => {
-      if (method === 'canvases.sections.lookup') {
-        return { ok: true, sections: [] };
-      }
-      return { ok: true };
-    });
-
-    await appMentionCallback(
-      buildArguments({
-        event: {
-          ...fakeEvent,
-          text: '<@UAPP123> daily report',
-        },
-      }),
-    );
-
-    assert(postSpy.mock.callCount() >= 1);
-    assert(apiCallSpy.mock.callCount() >= 1);
-    const editCall = apiCallSpy.mock.calls.find((call) => call.arguments[0] === 'canvases.edit');
-    assert(editCall);
-    const payload = editCall.arguments[1] as { canvas_id?: string };
-    assert.equal(payload.canvas_id, 'F099CANVAS');
-  });
-
-  it('should append daily report summary to separate summary canvas when enabled', async () => {
-    process.env.ALOWARE_REPORT_CANVAS_ID = 'F099CANVAS';
-    process.env.ALOWARE_SUMMARY_CANVAS_ENABLED = 'true';
-    process.env.ALOWARE_SUMMARY_CANVAS_ID = 'FSUMCANVAS';
-    process.env.ALOWARE_SUMMARY_CANVAS_LOOKUP_PERMALINK = 'false';
-
-    mock.method(fakeClient.conversations, 'history', async () => ({
-      ok: true,
-      messages: [
-        {
-          ts: '1730000001.000100',
-          thread_ts: '1730000001.000100',
-          text: 'An agent has sent an SMS ContactTaylor (+1 555-222-2222) Message Want to book a strategy call?',
-        },
-        {
-          ts: '1730000002.000100',
-          thread_ts: '1730000001.000100',
-          text: 'An agent has received an SMS ContactTaylor (+1 555-222-2222) Message Yes, I am free Friday.',
-        },
-      ],
-      response_metadata: { next_cursor: '' },
-    }));
-    mock.method(fakeClient.chat, 'postMessage', async () => ({ ok: true, ts: '1730000003.000100' }));
-    const apiCallSpy = mock.method(fakeClient, 'apiCall', async (method: string) => {
-      if (method === 'canvases.sections.lookup') {
-        return { ok: true, sections: [] };
-      }
-      return { ok: true };
-    });
-
-    await appMentionCallback(
-      buildArguments({
-        event: {
-          ...fakeEvent,
-          text: '<@UAPP123> daily report',
-        },
-      }),
-    );
-
-    const editCalls = apiCallSpy.mock.calls.filter((call) => call.arguments[0] === 'canvases.edit');
-    assert(editCalls.length > 0);
-    const summaryCanvasCall = editCalls.find((call) => {
-      const payload = call.arguments[1] as { canvas_id?: string };
-      return payload.canvas_id === 'FSUMCANVAS';
-    });
-    assert(summaryCanvasCall);
-  });
-
-  it('should look up canvas by title when canvas id is not configured', async () => {
-    process.env.ALOWARE_REPORT_CANVAS_ID = '';
-    process.env.ALOWARE_REPORT_CANVAS_TITLE = 'Analysis Log Report';
-
-    mock.method(fakeClient.conversations, 'history', async () => ({
-      ok: true,
-      messages: [
-        {
-          ts: '1730000001.000100',
-          thread_ts: '1730000001.000100',
-          text: 'An agent has sent an SMS ContactTaylor (+1 555-222-2222) Message Want to book a strategy call?',
-        },
-        {
-          ts: '1730000002.000100',
-          thread_ts: '1730000001.000100',
-          text: 'An agent has received an SMS ContactTaylor (+1 555-222-2222) Message Yes, I am free Friday.',
-        },
-      ],
-      response_metadata: { next_cursor: '' },
-    }));
-    const filesListSpy = mock.method(fakeClient.files, 'list', async () => ({
-      ok: true,
-      files: [
-        {
-          id: 'F_LOOKUP',
-          title: 'Analysis Log Report',
-        },
-      ],
-    }));
-    const postSpy = mock.method(fakeClient.chat, 'postMessage', async () => ({ ok: true }));
-    const apiCallSpy = mock.method(fakeClient, 'apiCall', async (method: string) => {
-      if (method === 'canvases.sections.lookup') {
-        return { ok: true, sections: [] };
-      }
-      return { ok: true };
-    });
-
-    await appMentionCallback(
-      buildArguments({
-        event: {
-          ...fakeEvent,
-          text: '<@UAPP123> daily report',
-        },
-      }),
-    );
-
-    assert(postSpy.mock.callCount() >= 1);
-    assert(filesListSpy.mock.callCount() === 1);
-    assert(apiCallSpy.mock.callCount() >= 1);
-    const editCall = apiCallSpy.mock.calls.find((call) => call.arguments[0] === 'canvases.edit');
-    assert(editCall);
-    const payload = editCall.arguments[1] as { canvas_id?: string };
-    assert.equal(payload.canvas_id, 'F_LOOKUP');
   });
 
   it('should log errors from chat post', async () => {

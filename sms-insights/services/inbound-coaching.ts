@@ -1,52 +1,39 @@
-import type { Logger } from "@slack/bolt";
-import { WebClient } from "@slack/web-api";
-import type { AlowareMessageFields } from "./aloware-parser.js";
+import type { Logger } from '@slack/bolt';
+import type { WebClient } from '@slack/web-api';
+import { generateAiResponse } from './ai-response.js';
+import type { AlowareMessageFields } from './aloware-parser.js';
 
-const INBOUND_COACHING_MARKER = "*Inbound Lead Response Suggestion*";
+const INBOUND_COACHING_MARKER = '*Inbound Lead Analysis*';
+const DEFAULT_INBOUND_COACHING_ENABLED = false;
+const OPENAI_MISSING_KEY_MESSAGE = 'Set OPENAI_API_KEY in your environment to enable AI replies.';
 
-type AssistantTarget = {
-  label: string;
-  userId: string;
+const parseBoolean = (value: string | undefined, fallback: boolean): boolean => {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  return normalized === 'true' || (normalized !== 'false' && fallback);
 };
 
-type PostingClient = {
-  client: WebClient;
-  source: "bot" | "user";
+const isInboundCoachingEnabled = (): boolean => {
+  return parseBoolean(process.env.ALOWARE_INBOUND_COACHING_ENABLED, DEFAULT_INBOUND_COACHING_ENABLED);
 };
 
-const getAssistantTargets = (): AssistantTarget[] => {
-  const claudeId = process.env.CLAUDE_ASSISTANT_USER_ID?.trim() || "";
-  const chatgptId = process.env.CHATGPT_ASSISTANT_USER_ID?.trim() || "";
-  const targets: AssistantTarget[] = [];
-  if (claudeId) targets.push({ label: "Claude", userId: claudeId });
-  if (chatgptId) targets.push({ label: "ChatGPT", userId: chatgptId });
-  return targets;
-};
-
-const buildCoachingPrompt = ({
-  assistant,
-  messageBody,
-  contactName,
-  assigneeUserId,
-}: {
-  assistant: AssistantTarget;
-  messageBody: string;
-  contactName: string;
-  assigneeUserId?: string;
-}): string => {
-  const assigneeTag = assigneeUserId ? `<@${assigneeUserId}>` : "the team";
+const buildCoachingPrompt = ({ messageBody, contactName }: { messageBody: string; contactName: string }): string => {
   return [
-    INBOUND_COACHING_MARKER,
-    `Hey <@${assistant.userId}>, acts as a high-performance sales coach for ${assigneeTag}.`,
-    `A "Hot Lead" (${contactName}) just messaged us. Give us the best direct-response script to secure a strategy call booking.`,
-    "",
-    "*Lead's Message:*",
-    `> "${messageBody}"`,
-    "",
-    "*Format:*",
-    "*Recommended Script:* <exact text for the setter to copy/paste>",
-    "*Psychological Trigger:* <why this conversational pivot converts>",
-  ].join("\n");
+    'You are a sales strategy analyst for Physical Therapy Biz.',
+    'Write an INTERNAL coaching note only.',
+    'Do not write an exact message script and do not use quotation marks with send-ready copy.',
+    'Do not mention AI, assistants, models, prompts, or tooling.',
+    'Keep it concise and practical.',
+    '',
+    `Lead: ${contactName}`,
+    `Inbound message: "${messageBody}"`,
+    '',
+    'Return exactly this format:',
+    'Lead Intent: <one sentence>',
+    'Conversion Direction: <one sentence>',
+    'Risk To Avoid: <one sentence>',
+    'Next Action: <one sentence>',
+  ].join('\n');
 };
 
 export const requestInboundCoaching = async ({
@@ -64,31 +51,31 @@ export const requestInboundCoaching = async ({
   channelId: string;
   assigneeUserId?: string;
 }): Promise<void> => {
-  const assistants = getAssistantTargets();
-  if (assistants.length === 0) return;
+  if (!isInboundCoachingEnabled()) return;
+  if (fields.direction !== 'inbound') return;
 
-  const assistant =
-    assistants.find((a) => a.label === "Claude") || assistants[0];
-  const userToken = process.env.SLACK_USER_TOKEN?.trim() || "";
-  const pClient = userToken ? new WebClient(userToken) : client;
-
-  const text = buildCoachingPrompt({
-    assistant,
+  const prompt = buildCoachingPrompt({
     messageBody: fields.body,
     contactName: fields.contactName,
-    assigneeUserId,
   });
 
   try {
-    await pClient.chat.postMessage({
+    const analysis = (await generateAiResponse(prompt)).trim();
+    if (!analysis || analysis === OPENAI_MISSING_KEY_MESSAGE) {
+      logger.warn('Inbound coaching skipped: OpenAI is not configured.');
+      return;
+    }
+
+    const assigneeLine = assigneeUserId ? `Owner: <@${assigneeUserId}>` : 'Owner: team';
+    const text = [INBOUND_COACHING_MARKER, `Lead: ${fields.contactName}`, assigneeLine, '', analysis].join('\n');
+
+    await client.chat.postMessage({
       channel: channelId,
       thread_ts: ts,
       text,
-      link_names: true,
+      link_names: Boolean(assigneeUserId),
     });
-    logger.info(
-      `Inbound coaching requested for ${fields.contactName} from ${assistant.label}`,
-    );
+    logger.info(`Inbound coaching posted for ${fields.contactName}`);
   } catch (error) {
     logger.error(`Failed to post inbound coaching: ${error}`);
   }

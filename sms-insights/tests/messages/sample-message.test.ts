@@ -37,14 +37,11 @@ describe('messages', () => {
     __resetLeadWatcherMessageCacheForTests();
     process.env.ALLOWED_CHANNEL_IDS = 'C1234';
     process.env.ALOWARE_CHANNEL_ID = 'C1234';
-    process.env.ALOWARE_CANVAS_DURABLE_MODE = 'false';
     process.env.ALOWARE_WATCHER_ENABLED = 'true';
     process.env.ALOWARE_WATCHER_BRANDON_USER_ID = 'UBRANDON';
     process.env.ALOWARE_WATCHER_JACK_USER_ID = 'UJACK';
     process.env.ALOWARE_WATCHER_DEFAULT_ASSIGNEE = 'brandon';
-    process.env.ALOWARE_SUMMARY_CANVAS_ENABLED = 'true';
-    process.env.ALOWARE_SUMMARY_CANVAS_ID = 'FSUM123';
-    process.env.ALOWARE_SUMMARY_CANVAS_LOOKUP_PERMALINK = 'false';
+    process.env.ALOWARE_WATCHER_REQUIRE_OWNER_HINT = 'false';
     process.env.ALOWARE_DAILY_ANALYSIS_HANDOFF_ENABLED = 'false';
     fakeLogger.resetCalls();
   });
@@ -130,49 +127,4 @@ describe('messages', () => {
     assert.equal(postSpy.mock.callCount(), 1);
   });
 
-  it('should write daily snapshot replies to summary canvas as compact daily summaries', async () => {
-    mock.method(fakeClient.chat, 'postMessage', async () => ({ ok: true }));
-    const apiCallSpy = mock.method(fakeClient, 'apiCall', async (method: string) => {
-      if (method === 'canvases.sections.lookup') {
-        return { ok: true, sections: [] };
-      }
-      return { ok: true };
-    });
-
-    await sampleMessageCallback(
-      buildArguments({
-        event: {
-          channel: 'C1234',
-          ts: '171234.006',
-          thread_ts: '171234.001',
-          user: 'U_SMS_INSIGHTS',
-          text: [
-            '*PT BIZ - DAILY SMS SNAPSHOT*',
-            '*Rep: Jack Licata*',
-            '- Outbound Conversations: 26',
-            '- Bookings: 1',
-            '- Opt Outs: 1',
-            '*Sequence Specific KPIs (24h)*',
-            '- Alpha Sequence: sent 26, replies received 2 (7.7% response rate), bookings 1 (3.8% per conversation), opt-outs 1 (3.8%)',
-          ].join('\n'),
-        },
-      }),
-    );
-
-    const editCalls = apiCallSpy.mock.calls.filter((call) => call.arguments[0] === 'canvases.edit');
-    assert(editCalls.length > 0);
-
-    const summaryInsertCall = editCalls.find((call) => {
-      const payload = call.arguments[1] as
-        | { canvas_id?: string; changes?: Array<{ document_content?: { markdown?: string } }> }
-        | undefined;
-      const markdown = payload?.changes?.[0]?.document_content?.markdown || '';
-      return (
-        payload?.canvas_id === 'FSUM123' &&
-        markdown.includes('Daily Report Summary') &&
-        markdown.includes('Messages sent:')
-      );
-    });
-    assert(summaryInsertCall);
-  });
 });

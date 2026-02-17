@@ -17,8 +17,8 @@ const DAILY_REPORT_TEXT = [
   '- Bookings: 1',
   '- Opt Outs: 1',
   '*Sequence Specific KPIs (24h)*',
-  '- Alpha Sequence: sent 12, replies received 2 (16.7% response rate), bookings 1 (8.3% per conversation), opt-outs 1 (8.3%)',
-  '- Beta Sequence: sent 8, replies received 0 (0.0% response rate), bookings 0 (0.0% per conversation), opt-outs 0 (0.0%)',
+  '- Alpha Sequence: sent 12, replies received 2 (16.7% response rate), bookings 1 (50.0% close rate (1/2 replied)), opt-outs 1 (8.3%)',
+  '- Beta Sequence: sent 8, replies received 0 (0.0% response rate), bookings 0 (n/a close rate (0 replies)), opt-outs 0 (0.0%)',
   '',
   '*Rep: Jack Licata*',
   '- Line: Main',
@@ -28,8 +28,8 @@ const DAILY_REPORT_TEXT = [
   '- Bookings: 0',
   '- Opt Outs: 0',
   '*Sequence Specific KPIs (24h)*',
-  '- Alpha Sequence: sent 4, replies received 0 (0.0% response rate), bookings 0 (0.0% per conversation), opt-outs 0 (0.0%)',
-  '- Gamma Sequence: sent 2, replies received 0 (0.0% response rate), bookings 0 (0.0% per conversation), opt-outs 0 (0.0%)',
+  '- Alpha Sequence: sent 4, replies received 0 (0.0% response rate), bookings 0 (n/a close rate (0 replies)), opt-outs 0 (0.0%)',
+  '- Gamma Sequence: sent 2, replies received 0 (0.0% response rate), bookings 0 (n/a close rate (0 replies)), opt-outs 0 (0.0%)',
 ].join('\n');
 
 describe('daily report summary', () => {

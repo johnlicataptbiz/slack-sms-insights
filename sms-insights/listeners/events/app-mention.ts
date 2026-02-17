@@ -1,24 +1,16 @@
-import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from "@slack/bolt";
-import { generateAiResponse } from "../../services/ai-response.js";
-import { buildAlowareAnalyticsReport } from "../../services/aloware-analytics.js";
-import {
-  isAlowareChannel,
-  isReplyGenerationRequest,
-  REPLY_BLOCKED_MESSAGE,
-} from "../../services/aloware-policy.js";
-import { appendDailyReportToCanvas } from "../../services/canvas-log.js";
-import { isChannelAllowed } from "../../services/channel-access.js";
-import {
-  buildDailyReportSummary,
-  isDailySnapshotReport,
-} from "../../services/daily-report-summary.js";
-import { appendAssistantSummaryToCanvas } from "../../services/summary-canvas.js";
-import { requestDailyAnalysisHandoff } from "../../services/daily-analysis-handoff.js";
-import { timeOperation } from "../../services/telemetry.js";
-import { auditCanvasStructure } from "../../services/canvas-governance.js";
+import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from '@slack/bolt';
+import { generateAiResponse } from '../../services/ai-response.js';
+import { buildAlowareAnalyticsReportBundle, buildDailySnapshotBlocks } from '../../services/aloware-analytics.js';
+import { isAlowareChannel, isReplyGenerationRequest, REPLY_BLOCKED_MESSAGE } from '../../services/aloware-policy.js';
+import { isChannelAllowed } from '../../services/channel-access.js';
+import { requestDailyAnalysisHandoff } from '../../services/daily-analysis-handoff.js';
+import { buildDailyReportSummary, isDailySnapshotReport } from '../../services/daily-report-summary.js';
+import { timeOperation } from '../../services/telemetry.js';
+
+const SLACK_TEXT_CHUNK_LIMIT = 3500;
 
 const removeMentions = (text: string): string => {
-  return text.replace(/<@[^>]+>/g, "").trim();
+  return text.replace(/<@[^>]+>/g, '').trim();
 };
 
 type AppMentionConfig = {
@@ -33,11 +25,9 @@ type AppMentionConfig = {
 let cachedConfig: AppMentionConfig | undefined;
 
 const getAppMentionConfig = (): AppMentionConfig => {
-  const rawAllowBotMentions =
-    process.env.ALLOW_BOT_APP_MENTIONS?.trim().toLowerCase() || "";
-  const rawAllowedBotIds = process.env.ALLOWED_BOT_MENTION_IDS?.trim() || "";
-  const rawBroadcastReplies =
-    process.env.ALOWARE_BROADCAST_THREAD_REPLIES?.trim().toLowerCase() || "";
+  const rawAllowBotMentions = process.env.ALLOW_BOT_APP_MENTIONS?.trim().toLowerCase() || '';
+  const rawAllowedBotIds = process.env.ALLOWED_BOT_MENTION_IDS?.trim() || '';
+  const rawBroadcastReplies = process.env.ALOWARE_BROADCAST_THREAD_REPLIES?.trim().toLowerCase() || '';
 
   if (
     cachedConfig &&
@@ -52,16 +42,14 @@ const getAppMentionConfig = (): AppMentionConfig => {
     rawAllowBotMentions,
     rawAllowedBotIds,
     rawBroadcastReplies,
-    allowMentionsFromBots: rawAllowBotMentions
-      ? rawAllowBotMentions === "true"
-      : true,
+    allowMentionsFromBots: rawAllowBotMentions ? rawAllowBotMentions === 'true' : true,
     allowedBotIds: new Set(
       rawAllowedBotIds
-        .split(",")
+        .split(',')
         .map((value) => value.trim())
         .filter((value) => value.length > 0),
     ),
-    shouldBroadcastReplies: rawBroadcastReplies === "true",
+    shouldBroadcastReplies: rawBroadcastReplies === 'true',
   };
 
   return cachedConfig;
@@ -79,17 +67,66 @@ const shouldBroadcastReplies = (): boolean => {
   return getAppMentionConfig().shouldBroadcastReplies;
 };
 
+const splitSlackText = (text: string, maxLen = SLACK_TEXT_CHUNK_LIMIT): string[] => {
+  const normalized = text.replaceAll('\r', '').trim();
+  if (normalized.length <= maxLen) {
+    return [normalized];
+  }
+
+  const chunks: string[] = [];
+  let current = '';
+  const paragraphs = normalized.split('\n\n');
+
+  const flushCurrent = () => {
+    if (current.trim().length > 0) {
+      chunks.push(current.trimEnd());
+      current = '';
+    }
+  };
+
+  for (const paragraph of paragraphs) {
+    const candidate = current.length > 0 ? `${current}\n\n${paragraph}` : paragraph;
+    if (candidate.length <= maxLen) {
+      current = candidate;
+      continue;
+    }
+
+    flushCurrent();
+
+    if (paragraph.length <= maxLen) {
+      current = paragraph;
+      continue;
+    }
+
+    let remaining = paragraph;
+    while (remaining.length > maxLen) {
+      const window = remaining.slice(0, maxLen);
+      const lineSplit = window.lastIndexOf('\n');
+      const wordSplit = window.lastIndexOf(' ');
+      const splitAt = Math.max(lineSplit, wordSplit);
+      const cut = splitAt > Math.floor(maxLen * 0.6) ? splitAt : maxLen;
+      chunks.push(remaining.slice(0, cut).trimEnd());
+      remaining = remaining.slice(cut).trimStart();
+    }
+    current = remaining;
+  }
+
+  flushCurrent();
+
+  if (chunks.length <= 1) {
+    return chunks.length === 1 ? chunks : [normalized];
+  }
+
+  return chunks.map((chunk, index) => `*Report chunk ${index + 1}/${chunks.length}*\n${chunk}`);
+};
+
 const appMentionCallback = async ({
   client,
   event,
   logger,
-}: AllMiddlewareArgs & SlackEventMiddlewareArgs<"app_mention">) => {
+}: AllMiddlewareArgs & SlackEventMiddlewareArgs<'app_mention'>) => {
   try {
-    if (
-      "bot_id" in event &&
-      typeof event.bot_id === "string" &&
-      !shouldAllowBotMention(event.bot_id)
-    ) {
+    if ('bot_id' in event && typeof event.bot_id === 'string' && !shouldAllowBotMention(event.bot_id)) {
       return;
     }
 
@@ -99,8 +136,7 @@ const appMentionCallback = async ({
 
     const isAloware = isAlowareChannel(event.channel);
     const threadTs = event.thread_ts || event.ts;
-    const shouldBroadcastThreadReply =
-      isAloware && Boolean(threadTs) && shouldBroadcastReplies();
+    const shouldBroadcastThreadReply = isAloware && Boolean(threadTs) && shouldBroadcastReplies();
     const prompt = removeMentions(event.text);
     if (isAloware && isReplyGenerationRequest(prompt)) {
       await client.chat.postMessage({
@@ -112,113 +148,80 @@ const appMentionCallback = async ({
       return;
     }
 
-    // --- Maintenance & Governance Command ---
-    if (
-      prompt.toLowerCase().includes("maintenance") ||
-      prompt.toLowerCase().includes("audit")
-    ) {
-      await client.chat.postMessage({
-        channel: event.channel,
-        thread_ts: threadTs,
-        text: "🛡️ *Starting Canvas Governance Audit...* I will verify structural integrity and repair any managed sections.",
-      });
+    let reportText = '';
+    let summaryBlocks: ReturnType<typeof buildDailySnapshotBlocks> | undefined;
 
-      const result = await auditCanvasStructure({
-        client,
+    if (isAloware) {
+      const reportBundle = (await timeOperation({
         logger,
-        channelId: event.channel,
-      });
-
-      await client.chat.postMessage({
-        channel: event.channel,
-        thread_ts: threadTs,
-        text: `✅ *Audit Complete.*\n- Summary Canvas: ${result.summaryCanvasOk ? "OK / Repaired" : "FAILED"}\n- Report Canvas: ${result.reportCanvasOk ? "OK / Repaired" : "FAILED"}`,
-      });
-      return;
-    }
-
-    const answer = isAloware
-      ? await timeOperation({
-          logger,
-          name: "app_mention.generate_aloware_report",
-          context: {
-            channel_id: event.channel,
-          },
-          fn: async () =>
-            buildAlowareAnalyticsReport({
-              channelId: event.channel,
-              client,
-              logger,
-              prompt,
-            }),
-        })
-      : await timeOperation({
-          logger,
-          name: "app_mention.generate_openai_response",
-          context: {
-            channel_id: event.channel,
-          },
-          fn: async () =>
-            generateAiResponse(prompt || "Say hello in one sentence."),
-        });
-
-    const postResult = (await timeOperation({
-      logger,
-      name: "app_mention.post_message",
-      context: {
-        channel_id: event.channel,
-        is_aloware: isAloware,
-      },
-      fn: async () =>
-        client.chat.postMessage({
-          channel: event.channel,
-          thread_ts: threadTs,
-          reply_broadcast: shouldBroadcastThreadReply,
-          text: answer,
-        }),
-    })) as { ts?: string };
-
-    await timeOperation({
-      logger,
-      name: "app_mention.canvas_sync",
-      context: {
-        channel_id: event.channel,
-        is_aloware: isAloware,
-      },
-      fn: async () =>
-        appendDailyReportToCanvas({
-          client,
-          logger,
-          channelId: event.channel,
-          prompt,
-          report: answer,
-          reportMessageTs: postResult.ts,
-        }),
-    });
-
-    if (isAloware && isDailySnapshotReport(answer)) {
-      const summaryTs = postResult.ts || `${Date.now() / 1000}`;
-      const summaryText = buildDailyReportSummary(answer);
-      await timeOperation({
-        logger,
-        name: "app_mention.summary_canvas_sync",
+        name: 'app_mention.generate_aloware_report',
         context: {
           channel_id: event.channel,
         },
         fn: async () =>
-          appendAssistantSummaryToCanvas({
+          buildAlowareAnalyticsReportBundle({
+            channelId: event.channel,
             client,
             logger,
-            message: {
-              assistantLabel: "Daily Report Summary",
-              channelId: event.channel,
-              text: summaryText,
-              threadTs: threadTs || summaryTs,
-              ts: summaryTs,
-            },
+            prompt,
           }),
-      });
+      })) as Awaited<ReturnType<typeof buildAlowareAnalyticsReportBundle>>;
 
+      reportText = reportBundle.reportText;
+      if (reportBundle.summary) {
+        summaryBlocks = buildDailySnapshotBlocks(reportBundle.summary);
+      }
+    } else {
+      reportText = await timeOperation({
+        logger,
+        name: 'app_mention.generate_openai_response',
+        context: {
+          channel_id: event.channel,
+        },
+        fn: async () => generateAiResponse(prompt || 'Say hello in one sentence.'),
+      });
+    }
+
+    const responseChunks = isAloware ? splitSlackText(reportText) : [reportText];
+
+    const postResult = (await timeOperation({
+      logger,
+      name: 'app_mention.post_message',
+      context: {
+        channel_id: event.channel,
+        is_aloware: isAloware,
+      },
+      fn: async () => {
+        let firstTs = '';
+        if (summaryBlocks) {
+          const summaryPost = await client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: threadTs,
+            reply_broadcast: shouldBroadcastThreadReply,
+            text: 'Daily SMS Snapshot',
+            blocks: summaryBlocks,
+          });
+          if (!firstTs && summaryPost.ts) {
+            firstTs = summaryPost.ts;
+          }
+        }
+        for (const [index, chunk] of responseChunks.entries()) {
+          const posted = await client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: threadTs,
+            reply_broadcast: shouldBroadcastThreadReply && !summaryBlocks && index === 0,
+            text: chunk,
+          });
+          if (!firstTs && posted.ts) {
+            firstTs = posted.ts;
+          }
+        }
+        return { ts: firstTs };
+      },
+    })) as { ts?: string };
+
+    if (isAloware && isDailySnapshotReport(reportText)) {
+      const summaryText = buildDailyReportSummary(reportText);
       const replyThread = threadTs || postResult.ts || event.ts;
       await requestDailyAnalysisHandoff({
         botClient: client,

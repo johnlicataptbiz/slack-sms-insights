@@ -16,6 +16,7 @@ describe('lead watcher service', () => {
     process.env.ALOWARE_WATCHER_BRANDON_USER_ID = 'UBRANDON';
     process.env.ALOWARE_WATCHER_JACK_USER_ID = 'UJACK';
     process.env.ALOWARE_WATCHER_DEFAULT_ASSIGNEE = 'brandon';
+    process.env.ALOWARE_WATCHER_REQUIRE_OWNER_HINT = 'false';
     process.env.ALOWARE_WATCHER_BROADCAST_ALERTS = 'false';
   });
 
@@ -38,8 +39,12 @@ describe('lead watcher service', () => {
     assert.equal(alert.signalType, 'booking');
     assert(alert.text.includes('<@UBRANDON>'));
     assert(alert.text.includes('Taylor'));
-    assert(alert.text.includes('Why flagged:'));
-    assert(alert.text.includes('Suggested next step:'));
+    const detailsText = (alert.blocks || [])
+      .filter((block) => block.type === 'section')
+      .map((block) => (block as { text?: { text?: string } }).text?.text || '')
+      .join('\n');
+    assert(detailsText.includes('Reason:'));
+    assert(detailsText.includes('Next Step:'));
   });
 
   it('should treat specific availability as booking intent even without direct booking words', () => {
@@ -51,8 +56,21 @@ describe('lead watcher service', () => {
 
     assert(alert);
     assert.equal(alert.signalType, 'booking');
-    assert(alert.text.includes('Scheduling detail detected'));
-    assert(alert.text.includes('Confirm timezone'));
+    const detailsText = (alert.blocks || [])
+      .filter((block) => block.type === 'section')
+      .map((block) => (block as { text?: { text?: string } }).text?.text || '')
+      .join('\n');
+    assert(detailsText.includes('shared specific availability'));
+  });
+
+  it('should skip booking alerts when message says the appointment is already booked', () => {
+    const alert = buildLeadWatcherAlert({
+      channelId: 'C1234',
+      ts: '171000.105',
+      text: 'An agent has received an SMS ContactMorgan (+1 555-444-4444) Message Already booked for Friday, thanks for the follow-up!',
+    });
+
+    assert.equal(alert, undefined);
   });
 
   it('should suppress negative or low-signal inbound messages', () => {
@@ -77,7 +95,26 @@ describe('lead watcher service', () => {
     const alert = buildLeadWatcherAlert({
       channelId: 'C1234',
       ts: '171000.103',
-      text: 'An agent has received an SMS User Jack Licata ContactTaylor (+1 555-222-2222) Message I can do a strategy call Tuesday.',
+      text: '',
+      attachments: [
+        {
+          title: 'An agent has received an SMS',
+          fields: [
+            {
+              title: 'Line',
+              value: "Jack's Personal Line (<tel:+1817-580-9950|+1 817-580-9950>)",
+            },
+            {
+              title: 'Contact',
+              value: 'Taylor (<tel:+15552222222|+1 555-222-2222>)',
+            },
+            {
+              title: 'Message',
+              value: 'I can do a strategy call Tuesday.',
+            },
+          ],
+        },
+      ],
     });
 
     assert(alert);

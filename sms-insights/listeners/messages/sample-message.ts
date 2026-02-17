@@ -1,33 +1,20 @@
-import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from "@slack/bolt";
-import { isAlowareChannel } from "../../services/aloware-policy.js";
-import { isChannelAllowed } from "../../services/channel-access.js";
-import { requestDailyAnalysisHandoff } from "../../services/daily-analysis-handoff.js";
-import {
-  buildDailyReportBlocks,
-  buildDailyReportSummary,
-  isDailySnapshotReport,
-} from "../../services/daily-report-summary.js";
-import {
-  getHubSpotConfig,
-  syncLeadNoteToHubSpot,
-} from "../../services/hubspot-sync.js";
+import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from '@slack/bolt';
+import { parseAlowareMessage } from '../../services/aloware-parser.js';
+import { isAlowareChannel } from '../../services/aloware-policy.js';
+import { isChannelAllowed } from '../../services/channel-access.js';
+import { requestDailyAnalysisHandoff } from '../../services/daily-analysis-handoff.js';
+import { buildDailyReportSummary, isDailySnapshotReport } from '../../services/daily-report-summary.js';
+import { getHubSpotConfig, syncLeadNoteToHubSpot } from '../../services/hubspot-sync.js';
+import { requestInboundCoaching } from '../../services/inbound-coaching.js';
 import {
   buildLeadWatcherAlert,
   getHubSpotSyncData,
   type LeadWatcherAttachment,
   shouldBroadcastLeadWatcherAlerts,
-} from "../../services/lead-watcher.js";
-import { parseAlowareMessage } from "../../services/aloware-parser.js";
-import { requestInboundCoaching } from "../../services/inbound-coaching.js";
-import { requestSetterFeedback } from "../../services/setter-feedback.js";
-import { appendAssistantSummaryToCanvas } from "../../services/summary-canvas.js";
+} from '../../services/lead-watcher.js';
+import { requestSetterFeedback } from '../../services/setter-feedback.js';
 
-const IGNORED_SUBTYPES = new Set([
-  "message_changed",
-  "message_deleted",
-  "channel_join",
-  "channel_leave",
-]);
+const IGNORED_SUBTYPES = new Set(['message_changed', 'message_deleted', 'channel_join', 'channel_leave']);
 const DEDUPE_WINDOW_SECONDS = 6 * 60 * 60;
 
 type WatchedMessageEvent = {
@@ -62,78 +49,52 @@ const sampleMessageCallback = async ({
   context,
   event,
   logger,
-}: AllMiddlewareArgs & SlackEventMiddlewareArgs<"message">) => {
+}: AllMiddlewareArgs & SlackEventMiddlewareArgs<'message'>) => {
   try {
     const message = event as unknown as WatchedMessageEvent;
     if (!isChannelAllowed(message.channel)) {
       return;
     }
-    if (
-      message.hidden ||
-      (message.subtype && IGNORED_SUBTYPES.has(message.subtype))
-    ) {
+    if (message.hidden || (message.subtype && IGNORED_SUBTYPES.has(message.subtype))) {
       return;
     }
 
     const isAloware = isAlowareChannel(message.channel);
-    const isDailySnapshot =
-      isAloware && isDailySnapshotReport(message.text || "");
-    const isFromSelf =
-      typeof context.botUserId === "string" &&
-      message.user === context.botUserId;
+    const isDailySnapshot = isAloware && isDailySnapshotReport(message.text || '');
+    const isFromSelf = typeof context.botUserId === 'string' && message.user === context.botUserId;
 
     if (isFromSelf && !isDailySnapshot) {
       return;
     }
 
     if (isAloware) {
-      const summaryText = isDailySnapshot
-        ? buildDailyReportSummary(message.text || "")
-        : message.text;
-      await appendAssistantSummaryToCanvas({
-        client,
-        logger,
-        message: {
-          assistantLabel: isDailySnapshot ? "Daily Report Summary" : undefined,
-          channelId: message.channel,
-          text: summaryText,
-          threadTs: message.thread_ts || message.ts,
-          ts: message.ts,
-          userId: message.user,
-        },
-      });
+      const channelId = message.channel;
+      if (!channelId) {
+        return;
+      }
 
       if (isDailySnapshot) {
+        const summaryText = buildDailyReportSummary(message.text || '');
         const replyThreadTs = message.thread_ts || message.ts;
         if (replyThreadTs) {
-          await client.chat.postMessage({
-            channel: message.channel!,
-            thread_ts: replyThreadTs,
-            text: "Here is today's summary statistics.",
-            blocks: buildDailyReportBlocks(message.text || ""),
-          });
-
           await requestDailyAnalysisHandoff({
             botClient: client,
-            channelId: message.channel!,
+            channelId,
             logger,
-            summaryText: summaryText || "",
+            summaryText,
             threadTs: replyThreadTs,
           });
         }
       } else {
         // 🚀 SETTER FEEDBACK (Outbound)
-        const fields = parseAlowareMessage(
-          message.text || "",
-          message.attachments,
-        );
-        if (fields.direction === "outbound" && message.ts && message.channel) {
+        const fields = parseAlowareMessage(message.text || '', message.attachments);
+        if (fields.direction === 'outbound' && message.ts && message.channel) {
           await requestSetterFeedback({
             client,
             fields,
             logger,
             ts: message.ts,
-            channelId: message.channel,
+            channelId,
           });
         }
       }
@@ -199,10 +160,7 @@ const sampleMessageCallback = async ({
 
       // 🚀 INBOUND COACHING for Hot Leads
       if (alert.channelId && message.ts) {
-        const fields = parseAlowareMessage(
-          message.text || "",
-          message.attachments,
-        );
+        const fields = parseAlowareMessage(message.text || '', message.attachments);
         await requestInboundCoaching({
           client,
           fields,

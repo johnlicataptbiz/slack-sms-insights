@@ -4,6 +4,7 @@ import type { WebClient } from '@slack/web-api';
 import {
   __resetAlowareAnalyticsCachesForTests,
   buildAlowareAnalyticsReport,
+  buildAlowareAnalyticsReportBundle,
 } from '../../services/aloware-analytics.js';
 
 type MockHistoryMessage = {
@@ -28,6 +29,8 @@ const buildClient = (messages: MockHistoryMessage[]): WebClient => {
   } as unknown as WebClient;
 };
 
+const toSlackTs = (unixSeconds: number): string => `${unixSeconds}.000100`;
+
 describe('aloware analytics', () => {
   beforeEach(() => {
     mock.restoreAll();
@@ -35,8 +38,12 @@ describe('aloware analytics', () => {
     process.env.ALOWARE_TRACKED_KEYWORDS = 'yes,maybe';
     process.env.ALOWARE_ANALYTICS_CACHE_TTL_SECONDS = '45';
     process.env.ALOWARE_ANALYTICS_CACHE_MAX_STALE_SECONDS = '300';
+    process.env.ALOWARE_SEQUENCE_ATTRIBUTION_LOOKBACK_DAYS = '30';
     process.env.ALOWARE_INBOUND_PATTERN = '\\b(has\\s+received\\s+an\\s+sms|received\\s+an\\s+sms|inbound|incoming)\\b';
     process.env.ALOWARE_OUTBOUND_PATTERN = '\\b(has\\s+sent\\s+an\\s+sms|sent\\s+an\\s+sms|outbound|outgoing)\\b';
+    delete process.env.ALOWARE_REPORT_TIMEZONE;
+    delete process.env.ALOWARE_DAILY_WINDOW_START_HOUR;
+    delete process.env.ALOWARE_DAILY_WINDOW_END_HOUR;
   });
 
   it('should return operator dashboard summary sections', async () => {
@@ -63,12 +70,11 @@ describe('aloware analytics', () => {
     });
 
     assert(report.includes('*SMS Insights Core KPI Report*'));
-    assert(report.includes('*1) REQUIRED: REPLY RATES BY MESSAGE (7d)*'));
-    assert(report.includes('*2) REQUIRED: PERFORMANCE BY SEQUENCE WITH 7-DAY TOTALS*'));
-    assert(report.includes('*3) REQUIRED: BOOKING CONVERSION BY MESSAGE STRUCTURE (7d)*'));
-    assert(report.includes('*4) REQUIRED: OPT-OUTS TIED TO CAMPAIGNS (7d)*'));
-    assert(report.includes('Outbound conversations started (7d): 2'));
-    assert(report.includes('Conversations replied (7d): 1 (50.0%)'));
+    assert(report.includes('*1) REQUIRED: REPLY RATES BY MESSAGE (24h)*'));
+    assert(report.includes('*2) REQUIRED: BOOKING CONVERSION BY MESSAGE STRUCTURE (24h)*'));
+    assert(report.includes('*3) REQUIRED: OPT-OUTS TIED TO CAMPAIGNS (24h)*'));
+    assert(report.includes('Outbound conversations started (24h): 2'));
+    assert(report.includes('Conversations replied (24h): 1 (50.0%)'));
   });
 
   it('should handle empty histories', async () => {
@@ -78,12 +84,12 @@ describe('aloware analytics', () => {
     const report = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
 
-    assert(report.includes('Outbound conversations started (7d): 0'));
-    assert(report.includes('Conversations replied (7d): 0 (0.0%)'));
-    assert(report.includes('Total opt-out conversations (7d): 0 out of 0 (0.0%)'));
+    assert(report.includes('Outbound conversations started (24h): 0'));
+    assert(report.includes('Conversations replied (24h): 0 (0.0%)'));
+    assert(report.includes('Total opt-out conversations (24h): 0 out of 0 (0.0%)'));
   });
 
   it('should return checklist format for daily report prompt', async () => {
@@ -115,9 +121,96 @@ describe('aloware analytics', () => {
     assert(report.includes('- Reply Rate:'));
     assert(report.includes('*Revenue Signal*'));
     assert(report.includes('*Top Booking Driver*'));
-    assert(report.includes('*Sequence Specific KPIs (24h)*'));
+    assert(report.includes('*Sequence Specific KPIs (Daily Window)*'));
     assert(report.includes('*Risk Signal*'));
     assert(report.includes('*Quick Take*'));
+  });
+
+  it('should treat summary prompts as daily checklist reports', async () => {
+    mock.method(Date, 'now', () => 1_730_000_000_000);
+    const client = buildClient([
+      {
+        ts: '1729999900.000100',
+        text: 'An agent has received an SMS ContactSarrah (+1 630-347-0853) Message Wednesdays are best.',
+      },
+      {
+        ts: '1729999920.000100',
+        text: 'An agent has sent an SMS ContactSarrah (+1 630-347-0853) Message Great, noted.',
+      },
+    ]);
+
+    const bundle = await buildAlowareAnalyticsReportBundle({
+      channelId: 'C09ULGH1BEC',
+      client,
+      prompt: 'summary',
+    });
+
+    assert.equal(bundle.isDaily, true);
+    assert(bundle.summary);
+    assert(bundle.reportText.includes('*PT BIZ - DAILY SMS SNAPSHOT*'));
+  });
+
+  it('should use configured daily window instead of a rolling 24h window', async () => {
+    process.env.ALOWARE_REPORT_TIMEZONE = 'UTC';
+    process.env.ALOWARE_DAILY_WINDOW_START_HOUR = '4';
+    process.env.ALOWARE_DAILY_WINDOW_END_HOUR = '23';
+
+    const nowTs = Math.floor(Date.UTC(2026, 1, 16, 20, 0, 0) / 1000);
+    mock.method(Date, 'now', () => nowTs * 1000);
+
+    const client = buildClient([
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 16, 3, 30, 0) / 1000)),
+        text: 'An agent has sent an SMS ContactOutside (+1 555-880-0001) Message Quick follow-up.',
+      },
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 16, 5, 0, 0) / 1000)),
+        text: 'An agent has sent an SMS ContactInside (+1 555-880-0002) Message Quick follow-up.',
+      },
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 16, 5, 10, 0) / 1000)),
+        text: 'An agent has received an SMS ContactInside (+1 555-880-0002) Message Wednesday works.',
+      },
+    ]);
+
+    const report = await buildAlowareAnalyticsReport({
+      channelId: 'C09ULGH1BEC',
+      client,
+      prompt: 'Please send a daily report with new inbound leads and booking requests',
+    });
+
+    assert(report.includes('Time Range: 4:00 AM - 11:00 PM (UTC)'));
+    assert(report.includes('- Outbound Conversations: 1'));
+    assert(!report.includes('- Outbound Conversations: 2'));
+  });
+
+  it('should keep booking counts scoped to outbound-started conversations', async () => {
+    process.env.ALOWARE_REPORT_TIMEZONE = 'UTC';
+    process.env.ALOWARE_DAILY_WINDOW_START_HOUR = '4';
+    process.env.ALOWARE_DAILY_WINDOW_END_HOUR = '23';
+
+    const nowTs = Math.floor(Date.UTC(2026, 1, 16, 20, 0, 0) / 1000);
+    mock.method(Date, 'now', () => nowTs * 1000);
+
+    const client = buildClient([
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 16, 10, 0, 0) / 1000)),
+        text: 'An agent has received an SMS ContactInboundOnly (+1 555-881-0001) Message Yes, please book me for Tuesday.',
+      },
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 16, 11, 0, 0) / 1000)),
+        text: 'An agent has sent an SMS ContactOutboundOnly (+1 555-881-0002) Message Quick follow-up.',
+      },
+    ]);
+
+    const report = await buildAlowareAnalyticsReport({
+      channelId: 'C09ULGH1BEC',
+      client,
+      prompt: 'Please send a daily report with new inbound leads and booking requests',
+    });
+
+    assert(report.includes('- Outbound Conversations: 1'));
+    assert(report.includes('- Bookings: 0'));
   });
 
   it('should count replies once per contact in daily sequence KPIs', async () => {
@@ -143,7 +236,7 @@ describe('aloware analytics', () => {
       prompt: 'Please send a daily report with new inbound leads and booking requests',
     });
 
-    assert(report.includes('- Replies received counts unique contacts (max 1 per conversation).'));
+    assert(report.includes('- Replies received counts unique contacts (max 1 reply per contact).'));
     assert(report.includes('No sequence (manual/direct): sent 1, replies received 1 (100.0% response rate)'));
     assert(!report.includes('No sequence (manual/direct): sent 1, replies received 2 (200.0% response rate)'));
   });
@@ -156,7 +249,7 @@ describe('aloware analytics', () => {
         text: 'An agent has sent an SMS ContactAva (+1 555-200-0001) Message Are you open to a strategy call this week?',
       },
       {
-        ts: '1729920000.000100',
+        ts: '1729999200.000100',
         text: 'An agent has received an SMS ContactAva (+1 555-200-0001) Message Stop',
       },
       {
@@ -201,12 +294,12 @@ describe('aloware analytics', () => {
 
     assert(
       report.includes(
-        'BOOK- BUYER Intro Flow: sent 2, replies received 1 (50.0% response rate), bookings 1 (100.0% per conversation), opt-outs 0 (0.0%)',
+        'BOOK- BUYER Intro Flow: sent 2, replies received 1 (50.0% response rate), bookings 1 (100.0% close rate (1/1 replied)), opt-outs 0 (0.0%)',
       ),
     );
     assert(
       !report.includes(
-        'No sequence (manual/direct): sent 1, replies received 0 (0.0% response rate), bookings 0 (0.0% per conversation), opt-outs 0 (0.0%)',
+        'No sequence (manual/direct): sent 1, replies received 0 (0.0% response rate), bookings 0 (n/a close rate (0 replies)), opt-outs 0 (0.0%)',
       ),
     );
   });
@@ -237,7 +330,7 @@ describe('aloware analytics', () => {
     assert(report.includes('- Bookings: 1'));
     assert(
       report.includes(
-        'BOOK- BUYER Intro Flow: sent 2, replies received 1 (50.0% response rate), bookings 1 (100.0% per conversation), opt-outs 0 (0.0%)',
+        'BOOK- BUYER Intro Flow: sent 2, replies received 1 (50.0% response rate), bookings 1 (100.0% close rate (1/1 replied)), opt-outs 0 (0.0%)',
       ),
     );
   });
@@ -267,6 +360,41 @@ describe('aloware analytics', () => {
 
     assert(report.includes('WORKSHOP PLAYBOOK: sent 1, replies received 1 (100.0% response rate)'));
     assert(!report.includes('No sequence (manual/direct): sent 1, replies received 1 (100.0% response rate)'));
+  });
+
+  it('should attribute booking to original sequence even when that sequence touch is older than 7 days', async () => {
+    mock.method(Date, 'now', () => 1_730_000_000_000);
+    const client = buildClient([
+      {
+        ts: '1729200000.000100',
+        text: 'An agent has sent an SMS ContactJordan (+1 555-401-1001) Sequence WORKSHOP PLAYBOOK Message Quick question before we book.',
+      },
+      {
+        ts: '1729999800.000100',
+        text: 'An agent has sent an SMS ContactJordan (+1 555-401-1001) Message Want to lock Wednesday at 10?',
+      },
+      {
+        ts: '1729999850.000100',
+        text: 'An agent has received an SMS ContactJordan (+1 555-401-1001) Message Yes Wednesday at 10 works for me.',
+      },
+    ]);
+
+    const report = await buildAlowareAnalyticsReport({
+      channelId: 'C09ULGH1BEC',
+      client,
+      prompt: 'Please send a daily report with new inbound leads and booking requests',
+    });
+
+    assert(
+      report.includes(
+        'WORKSHOP PLAYBOOK: sent 1, replies received 1 (100.0% response rate), bookings 1 (100.0% close rate (1/1 replied))',
+      ),
+    );
+    assert(
+      !report.includes(
+        'No sequence (manual/direct): sent 1, replies received 1 (100.0% response rate), bookings 1 (100.0% close rate (1/1 replied))',
+      ),
+    );
   });
 
   it('should parse attachment-based aloware events', async () => {
@@ -306,9 +434,9 @@ describe('aloware analytics', () => {
       prompt: 'keywords: strategy call',
     });
 
-    assert(report.includes('Outbound conversations started (7d): 1'));
-    assert(report.includes('Conversations replied (7d): 1 (100.0%)'));
-    assert(report.includes('*2) REQUIRED: PERFORMANCE BY SEQUENCE WITH 7-DAY TOTALS*'));
+    assert(report.includes('Outbound conversations started (24h): 1'));
+    assert(report.includes('Conversations replied (24h): 1 (100.0%)'));
+    assert(report.includes('*2) REQUIRED: BOOKING CONVERSION BY MESSAGE STRUCTURE (24h)*'));
   });
 
   it('should reuse cached history inside TTL windows', async () => {
@@ -334,13 +462,13 @@ describe('aloware analytics', () => {
     const first = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
     nowMs += 20_000;
     const second = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
 
     assert(first.includes('*SMS Insights Core KPI Report*'));
@@ -381,7 +509,7 @@ describe('aloware analytics', () => {
       prompt: 'daily report',
     });
 
-    assert.equal(historySpy.mock.callCount(), 2);
+    assert.equal(historySpy.mock.callCount(), 4);
   });
 
   it('should serve stale cached history when refresh fails within stale window', async () => {
@@ -422,17 +550,17 @@ describe('aloware analytics', () => {
     const first = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
     nowMs += 2_000;
     const second = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
 
-    assert(first.includes('Conversations replied (7d): 1 (100.0%)'));
-    assert(second.includes('Conversations replied (7d): 1 (100.0%)'));
+    assert(first.includes('Conversations replied (24h): 1 (100.0%)'));
+    assert(second.includes('Conversations replied (24h): 1 (100.0%)'));
     assert.equal(historySpy.mock.callCount(), 2);
   });
 
@@ -450,7 +578,7 @@ describe('aloware analytics', () => {
     const inboundReport = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
 
     process.env.ALOWARE_INBOUND_PATTERN = '\\bnevermatches\\b';
@@ -458,11 +586,11 @@ describe('aloware analytics', () => {
     const outboundReport = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
 
-    assert(inboundReport.includes('Outbound conversations started (7d): 0'));
-    assert(outboundReport.includes('Outbound conversations started (7d): 1'));
+    assert(inboundReport.includes('Outbound conversations started (24h): 0'));
+    assert(outboundReport.includes('Outbound conversations started (24h): 1'));
   });
 
   it('should keep sequence totals accurate when contact formatting differs', async () => {
@@ -487,6 +615,62 @@ describe('aloware analytics', () => {
     assert(report.includes('*Core Metrics*'));
     assert(report.includes('- Outbound Conversations: 1'));
     assert(report.includes('- Reply Rate: 100.0%'));
+  });
+
+  it('should merge similarly named sequences when they are not explicit A/B variants', async () => {
+    mock.method(Date, 'now', () => 1_730_000_000_000);
+    const client = buildClient([
+      {
+        ts: '1729999800.000100',
+        text: 'An agent has sent an SMS ContactTaylor (+1 555-701-0001) Sequence Workshop Playbook - 2026 v1.0 Message Quick question for you.',
+      },
+      {
+        ts: '1729999850.000100',
+        text: 'An agent has received an SMS ContactTaylor (+1 555-701-0001) Message Yes.',
+      },
+      {
+        ts: '1729999900.000100',
+        text: 'An agent has sent an SMS ContactMorgan (+1 555-701-0002) Sequence WORKSHOP PLAYBOOK Message Following up.',
+      },
+    ]);
+
+    const report = await buildAlowareAnalyticsReport({
+      channelId: 'C09ULGH1BEC',
+      client,
+      prompt: 'Please send a daily report with new inbound leads and booking requests',
+    });
+
+    assert(report.includes('Workshop Playbook: sent 2, replies received 1 (50.0% response rate)'));
+    assert(!report.includes('WORKSHOP PLAYBOOK: sent 1'));
+    assert(!report.includes('Workshop Playbook - 2026 v1.0: sent 1'));
+  });
+
+  it('should keep explicit Version A and Version B sequences separated for A/B testing', async () => {
+    mock.method(Date, 'now', () => 1_730_000_000_000);
+    const client = buildClient([
+      {
+        ts: '1729999800.000100',
+        text: 'An agent has sent an SMS ContactAlex (+1 555-702-0001) Sequence Workshop Playbook Version A Message Quick question for you.',
+      },
+      {
+        ts: '1729999850.000100',
+        text: 'An agent has received an SMS ContactAlex (+1 555-702-0001) Message Yes.',
+      },
+      {
+        ts: '1729999900.000100',
+        text: 'An agent has sent an SMS ContactRiley (+1 555-702-0002) Sequence Workshop Playbook Version B Message Quick question for you.',
+      },
+    ]);
+
+    const report = await buildAlowareAnalyticsReport({
+      channelId: 'C09ULGH1BEC',
+      client,
+      prompt: 'Please send a daily report with new inbound leads and booking requests',
+    });
+
+    assert(report.includes('Workshop Playbook - Version A: sent 1, replies received 1 (100.0% response rate)'));
+    assert(report.includes('Workshop Playbook - Version B: sent 1, replies received 0 (0.0% response rate)'));
+    assert(!report.includes('Workshop Playbook: sent 2'));
   });
 
   it('should build large reports within a conservative performance threshold', async () => {
@@ -514,7 +698,7 @@ describe('aloware analytics', () => {
     const report = await buildAlowareAnalyticsReport({
       channelId: 'C09ULGH1BEC',
       client,
-      prompt: 'summary',
+      prompt: 'kpi report',
     });
     const durationMs = performance.now() - startedAt;
 

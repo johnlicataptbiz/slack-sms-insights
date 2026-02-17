@@ -1,7 +1,7 @@
-import type { Logger } from "@slack/bolt";
-import { WebClient } from "@slack/web-api";
+import type { Logger } from '@slack/bolt';
+import { WebClient } from '@slack/web-api';
 
-const ANALYSIS_REQUEST_MARKER = "*Daily AI Analysis Request*";
+const ANALYSIS_REQUEST_MARKER = '*Daily AI Analysis Request*';
 const DEFAULT_POST_DELAY_MS = 2_000;
 const DEFAULT_HANDOFF_ENABLED = true;
 
@@ -19,38 +19,29 @@ type ThreadMessage = {
 
 type PostingClient = {
   client: WebClient;
-  source: "bot" | "user";
+  source: 'bot' | 'user';
 };
 
-const parseBoolean = (
-  value: string | undefined,
-  fallback: boolean,
-): boolean => {
+const parseBoolean = (value: string | undefined, fallback: boolean): boolean => {
   if (!value) {
     return fallback;
   }
   const normalized = value.trim().toLowerCase();
-  if (normalized === "true") {
+  if (normalized === 'true') {
     return true;
   }
-  if (normalized === "false") {
+  if (normalized === 'false') {
     return false;
   }
   return fallback;
 };
 
 const isHandoffEnabled = (): boolean => {
-  return parseBoolean(
-    process.env.ALOWARE_DAILY_ANALYSIS_HANDOFF_ENABLED,
-    DEFAULT_HANDOFF_ENABLED,
-  );
+  return parseBoolean(process.env.ALOWARE_DAILY_ANALYSIS_HANDOFF_ENABLED, DEFAULT_HANDOFF_ENABLED);
 };
 
 const getPostDelayMs = (): number => {
-  const parsed = Number.parseInt(
-    process.env.ALOWARE_DAILY_ANALYSIS_POST_DELAY_MS || "",
-    10,
-  );
+  const parsed = Number.parseInt(process.env.ALOWARE_DAILY_ANALYSIS_POST_DELAY_MS || '', 10);
   if (Number.isNaN(parsed)) {
     return DEFAULT_POST_DELAY_MS;
   }
@@ -58,41 +49,32 @@ const getPostDelayMs = (): number => {
 };
 
 const getAssistantTargets = (): AssistantTarget[] => {
-  const chatgptId = process.env.CHATGPT_ASSISTANT_USER_ID?.trim() || "";
-  const claudeId = process.env.CLAUDE_ASSISTANT_USER_ID?.trim() || "";
+  const claudeId = process.env.CLAUDE_ASSISTANT_USER_ID?.trim() || '';
 
   const targets: AssistantTarget[] = [
     {
-      label: "Claude",
+      label: 'Claude',
       userId: claudeId,
-    },
-    {
-      label: "ChatGPT",
-      userId: chatgptId,
     },
   ];
 
   return targets.filter((target) => target.userId.length > 0);
 };
 
-const getPostingClients = ({
-  botClient,
-}: {
-  botClient: WebClient;
-}): PostingClient[] => {
+const getPostingClients = ({ botClient }: { botClient: WebClient }): PostingClient[] => {
   const clients: PostingClient[] = [];
-  const userToken = process.env.SLACK_USER_TOKEN?.trim() || "";
+  const userToken = process.env.SLACK_USER_TOKEN?.trim() || '';
 
   if (userToken.length > 0) {
     clients.push({
       client: new WebClient(userToken),
-      source: "user",
+      source: 'user',
     });
   }
 
   clients.push({
     client: botClient,
-    source: "bot",
+    source: 'bot',
   });
 
   return clients;
@@ -108,7 +90,7 @@ const fetchThreadReplies = async ({
   threadTs: string;
 }): Promise<ThreadMessage[]> => {
   const replies: ThreadMessage[] = [];
-  let cursor = "";
+  let cursor = '';
 
   do {
     const response = await client.conversations.replies({
@@ -120,51 +102,50 @@ const fetchThreadReplies = async ({
     });
 
     replies.push(...((response.messages || []) as ThreadMessage[]));
-    cursor = response.response_metadata?.next_cursor || "";
+    cursor = response.response_metadata?.next_cursor || '';
   } while (cursor);
 
   return replies;
 };
 
-const buildPrompt = ({
-  assistant,
-  summaryText,
-}: {
-  assistant: AssistantTarget;
-  summaryText: string;
-}): string => {
+const buildPrompt = ({ assistant, summaryText }: { assistant: AssistantTarget; summaryText: string }): string => {
   return [
     ANALYSIS_REQUEST_MARKER,
-    `<@${assistant.userId}> analyze this 4:00 PM SMS snapshot and reply in this thread using the exact structure below.`,
-    "Keep it concise and tactical.",
-    "",
-    "Required output format:",
-    "*Snapshot Verdict:* <one sentence>",
-    "",
-    "*Best/Worst Sequences*",
-    "- Best: <sequence + why>",
-    "- Worst: <sequence + why>",
-    "",
-    "*Booking Conversion Moves*",
-    "- <highest-leverage message-structure adjustment>",
-    "- <second adjustment>",
-    "",
-    "*Opt-Out Watch*",
-    "- <specific risk signal to monitor tomorrow>",
-    "",
-    "*Tomorrow Plan (3 actions)*",
-    "1. <action>",
-    "2. <action>",
-    "3. <action>",
-    "",
-    "Style constraints:",
-    "- No horizontal separators or divider lines.",
-    "- No HTML entities (for example, write 'and', not '&amp;').",
-    "- No intro/outro text outside the required sections.",
-    "",
-    "Snapshot:",
+    `<@${assistant.userId}>, acts as our Physical Therapy Business Growth Analyst.`,
+    'Analyze this 4:00 PM SMS snapshot and reply in this thread using the EXACT structure below.',
+    '',
+    'CRITICAL BUSINESS RULES:',
+    '1. FOCUS: High-performance sales and lead conversion metrics.',
+    '2. SUPPRESS REPO MODE: NEVER mention repositories, code, GitHub, development, or technical tasks. This is strictly business analytics.',
+    '3. TONE: Concise, tactical, and aggressive about growth.',
+    '',
+    'Required output format:',
+    '*Snapshot Verdict:* <one sentence summary>',
+    '',
+    '*Best/Worst Sequences*',
+    "- Best: <sequence + why it's winning>",
+    "- Worst: <sequence + why it's bleeding leads>",
+    '',
+    '*Booking Conversion Moves*',
+    '- <highest-leverage messaging adjustment>',
+    '- <second tactical change>',
+    '',
+    '*Opt-Out Watch*',
+    '- <specific risk signal to track tomorrow>',
+    '',
+    '*Tomorrow Plan (3 actions)*',
+    '1. <actionable step>',
+    '2. <actionable step>',
+    '3. <actionable step>',
+    '',
+    'Style constraints:',
+    '- No horizontal separators or divider lines.',
+    '- No HTML entities (no &amp;).',
+    '- No intro/outro text.',
+    '',
+    'Snapshot Data:',
     summaryText,
-  ].join("\n");
+  ].join('\n');
 };
 
 const hasAssistantReply = ({
@@ -183,7 +164,7 @@ const hasAssistantReply = ({
     if (!message.thread_ts || message.thread_ts !== threadTs) {
       return false;
     }
-    return (message.text || "").trim().length > 0;
+    return (message.text || '').trim().length > 0;
   });
 };
 
@@ -200,11 +181,8 @@ const hasExistingRequest = ({
     if (!message.thread_ts || message.thread_ts !== threadTs) {
       return false;
     }
-    const text = message.text || "";
-    return (
-      text.includes(ANALYSIS_REQUEST_MARKER) &&
-      text.includes(`<@${assistant.userId}>`)
-    );
+    const text = message.text || '';
+    return text.includes(ANALYSIS_REQUEST_MARKER) && text.includes(`<@${assistant.userId}>`);
   });
 };
 
@@ -236,21 +214,15 @@ const postPromptWithFallback = async ({
         text,
         thread_ts: threadTs,
       });
-      logger.info(
-        `AI Handoff: ${assistant.label} tagged for daily analysis via ${source} token.`,
-      );
+      logger.info(`AI Handoff: ${assistant.label} tagged for daily analysis via ${source} token.`);
       return true;
     } catch (error) {
-      logger.warn(
-        `AI Handoff: failed via ${source} token for ${assistant.label}; trying fallback if available.`,
-      );
+      logger.warn(`AI Handoff: failed via ${source} token for ${assistant.label}; trying fallback if available.`);
       logger.error(error);
     }
   }
 
-  logger.warn(
-    `AI Handoff: unable to tag ${assistant.label} after all posting attempts.`,
-  );
+  logger.warn(`AI Handoff: unable to tag ${assistant.label} after all posting attempts.`);
   return false;
 };
 
@@ -280,9 +252,7 @@ export const requestDailyAnalysisHandoff = async ({
 
   const assistants = getAssistantTargets();
   if (assistants.length === 0) {
-    logger.warn(
-      "AI Handoff skipped: CHATGPT_ASSISTANT_USER_ID / CLAUDE_ASSISTANT_USER_ID are not configured.",
-    );
+    logger.warn('AI Handoff skipped: CLAUDE_ASSISTANT_USER_ID is not configured.');
     return;
   }
 
@@ -298,7 +268,7 @@ export const requestDailyAnalysisHandoff = async ({
       threadTs,
     });
   } catch (error) {
-    logger.warn("AI Handoff: unable to preload thread replies for dedupe.");
+    logger.warn('AI Handoff: unable to preload thread replies for dedupe.');
     logger.error(error);
   }
 
@@ -311,9 +281,7 @@ export const requestDailyAnalysisHandoff = async ({
         threadTs,
       })
     ) {
-      logger.info(
-        `AI Handoff: skipping ${assistant.label}; analysis reply already exists in thread.`,
-      );
+      logger.info(`AI Handoff: skipping ${assistant.label}; analysis reply already exists in thread.`);
       continue;
     }
 
@@ -324,9 +292,7 @@ export const requestDailyAnalysisHandoff = async ({
         threadTs,
       })
     ) {
-      logger.info(
-        `AI Handoff: skipping ${assistant.label}; existing request message already posted in thread.`,
-      );
+      logger.info(`AI Handoff: skipping ${assistant.label}; existing request message already posted in thread.`);
       continue;
     }
 

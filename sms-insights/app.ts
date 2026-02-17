@@ -1,20 +1,20 @@
-import { App, LogLevel } from "@slack/bolt";
-import "dotenv/config";
-import registerListeners from "./listeners/index.js";
-import { createServer } from "node:http";
-import { reportError } from "./services/error-reporter.js";
+import { App, LogLevel } from '@slack/bolt';
+import 'dotenv/config';
+import { createServer } from 'node:http';
+import registerListeners from './listeners/index.js';
+import { reportError } from './services/error-reporter.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 
 const getLogLevel = (): LogLevel => {
   const configured = process.env.APP_LOG_LEVEL?.trim().toUpperCase();
-  if (configured === "DEBUG") {
+  if (configured === 'DEBUG') {
     return LogLevel.DEBUG;
   }
-  if (configured === "WARN") {
+  if (configured === 'WARN') {
     return LogLevel.WARN;
   }
-  if (configured === "ERROR") {
+  if (configured === 'ERROR') {
     return LogLevel.ERROR;
   }
   return DEFAULT_APP_LOG_LEVEL;
@@ -33,25 +33,30 @@ registerListeners(app);
 
 /** Global Error Handler */
 app.error(async (error) => {
-  await reportError(app, error, "Global App Error");
+  await reportError(app, error, 'Global App Error');
 });
 
 /** Start Bolt App */
 (async () => {
   try {
     // Start a simple HTTP server FIRST for health checks (required by Railway)
-    const port = parseInt(process.env.PORT || "3000", 10);
-    createServer((req: any, res: any) => {
+    const port = Number.parseInt(process.env.PORT || '3000', 10);
+    createServer((_req, res) => {
       res.writeHead(200);
-      res.end("Health check: OK");
-    }).listen(port, "0.0.0.0", () => {
+      res.end('Health check: OK');
+    }).listen(port, '0.0.0.0', () => {
       app.logger.info(`Health check server listening on port ${port}`);
     });
 
     // Start Bolt App
     await app.start();
-    app.logger.info("⚡️ Bolt app is running via Socket Mode!");
+    app.logger.info('⚡️ Bolt app is running via Socket Mode!');
+
+    // 🕒 Schedule 4:00 PM Daily Report
+    const { scheduleDailyReport } = await import('./services/scheduler.js');
+    await scheduleDailyReport(app);
+
   } catch (error) {
-    await reportError(app, error, "Startup Failure");
+    await reportError(app, error, 'Startup Failure');
   }
 })();

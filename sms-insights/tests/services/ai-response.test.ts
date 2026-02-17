@@ -26,7 +26,15 @@ describe('ai response', () => {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ output_text: 'ok after retry' }),
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: 'ok after retry',
+              },
+            },
+          ],
+        }),
       } as Response;
     });
 

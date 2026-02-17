@@ -29,4 +29,3 @@ export const runSerializedTask = async <Result>({
     }
   }
 };
-

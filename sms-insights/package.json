@@ -7,9 +7,7 @@
   "scripts": {
     "build": "tsc",
     "build:watch": "tsc --watch",
-    "backfill:csv:canvas": "node --import tsx ./scripts/backfill-csv-canvas-7d.ts",
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
-    "canvas:guide:update": "node --import tsx ./scripts/update-guide-canvas.ts",
     "dev": "node --import tsx app.ts",
     "start": "node ./dist/app.js",
     "lint": "npx @biomejs/biome check *.ts listeners services tests",

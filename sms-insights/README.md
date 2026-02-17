@@ -31,19 +31,12 @@ To enable lead-watcher alerts in the Aloware SMS channel, set:
 - `ALOWARE_WATCHER_JACK_USER_ID=<Slack user ID>`
 - Optional: `ALOWARE_WATCHER_CHANNEL_ID=<channel ID>` to override `ALOWARE_CHANNEL_ID`
 - Optional: `ALOWARE_WATCHER_DEFAULT_ASSIGNEE=balanced|brandon|jack`
+- Optional: `ALOWARE_WATCHER_REQUIRE_OWNER_HINT=true|false` (`true` recommended so alerts only tag the line owner and never fall back)
+- Optional: `ALOWARE_INBOUND_COACHING_ENABLED=false|true` (`false` recommended to avoid public AI-style response scripting in threads)
+- Optional: `ALOWARE_SEQUENCE_ATTRIBUTION_LOOKBACK_DAYS=30` (keeps booked leads attributed to their originating sequence even after unenroll/no-sequence follow-ups)
 
-To store assistant thread summaries in a separate canvas, set:
-- `ALOWARE_SUMMARY_CANVAS_ENABLED=true`
-- Optional: `ALOWARE_SUMMARY_CANVAS_ID=<existing canvas id>` (auto-creates by title when omitted)
-- Optional: `ALOWARE_SUMMARY_CANVAS_TITLE=AI Summary Log`
-- Optional: `ALOWARE_SUMMARY_CANVAS_LOOKUP_PERMALINK=false` to skip permalink lookups
-- Ensure assistant IDs are set for matching replies:
-  - `CHATGPT_ASSISTANT_USER_ID=<user id>`
-  - `CODEX_ASSISTANT_USER_ID=<user id>`
-  - `CLAUDE_ASSISTANT_USER_ID=<user id>`
-
-Daily report runs also append an internal `Daily Report Summary` entry to this
-summary canvas, so analysis can stay off the main thread.
+AI-generated reports stay in the main channel (threaded when helpful) and are no longer persisted to a Slack canvas log.
+Optional: `ALOWARE_DAILY_ANALYSIS_HANDOFF_ENABLED=false` to stop automatic AI analysis prompt posts in daily-report threads.
 
 #### Install Dependencies
 

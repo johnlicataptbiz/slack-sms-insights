@@ -21,6 +21,26 @@ const parseBoolean = (value: string | undefined, fallback: boolean): boolean => 
   return normalized === 'true' || (normalized !== 'false' && fallback);
 };
 
+const parsePositiveInt = (value: string | undefined, fallback: number): number => {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed < 0) return fallback;
+  return parsed;
+};
+
+// In-memory dedupe cache to prevent repeated setter-feedback posts for the same
+// thread/message. Keyed by `channelId:ts`. TTL controlled by
+// ALOWARE_SETTER_FEEDBACK_DEDUPE_MINUTES (default 10 minutes).
+const setterFeedbackCache = new Map<string, number>();
+
+export const __resetSetterFeedbackCacheForTests = (): void => {
+  setterFeedbackCache.clear();
+};
+
+const getSetterFeedbackDedupeMinutes = (): number => {
+  return parsePositiveInt(process.env.ALOWARE_SETTER_FEEDBACK_DEDUPE_MINUTES, 10);
+};
+
 const isFeedbackEnabled = (): boolean => {
   return parseBoolean(process.env.ALOWARE_SETTER_FEEDBACK_ENABLED, DEFAULT_FEEDBACK_ENABLED);
 };
@@ -119,6 +139,15 @@ export const requestSetterFeedback = async ({
   const setterName = 'Jack';
   const setterUserId = process.env.ALOWARE_WATCHER_JACK_USER_ID;
 
+  const dedupeKey = `${channelId}:${ts}`;
+  const dedupeMinutes = getSetterFeedbackDedupeMinutes();
+  const now = Date.now();
+  const lastTs = setterFeedbackCache.get(dedupeKey) || 0;
+  if (now - lastTs < dedupeMinutes * 60_000) {
+    logger.info(`Setter Feedback: suppressed duplicate request for ${dedupeKey} (within ${dedupeMinutes}m).`);
+    return;
+  }
+
   const assistants = getAssistantTargets();
   if (assistants.length === 0) return;
 
@@ -142,6 +171,8 @@ export const requestSetterFeedback = async ({
         text,
         link_names: true,
       });
+      // mark dedupe on successful post
+      setterFeedbackCache.set(dedupeKey, Date.now());
       logger.info(`Setter Feedback requested for ${setterName} from ${assistant.label} via ${source}`);
       return;
     } catch (error) {

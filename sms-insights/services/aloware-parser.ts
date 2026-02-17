@@ -28,7 +28,7 @@ export const extractAttachmentField = (
   for (const attachment of attachments) {
     for (const field of attachment.fields || []) {
       const title = sanitize(field.title || '').toLowerCase();
-      if (title === target) {
+      if (title.includes(target)) {
         return sanitize(stripSlackLinkMarkup(field.value || ''));
       }
     }

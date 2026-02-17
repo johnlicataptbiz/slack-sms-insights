@@ -10,3 +10,4 @@ coverage/
 .railway/
 .vscode/
 frontend/node_modules/
+.vercel

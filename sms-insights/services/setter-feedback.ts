@@ -104,6 +104,12 @@ export const requestSetterFeedback = async ({
   if (!isFeedbackEnabled()) return;
   if (fields.direction !== 'outbound') return;
 
+  // Skip automated sequence messages — feedback is only for manual outbound messages
+  if (fields.sequence && fields.sequence.trim().length > 0) {
+    logger.info(`Setter Feedback: skipping automated sequence message (sequence=${fields.sequence}).`);
+    return;
+  }
+
   // Identify Jack only — Brandon is excluded from auto-feedback
   const userName = fields.user.toLowerCase();
   const isJack = userName.includes('jack');

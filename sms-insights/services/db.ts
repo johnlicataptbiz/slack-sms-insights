@@ -71,6 +71,22 @@ export const initializeSchema = async (): Promise<void> => {
       );
     `);
 
+    // Persistent cache for setter-feedback dedupe so suppression survives restarts.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS setter_feedback_dedupe (
+        channel_id TEXT NOT NULL,
+        thread_ts TEXT NOT NULL,
+        message_ts TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (channel_id, thread_ts)
+      );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_setter_feedback_dedupe_created_at
+      ON setter_feedback_dedupe (created_at DESC);
+    `);
+
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_daily_runs_channel_timestamp
       ON daily_runs (channel_id, timestamp DESC);

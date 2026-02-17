@@ -38,6 +38,8 @@ To enable lead-watcher alerts in the Aloware SMS channel, set:
 AI-generated reports stay in the main channel (threaded when helpful) and are no longer persisted to a Slack canvas log.
 Optional: `ALOWARE_DAILY_ANALYSIS_HANDOFF_ENABLED=false` to stop automatic AI analysis prompt posts in daily-report threads.
 
+Note: `CLAUDE_ASSISTANT_USER_ID` should point to the Slack user ID for an AI assistant (not a human/team watcher). If `CLAUDE_ASSISTANT_USER_ID` matches a configured watcher (e.g. `ALOWARE_WATCHER_JACK_USER_ID`), the app will now ignore it to avoid accidentally tagging real users.
+
 #### Install Dependencies
 
 ```sh

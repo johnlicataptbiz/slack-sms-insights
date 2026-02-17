@@ -51,6 +51,17 @@ const getPostDelayMs = (): number => {
 const getAssistantTargets = (): AssistantTarget[] => {
   const claudeId = process.env.CLAUDE_ASSISTANT_USER_ID?.trim() || '';
 
+  // If CLAUDE_ASSISTANT_USER_ID matches a configured watcher user, treat it
+  // as a misconfiguration and do NOT tag that user as the AI assistant.
+  const watcherIds = [
+    process.env.ALOWARE_WATCHER_JACK_USER_ID?.trim(),
+    process.env.ALOWARE_WATCHER_BRANDON_USER_ID?.trim(),
+  ].filter(Boolean);
+
+  if (claudeId && watcherIds.includes(claudeId)) {
+    return [];
+  }
+
   const targets: AssistantTarget[] = [
     {
       label: 'Claude',

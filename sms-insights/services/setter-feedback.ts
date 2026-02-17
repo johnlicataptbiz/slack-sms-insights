@@ -57,6 +57,13 @@ const isFeedbackEnabled = (): boolean => {
 const getAssistantTargets = (): AssistantTarget[] => {
   const claudeId = process.env.CLAUDE_ASSISTANT_USER_ID?.trim() || '';
 
+  // Defensive: treat explicit sentinel values as "disabled" so accidental
+  // mentions cannot be posted (production may set CLAUDE_ASSISTANT_USER_ID=DISABLED).
+  const sentinel = claudeId.toLowerCase();
+  if (!claudeId || sentinel === 'disabled' || sentinel === 'none' || sentinel === 'false') {
+    return [];
+  }
+
   // Protect against accidental self-tagging: if the configured Claude ID
   // matches a watcher (Jack/Brandon), do not treat it as an AI assistant.
   const watcherIds = [
@@ -64,7 +71,7 @@ const getAssistantTargets = (): AssistantTarget[] => {
     process.env.ALOWARE_WATCHER_BRANDON_USER_ID?.trim(),
   ].filter(Boolean);
 
-  if (claudeId && watcherIds.includes(claudeId)) {
+  if (watcherIds.includes(claudeId)) {
     // configured CLAUDE_ASSISTANT_USER_ID appears to be a human/watcher — ignore it
     return [];
   }

@@ -109,4 +109,28 @@ describe('setter-feedback service', () => {
 
     assert.equal(postSpy.mock.callCount(), 1);
   });
+
+  it('should NOT post feedback when CLAUDE_ASSISTANT_USER_ID is set to DISABLED', async () => {
+    __resetSetterFeedbackCacheForTests();
+    process.env.CLAUDE_ASSISTANT_USER_ID = 'DISABLED';
+    process.env.ALOWARE_SETTER_FEEDBACK_ENABLED = 'true';
+
+    const postSpy = mock.method((fakeClient as unknown as WebClient).chat, 'postMessage', async () => ({ ok: true }));
+
+    const fields = {
+      direction: 'outbound',
+      user: 'Jack',
+      body: 'Manual reply sent by Jack',
+      contactName: 'Taylor',
+      contactPhone: '+15552223333',
+      contactId: '1',
+      line: 'Line A',
+      sequence: '',
+    } as any;
+
+    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.400', channelId: 'C1234' });
+
+    // should not post because CLAUDE_ASSISTANT_USER_ID is explicitly disabled
+    assert.equal(postSpy.mock.callCount(), 0);
+  });
 });

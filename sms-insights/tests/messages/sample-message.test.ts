@@ -94,6 +94,24 @@ describe('messages', () => {
     assert.equal(postSpy.mock.callCount(), 0);
   });
 
+  it('should ignore messages posted by other apps (bot_id) except daily snapshots', async () => {
+    const postSpy = mock.method(fakeClient.chat, 'postMessage', async () => ({ ok: true }));
+
+    // app-posted outbound message with a sequence — should NOT trigger watcher/feedback
+    await sampleMessageCallback(
+      buildArguments({
+        event: {
+          channel: 'C1234',
+          ts: '171234.010',
+          bot_id: 'BAPP123',
+          text: 'An agent has sent an SMS ContactTaylor (+1 555-222-2222) Message Quick follow-up. Sequence: BOOK- BUYER',
+        },
+      }),
+    );
+
+    assert.equal(postSpy.mock.callCount(), 0);
+  });
+
   it('should log error when chat.postMessage throws', async () => {
     const testError = new Error('test exception');
     mock.method(fakeClient.chat, 'postMessage', async () => {

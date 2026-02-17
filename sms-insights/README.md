@@ -42,6 +42,8 @@ Note: `CLAUDE_ASSISTANT_USER_ID` should point to the Slack user ID for an AI ass
 
 Also: the app will now *skip* automatic setter feedback for messages that are part of an automated `Sequence` (these are typically bulk/automated messages). Setter coaching feedback only triggers for manual outbound messages.
 
+New: setter-feedback deduping — the app now suppresses duplicate setter-feedback requests for the same message/thread for `ALOWARE_SETTER_FEEDBACK_DEDUPE_MINUTES` (default 10 minutes). Set `ALOWARE_SETTER_FEEDBACK_DEDUPE_MINUTES=0` to disable dedupe.
+
 #### Install Dependencies
 
 ```sh

@@ -1,8 +1,13 @@
 import { App, LogLevel } from '@slack/bolt';
 import 'dotenv/config';
 import { createServer } from 'node:http';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import registerListeners from './listeners/index.js';
 import { reportError } from './services/error-reporter.js';
+import { initDatabase, initializeSchema } from './services/db.js';
+import { handleApiRoute } from './api/routes.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 
@@ -39,20 +44,56 @@ app.error(async (error) => {
 /** Start Bolt App */
 (async () => {
   try {
-    // Start a simple HTTP server FIRST for health checks (required by Railway)
+    // Initialize database
+    await initDatabase(app.logger);
+    await initializeSchema();
+
+    // Get frontend dist path
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = join(__filename, '..');
+    const frontendDistPath = join(__dirname, '../frontend/dist');
+    let frontendIndex: string | null = null;
+
+    try {
+      frontendIndex = readFileSync(join(frontendDistPath, 'index.html'), 'utf-8');
+    } catch {
+      app.logger.warn('Frontend dist not found; dashboard will be unavailable');
+    }
+
+    // Start HTTP server with API + static file serving
     const port = Number.parseInt(process.env.PORT || '3000', 10);
-    createServer((_req, res) => {
-      res.writeHead(200);
+    const server = createServer(async (req, res) => {
+      const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
+
+      // Handle API routes
+      if (pathname.startsWith('/api/')) {
+        const handled = await handleApiRoute(req, res, pathname, app.logger);
+        if (handled) {
+          return;
+        }
+      }
+
+      // Serve frontend
+      if (frontendIndex && !pathname.startsWith('/api/')) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(frontendIndex);
+        return;
+      }
+
+      // Fallback health check
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
       res.end('Health check: OK');
-    }).listen(port, '0.0.0.0', () => {
-      app.logger.info(`Health check server listening on port ${port}`);
+    });
+
+    server.listen(port, '0.0.0.0', () => {
+      app.logger.info(`🌐 HTTP server listening on port ${port}`);
     });
 
     // Start Bolt App
     await app.start();
     app.logger.info('⚡️ Bolt app is running via Socket Mode!');
 
-    // 🕒 Schedule 4:00 PM Daily Report
+    // 🕒 Schedule 6:00 AM Daily Report
     const { scheduleDailyReport } = await import('./services/scheduler.js');
     await scheduleDailyReport(app);
 

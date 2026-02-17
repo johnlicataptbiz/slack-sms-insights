@@ -184,6 +184,42 @@ describe('aloware analytics', () => {
     assert(!report.includes('- Outbound Conversations: 2'));
   });
 
+  it('should populate a requested date for manual daily report prompts', async () => {
+    process.env.ALOWARE_REPORT_TIMEZONE = 'UTC';
+    process.env.ALOWARE_DAILY_WINDOW_START_HOUR = '4';
+    process.env.ALOWARE_DAILY_WINDOW_END_HOUR = '23';
+
+    const nowTs = Math.floor(Date.UTC(2026, 1, 17, 20, 0, 0) / 1000);
+    mock.method(Date, 'now', () => nowTs * 1000);
+
+    const client = buildClient([
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 16, 5, 0, 0) / 1000)),
+        text: 'An agent has sent an SMS ContactPast (+1 555-880-0101) Message Quick follow-up.',
+      },
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 16, 5, 10, 0) / 1000)),
+        text: 'An agent has received an SMS ContactPast (+1 555-880-0101) Message Wednesday works.',
+      },
+      {
+        ts: toSlackTs(Math.floor(Date.UTC(2026, 1, 17, 5, 0, 0) / 1000)),
+        text: 'An agent has sent an SMS ContactToday (+1 555-880-0102) Message Quick follow-up.',
+      },
+    ]);
+
+    const bundle = await buildAlowareAnalyticsReportBundle({
+      channelId: 'C09ULGH1BEC',
+      client,
+      prompt: 'populate daily report for 2/16?',
+    });
+
+    assert.equal(bundle.isDaily, true);
+    assert(bundle.summary);
+    assert.equal(bundle.summary?.dateLabel, 'Feb 16, 2026');
+    assert(bundle.reportText.includes('Date: Feb 16, 2026'));
+    assert(bundle.reportText.includes('- Outbound Conversations: 1'));
+  });
+
   it('should keep booking counts scoped to outbound-started conversations', async () => {
     process.env.ALOWARE_REPORT_TIMEZONE = 'UTC';
     process.env.ALOWARE_DAILY_WINDOW_START_HOUR = '4';

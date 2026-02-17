@@ -112,7 +112,7 @@ const buildPrompt = ({ assistant, summaryText }: { assistant: AssistantTarget; s
   return [
     ANALYSIS_REQUEST_MARKER,
     `<@${assistant.userId}>, acts as our Physical Therapy Business Growth Analyst.`,
-    'Analyze this 4:00 PM SMS snapshot and reply in this thread using the EXACT structure below.',
+    'Analyze this 6:00 AM SMS snapshot and reply in this thread using the EXACT structure below.',
     '',
     'CRITICAL BUSINESS RULES:',
     '1. FOCUS: High-performance sales and lead conversion metrics.',

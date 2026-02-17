@@ -9,3 +9,4 @@ coverage/
 *.log
 .railway/
 .vscode/
+frontend/node_modules/

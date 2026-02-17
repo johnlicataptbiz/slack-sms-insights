@@ -491,10 +491,276 @@ const getLocalTimeParts = (ts: number, timezone: string): LocalTimeParts => {
   };
 };
 
-const resolveDailyWindowContext = ({ nowTs, timezone }: { nowTs: number; timezone: string }): DailyWindowContext => {
+const DATE_KEY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
+const SLASH_DATE_PATTERN = /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/;
+const ISO_DATE_PATTERN = /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/;
+const MONTH_NAME_DATE_PATTERN =
+  /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:,?\s*(\d{2,4}))?\b/i;
+
+const MONTH_NAME_TO_NUMBER: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
+
+const toDateKey = (year: number, month: number, day: number): string => {
+  return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+};
+
+const parseDateKey = (dateKey: string): { day: number; month: number; year: number } | undefined => {
+  const match = dateKey.match(DATE_KEY_PATTERN);
+  if (!match) {
+    return undefined;
+  }
+  const year = Number.parseInt(match[1], 10);
+  const month = Number.parseInt(match[2], 10);
+  const day = Number.parseInt(match[3], 10);
+  if ([year, month, day].some((value) => Number.isNaN(value))) {
+    return undefined;
+  }
+  return { day, month, year };
+};
+
+const isValidDate = (year: number, month: number, day: number): boolean => {
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return false;
+  }
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return (
+    parsed.getUTCFullYear() === year && parsed.getUTCMonth() + 1 === month && parsed.getUTCDate() === day
+  );
+};
+
+const normalizePromptDateYear = (rawYear?: string): number | undefined => {
+  if (!rawYear) {
+    return undefined;
+  }
+  const parsed = Number.parseInt(rawYear, 10);
+  if (Number.isNaN(parsed)) {
+    return undefined;
+  }
+  if (rawYear.length === 2) {
+    return 2000 + parsed;
+  }
+  return parsed;
+};
+
+const getTimezoneOffsetSeconds = (ts: number, timezone: string): number => {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    timeZoneName: 'shortOffset',
+  }).formatToParts(new Date(ts * 1000));
+  const offsetToken = parts.find((part) => part.type === 'timeZoneName')?.value || 'GMT';
+  if (offsetToken === 'GMT') {
+    return 0;
+  }
+
+  const match = offsetToken.match(/^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/);
+  if (!match) {
+    return 0;
+  }
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const hours = Number.parseInt(match[2], 10);
+  const minutes = Number.parseInt(match[3] || '0', 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return 0;
+  }
+  return sign * (hours * 3600 + minutes * 60);
+};
+
+const localDateTimeToUnixTs = ({
+  day,
+  hour,
+  minute,
+  month,
+  second,
+  timezone,
+  year,
+}: {
+  day: number;
+  hour: number;
+  minute: number;
+  month: number;
+  second: number;
+  timezone: string;
+  year: number;
+}): number => {
+  const naiveUtcTs = Math.floor(Date.UTC(year, month - 1, day, hour, minute, second) / 1000);
+  let resolvedTs = naiveUtcTs;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const offsetSeconds = getTimezoneOffsetSeconds(resolvedTs, timezone);
+    const adjustedTs = naiveUtcTs - offsetSeconds;
+    if (adjustedTs === resolvedTs) {
+      break;
+    }
+    resolvedTs = adjustedTs;
+  }
+  return resolvedTs;
+};
+
+const parseRequestedDailyDateKey = ({
+  nowTs,
+  prompt,
+  timezone,
+}: {
+  nowTs: number;
+  prompt: string;
+  timezone: string;
+}): string | undefined => {
+  if (!isDailyChecklistPrompt(prompt)) {
+    return undefined;
+  }
+
+  const normalizedPrompt = prompt.toLowerCase();
+  const nowLocal = getLocalTimeParts(nowTs, timezone);
+  const nowLocalYear = Number.parseInt(nowLocal.dateKey.slice(0, 4), 10);
+  let month: number | undefined;
+  let day: number | undefined;
+  let year: number | undefined;
+
+  const isoMatch = normalizedPrompt.match(ISO_DATE_PATTERN);
+  if (isoMatch) {
+    year = Number.parseInt(isoMatch[1], 10);
+    month = Number.parseInt(isoMatch[2], 10);
+    day = Number.parseInt(isoMatch[3], 10);
+  }
+
+  if (month === undefined || day === undefined) {
+    const slashMatch = normalizedPrompt.match(SLASH_DATE_PATTERN);
+    if (slashMatch) {
+      month = Number.parseInt(slashMatch[1], 10);
+      day = Number.parseInt(slashMatch[2], 10);
+      year = normalizePromptDateYear(slashMatch[3]);
+    }
+  }
+
+  if (month === undefined || day === undefined) {
+    const monthNameMatch = normalizedPrompt.match(MONTH_NAME_DATE_PATTERN);
+    if (monthNameMatch) {
+      month = MONTH_NAME_TO_NUMBER[monthNameMatch[1].toLowerCase()];
+      day = Number.parseInt(monthNameMatch[2], 10);
+      year = normalizePromptDateYear(monthNameMatch[3]);
+    }
+  }
+
+  if (month === undefined || day === undefined) {
+    return undefined;
+  }
+
+  let resolvedYear = year ?? nowLocalYear;
+  if (!isValidDate(resolvedYear, month, day)) {
+    return undefined;
+  }
+
+  if (year === undefined) {
+    const sameYearDateKey = toDateKey(resolvedYear, month, day);
+    if (sameYearDateKey > nowLocal.dateKey) {
+      resolvedYear -= 1;
+      if (!isValidDate(resolvedYear, month, day)) {
+        return undefined;
+      }
+    }
+  }
+
+  return toDateKey(resolvedYear, month, day);
+};
+
+const resolveDailyReportAnchor = ({
+  nowTs,
+  prompt,
+  timezone,
+}: {
+  nowTs: number;
+  prompt: string;
+  timezone: string;
+}): { effectiveNowTs: number; requestedDateKey?: string } => {
+  const requestedDateKey = parseRequestedDailyDateKey({
+    nowTs,
+    prompt,
+    timezone,
+  });
+  if (!requestedDateKey) {
+    return { effectiveNowTs: nowTs };
+  }
+
+  const parsedDate = parseDateKey(requestedDateKey);
+  if (!parsedDate) {
+    return { effectiveNowTs: nowTs };
+  }
+
+  const endHour = Math.max(getDailyWindowStartHour(), getDailyWindowEndHour());
+  const requestedWindowEndTs = localDateTimeToUnixTs({
+    day: parsedDate.day,
+    hour: endHour,
+    minute: 59,
+    month: parsedDate.month,
+    second: 59,
+    timezone,
+    year: parsedDate.year,
+  });
+
+  return {
+    effectiveNowTs: Math.min(nowTs, requestedWindowEndTs),
+    requestedDateKey,
+  };
+};
+
+const resolveDailyWindowContext = ({
+  nowTs,
+  targetDateKey,
+  timezone,
+}: {
+  nowTs: number;
+  targetDateKey?: string;
+  timezone: string;
+}): DailyWindowContext => {
   const startHour = getDailyWindowStartHour();
   const configuredEndHour = getDailyWindowEndHour();
   const endHour = Math.max(startHour, configuredEndHour);
+  if (targetDateKey) {
+    const parsedDate = parseDateKey(targetDateKey);
+    if (parsedDate) {
+      return {
+        dateKey: targetDateKey,
+        endHour,
+        label: `${formatHourLabel(startHour)} - ${formatHourLabel(endHour)}`,
+        startHour,
+        timezone,
+        windowStartTs: localDateTimeToUnixTs({
+          day: parsedDate.day,
+          hour: startHour,
+          minute: 0,
+          month: parsedDate.month,
+          second: 0,
+          timezone,
+          year: parsedDate.year,
+        }),
+      };
+    }
+  }
+
   const nowLocal = getLocalTimeParts(nowTs, timezone);
   const usePreviousDay = nowLocal.hour < startHour;
   const targetTs = usePreviousDay ? nowTs - DAY_SECONDS : nowTs;
@@ -1027,7 +1293,7 @@ const summarizePipelineStatus = ({
   replyRatePct: number;
   bookingRatePct: number;
   optOutRatePct: number;
-}): AnalyticsReportBundle => {
+}): string => {
   const notes: string[] = [];
   if (replyRatePct < 25) {
     notes.push('reply rate is soft');
@@ -3282,13 +3548,18 @@ const buildReportFromRawMessages = ({
   prompt: string;
   rawMessages: HistoryMessage[];
   reportBuildStartMs: number;
-}): string => {
+}): AnalyticsReportBundle => {
   const telemetryChannelId = channelId || 'offline';
-  const rollingDayStart = nowTs - DAY_SECONDS;
-  const weekStart = nowTs - WEEK_SECONDS;
   const reportTimezone = getReportTimezone();
+  const { effectiveNowTs, requestedDateKey } = resolveDailyReportAnchor({
+    nowTs,
+    prompt,
+    timezone: reportTimezone,
+  });
+  const rollingDayStart = effectiveNowTs - DAY_SECONDS;
+  const weekStart = effectiveNowTs - WEEK_SECONDS;
   const normalizedMessages = normalizeMessages(rawMessages).filter(
-    (message) => message.ts <= nowTs && message.ts >= weekStart,
+    (message) => message.ts <= effectiveNowTs && message.ts >= weekStart,
   );
   const dedupeEnabled = shouldDedupeSmsEvents();
   const messages = dedupeEnabled ? dedupeLikelyDuplicateMessages(normalizedMessages) : normalizedMessages;
@@ -3296,9 +3567,9 @@ const buildReportFromRawMessages = ({
     if (!attributionRawMessages || attributionRawMessages.length === 0) {
       return messages;
     }
-    const oldestAttributionTs = nowTs - getSequenceAttributionLookbackDays() * DAY_SECONDS;
+    const oldestAttributionTs = effectiveNowTs - getSequenceAttributionLookbackDays() * DAY_SECONDS;
     const normalizedAttributionMessages = normalizeMessages(attributionRawMessages).filter(
-      (message) => message.ts <= nowTs && message.ts >= oldestAttributionTs,
+      (message) => message.ts <= effectiveNowTs && message.ts >= oldestAttributionTs,
     );
     if (normalizedAttributionMessages.length === 0) {
       return messages;
@@ -3316,13 +3587,14 @@ const buildReportFromRawMessages = ({
     );
   }
   const dailyWindow = resolveDailyWindowContext({
-    nowTs,
+    nowTs: effectiveNowTs,
+    targetDateKey: requestedDateKey,
     timezone: reportTimezone,
   });
-  const dayMessages = messages.filter((message) => isWithinDailyWindow(message.ts, dailyWindow, nowTs));
+  const dayMessages = messages.filter((message) => isWithinDailyWindow(message.ts, dailyWindow, effectiveNowTs));
 
   if (isDailyChecklistPrompt(prompt)) {
-    const report = buildDailyChecklistReport(dayMessages, messages, nowTs, dailyWindow, attributionMessages);
+    const report = buildDailyChecklistReport(dayMessages, messages, effectiveNowTs, dailyWindow, attributionMessages);
     logger?.debug?.(
       `[telemetry] aloware.build_report ${JSON.stringify({
         channel_id: telemetryChannelId,
@@ -3492,8 +3764,14 @@ export const buildAlowareAnalyticsReport = async ({
   prompt: string;
 }): Promise<string> => {
   const reportBuildStartMs = Date.now();
-  const nowTs = Math.floor(Date.now() / 1000);
-  const weekStart = nowTs - WEEK_SECONDS;
+  const runtimeNowTs = Math.floor(Date.now() / 1000);
+  const reportTimezone = getReportTimezone();
+  const { effectiveNowTs } = resolveDailyReportAnchor({
+    nowTs: runtimeNowTs,
+    prompt,
+    timezone: reportTimezone,
+  });
+  const weekStart = effectiveNowTs - WEEK_SECONDS;
   const isDailyPrompt = isDailyChecklistPrompt(prompt);
   const forceRefresh = isDailyPrompt;
 
@@ -3504,7 +3782,7 @@ export const buildAlowareAnalyticsReport = async ({
     logger,
     oldest: weekStart,
   });
-  const sequenceLookbackStart = nowTs - getSequenceAttributionLookbackDays() * DAY_SECONDS;
+  const sequenceLookbackStart = effectiveNowTs - getSequenceAttributionLookbackDays() * DAY_SECONDS;
   const attributionRawMessages =
     isDailyPrompt && sequenceLookbackStart < weekStart
       ? await fetchHistory({
@@ -3520,7 +3798,7 @@ export const buildAlowareAnalyticsReport = async ({
     attributionRawMessages,
     channelId,
     logger,
-    nowTs,
+    nowTs: effectiveNowTs,
     prompt,
     rawMessages,
     reportBuildStartMs,
@@ -3540,8 +3818,14 @@ export const buildAlowareAnalyticsReportBundle = async ({
   prompt: string;
 }): Promise<AnalyticsReportBundle> => {
   const reportBuildStartMs = Date.now();
-  const nowTs = Math.floor(Date.now() / 1000);
-  const weekStart = nowTs - WEEK_SECONDS;
+  const runtimeNowTs = Math.floor(Date.now() / 1000);
+  const reportTimezone = getReportTimezone();
+  const { effectiveNowTs } = resolveDailyReportAnchor({
+    nowTs: runtimeNowTs,
+    prompt,
+    timezone: reportTimezone,
+  });
+  const weekStart = effectiveNowTs - WEEK_SECONDS;
   const isDailyPrompt = isDailyChecklistPrompt(prompt);
   const forceRefresh = isDailyPrompt;
 
@@ -3552,7 +3836,7 @@ export const buildAlowareAnalyticsReportBundle = async ({
     logger,
     oldest: weekStart,
   });
-  const sequenceLookbackStart = nowTs - getSequenceAttributionLookbackDays() * DAY_SECONDS;
+  const sequenceLookbackStart = effectiveNowTs - getSequenceAttributionLookbackDays() * DAY_SECONDS;
   const attributionRawMessages =
     isDailyPrompt && sequenceLookbackStart < weekStart
       ? await fetchHistory({
@@ -3568,7 +3852,7 @@ export const buildAlowareAnalyticsReportBundle = async ({
     attributionRawMessages,
     channelId,
     logger,
-    nowTs,
+    nowTs: effectiveNowTs,
     prompt,
     rawMessages,
     reportBuildStartMs,

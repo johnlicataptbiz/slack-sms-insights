@@ -1,0 +1,94 @@
+.run-list {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.runs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.runs-table thead {
+  background: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.runs-table th {
+  padding: 12px 15px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95em;
+}
+
+.runs-table tbody tr {
+  border-bottom: 1px solid #dee2e6;
+  transition: background 0.2s;
+}
+
+.runs-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.runs-table td {
+  padding: 12px 15px;
+  color: #555;
+  font-size: 0.95em;
+}
+
+.timestamp {
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+}
+
+.channel {
+  font-weight: 500;
+}
+
+.type {
+  color: #666;
+}
+
+.status {
+  font-weight: 600;
+}
+
+.duration {
+  text-align: center;
+  font-family: monospace;
+  color: #666;
+}
+
+.summary {
+  color: #777;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85em;
+  font-weight: 600;
+}
+
+.badge-success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.badge-error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.badge-pending {
+  background: #fff3cd;
+  color: #856404;
+}

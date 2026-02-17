@@ -41,6 +41,15 @@ const getSetterFeedbackDedupeMinutes = (): number => {
   return parsePositiveInt(process.env.ALOWARE_SETTER_FEEDBACK_DEDUPE_MINUTES, 10);
 };
 
+const isPersistentDedupeEnabled = (): boolean => {
+  const raw = (process.env.ALOWARE_SETTER_FEEDBACK_PERSISTENT_DEDUPE ?? '').trim().toLowerCase();
+  if (!raw) {
+    // default: enabled if a DB pool is available at runtime (checked lazily)
+    return true;
+  }
+  return raw === 'true';
+};
+
 const isFeedbackEnabled = (): boolean => {
   return parseBoolean(process.env.ALOWARE_SETTER_FEEDBACK_ENABLED, DEFAULT_FEEDBACK_ENABLED);
 };
@@ -141,6 +150,25 @@ export const requestSetterFeedback = async ({
 
   const dedupeKey = `${channelId}:${ts}`;
   const dedupeMinutes = getSetterFeedbackDedupeMinutes();
+
+  // 1) check persistent store (DB) when enabled
+  if (isPersistentDedupeEnabled()) {
+    try {
+      // lazy import to avoid circular deps in environments without DB
+      const { hasRecentPersistentFeedback } = await import('./setter-feedback-store.js');
+      // if DB says there's a recent feedback for this thread, suppress
+      const persisted = await hasRecentPersistentFeedback({ channelId, threadTs: ts, dedupeMinutes });
+      if (persisted) {
+        logger.info(`Setter Feedback: suppressed by persistent dedupe for ${dedupeKey} (within ${dedupeMinutes}m).`);
+        return;
+      }
+    } catch (err) {
+      // ignore DB errors and fall back to in-memory
+      logger.debug('Setter Feedback: persistent dedupe check failed, falling back to in-memory.', err);
+    }
+  }
+
+  // 2) in-memory dedupe fallback
   const now = Date.now();
   const lastTs = setterFeedbackCache.get(dedupeKey) || 0;
   if (now - lastTs < dedupeMinutes * 60_000) {
@@ -171,8 +199,22 @@ export const requestSetterFeedback = async ({
         text,
         link_names: true,
       });
-      // mark dedupe on successful post
+
+      // mark dedupe on successful post (both persistent + in-memory)
       setterFeedbackCache.set(dedupeKey, Date.now());
+
+      if (isPersistentDedupeEnabled()) {
+        try {
+          const { insertPersistentFeedback } = await import('./setter-feedback-store.js');
+          // fire-and-forget persistence; failure shouldn't block normal flow
+          insertPersistentFeedback({ channelId, threadTs: ts, messageTs: ts }).catch((e) =>
+            logger.debug('Setter Feedback: failed to persist dedupe record', e),
+          );
+        } catch (err) {
+          logger.debug('Setter Feedback: persistent dedupe insert failed', err);
+        }
+      }
+
       logger.info(`Setter Feedback requested for ${setterName} from ${assistant.label} via ${source}`);
       return;
     } catch (error) {

@@ -44,6 +44,8 @@ Also: the app will now *skip* automatic setter feedback for messages that are pa
 
 New: setter-feedback deduping — the app now suppresses duplicate setter-feedback requests for the same message/thread for `ALOWARE_SETTER_FEEDBACK_DEDUPE_MINUTES` (default 10 minutes). Set `ALOWARE_SETTER_FEEDBACK_DEDUPE_MINUTES=0` to disable dedupe.
 
+Persistent dedupe: when a database is available the app will persist dedupe records so suppression survives restarts. Control with `ALOWARE_SETTER_FEEDBACK_PERSISTENT_DEDUPE=true|false` (default: `true` when DB is available).
+
 #### Install Dependencies
 
 ```sh

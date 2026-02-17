@@ -63,6 +63,14 @@ const sampleMessageCallback = async ({
     const isDailySnapshot = isAloware && isDailySnapshotReport(message.text || '');
     const isFromSelf = typeof context.botUserId === 'string' && message.user === context.botUserId;
 
+    // Ignore messages posted by OTHER Slack apps/bots — those are automated and
+    // should not trigger watcher alerts or setter-feedback. However, allow
+    // processing for daily snapshot reports (they may be posted by an app).
+    if (message.bot_id && !isDailySnapshot && !isFromSelf) {
+      logger.debug('Ignoring message from another app/bot (not a daily snapshot).', message.bot_id);
+      return;
+    }
+
     if (isFromSelf && !isDailySnapshot) {
       return;
     }

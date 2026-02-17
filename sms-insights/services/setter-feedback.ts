@@ -27,6 +27,19 @@ const isFeedbackEnabled = (): boolean => {
 
 const getAssistantTargets = (): AssistantTarget[] => {
   const claudeId = process.env.CLAUDE_ASSISTANT_USER_ID?.trim() || '';
+
+  // Protect against accidental self-tagging: if the configured Claude ID
+  // matches a watcher (Jack/Brandon), do not treat it as an AI assistant.
+  const watcherIds = [
+    process.env.ALOWARE_WATCHER_JACK_USER_ID?.trim(),
+    process.env.ALOWARE_WATCHER_BRANDON_USER_ID?.trim(),
+  ].filter(Boolean);
+
+  if (claudeId && watcherIds.includes(claudeId)) {
+    // configured CLAUDE_ASSISTANT_USER_ID appears to be a human/watcher — ignore it
+    return [];
+  }
+
   const targets: AssistantTarget[] = [];
   if (claudeId) targets.push({ label: 'Claude', userId: claudeId });
 
@@ -90,6 +103,12 @@ export const requestSetterFeedback = async ({
 }): Promise<void> => {
   if (!isFeedbackEnabled()) return;
   if (fields.direction !== 'outbound') return;
+
+  // Skip automated sequence messages — feedback is only for manual outbound messages
+  if (fields.sequence && fields.sequence.trim().length > 0) {
+    logger.info(`Setter Feedback: skipping automated sequence message (sequence=${fields.sequence}).`);
+    return;
+  }
 
   // Identify Jack only — Brandon is excluded from auto-feedback
   const userName = fields.user.toLowerCase();

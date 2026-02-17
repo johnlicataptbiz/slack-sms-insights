@@ -152,6 +152,11 @@ export const requestSetterFeedback = async ({
 
   if (!isJack) return;
 
+  // Additional check to ensure it's a manual message from Jack
+  if (fields.user !== 'Jack Licata' || (fields.sequence && fields.sequence.trim().length > 0)) {
+    return;
+  }
+
   const setterName = 'Jack';
   const setterUserId = process.env.ALOWARE_WATCHER_JACK_USER_ID;
 

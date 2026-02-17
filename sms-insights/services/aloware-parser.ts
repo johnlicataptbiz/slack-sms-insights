@@ -105,11 +105,6 @@ export const parseAlowareMessage = (text: string, attachments?: LeadWatcherAttac
   fields.sequence = extractAttachmentField(attachments, 'sequence');
   fields.user = extractAttachmentField(attachments, 'user');
 
-  // If the user field is missing, but there is a "Sequence" field, we can assume the user is the system
-  if (!fields.user && fields.sequence) {
-    fields.user = 'System';
-  }
-
   // 5. Raw Contact Link (to get Aloware ID)
   const contactFieldValue = attachments?.[0]?.fields?.find((f) => f.title?.toLowerCase() === 'contact')?.value || '';
   const idMatch = contactFieldValue.match(/contacts\/(\d+)/);

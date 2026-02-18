@@ -38,8 +38,12 @@ export function RepTable({ reps }: Props) {
                 ? `${Math.round(rep.followupLagMinutesAvg)}m`
                 : '-'}
             </td>
-            <td style={{ color: rep.overdueWorkItems > 0 ? '#ef4444' : 'inherit', fontWeight: rep.overdueWorkItems > 0 ? 600 : 400 }}>
-              {rep.overdueWorkItems}
+            <td>
+              {rep.overdueWorkItems > 0 ? (
+                <span className="badge badge--high">{rep.overdueWorkItems}</span>
+              ) : (
+                <span style={{ color: '#9ca3af' }}>0</span>
+              )}
             </td>
           </tr>
         ))}

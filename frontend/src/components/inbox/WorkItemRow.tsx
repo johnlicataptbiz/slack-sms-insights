@@ -22,19 +22,26 @@ export const WorkItemRow = React.memo(function WorkItemRow({
       <div className="WorkItemRow__header">
         <span className="WorkItemRow__contact">{item.contactName ?? 'Unknown'}</span>
         <span className="WorkItemRow__date">
-          {new Date(item.createdAt).toLocaleDateString()}
+          {new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
       </div>
       
-      <span className={`WorkItemRow__type WorkItemRow__type--${item.type}`}>
-        {item.type.replace(/_/g, ' ')}
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+        <span className={`WorkItemRow__type WorkItemRow__type--${item.type}`}>
+          {item.type.replace(/_/g, ' ')}
+        </span>
+        {item.currentLagMinutes != null && item.currentLagMinutes > 30 && (
+          <span className="badge badge--high" style={{ fontSize: '0.65rem' }}>URGENT</span>
+        )}
+      </div>
 
       <div className="WorkItemRow__meta">
-        <span>{item.repName ?? 'Unassigned'}</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span role="img" aria-label="rep">👤</span> {item.repName ?? 'Unassigned'}
+        </span>
         {item.currentLagMinutes != null && (
           <span className="WorkItemRow__lag">
-            {item.currentLagMinutes} min lag
+            {item.currentLagMinutes}m lag
           </span>
         )}
       </div>

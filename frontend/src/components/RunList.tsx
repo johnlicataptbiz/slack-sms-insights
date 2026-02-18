@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import RunDetail from './RunDetail';
 import '../styles/RunList.css';
 
@@ -17,6 +17,7 @@ type Run = {
 
 export default function RunList({ runs, token }: { runs: Run[]; token: string }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'timestamp', direction: 'desc' });
   const selectedRun = runs.find(r => r.id === selectedRunId) || null;
 
   const formatTime = (isoString: string, reportDate?: string) => {
@@ -33,6 +34,51 @@ export default function RunList({ runs, token }: { runs: Run[]; token: string })
     return <span className={statusClass}>{status.toUpperCase()}</span>;
   };
 
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedRuns = useMemo(() => {
+    if (!sortConfig) return runs;
+
+    return [...runs].sort((a, b) => {
+      let aValue: any, bValue: any;
+
+      switch (sortConfig.key) {
+        case 'timestamp':
+          aValue = new Date(a.report_date || a.timestamp).getTime();
+          bValue = new Date(b.report_date || b.timestamp).getTime();
+          break;
+        case 'channel':
+          aValue = (a.channel_name || a.channel_id).toLowerCase();
+          bValue = (b.channel_name || b.channel_id).toLowerCase();
+          break;
+        case 'type':
+          aValue = a.report_type.toLowerCase();
+          bValue = b.report_type.toLowerCase();
+          break;
+        case 'status':
+          aValue = a.status;
+          bValue = b.status;
+          break;
+        case 'duration':
+          aValue = a.duration_ms || 0;
+          bValue = b.duration_ms || 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [runs, sortConfig]);
+
   if (selectedRun) {
     return <RunDetail run={selectedRun} onBack={() => setSelectedRunId(null)} />;
   }
@@ -42,16 +88,26 @@ export default function RunList({ runs, token }: { runs: Run[]; token: string })
       <table className="runs-table">
         <thead>
           <tr>
-            <th>Report Date</th>
-            <th>Channel</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Duration</th>
+            <th className="sortable" onClick={() => handleSort('timestamp')}>
+              Report Date {sortConfig?.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
+            <th className="sortable" onClick={() => handleSort('channel')}>
+              Channel {sortConfig?.key === 'channel' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
+            <th className="sortable" onClick={() => handleSort('type')}>
+              Type {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
+            <th className="sortable" onClick={() => handleSort('status')}>
+              Status {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
+            <th className="sortable" onClick={() => handleSort('duration')}>
+              Duration {sortConfig?.key === 'duration' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            </th>
             <th>Summary</th>
           </tr>
         </thead>
         <tbody>
-          {runs.map((run) => (
+          {sortedRuns.map((run) => (
             <tr key={run.id} onClick={() => setSelectedRunId(run.id)} style={{ cursor: 'pointer' }}>
               <td className="timestamp">{formatTime(run.timestamp, run.report_date)}</td>
               <td className="channel">{run.channel_name || run.channel_id}</td>

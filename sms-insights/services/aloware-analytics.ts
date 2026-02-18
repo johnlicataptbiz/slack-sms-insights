@@ -632,6 +632,18 @@ const parseRequestedDailyDateKey = ({
   }
 
   const normalizedPrompt = prompt.toLowerCase();
+
+  if (normalizedPrompt.includes('yesterday')) {
+    const yesterdayTs = nowTs - DAY_SECONDS;
+    const yesterdayLocal = getLocalTimeParts(yesterdayTs, timezone);
+    return yesterdayLocal.dateKey;
+  }
+
+  if (normalizedPrompt.includes('today')) {
+    const nowLocal = getLocalTimeParts(nowTs, timezone);
+    return nowLocal.dateKey;
+  }
+
   const nowLocal = getLocalTimeParts(nowTs, timezone);
   const nowLocalYear = Number.parseInt(nowLocal.dateKey.slice(0, 4), 10);
   let month: number | undefined;
@@ -664,6 +676,13 @@ const parseRequestedDailyDateKey = ({
   }
 
   if (month === undefined || day === undefined) {
+    // If it's a daily report request with no specific date, and it's before 10 AM,
+    // default to yesterday. Otherwise, let it fall through to the "today" logic.
+    if (nowLocal.hour < 10) {
+      const yesterdayTs = nowTs - DAY_SECONDS;
+      const yesterdayLocal = getLocalTimeParts(yesterdayTs, timezone);
+      return yesterdayLocal.dateKey;
+    }
     return undefined;
   }
 

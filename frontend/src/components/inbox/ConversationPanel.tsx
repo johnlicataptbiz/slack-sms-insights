@@ -70,7 +70,7 @@ export function ConversationPanel({
           >
             <div className="MessageBubble__body">{event.body}</div>
             <div className="MessageBubble__time">
-              {new Date(event.createdAt).toLocaleString()}
+              {new Date(event.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </div>
           </div>
         ))}

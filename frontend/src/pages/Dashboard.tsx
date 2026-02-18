@@ -84,14 +84,8 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
 
   return (
     <div className="dashboard-container">
-      <header className="dashboard-header">
-        <div className="header-left">
-          <h1>📊 Daily Report Dashboard</h1>
-          <p>SMS Insights report tracking</p>
-        </div>
-        <button onClick={onLogout} className="logout-button">
-          Logout
-        </button>
+      <header className="Insights__header">
+        <h1>Daily Report History</h1>
       </header>
 
       <div className="filters">

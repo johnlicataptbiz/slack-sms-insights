@@ -10,6 +10,7 @@
     "build:watch": "tsc --watch",
     "build:frontend": "cd frontend && npm run build",
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
+    "backfill:slack": "node --import tsx ./scripts/backfill-slack-events.ts",
     "dev": "node --import tsx app.ts",
     "start": "node ./dist/app.js",
     "lint": "npx @biomejs/biome check *.ts listeners services tests api",

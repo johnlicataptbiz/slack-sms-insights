@@ -1,14 +1,25 @@
 /* Global styles */
 :root {
-  --color-primary: #667eea;
-  --color-success: #27ae60;
-  --color-error: #e74c3c;
-  --color-warning: #f39c12;
-  --color-info: #3498db;
-  --color-text: #333;
-  --color-text-muted: #666;
-  --color-border: #ddd;
-  --color-bg: #f5f5f5;
+  --color-primary: #6366f1;
+  --color-primary-dark: #4f46e5;
+  --color-success: #10b981;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+  --color-text: #111827;
+  --color-text-muted: #6b7280;
+  --color-text-light: #f9fafb;
+  --color-border: #e5e7eb;
+  --color-bg: #f8fafc;
+  --color-bg-secondary: #ffffff;
+  --color-sidebar-bg: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --color-sidebar-hover: rgba(255, 255, 255, 0.1);
+  --color-sidebar-active: rgba(99, 102, 241, 0.2);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --border-radius: 8px;
+  --border-radius-lg: 12px;
 }
 
 * {
@@ -66,4 +77,160 @@ select {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #555;
+}
+
+/* App Shell Layout */
+.AppShell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.AppShell__nav {
+  width: 280px;
+  background: var(--color-sidebar-bg);
+  color: var(--color-text-light);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--shadow-lg);
+}
+
+.AppShell__logo {
+  padding: 0 24px;
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 40px;
+  color: var(--color-text-light);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.AppShell__logo::before {
+  content: '';
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.AppShell__links {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.AppShell__links button {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 12px 16px;
+  text-align: left;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.AppShell__links button::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 4px;
+  background: var(--color-primary);
+  transform: scaleY(0);
+  transition: transform 0.3s ease;
+  border-radius: 0 2px 2px 0;
+}
+
+.AppShell__links button:hover {
+  background: var(--color-sidebar-hover);
+  color: var(--color-text-light);
+  transform: translateX(4px);
+}
+
+.AppShell__links button.active {
+  background: var(--color-sidebar-active);
+  color: var(--color-text-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.AppShell__links button.active::before {
+  transform: scaleY(1);
+}
+
+.AppShell__stats {
+  margin-top: auto;
+  padding: 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
+}
+
+.AppShell__stat-item {
+  margin-bottom: 16px;
+}
+
+.AppShell__stat-item:last-child {
+  margin-bottom: 0;
+}
+
+.AppShell__stat-label {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.AppShell__stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-light);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.AppShell__logout {
+  margin: 16px 12px;
+  background: transparent;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+  padding: 10px 16px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.AppShell__logout:hover {
+  background: var(--color-error);
+  border-color: var(--color-error);
+  color: var(--color-text-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.AppShell__content {
+  flex: 1;
+  overflow: auto;
+  background: var(--color-bg);
+  padding: 24px;
 }

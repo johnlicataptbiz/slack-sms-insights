@@ -1,8 +1,9 @@
 .run-list {
-  background: white;
-  border-radius: 8px;
+  background: var(--color-bg-secondary);
+  border-radius: var(--border-radius-lg);
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--color-border);
 }
 
 .runs-table {
@@ -11,84 +12,111 @@
 }
 
 .runs-table thead {
-  background: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
+  background: var(--color-bg);
+  border-bottom: 2px solid var(--color-border);
 }
 
 .runs-table th {
-  padding: 12px 15px;
+  padding: 18px 24px;
   text-align: left;
-  font-weight: 600;
-  color: #333;
-  font-size: 0.95em;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.runs-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.3s ease;
+}
+
+.runs-table th.sortable:hover {
+  color: var(--color-primary);
+  background: rgba(99, 102, 241, 0.05);
 }
 
 .runs-table tbody tr {
-  border-bottom: 1px solid #dee2e6;
-  transition: background 0.2s;
+  border-bottom: 1px solid var(--color-border);
+  transition: all 0.3s ease;
 }
 
 .runs-table tbody tr:hover {
-  background: #f8f9fa;
+  background: var(--color-bg);
+  transform: scale(1.01);
 }
 
 .runs-table td {
-  padding: 12px 15px;
-  color: #555;
-  font-size: 0.95em;
+  padding: 20px 24px;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 500;
 }
 
 .timestamp {
-  font-weight: 500;
-  color: #333;
+  font-weight: 600;
+  color: var(--color-text);
   white-space: nowrap;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
 }
 
 .channel {
-  font-weight: 500;
+  font-weight: 600;
+  color: var(--color-primary);
 }
 
 .type {
-  color: #666;
+  color: var(--color-text-muted);
+  font-weight: 500;
 }
 
 .status {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .duration {
   text-align: center;
-  font-family: monospace;
-  color: #666;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  color: var(--color-text-muted);
+  font-weight: 600;
 }
 
 .summary {
-  color: #777;
-  max-width: 200px;
+  color: var(--color-text-muted);
+  max-width: 250px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .badge {
   display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.85em;
-  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .badge-success {
-  background: #d4edda;
-  color: #155724;
+  background: var(--color-success);
+  color: var(--color-text-light);
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
 }
 
 .badge-error {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--color-error);
+  color: var(--color-text-light);
+  box-shadow: 0 2px 4px rgba(239, 68, 68, 0.2);
 }
 
 .badge-pending {
-  background: #fff3cd;
-  color: #856404;
+  background: var(--color-warning);
+  color: #92400e;
+  box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
 }

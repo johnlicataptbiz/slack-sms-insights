@@ -22,7 +22,7 @@ export function WorkItemFilters({ value, onChange }: WorkItemFiltersProps) {
 
   return (
     <div className="WorkItemFilters">
-      <div>
+      <div className="WorkItemFilters__section">
         <label>Search</label>
         <input
           type="text"
@@ -32,9 +32,10 @@ export function WorkItemFilters({ value, onChange }: WorkItemFiltersProps) {
         />
       </div>
 
-      <div>
-        <label>Status</label>
+      <div className="WorkItemFilters__section">
+        <label htmlFor="status-filter">Status</label>
         <select
+          id="status-filter"
           value={value.status}
           onChange={(e) => handleChange('status', e.target.value as any)}
         >
@@ -44,21 +45,22 @@ export function WorkItemFilters({ value, onChange }: WorkItemFiltersProps) {
         </select>
       </div>
 
-      <div>
-        <label>Rep</label>
+      <div className="WorkItemFilters__section">
+        <label htmlFor="rep-filter">Rep</label>
         <select
+          id="rep-filter"
           value={value.repId}
           onChange={(e) => handleChange('repId', e.target.value)}
         >
           <option value="me">Assigned to Me</option>
           <option value="all">All Reps</option>
-          {/* In a real app, we'd map over a list of reps here */}
         </select>
       </div>
 
-      <div>
-        <label>Type</label>
+      <div className="WorkItemFilters__section">
+        <label htmlFor="type-filter">Type</label>
         <select
+          id="type-filter"
           value={value.type}
           onChange={(e) => handleChange('type', e.target.value)}
         >

@@ -176,7 +176,51 @@ export const getSlaMetrics = async (
     const overdueNeedsReply = Number.parseInt(row?.overdue_needs_reply ?? '0', 10);
     const breachRate = openNeedsReply > 0 ? overdueNeedsReply / openNeedsReply : 0;
 
-    // Calculate buckets from response_times (v1 implementation in JS for simplicity, can move to SQL later)
+    // Calculate buckets from response_times
+    const bucketResult = await client.query<{ bucket: string; count: string }>(
+      `
+      WITH inbound AS (
+        SELECT
+          e.id,
+          e.event_ts,
+          e.contact_id,
+          e.contact_phone
+        FROM sms_events e
+        WHERE e.direction = 'inbound'
+          AND e.event_ts >= NOW() - ($2::int || ' days')::interval
+      ),
+      response_times AS (
+        SELECT
+          EXTRACT(EPOCH FROM (o.event_ts - i.event_ts)) / 60.0 AS minutes
+        FROM inbound i
+        JOIN LATERAL (
+          SELECT e2.event_ts
+          FROM sms_events e2
+          WHERE e2.direction = 'outbound'
+            AND e2.event_ts > i.event_ts
+            AND (
+              (i.contact_id IS NOT NULL AND e2.contact_id = i.contact_id)
+              OR (i.contact_id IS NULL AND i.contact_phone IS NOT NULL AND e2.contact_phone = i.contact_phone)
+            )
+          ORDER BY e2.event_ts ASC
+          LIMIT 1
+        ) o ON TRUE
+      )
+      SELECT
+        CASE
+          WHEN minutes <= 5 THEN '0-5'
+          WHEN minutes <= 15 THEN '5-15'
+          WHEN minutes <= 60 THEN '15-60'
+          WHEN minutes <= 180 THEN '60-180'
+          ELSE '180+'
+        END AS bucket,
+        COUNT(*) AS count
+      FROM response_times
+      GROUP BY 1;
+      `,
+      [params.repId ?? null, params.windowDays],
+    );
+
     const buckets: ResponseTimeBucket[] = [
       { bucket: '0-5', count: 0 },
       { bucket: '5-15', count: 0 },
@@ -185,19 +229,20 @@ export const getSlaMetrics = async (
       { bucket: '180+', count: 0 },
     ];
 
-    // Note: We'd need to return the raw minutes from the query to do this in JS, 
-    // or do a separate bucketed query. Let's stick to placeholders for now but 
-    // update the type to show we're thinking about it.
-    
+    for (const r of bucketResult.rows) {
+      const b = buckets.find((b) => b.bucket === r.bucket);
+      if (b) b.count = Number.parseInt(r.count, 10);
+    }
+
     return {
       windowDays: params.windowDays,
       openNeedsReply,
       overdueNeedsReply,
       breachRate,
-      p50Minutes: row?.p50_minutes ?? null,
-      p75Minutes: row?.p75_minutes ?? null,
-      p90Minutes: row?.p90_minutes ?? null,
-      p95Minutes: row?.p95_minutes ?? null,
+      p50Minutes: row?.p50_minutes ? Number.parseFloat(row.p50_minutes as any) : null,
+      p75Minutes: row?.p75_minutes ? Number.parseFloat(row.p75_minutes as any) : null,
+      p90Minutes: row?.p90_minutes ? Number.parseFloat(row.p90_minutes as any) : null,
+      p95Minutes: row?.p95_minutes ? Number.parseFloat(row.p95_minutes as any) : null,
       buckets,
     };
   } catch (err) {

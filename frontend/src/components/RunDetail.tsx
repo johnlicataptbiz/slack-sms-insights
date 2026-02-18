@@ -17,6 +17,7 @@ type Run = {
 
 export default function RunDetail({ run, onBack }: { run: Run; onBack: () => void }) {
   const [showRaw, setShowRaw] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
@@ -31,6 +32,56 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
   }, [run.full_report, run.status]);
 
   const hasStructuredData = parsedData && parsedData.reps.length > 0;
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedSequences = useMemo(() => {
+    if (!parsedData?.allSequences) return [];
+    if (!sortConfig) return parsedData.allSequences;
+
+    return [...parsedData.allSequences].sort((a, b) => {
+      let aValue: any, bValue: any;
+
+      switch (sortConfig.key) {
+        case 'label':
+          aValue = a.label.toLowerCase();
+          bValue = b.label.toLowerCase();
+          break;
+        case 'messagesSent':
+          aValue = a.messagesSent;
+          bValue = b.messagesSent;
+          break;
+        case 'repliesReceived':
+          aValue = a.repliesReceived;
+          bValue = b.repliesReceived;
+          break;
+        case 'replyRate':
+          aValue = a.replyRate;
+          bValue = b.replyRate;
+          break;
+        case 'booked':
+          aValue = a.booked;
+          bValue = b.booked;
+          break;
+        case 'optOuts':
+          aValue = a.optOuts;
+          bValue = b.optOuts;
+          break;
+        default:
+          return 0;
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [parsedData?.allSequences, sortConfig]);
 
   return (
     <div className="run-detail">
@@ -77,26 +128,38 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
         <div className="structured-report">
           <div className="metrics-grid">
             <div className="metric-card">
+              <div className="metric-icon">📤</div>
               <span className="metric-label">Total Sent</span>
               <span className="metric-value">{parsedData.totalMessagesSent.toLocaleString()}</span>
             </div>
             <div className="metric-card">
+              <div className="metric-icon">💬</div>
               <span className="metric-label">Reply Rate</span>
               <span className="metric-value">{parsedData.overallReplyRate.toFixed(1)}%</span>
               <span className="metric-subtext">{parsedData.totalRepliesReceived} replies</span>
             </div>
             <div className="metric-card highlight">
+              <div className="metric-icon">🎯</div>
               <span className="metric-label">Bookings</span>
-              <span className="metric-value">🚀 {parsedData.totalBooked}</span>
+              <span className="metric-value">{parsedData.totalBooked}</span>
+              <div className="metric-trend positive">+{parsedData.totalBooked > 0 ? 'Active' : 'Monitor'}</div>
             </div>
             <div className="metric-card warning">
+              <div className="metric-icon">🚫</div>
               <span className="metric-label">Opt-Outs</span>
-              <span className="metric-value">⚠️ {parsedData.totalOptOuts}</span>
+              <span className="metric-value">{parsedData.totalOptOuts}</span>
+              <div className="metric-trend negative">{parsedData.totalOptOuts > 10 ? 'High Risk' : 'Normal'}</div>
             </div>
           </div>
 
-          <div className="report-section">
-            <h3>Performance by Representative</h3>
+          <div className="report-section section-primary">
+            <div className="section-header">
+              <div className="section-icon">👥</div>
+              <div className="section-content">
+                <h3>Performance by Representative</h3>
+                <p className="section-description">Individual performance metrics and top-performing sequences</p>
+              </div>
+            </div>
             <div className="table-container">
               <table className="metrics-table">
                 <thead>
@@ -126,33 +189,86 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
             </div>
           </div>
 
-          <div className="report-section">
-            <h3>Sequence Performance</h3>
+          <div className="report-section section-secondary">
+            <div className="section-header">
+              <div className="section-icon">📊</div>
+              <div className="section-content">
+                <h3>Sequence Performance</h3>
+                <p className="section-description">Detailed analysis of messaging sequences with risk assessment</p>
+              </div>
+            </div>
             <div className="table-container">
               <table className="metrics-table">
                 <thead>
                   <tr>
-                    <th>Sequence</th>
-                    <th>Sent</th>
-                    <th>Replies</th>
-                    <th>Reply Rate</th>
-                    <th>Booked</th>
-                    <th>Opt-Outs</th>
+                    <th className="sortable" onClick={() => handleSort('label')}>
+                      Sequence {sortConfig?.key === 'label' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('messagesSent')}>
+                      Sent {sortConfig?.key === 'messagesSent' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('repliesReceived')}>
+                      Replies {sortConfig?.key === 'repliesReceived' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('replyRate')}>
+                      Reply Rate {sortConfig?.key === 'replyRate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('booked')}>
+                      Booked {sortConfig?.key === 'booked' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th className="sortable" onClick={() => handleSort('optOuts')}>
+                      Opt-Outs {sortConfig?.key === 'optOuts' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th>Risk Level</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {parsedData.allSequences.map((seq, i) => (
-                    <tr key={i}>
-                      <td className="font-bold">{seq.label}</td>
-                      <td>{seq.messagesSent}</td>
-                      <td>{seq.repliesReceived}</td>
-                      <td>{seq.replyRate.toFixed(1)}%</td>
-                      <td className={seq.booked > 0 ? 'success-text' : ''}>{seq.booked}</td>
-                      <td className={seq.optOuts > 0 ? 'warning-text' : ''}>{seq.optOuts}</td>
-                    </tr>
-                  ))}
+                  {sortedSequences.map((seq, i) => {
+                    const optOutRate = seq.messagesSent > 0 ? (seq.optOuts / seq.messagesSent) * 100 : 0;
+                    const isHighRisk = optOutRate > 5 || seq.optOuts > 10;
+                    const isMediumRisk = optOutRate > 2 || seq.optOuts > 5;
+
+                    return (
+                      <tr key={i} className={isHighRisk ? 'high-risk-row' : isMediumRisk ? 'medium-risk-row' : ''}>
+                        <td className="font-bold">{seq.label}</td>
+                        <td>{seq.messagesSent}</td>
+                        <td>{seq.repliesReceived}</td>
+                        <td>{seq.replyRate.toFixed(1)}%</td>
+                        <td className={seq.booked > 0 ? 'success-text' : ''}>{seq.booked}</td>
+                        <td className={seq.optOuts > 0 ? 'warning-text' : ''}>
+                          {seq.optOuts}
+                          {seq.optOuts > 0 && <span className="opt-out-rate">({optOutRate.toFixed(1)}%)</span>}
+                        </td>
+                        <td>
+                          {isHighRisk && <span className="risk-badge high-risk">🔴 High</span>}
+                          {isMediumRisk && !isHighRisk && <span className="risk-badge medium-risk">🟡 Medium</span>}
+                          {!isMediumRisk && <span className="risk-badge low-risk">🟢 Low</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <div className="report-section section-week-to-date">
+            <div className="section-header">
+              <div className="section-icon">📅</div>
+              <div className="section-content">
+                <h3>Week-to-Date Summary</h3>
+                <p className="section-description">Rolling weekly performance metrics (coming soon)</p>
+              </div>
+            </div>
+            <div className="week-to-date-placeholder">
+              <div className="placeholder-icon">📈</div>
+              <h4>Week-to-Date Analytics</h4>
+              <p>Enhanced week-to-date summaries will be available in a future update. This section will display rolling 7-day metrics, trend analysis, and comparative performance data.</p>
+              <div className="placeholder-features">
+                <span className="feature-tag">Rolling Metrics</span>
+                <span className="feature-tag">Trend Analysis</span>
+                <span className="feature-tag">Comparative Data</span>
+              </div>
             </div>
           </div>
         </div>

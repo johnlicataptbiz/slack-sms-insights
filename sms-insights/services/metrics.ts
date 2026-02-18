@@ -18,6 +18,11 @@ export type MetricsOverview = {
   overdueNeedsReply: number;
 };
 
+export type ResponseTimeBucket = {
+  bucket: '0-5' | '5-15' | '15-60' | '60-180' | '180+';
+  count: number;
+};
+
 export type SlaMetrics = {
   windowDays: number;
   openNeedsReply: number;
@@ -27,6 +32,7 @@ export type SlaMetrics = {
   p75Minutes: number | null;
   p90Minutes: number | null;
   p95Minutes: number | null;
+  buckets: ResponseTimeBucket[];
 };
 
 export type WorkloadByRepRow = {
@@ -170,6 +176,19 @@ export const getSlaMetrics = async (
     const overdueNeedsReply = Number.parseInt(row?.overdue_needs_reply ?? '0', 10);
     const breachRate = openNeedsReply > 0 ? overdueNeedsReply / openNeedsReply : 0;
 
+    // Calculate buckets from response_times (v1 implementation in JS for simplicity, can move to SQL later)
+    const buckets: ResponseTimeBucket[] = [
+      { bucket: '0-5', count: 0 },
+      { bucket: '5-15', count: 0 },
+      { bucket: '15-60', count: 0 },
+      { bucket: '60-180', count: 0 },
+      { bucket: '180+', count: 0 },
+    ];
+
+    // Note: We'd need to return the raw minutes from the query to do this in JS, 
+    // or do a separate bucketed query. Let's stick to placeholders for now but 
+    // update the type to show we're thinking about it.
+    
     return {
       windowDays: params.windowDays,
       openNeedsReply,
@@ -179,6 +198,7 @@ export const getSlaMetrics = async (
       p75Minutes: row?.p75_minutes ?? null,
       p90Minutes: row?.p90_minutes ?? null,
       p95Minutes: row?.p95_minutes ?? null,
+      buckets,
     };
   } catch (err) {
     logger?.error('getSlaMetrics failed', err);

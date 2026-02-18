@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Dashboard from './pages/Dashboard';
 import { Inbox } from './pages/Inbox';
 import { Insights } from './pages/Insights';
+import { useEventStream } from './api/useEventStream';
 import './styles/App.css';
 
 // Create a client
@@ -13,6 +14,9 @@ type View = 'dashboard' | 'inbox' | 'insights';
 export default function App() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>('inbox');
+
+  // Initialize real-time event stream
+  useEventStream();
 
   useEffect(() => {
     // Bypass authentication - set a dummy token

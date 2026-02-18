@@ -6,8 +6,11 @@ export function useEventStream() {
   const qc = useQueryClient();
 
   useEffect(() => {
-    // In a real app, we'd use the configured base URL
-    const es = new EventSource('/api/events/stream');
+    const token = localStorage.getItem('slackToken');
+    if (!token) return;
+
+    // Use the correct endpoint from routes.ts
+    const es = new EventSource(`/api/stream?token=${token}`);
 
     es.addEventListener('work-item-updated', (event: MessageEvent) => {
       try {

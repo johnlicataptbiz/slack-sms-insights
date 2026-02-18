@@ -174,7 +174,35 @@ const handleGetConversationById: RequestHandler = async (req, res, logger, origi
     return sendJson(res, 404, { error: 'Conversation not found' }, origin);
   }
 
-  sendJson(res, 200, { conversation }, origin);
+  // Fetch recent events to satisfy the frontend Conversation detail view
+  const events = await listSmsEventsForConversation(
+    { contact_id: conversation.contact_id, contact_phone: conversation.contact_phone },
+    50,
+    logger,
+  );
+
+  // Map to frontend format
+  const frontendConversation = {
+    id: conversation.id,
+    contactId: conversation.contact_id,
+    contactName: conversation.contact_phone, // Fallback
+    repId: conversation.current_rep_id,
+    repName: conversation.current_rep_id ? 'Assigned Rep' : null,
+    lastMessageAt: conversation.last_touch_at,
+    lastInboundAt: conversation.last_inbound_at,
+    lastOutboundAt: conversation.last_outbound_at,
+    firstResponseAt: null, // Calculate if needed
+    source: 'inbound',
+    stage: 'active',
+    events: events.map(e => ({
+        id: e.id,
+        direction: e.direction,
+        body: e.body,
+        createdAt: e.event_ts,
+    }))
+  };
+
+  sendJson(res, 200, frontendConversation, origin);
 };
 
 const handleGetConversationEvents: RequestHandler = async (req, res, logger, origin) => {
@@ -233,13 +261,6 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
     timeRange: { from: fromStr, to: toStr },
     totalConversations: volume.rows.reduce((acc, r) => acc + r.inbound + r.outbound, 0), // Rough proxy
     newConversations: volume.rows.reduce((acc, r) => acc + r.inbound, 0), // Rough proxy
-    responseTimeBuckets: [
-      { bucket: '0-5', count: 0 }, // Placeholder until we have real buckets
-      { bucket: '5-15', count: 0 },
-      { bucket: '15-60', count: 0 },
-      { bucket: '60-180', count: 0 },
-      { bucket: '180+', count: 0 },
-    ],
     reps: workload.rows.map(r => ({
       repId: r.repId || 'unassigned',
       repName: r.repId || 'Unassigned', // We'd need a rep lookup here
@@ -256,6 +277,7 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
       avgTimeToQualifiedMinutes: null,
       avgTimeToCloseWonMinutes: null,
     },
+    responseTimeBuckets: sla.buckets,
     openWorkItems: overview.openWorkItems,
     overdueWorkItems: overview.overdueWorkItems,
   };

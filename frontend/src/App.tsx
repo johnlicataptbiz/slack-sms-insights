@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import Inbox from './pages/Inbox';
+import Insights from './pages/Insights';
 import './styles/App.css';
 
-type View = 'dashboard' | 'inbox';
+type View = 'dashboard' | 'inbox' | 'insights';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -37,6 +38,9 @@ export default function App() {
         <button onClick={() => setView('inbox')} disabled={view === 'inbox'}>
           Inbox
         </button>
+        <button onClick={() => setView('insights')} disabled={view === 'insights'}>
+          Insights
+        </button>
         <button onClick={() => setView('dashboard')} disabled={view === 'dashboard'}>
           Daily Runs
         </button>
@@ -44,7 +48,13 @@ export default function App() {
         <button onClick={handleLogout}>Logout</button>
       </div>
 
-      {view === 'inbox' ? <Inbox token={token} /> : <Dashboard token={token} onLogout={handleLogout} />}
+      {view === 'inbox' ? (
+        <Inbox token={token} />
+      ) : view === 'insights' ? (
+        <Insights token={token} />
+      ) : (
+        <Dashboard token={token} onLogout={handleLogout} />
+      )}
     </div>
   );
 }

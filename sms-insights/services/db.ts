@@ -193,6 +193,14 @@ export const initializeSchema = async (): Promise<void> => {
       CREATE INDEX IF NOT EXISTS idx_work_items_type_resolved_due
       ON work_items (type, resolved_at, due_at);
     `);
+
+    // Enforce "one open needs_reply per conversation" at the DB level.
+    // This removes the update-then-insert race in the work item engine.
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_open_needs_reply_per_conversation
+      ON work_items (conversation_id)
+      WHERE type = 'needs_reply' AND resolved_at IS NULL;
+    `);
   } finally {
     client.release();
   }

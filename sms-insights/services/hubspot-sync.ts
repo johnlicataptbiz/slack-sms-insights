@@ -175,7 +175,7 @@ const createNoteWithAssociation = async (
   content: string,
   prefix: string,
   token: string,
-  logger: Logger,
+  _logger: Logger,
 ): Promise<void> => {
   const timestamp = new Date().toISOString();
   const body = `${prefix}\nLast Updated: ${timestamp}\n\n${content}`;
@@ -213,7 +213,7 @@ const updateNote = async (
   newContent: string,
   prefix: string,
   token: string,
-  logger: Logger,
+  _logger: Logger,
 ): Promise<void> => {
   const timestamp = new Date().toISOString();
   // We replace the content to avoid infinite growth, or we could append if it's small.

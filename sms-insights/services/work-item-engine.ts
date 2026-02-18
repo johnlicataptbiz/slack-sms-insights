@@ -2,6 +2,7 @@ import type { Logger } from '@slack/bolt';
 import type { Pool } from 'pg';
 import type { ConversationRow } from './conversation-projector.js';
 import { getPool } from './db.js';
+import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventRow } from './sms-event-store.js';
 
 export type WorkItemType = 'needs_reply' | 'sla_breach' | 'hot_lead' | 'unowned' | 'followup_due';
@@ -89,7 +90,11 @@ export const upsertNeedsReplyWorkItem = async (
       ['needs_reply', conversation.id, conversation.current_rep_id, severity, dueAt, inboundEvent.id],
     );
 
-    return insert.rows[0] ?? null;
+    const row = insert.rows[0] ?? null;
+    if (row) {
+      publishRealtimeEvent({ type: 'work_item_created', id: row.id, ts: new Date().toISOString() }, logger);
+    }
+    return row;
   } catch (err) {
     logger?.error('upsertNeedsReplyWorkItem failed', err);
     throw err;
@@ -119,7 +124,11 @@ export const resolveNeedsReplyOnOutbound = async (
       [conversationId, outboundEvent.event_ts],
     );
 
-    return result.rowCount ?? 0;
+    const count = result.rowCount ?? 0;
+    if (count > 0) {
+      publishRealtimeEvent({ type: 'work_item_resolved', id: conversationId, ts: new Date().toISOString() }, logger);
+    }
+    return count;
   } catch (err) {
     logger?.error('resolveNeedsReplyOnOutbound failed', err);
     throw err;

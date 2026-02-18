@@ -36,7 +36,7 @@ export const scheduleDailyReport = async (app: App) => {
   // Convert the local CT "nextRun" back to a UTC timestamp for Slack
   // 1. Get the ISO string from the CT date
   // 2. Adjust for the offset
-  const formatter = new Intl.DateTimeFormat('en-US', {
+  const _formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Chicago',
     year: 'numeric',
     month: 'numeric',

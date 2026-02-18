@@ -1,6 +1,7 @@
 import type { Logger } from '@slack/bolt';
 import type { Pool } from 'pg';
 import { getPool } from './db.js';
+import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventDirection, SmsEventRow } from './sms-event-store.js';
 
 export type ConversationRow = {
@@ -106,7 +107,11 @@ export const upsertConversationFromEvent = async (
       ],
     );
 
-    return result.rows[0] ?? null;
+    const row = result.rows[0] ?? null;
+    if (row) {
+      publishRealtimeEvent({ type: 'conversation_updated', id: row.id, ts: new Date().toISOString() }, logger);
+    }
+    return row;
   } catch (err) {
     logger?.error('upsertConversationFromEvent failed', err);
     throw err;

@@ -28,10 +28,44 @@ const getDbOrThrow = (): Pool => {
   return pool;
 };
 
+export type WorkItemCursor = {
+  dueAt: string;
+  id: string;
+};
+
+export type ListOpenWorkItemsParams = {
+  type?: string;
+  repId?: string;
+  severity?: 'low' | 'med' | 'high';
+  overdueOnly?: boolean;
+  dueBefore?: string; // ISO timestamp
+  limit: number;
+  offset?: number; // legacy
+  cursor?: WorkItemCursor; // new
+};
+
+export type ListOpenWorkItemsResult = {
+  items: WorkItemListRow[];
+  nextCursor: WorkItemCursor | null;
+};
+
+const encodeCursor = (cursor: WorkItemCursor): string => {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+};
+
+const decodeCursor = (cursor: string): WorkItemCursor => {
+  const raw = Buffer.from(cursor, 'base64url').toString('utf8');
+  const parsed = JSON.parse(raw) as { dueAt?: unknown; id?: unknown };
+  if (typeof parsed?.dueAt !== 'string' || typeof parsed?.id !== 'string') {
+    throw new Error('Invalid cursor');
+  }
+  return { dueAt: parsed.dueAt, id: parsed.id };
+};
+
 export const listOpenWorkItems = async (
-  params: { type?: string; repId?: string; limit: number; offset: number },
+  params: ListOpenWorkItemsParams,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<WorkItemListRow[]> => {
+): Promise<ListOpenWorkItemsResult> => {
   const pool = getDbOrThrow();
   const client = await pool.connect();
   try {
@@ -47,11 +81,35 @@ export const listOpenWorkItems = async (
       where.push(`wi.rep_id = $${i++}`);
       values.push(params.repId);
     }
+    if (params.severity) {
+      where.push(`wi.severity = $${i++}`);
+      values.push(params.severity);
+    }
+    if (params.overdueOnly) {
+      where.push('wi.due_at < NOW()');
+    }
+    if (params.dueBefore) {
+      where.push(`wi.due_at < $${i++}`);
+      values.push(params.dueBefore);
+    }
 
-    values.push(params.limit);
+    // Cursor pagination (preferred): stable ordering by (due_at, id)
+    if (params.cursor) {
+      where.push(`(wi.due_at, wi.id) > ($${i++}::timestamptz, $${i++}::uuid)`);
+      values.push(params.cursor.dueAt, params.cursor.id);
+    }
+
+    const limit = Math.max(1, Math.min(params.limit, 200));
+    values.push(limit + 1);
     const limitParam = `$${i++}`;
-    values.push(params.offset);
-    const offsetParam = `$${i++}`;
+
+    // Legacy offset pagination (fallback)
+    let offsetSql = '';
+    if (typeof params.offset === 'number') {
+      values.push(Math.max(0, params.offset));
+      const offsetParam = `$${i++}`;
+      offsetSql = ` OFFSET ${offsetParam}`;
+    }
 
     const sql = `
       SELECT
@@ -72,13 +130,20 @@ export const listOpenWorkItems = async (
       FROM work_items wi
       JOIN conversations c ON c.id = wi.conversation_id
       WHERE ${where.join(' AND ')}
-      ORDER BY wi.due_at ASC
-      LIMIT ${limitParam}
-      OFFSET ${offsetParam};
+      ORDER BY wi.due_at ASC, wi.id ASC
+      LIMIT ${limitParam}${offsetSql};
     `;
 
     const result = await client.query<WorkItemListRow>(sql, values);
-    return result.rows;
+    const rows = result.rows;
+
+    const hasMore = rows.length > limit;
+    const items = hasMore ? rows.slice(0, limit) : rows;
+
+    const last = items.at(-1);
+    const nextCursor: WorkItemCursor | null = hasMore && last ? { dueAt: last.due_at, id: last.id } : null;
+
+    return { items, nextCursor };
   } catch (err) {
     logger?.error('listOpenWorkItems failed', err);
     throw err;
@@ -86,3 +151,6 @@ export const listOpenWorkItems = async (
     client.release();
   }
 };
+
+export const encodeWorkItemCursor = (cursor: WorkItemCursor): string => encodeCursor(cursor);
+export const decodeWorkItemCursor = (cursor: string): WorkItemCursor => decodeCursor(cursor);

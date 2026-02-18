@@ -493,7 +493,8 @@ export const handleApiRoute = async (
 
   // Handle CORS preflight requests
   if (method === 'OPTIONS') {
-    const origin = req.headers.origin || 'http://localhost:5173';
+    const requestOrigin = req.headers.origin;
+    const origin = requestOrigin ? requestOrigin : 'http://localhost:5173';
     sendJson(res, 200, {}, origin);
     return true;
   }
@@ -510,12 +511,16 @@ export const handleApiRoute = async (
       }
 
       try {
-        // Add origin to handler calls
-        const origin = req.headers.origin || 'http://localhost:5173';
+        // Add origin to handler calls.
+        // In production, the dashboard is hosted on Vercel, so we must allow that origin for CORS.
+        // If no Origin header is present, fall back to localhost for local dev.
+        const requestOrigin = req.headers.origin;
+        const origin = requestOrigin ? requestOrigin : 'http://localhost:5173';
         await route.handler(req, res, logger, origin);
       } catch (error) {
         logger?.error('API route error:', error);
-        const origin = req.headers.origin || 'http://localhost:5173';
+        const requestOrigin = req.headers.origin;
+        const origin = requestOrigin ? requestOrigin : 'http://localhost:5173';
         sendJson(res, 500, { error: 'Internal server error' }, origin);
       }
       return true;

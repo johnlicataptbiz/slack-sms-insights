@@ -18,6 +18,15 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<View>('insights');
 
+  // Ensure a token exists before any queries fire (React Query runs during render).
+  // This prevents a first-render 401 when localStorage is empty.
+  //
+  // NOTE: In dev, React.StrictMode intentionally double-invokes render/effects.
+  // We set the token unconditionally to keep the app stable during local dev.
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('slackToken', localStorage.getItem('slackToken') || 'dummy-token-bypass-auth');
+  }
+
   // Initialize real-time event stream
   useEventStream();
 
@@ -25,9 +34,6 @@ export default function App() {
   const { data: metrics } = useMetrics(getTodayRange());
 
   useEffect(() => {
-    // Bypass authentication - set a dummy token
-    const dummyToken = 'dummy-token-bypass-auth';
-    localStorage.setItem('slackToken', dummyToken);
     setLoading(false);
   }, []);
 
@@ -44,7 +50,7 @@ export default function App() {
     );
   }
 
-  const token = 'dummy-token-bypass-auth';
+  const token = localStorage.getItem('slackToken') || 'dummy-token-bypass-auth';
 
   return (
     <div className="AppShell">

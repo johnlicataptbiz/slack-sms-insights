@@ -35,8 +35,7 @@ export const apiFetch = async <T>(
   options: ApiClientOptions = {},
 ): Promise<T> => {
   const baseUrl = options.baseUrl ?? '';
-  const token =
-    getAuthToken(init.token ?? options.token ?? undefined) ?? 'dummy-token-bypass-auth';
+  const token = getAuthToken(init.token ?? options.token ?? undefined);
 
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');

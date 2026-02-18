@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { WebClient } from '@slack/web-api';
-import { initDatabase, closeDatabase } from '../services/db.js';
-import { logDailyRun } from '../services/daily-run-logger.js';
 import { buildAlowareAnalyticsReportBundle } from '../services/aloware-analytics.js';
+import { logDailyRun } from '../services/daily-run-logger.js';
+import { closeDatabase, initDatabase } from '../services/db.js';
 
 const DAILY_REPORT_CHANNEL_ID = 'C09ULGH1BEC'; // #alowaresmsupdates
 
@@ -11,11 +11,11 @@ async function run() {
   await initDatabase();
 
   const client = new WebClient(process.env.SLACK_BOT_TOKEN);
-  
+
   const dates = [
     '2026-02-17', // Yesterday
     '2026-02-16', // Day prior
-    '2026-02-15'  // Two days prior
+    '2026-02-15', // Two days prior
   ];
 
   for (const date of dates) {
@@ -25,7 +25,7 @@ async function run() {
         channelId: DAILY_REPORT_CHANNEL_ID,
         client,
         prompt: `daily report ${date}`,
-        logger: console as any
+        logger: console,
       });
 
       if (bundle.summary) {

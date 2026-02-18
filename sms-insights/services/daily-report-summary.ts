@@ -124,7 +124,9 @@ export const buildDailyReportSummary = (report: string): string => {
   return lines.join('\n');
 };
 
-export const buildDailyReportBlocks = (report: string): any[] => {
+type SlackBlock = Record<string, unknown>;
+
+export const buildDailyReportBlocks = (report: string): SlackBlock[] => {
   const booked = sumFromPatterns(report, BOOKINGS_PATTERNS);
   const optOuts = sumFromPatterns(report, OPTOUTS_PATTERNS);
   const sequences = aggregateSequenceRows(report);
@@ -135,7 +137,7 @@ export const buildDailyReportBlocks = (report: string): any[] => {
 
   const topSequences = sequences.slice(0, 3);
 
-  const blocks: any[] = [
+  const blocks: SlackBlock[] = [
     {
       type: 'header',
       text: {

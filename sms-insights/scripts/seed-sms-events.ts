@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import { initDatabase, closeDatabase } from '../services/db.js';
-import { insertSmsEvent } from '../services/sms-event-store.js';
 import { upsertConversationFromEvent } from '../services/conversation-projector.js';
+import { closeDatabase, initDatabase } from '../services/db.js';
+import { insertSmsEvent } from '../services/sms-event-store.js';
 import { upsertNeedsReplyWorkItem } from '../services/work-item-engine.js';
 
 async function seedSmsEvents() {

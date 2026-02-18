@@ -50,6 +50,27 @@ export const logDailyRun = async (
   }
 };
 
+export type DailyRunRow = {
+  id: string;
+  timestamp: string;
+  channel_id: string;
+  channel_name: string | null;
+  report_date: string | null;
+  report_type: DailyRunInput['reportType'];
+  status: DailyRunInput['status'];
+  error_message: string | null;
+  summary_text: string | null;
+  full_report: string | null;
+  duration_ms: number | null;
+  created_at: string;
+};
+
+export type ChannelWithRunsRow = {
+  channel_id: string;
+  channel_name: string | null;
+  run_count: string;
+};
+
 export const getDailyRuns = async (
   options: {
     channelId?: string;
@@ -58,7 +79,7 @@ export const getDailyRuns = async (
     daysBack?: number;
   } = {},
   logger?: Pick<Logger, 'warn'>,
-): Promise<any[]> => {
+): Promise<DailyRunRow[]> => {
   const pool = getPool();
   if (!pool) {
     return [];
@@ -66,7 +87,7 @@ export const getDailyRuns = async (
 
   try {
     let query = 'SELECT * FROM daily_runs WHERE 1=1';
-    const params: any[] = [];
+    const params: Array<string | number> = [];
 
     if (options.channelId) {
       params.push(options.channelId);
@@ -89,7 +110,7 @@ export const getDailyRuns = async (
       query += ` OFFSET $${params.length}`;
     }
 
-    const result = await pool.query(query, params);
+    const result = await pool.query<DailyRunRow>(query, params);
     return result.rows;
   } catch (error) {
     logger?.warn('Failed to fetch daily runs:', error);
@@ -97,14 +118,14 @@ export const getDailyRuns = async (
   }
 };
 
-export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>): Promise<any | null> => {
+export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>): Promise<DailyRunRow | null> => {
   const pool = getPool();
   if (!pool) {
     return null;
   }
 
   try {
-    const result = await pool.query('SELECT * FROM daily_runs WHERE id = $1', [id]);
+    const result = await pool.query<DailyRunRow>('SELECT * FROM daily_runs WHERE id = $1', [id]);
     return result.rows[0] || null;
   } catch (error) {
     logger?.warn('Failed to fetch daily run by ID:', error);
@@ -112,14 +133,14 @@ export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>)
   }
 };
 
-export const getChannelsWithRuns = async (logger?: Pick<Logger, 'warn'>): Promise<any[]> => {
+export const getChannelsWithRuns = async (logger?: Pick<Logger, 'warn'>): Promise<ChannelWithRunsRow[]> => {
   const pool = getPool();
   if (!pool) {
     return [];
   }
 
   try {
-    const result = await pool.query(
+    const result = await pool.query<ChannelWithRunsRow>(
       `SELECT DISTINCT channel_id, channel_name, COUNT(*) as run_count
        FROM daily_runs
        GROUP BY channel_id, channel_name

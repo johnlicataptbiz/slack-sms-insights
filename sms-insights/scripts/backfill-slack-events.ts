@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import { WebClient } from '@slack/web-api';
-import { initDatabase, closeDatabase } from '../services/db.js';
 import { parseAlowareMessage } from '../services/aloware-parser.js';
-import { insertSmsEvent } from '../services/sms-event-store.js';
 import { upsertConversationFromEvent } from '../services/conversation-projector.js';
-import { upsertNeedsReplyWorkItem, resolveNeedsReplyOnOutbound } from '../services/work-item-engine.js';
+import { closeDatabase, initDatabase } from '../services/db.js';
+import { insertSmsEvent } from '../services/sms-event-store.js';
+import { resolveNeedsReplyOnOutbound, upsertNeedsReplyWorkItem } from '../services/work-item-engine.js';
 
 const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 const CHANNEL_ID = process.env.ALOWARE_CHANNEL_ID || 'C09ULGH1BEC';
@@ -50,9 +50,9 @@ async function backfill() {
 
       for (const message of messages) {
         totalProcessed++;
-        
+
         const text = message.text || '';
-        const attachments = message.attachments as any[] | undefined;
+        const attachments = message.attachments as unknown as Parameters<typeof parseAlowareMessage>[1];
         const slackMessageTs = message.ts;
 
         if (!slackMessageTs) continue;
@@ -64,7 +64,7 @@ async function backfill() {
         if (!parsed.contactId && !parsed.contactPhone) continue;
 
         const eventRow = await insertSmsEvent({
-          slackTeamId: (message as any).team || 'unknown',
+          slackTeamId: (message as { team?: string }).team || 'unknown',
           slackChannelId: CHANNEL_ID,
           slackMessageTs,
           eventTs: slackTsToDate(slackMessageTs),
@@ -94,13 +94,11 @@ async function backfill() {
 
       cursor = result.response_metadata?.next_cursor;
       console.log(`Progress: ${totalProcessed} processed, ${totalIngested} ingested`);
-
     } while (cursor);
 
     console.log('✅ Backfill complete!');
     console.log(`Total messages processed: ${totalProcessed}`);
     console.log(`Total SMS events ingested: ${totalIngested}`);
-
   } catch (error) {
     console.error('❌ Backfill failed:', error);
   } finally {

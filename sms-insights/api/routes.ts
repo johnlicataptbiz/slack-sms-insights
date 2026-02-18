@@ -10,7 +10,7 @@ import {
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
-import { decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem, assignWorkItem } from '../services/work-items.js';
+import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
 
 type RequestHandler = (
   req: IncomingMessage & { body?: unknown; user?: unknown },
@@ -128,10 +128,25 @@ const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
   }
 
   try {
-    const body = await parseJsonBody(req);
-    // biome-ignore lint/suspicious/noExplicitAny: legacy endpoint accepts arbitrary JSON payload from bot.
+    type LegacyRunPayload = {
+      channelId: string;
+      channelName?: string;
+      reportType: 'daily' | 'manual' | 'test';
+      status: 'success' | 'error' | 'pending';
+      errorMessage?: string;
+      summaryText?: string;
+      fullReport?: string;
+      durationMs?: number;
+    };
+
+    const body = (await parseJsonBody(req)) as Partial<LegacyRunPayload>;
+
+    if (!body.channelId || !body.reportType || !body.status) {
+      return sendJson(res, 400, { error: 'Missing required fields: channelId, reportType, status' }, origin);
+    }
+
     const { channelId, channelName, reportType, status, errorMessage, summaryText, fullReport, durationMs } =
-      body as any;
+      body as LegacyRunPayload;
 
     const runId = await logDailyRun(
       {
@@ -194,12 +209,12 @@ const handleGetConversationById: RequestHandler = async (req, res, logger, origi
     firstResponseAt: null, // Calculate if needed
     source: 'inbound',
     stage: 'active',
-    events: events.map(e => ({
-        id: e.id,
-        direction: e.direction,
-        body: e.body,
-        createdAt: e.event_ts,
-    }))
+    events: events.map((e) => ({
+      id: e.id,
+      direction: e.direction,
+      body: e.body,
+      createdAt: e.event_ts,
+    })),
   };
 
   sendJson(res, 200, frontendConversation, origin);
@@ -243,17 +258,24 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
   const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
   const windowDays = Math.max(1, Math.min(days, 90));
 
-  let overview, sla, workload, volume;
-  try {
-    [overview, sla, workload, volume] = await Promise.all([
-      getMetricsOverview({ windowDays }, logger),
-      getSlaMetrics({ windowDays }, logger),
-      getWorkloadByRepMetrics({ windowDays }, logger),
-      getVolumeByDayMetrics({ windowDays }, logger),
-    ]);
-  } catch (err) {
+  const [overview, sla, workload, volume] = await Promise.all([
+    getMetricsOverview({ windowDays }, logger),
+    getSlaMetrics({ windowDays }, logger),
+    getWorkloadByRepMetrics({ windowDays }, logger),
+    getVolumeByDayMetrics({ windowDays }, logger),
+  ]).catch((err) => {
     logger?.error('Failed to fetch metrics:', err);
-    return sendJson(res, 500, { error: 'Failed to fetch metrics', details: err instanceof Error ? err.message : String(err) }, origin);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch metrics', details: err instanceof Error ? err.message : String(err) },
+      origin,
+    );
+    return [null, null, null, null] as const;
+  });
+
+  if (!overview || !sla || !workload || !volume) {
+    return;
   }
 
   // Transform to frontend MetricsSummary format
@@ -261,7 +283,7 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
     timeRange: { from: fromStr, to: toStr },
     totalConversations: volume.rows.reduce((acc, r) => acc + r.inbound + r.outbound, 0), // Rough proxy
     newConversations: volume.rows.reduce((acc, r) => acc + r.inbound, 0), // Rough proxy
-    reps: workload.rows.map(r => ({
+    reps: workload.rows.map((r) => ({
       repId: r.repId || 'unassigned',
       repName: r.repId || 'Unassigned', // We'd need a rep lookup here
       conversationsHandled: 0, // Placeholder
@@ -314,16 +336,16 @@ const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
     // Map internal event types to frontend event types if needed
     // Currently they match or are compatible
     if (event.type === 'work-item-updated') {
-        res.write('event: work-item-updated\n');
-        res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
+      res.write('event: work-item-updated\n');
+      res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
     } else if (event.type === 'work-item-created') {
-        res.write('event: work-item-created\n');
-        res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
+      res.write('event: work-item-created\n');
+      res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
     } else if (event.type === 'metrics-updated') {
-        res.write('event: metrics-updated\n');
-        res.write(`data: {}\n\n`);
+      res.write('event: metrics-updated\n');
+      res.write('data: {}\n\n');
     } else {
-        writeEvent(event);
+      writeEvent(event);
     }
   });
 
@@ -345,7 +367,7 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
   const severity = (url.searchParams.get('severity') || undefined) as 'low' | 'med' | 'high' | undefined;
   const overdueOnly = url.searchParams.get('overdueOnly') === 'true';
   const dueBefore = url.searchParams.get('dueBefore') || undefined;
-  const search = url.searchParams.get('search') || undefined; // Not implemented in service yet, but good to have param
+  const _search = url.searchParams.get('search') || undefined; // Not implemented in service yet, but good to have param
 
   const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200);
   const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
@@ -353,7 +375,7 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
   const cursorParam = url.searchParams.get('cursor') || undefined;
   const cursor = cursorParam ? decodeWorkItemCursor(cursorParam) : undefined;
 
-  const { items, nextCursor } = await listOpenWorkItems(
+  const { items, nextCursor: _nextCursor } = await listOpenWorkItems(
     {
       type: type === 'ALL' ? undefined : type,
       repId: repId === 'all' ? undefined : repId === 'me' ? 'dummy-user' : repId, // Handle 'me' and 'all'
@@ -368,7 +390,7 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
   );
 
   // Transform to frontend WorkItem format
-  const frontendItems = items.map(item => ({
+  const frontendItems = items.map((item) => ({
     id: item.id,
     type: item.type,
     status: item.resolved_at ? 'resolved' : 'open',
@@ -409,19 +431,19 @@ const handleAssignWorkItem: RequestHandler = async (req, res, logger, origin) =>
   }
 
   try {
-    const body = await parseJsonBody(req) as { repId: string };
+    const body = (await parseJsonBody(req)) as { repId: string };
     if (!body.repId) {
-        return sendJson(res, 400, { error: 'Missing repId' }, origin);
+      return sendJson(res, 400, { error: 'Missing repId' }, origin);
     }
 
     const success = await assignWorkItem(id, body.repId, logger);
     if (!success) {
-        return sendJson(res, 404, { error: 'Work item not found' }, origin);
+      return sendJson(res, 404, { error: 'Work item not found' }, origin);
     }
 
     sendJson(res, 200, { success: true }, origin);
-  } catch (error) {
-      sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (_error) {
+    sendJson(res, 400, { error: 'Invalid request body' }, origin);
   }
 };
 

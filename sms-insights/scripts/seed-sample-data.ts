@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import { initDatabase, closeDatabase } from '../services/db.js';
-import { logDailyRun } from '../services/daily-run-logger.js';
 import { buildDailyReportSummary } from '../services/daily-report-summary.js';
+import { logDailyRun } from '../services/daily-run-logger.js';
+import { closeDatabase, initDatabase } from '../services/db.js';
 
 const DAILY_REPORT_TEXT = [
   '*PT BIZ - DAILY SMS SNAPSHOT*',
@@ -57,7 +57,7 @@ async function seed() {
       summaryText: summary,
       fullReport: DAILY_REPORT_TEXT,
       durationMs: 1500,
-    }
+    },
   ];
 
   for (const sample of samples) {

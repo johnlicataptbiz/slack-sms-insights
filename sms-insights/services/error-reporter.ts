@@ -1,11 +1,32 @@
 import type { App } from '@slack/bolt';
 
-export async function reportError(app: App, error: any, context: string) {
+type SlackWebApiPlatformError = {
+  code?: string;
+  data?: {
+    error?: string;
+  };
+  message?: string;
+  stack?: string;
+};
+
+const isSlackWebApiPlatformError = (error: unknown): error is SlackWebApiPlatformError => {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  return true;
+};
+
+export async function reportError(app: App, error: unknown, context: string) {
   const adminChannel = process.env.SYSTEM_ADMIN_CHANNEL_ID || process.env.ALOWARE_WATCHER_CHANNEL_ID;
 
   app.logger.error(`[${context}] Error:`, error);
 
-  if (!adminChannel || (error?.code === 'slack_webapi_platform_error' && error?.data?.error === 'invalid_auth')) {
+  const slackError = isSlackWebApiPlatformError(error) ? error : undefined;
+
+  if (
+    !adminChannel ||
+    (slackError?.code === 'slack_webapi_platform_error' && slackError?.data?.error === 'invalid_auth')
+  ) {
     return;
   }
 
@@ -26,14 +47,14 @@ export async function reportError(app: App, error: any, context: string) {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*Context:* \`${context}\`\n*Error:* \`${error?.message || error}\``,
+            text: `*Context:* \`${context}\`\n*Error:* \`${slackError?.message || String(error)}\``,
           },
         },
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*Stack:* \n\`\`\`${error?.stack?.slice(0, 500) || 'No stack trace available'}\`\`\``,
+            text: `*Stack:* \n\`\`\`${slackError?.stack?.slice(0, 500) || 'No stack trace available'}\`\`\``,
           },
         },
         {

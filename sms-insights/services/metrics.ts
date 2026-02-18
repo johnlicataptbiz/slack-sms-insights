@@ -239,10 +239,10 @@ export const getSlaMetrics = async (
       openNeedsReply,
       overdueNeedsReply,
       breachRate,
-      p50Minutes: row?.p50_minutes ? Number.parseFloat(row.p50_minutes as any) : null,
-      p75Minutes: row?.p75_minutes ? Number.parseFloat(row.p75_minutes as any) : null,
-      p90Minutes: row?.p90_minutes ? Number.parseFloat(row.p90_minutes as any) : null,
-      p95Minutes: row?.p95_minutes ? Number.parseFloat(row.p95_minutes as any) : null,
+      p50Minutes: typeof row?.p50_minutes === 'number' ? row.p50_minutes : null,
+      p75Minutes: typeof row?.p75_minutes === 'number' ? row.p75_minutes : null,
+      p90Minutes: typeof row?.p90_minutes === 'number' ? row.p90_minutes : null,
+      p95Minutes: typeof row?.p95_minutes === 'number' ? row.p95_minutes : null,
       buckets,
     };
   } catch (err) {

@@ -24,7 +24,7 @@ describe('setter-feedback service', () => {
       contactId: '1',
       line: 'Line A',
       sequence: 'BOOK- BUYER Intro Flow',
-    } as any;
+    } satisfies Parameters<typeof requestSetterFeedback>[0]['fields'];
 
     await requestSetterFeedback({
       client: fakeClient as unknown as WebClient,
@@ -50,7 +50,7 @@ describe('setter-feedback service', () => {
       contactId: '1',
       line: 'Line A',
       sequence: '',
-    } as any;
+    } satisfies Parameters<typeof requestSetterFeedback>[0]['fields'];
 
     await requestSetterFeedback({
       client: fakeClient as unknown as WebClient,
@@ -82,7 +82,7 @@ describe('setter-feedback service', () => {
       contactId: '1',
       line: 'Line A',
       sequence: '',
-    } as any;
+    } satisfies Parameters<typeof requestSetterFeedback>[0]['fields'];
 
     // first call -> should post
     await requestSetterFeedback({
@@ -132,7 +132,7 @@ describe('setter-feedback service', () => {
       contactId: '1',
       line: 'Line A',
       sequence: '',
-    } as any;
+    } satisfies Parameters<typeof requestSetterFeedback>[0]['fields'];
 
     await requestSetterFeedback({
       client: fakeClient as unknown as WebClient,
@@ -168,7 +168,7 @@ describe('setter-feedback service', () => {
       contactId: '1',
       line: 'Line A',
       sequence: '',
-    } as any;
+    } satisfies Parameters<typeof requestSetterFeedback>[0]['fields'];
 
     await requestSetterFeedback({
       client: fakeClient as unknown as WebClient,

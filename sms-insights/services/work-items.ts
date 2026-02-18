@@ -72,7 +72,7 @@ export const listOpenWorkItems = async (
   const client = await pool.connect();
   try {
     const where: string[] = ['wi.resolved_at IS NULL'];
-    const values: any[] = [];
+    const values: Array<string | number | boolean | null> = [];
     let i = 1;
 
     if (params.type) {
@@ -108,7 +108,7 @@ export const listOpenWorkItems = async (
     const limit = Math.max(1, Math.min(params.limit, 200));
     // Fetch limit + 1 to know if there is a next page
     const fetchLimit = limit + 1;
-    
+
     // Legacy offset pagination (fallback)
     let offsetSql = '';
     if (typeof params.offset === 'number' && !params.cursor) {

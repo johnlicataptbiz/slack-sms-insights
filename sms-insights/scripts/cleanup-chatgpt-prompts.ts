@@ -1,5 +1,5 @@
-import { WebClient } from "@slack/web-api";
-import "dotenv/config";
+import { WebClient } from '@slack/web-api';
+import 'dotenv/config';
 
 type SlackMessage = {
   bot_id?: string;
@@ -17,22 +17,19 @@ type DeletionClient = {
 };
 
 const DEFAULT_LOOKBACK_DAYS = 30;
-const OLD_CHATGPT_USER_ID = "U09TUT5FJMA";
-const PROMPT_MARKERS = [
-  "daily ai analysis request",
-  "acts as our physical therapy business growth analyst",
-];
+const OLD_CHATGPT_USER_ID = 'U09TUT5FJMA';
+const PROMPT_MARKERS = ['daily ai analysis request', 'acts as our physical therapy business growth analyst'];
 
 const getChannelId = (): string => {
   const configured = process.env.ALOWARE_CHANNEL_ID?.trim();
   if (!configured) {
-    throw new Error("ALOWARE_CHANNEL_ID is required in .env");
+    throw new Error('ALOWARE_CHANNEL_ID is required in .env');
   }
   return configured;
 };
 
 const getLookbackDays = (): number => {
-  const parsed = Number.parseInt(process.env.CLEANUP_LOOKBACK_DAYS || "", 10);
+  const parsed = Number.parseInt(process.env.CLEANUP_LOOKBACK_DAYS || '', 10);
   if (Number.isNaN(parsed)) {
     return DEFAULT_LOOKBACK_DAYS;
   }
@@ -40,19 +37,19 @@ const getLookbackDays = (): number => {
 };
 
 const isApplyMode = (): boolean => {
-  return process.env.APPLY === "true";
+  return process.env.APPLY === 'true';
 };
 
 const hasChatGptReference = (text: string): boolean => {
   const normalized = text.toLowerCase();
-  if (normalized.includes("chatgpt")) {
+  if (normalized.includes('chatgpt')) {
     return true;
   }
   return normalized.includes(`<@${OLD_CHATGPT_USER_ID.toLowerCase()}>`);
 };
 
 const isChatGptPromptMessage = (message: SlackMessage): boolean => {
-  const text = (message.text || "").trim();
+  const text = (message.text || '').trim();
   if (!text) {
     return false;
   }
@@ -73,7 +70,7 @@ const fetchHistory = async ({
   oldest: string;
 }): Promise<SlackMessage[]> => {
   const messages: SlackMessage[] = [];
-  let cursor = "";
+  let cursor = '';
 
   do {
     const response = await client.conversations.history({
@@ -84,7 +81,7 @@ const fetchHistory = async ({
       oldest,
     });
     messages.push(...((response.messages || []) as SlackMessage[]));
-    cursor = response.response_metadata?.next_cursor || "";
+    cursor = response.response_metadata?.next_cursor || '';
   } while (cursor);
 
   return messages;
@@ -100,7 +97,7 @@ const fetchReplies = async ({
   threadTs: string;
 }): Promise<SlackMessage[]> => {
   const messages: SlackMessage[] = [];
-  let cursor = "";
+  let cursor = '';
 
   do {
     const response = await client.conversations.replies({
@@ -111,7 +108,7 @@ const fetchReplies = async ({
       ts: threadTs,
     });
     messages.push(...((response.messages || []) as SlackMessage[]));
-    cursor = response.response_metadata?.next_cursor || "";
+    cursor = response.response_metadata?.next_cursor || '';
   } while (cursor);
 
   return messages;
@@ -120,34 +117,34 @@ const fetchReplies = async ({
 const getDeletionClients = async (): Promise<DeletionClient[]> => {
   const clients: DeletionClient[] = [];
 
-  const botToken = process.env.SLACK_BOT_TOKEN?.trim() || "";
+  const botToken = process.env.SLACK_BOT_TOKEN?.trim() || '';
   if (botToken) {
     const botClient = new WebClient(botToken);
     const auth = await botClient.auth.test();
     if (auth.user_id) {
       clients.push({
         client: botClient,
-        label: "bot",
+        label: 'bot',
         userId: auth.user_id,
       });
     }
   }
 
-  const userToken = process.env.SLACK_USER_TOKEN?.trim() || "";
+  const userToken = process.env.SLACK_USER_TOKEN?.trim() || '';
   if (userToken) {
     const userClient = new WebClient(userToken);
     const auth = await userClient.auth.test();
     if (auth.user_id) {
       clients.push({
         client: userClient,
-        label: "user",
+        label: 'user',
         userId: auth.user_id,
       });
     }
   }
 
   if (clients.length === 0) {
-    throw new Error("No valid deletion client found (SLACK_BOT_TOKEN/SLACK_USER_TOKEN).");
+    throw new Error('No valid deletion client found (SLACK_BOT_TOKEN/SLACK_USER_TOKEN).');
   }
 
   return clients;
@@ -162,9 +159,7 @@ const main = async (): Promise<void> => {
   const clients = await getDeletionClients();
   const scanClient = clients[0].client;
 
-  console.log(
-    `Scanning channel ${channelId} for ChatGPT prompt messages in last ${lookbackDays} day(s)...`,
-  );
+  console.log(`Scanning channel ${channelId} for ChatGPT prompt messages in last ${lookbackDays} day(s)...`);
 
   const roots = await fetchHistory({
     channelId,
@@ -175,11 +170,11 @@ const main = async (): Promise<void> => {
   const candidatesByTs = new Map<string, SlackMessage>();
   const threadRoots = roots
     .filter((message) => Number(message.reply_count || 0) > 0)
-    .map((message) => message.ts || "")
+    .map((message) => message.ts || '')
     .filter((ts) => ts.length > 0);
 
   for (const message of roots) {
-    if ((message.thread_ts || "") !== (message.ts || "") && message.thread_ts) {
+    if ((message.thread_ts || '') !== (message.ts || '') && message.thread_ts) {
       continue;
     }
     if (isChatGptPromptMessage(message) && message.ts) {
@@ -201,7 +196,7 @@ const main = async (): Promise<void> => {
   }
 
   const candidates = [...candidatesByTs.values()].sort(
-    (a, b) => Number.parseFloat(a.ts || "0") - Number.parseFloat(b.ts || "0"),
+    (a, b) => Number.parseFloat(a.ts || '0') - Number.parseFloat(b.ts || '0'),
   );
 
   console.log(`Found ${candidates.length} candidate message(s).`);
@@ -214,22 +209,20 @@ const main = async (): Promise<void> => {
   let failed = 0;
 
   for (const message of candidates) {
-    const messageTs = message.ts || "";
-    const owner = message.user || "";
-    const snippet = (message.text || "").replace(/\s+/g, " ").slice(0, 140);
+    const messageTs = message.ts || '';
+    const owner = message.user || '';
+    const snippet = (message.text || '').replace(/\s+/g, ' ').slice(0, 140);
 
     if (!apply) {
-      console.log(`[DRY RUN] ${messageTs} owner=${owner || "unknown"} text="${snippet}"`);
+      console.log(`[DRY RUN] ${messageTs} owner=${owner || 'unknown'} text="${snippet}"`);
       continue;
     }
 
     const preferred = clients.find((entry) => entry.userId === owner);
-    const orderedClients = preferred
-      ? [preferred, ...clients.filter((entry) => entry.userId !== owner)]
-      : clients;
+    const orderedClients = preferred ? [preferred, ...clients.filter((entry) => entry.userId !== owner)] : clients;
 
     let deletedBy: string | undefined;
-    let lastError = "";
+    let lastError = '';
 
     for (const deletionClient of orderedClients) {
       try {
@@ -239,8 +232,9 @@ const main = async (): Promise<void> => {
         });
         deletedBy = deletionClient.label;
         break;
-      } catch (error: any) {
-        lastError = error?.data?.error || error?.message || String(error);
+      } catch (error: unknown) {
+        const maybeSlackError = error as { data?: { error?: string }; message?: string };
+        lastError = maybeSlackError?.data?.error || maybeSlackError?.message || String(error);
       }
     }
 
@@ -250,7 +244,7 @@ const main = async (): Promise<void> => {
       continue;
     }
 
-    if (lastError.includes("cant_delete_message") || lastError.includes("not_authed")) {
+    if (lastError.includes('cant_delete_message') || lastError.includes('not_authed')) {
       skipped += 1;
       console.log(`[SKIPPED] ${messageTs} reason=${lastError} text="${snippet}"`);
       continue;
@@ -261,7 +255,7 @@ const main = async (): Promise<void> => {
   }
 
   if (!apply) {
-    console.log("Dry run complete. Re-run with APPLY=true to delete.");
+    console.log('Dry run complete. Re-run with APPLY=true to delete.');
     return;
   }
 
@@ -269,6 +263,6 @@ const main = async (): Promise<void> => {
 };
 
 main().catch((error) => {
-  console.error("Cleanup failed:", error);
+  console.error('Cleanup failed:', error);
   process.exit(1);
 });

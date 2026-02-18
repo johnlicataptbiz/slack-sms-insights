@@ -109,13 +109,23 @@ const requestOpenAiResponse = async ({
   }
 };
 
-const extractOutputText = (payload: any): string | undefined => {
+type OpenAiChatCompletionPayload = {
+  choices?: Array<{
+    message?: {
+      content?: unknown;
+    };
+  }>;
+};
+
+const extractOutputText = (payload: unknown): string | undefined => {
   if (typeof payload !== 'object' || payload === null) {
     return undefined;
   }
 
+  const typed = payload as OpenAiChatCompletionPayload;
+
   // Standard OpenAI Chat Completions response format
-  const choice = payload.choices?.[0];
+  const choice = typed.choices?.[0];
   const content = choice?.message?.content;
 
   if (typeof content === 'string' && content.trim().length > 0) {

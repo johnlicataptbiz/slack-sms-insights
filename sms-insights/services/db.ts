@@ -9,6 +9,8 @@ export const initDatabase = async (logger?: Pick<Logger, 'info' | 'error'>): Pro
   }
 
   const databaseUrl = process.env.DATABASE_URL;
+  logger?.info(`Checking DATABASE_URL: ${databaseUrl ? 'Present (starts with ' + databaseUrl.substring(0, 10) + '...)' : 'MISSING'}`);
+  
   if (!databaseUrl) {
     logger?.error('DATABASE_URL not set; database logging disabled');
     return;

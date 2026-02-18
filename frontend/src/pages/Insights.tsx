@@ -28,14 +28,25 @@ function formatMinutes(minutes: number | null | undefined) {
 export function Insights() {
   const [range, setRange] = useState<'today' | '7d' | '30d'>('7d');
   const { from, to } = computeRange(range);
-  const { data: metrics, isLoading, isError } = useMetrics({ from, to });
+  const { data: metrics, isLoading, isError, error } = useMetrics({ from, to });
 
   if (isLoading) {
-    return <div className="Insights" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>Loading metrics...</div>;
+    return (
+      <div className="Insights" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        Loading metrics...
+      </div>
+    );
   }
 
   if (isError) {
-    return <div className="Insights__error">Failed to load metrics.</div>;
+    return (
+      <div className="Insights__error">
+        Failed to load metrics.
+        <pre style={{ whiteSpace: 'pre-wrap', marginTop: 12, opacity: 0.8 }}>
+          {String((error as any)?.message ?? error)}
+        </pre>
+      </div>
+    );
   }
 
   return (

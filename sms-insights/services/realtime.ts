@@ -3,7 +3,11 @@ import type { Logger } from '@slack/bolt';
 export type RealtimeEvent =
   | { type: 'work-item-created'; payload: unknown }
   | { type: 'work-item-updated'; payload: unknown }
-  | { type: 'runs-updated'; ts: string; payload: { runId: string; channelId: string; reportType: string; status: string } }
+  | {
+      type: 'runs-updated';
+      ts: string;
+      payload: { runId: string; channelId: string; reportType: string; status: string };
+    }
   | { type: 'work_item_created'; id: string; ts: string } // legacy
   | { type: 'work_item_resolved'; id: string; ts: string } // legacy
   | { type: 'conversation_updated'; id: string; ts: string }

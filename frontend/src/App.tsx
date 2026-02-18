@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import Dashboard from './pages/Dashboard';
-import { Inbox } from './pages/Inbox';
 import { Insights } from './pages/Insights';
 import { useEventStream } from './api/useEventStream';
 import { useMetrics } from './api/queries';
 import './styles/App.css';
 
-type View = 'dashboard' | 'inbox' | 'insights';
+type View = 'dashboard' | 'insights';
 
 function getTodayRange() {
   const to = new Date();
@@ -17,7 +16,7 @@ function getTodayRange() {
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<View>('inbox');
+  const [view, setView] = useState<View>('insights');
 
   // Initialize real-time event stream
   useEventStream();
@@ -54,12 +53,6 @@ export default function App() {
         
         <div className="AppShell__links">
           <button 
-            className={view === 'inbox' ? 'active' : ''} 
-            onClick={() => setView('inbox')}
-          >
-            <span role="img" aria-label="inbox">📥</span> Inbox
-          </button>
-          <button 
             className={view === 'insights' ? 'active' : ''} 
             onClick={() => setView('insights')}
           >
@@ -73,18 +66,6 @@ export default function App() {
           </button>
         </div>
 
-        <div className="AppShell__stats">
-          <div className="AppShell__stat-item">
-            <div className="AppShell__stat-label">Open Items</div>
-            <div className="AppShell__stat-value">{metrics?.openWorkItems ?? '...'}</div>
-          </div>
-          <div className="AppShell__stat-item">
-            <div className="AppShell__stat-label">SLA Breaches</div>
-            <div className="AppShell__stat-value" style={{ color: metrics?.overdueWorkItems ? 'var(--color-error)' : 'white' }}>
-              {metrics?.overdueWorkItems ?? '...'}
-            </div>
-          </div>
-        </div>
 
         <button className="AppShell__logout" onClick={handleLogout}>
           Logout
@@ -92,9 +73,7 @@ export default function App() {
       </nav>
 
       <main className="AppShell__content">
-        {view === 'inbox' ? (
-          <Inbox />
-        ) : view === 'insights' ? (
+        {view === 'insights' ? (
           <Insights />
         ) : (
           <Dashboard token={token} onLogout={handleLogout} />

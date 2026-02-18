@@ -259,8 +259,10 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
   const windowDays = Math.max(1, Math.min(days, 90));
 
   const [overview, sla, workload, volume] = await Promise.all([
-    getMetricsOverview({ windowDays }, logger),
-    getSlaMetrics({ windowDays }, logger),
+    getMetricsOverview({ windowDays, repId: undefined }, logger),
+    // Pass empty string instead of undefined to avoid pg "could not determine data type of parameter $1"
+    // in some environments when the first param is omitted.
+    getSlaMetrics({ windowDays, repId: '' }, logger),
     getWorkloadByRepMetrics({ windowDays }, logger),
     getVolumeByDayMetrics({ windowDays }, logger),
   ]).catch((err) => {

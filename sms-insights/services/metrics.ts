@@ -116,6 +116,10 @@ export const getSlaMetrics = async (
     // Approximate response time:
     // For each inbound event in window, find the first outbound event after it for the same contact_id/phone.
     // This is a v1 approximation until sms_events has conversation_id and we can do exact pairing.
+    // IMPORTANT: when repId is not provided, pass NULL (not undefined) so Postgres can infer $1::text.
+    // Some pg query plans can still error with 42P18 if the driver sends an "unknown" typed param.
+    const repIdParam: string | null = params.repId ? String(params.repId) : null;
+
     const result = await client.query<{
       open_needs_reply: string;
       overdue_needs_reply: string;
@@ -125,15 +129,20 @@ export const getSlaMetrics = async (
       p95_minutes: number | null;
     }>(
       `
-      WITH inbound AS (
+      WITH _params AS (
+        SELECT $1::text AS rep_id, $2::int AS window_days
+      ),
+      inbound AS (
         SELECT
           e.id,
           e.event_ts,
           e.contact_id,
           e.contact_phone
         FROM sms_events e
+        CROSS JOIN _params p
         WHERE e.direction = 'inbound'
-          AND e.event_ts >= NOW() - ($2::int || ' days')::interval
+          AND e.event_ts >= NOW() - (p.window_days || ' days')::interval
+          AND (p.rep_id IS NULL OR p.rep_id = '' OR e.aloware_user = p.rep_id)
       ),
       response_times AS (
         SELECT
@@ -155,9 +164,10 @@ export const getSlaMetrics = async (
       open_needs_reply AS (
         SELECT wi.*
         FROM work_items wi
+        CROSS JOIN _params p
         WHERE wi.resolved_at IS NULL
           AND wi.type = 'needs_reply'
-          AND ($1::text IS NULL OR wi.rep_id = $1::text)
+          AND (p.rep_id IS NULL OR wi.rep_id = p.rep_id)
       )
       SELECT
         (SELECT COUNT(*) FROM open_needs_reply) AS open_needs_reply,
@@ -168,7 +178,7 @@ export const getSlaMetrics = async (
         (SELECT percentile_cont(0.95) WITHIN GROUP (ORDER BY minutes) FROM response_times) AS p95_minutes
       ;
       `,
-      [params.repId ?? null, params.windowDays],
+      [repIdParam, params.windowDays],
     );
 
     const row = result.rows[0];
@@ -179,15 +189,20 @@ export const getSlaMetrics = async (
     // Calculate buckets from response_times
     const bucketResult = await client.query<{ bucket: string; count: string }>(
       `
-      WITH inbound AS (
+      WITH _params AS (
+        SELECT $1::text AS rep_id, $2::int AS window_days
+      ),
+      inbound AS (
         SELECT
           e.id,
           e.event_ts,
           e.contact_id,
           e.contact_phone
         FROM sms_events e
+        CROSS JOIN _params p
         WHERE e.direction = 'inbound'
-          AND e.event_ts >= NOW() - ($2::int || ' days')::interval
+          AND e.event_ts >= NOW() - (p.window_days || ' days')::interval
+          AND (p.rep_id IS NULL OR p.rep_id = '' OR e.aloware_user = p.rep_id)
       ),
       response_times AS (
         SELECT
@@ -218,7 +233,7 @@ export const getSlaMetrics = async (
       FROM response_times
       GROUP BY 1;
       `,
-      [params.repId ?? null, params.windowDays],
+      [repIdParam, params.windowDays],
     );
 
     const buckets: ResponseTimeBucket[] = [

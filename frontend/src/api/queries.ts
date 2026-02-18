@@ -40,6 +40,7 @@ export function useMetrics(params: { from: string; to: string }) {
     queryKey: ['metrics', params],
     queryFn: () => client.get<MetricsSummary>(`/api/metrics?${searchParams.toString()}`),
     staleTime: 60_000,
+    retry: false,
   });
 }
 

@@ -10,7 +10,9 @@ export function useEventStream() {
     // Keep realtime only for Insights + Daily Runs.
     const token = localStorage.getItem('slackToken') || 'dummy-token-bypass-auth';
 
-    const es = new EventSource(`/api/stream?token=${encodeURIComponent(token)}`);
+    const es = new EventSource(`/api/stream?token=${encodeURIComponent(token)}`, {
+      withCredentials: true,
+    });
 
     es.addEventListener('runs-updated', () => {
       // New report run logged; refresh dashboard run lists/details.

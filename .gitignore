@@ -11,3 +11,4 @@ coverage/
 .vscode/
 frontend/node_modules/
 .vercel
+.env*.local

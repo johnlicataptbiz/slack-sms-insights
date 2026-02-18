@@ -60,70 +60,6 @@ const sendJson = (res: ServerResponse, statusCode: number, data: any, origin?: s
   res.end(JSON.stringify(data));
 };
 
-// OAuth endpoints
-const handleOAuthStart: RequestHandler = async (req, res, logger, origin) => {
-  const clientId = process.env.SLACK_CLIENT_ID;
-  const redirectUri = process.env.DASHBOARD_AUTH_REDIRECT_URI || `http://localhost:${process.env.PORT || 3000}/api/oauth/callback`;
-  const scopes = ['users:read', 'chat:read'];
-  const state = Math.random().toString(36).substring(7);
-
-  if (!clientId) {
-    return sendJson(res, 500, { error: 'SLACK_CLIENT_ID not configured' }, origin);
-  }
-
-  const url = new URL('https://slack.com/oauth/v2/authorize');
-  url.searchParams.append('client_id', clientId);
-  url.searchParams.append('scope', scopes.join(','));
-  url.searchParams.append('redirect_uri', redirectUri);
-  url.searchParams.append('state', state);
-
-  res.writeHead(302, { Location: url.toString() });
-  res.end();
-};
-
-const handleOAuthCallback: RequestHandler = async (req, res, logger, origin) => {
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const code = url.searchParams.get('code');
-  const error = url.searchParams.get('error');
-
-  if (error) {
-    return sendJson(res, 400, { error: `OAuth error: ${error}` }, origin);
-  }
-
-  if (!code) {
-    return sendJson(res, 400, { error: 'Missing authorization code' }, origin);
-  }
-
-  try {
-    const clientId = process.env.SLACK_CLIENT_ID;
-    const clientSecret = process.env.SLACK_CLIENT_SECRET;
-    const redirectUri = process.env.DASHBOARD_AUTH_REDIRECT_URI || `http://localhost:${process.env.PORT || 3000}/api/oauth/callback`;
-
-    if (!clientId || !clientSecret) {
-      return sendJson(res, 500, { error: 'OAuth credentials not configured' }, origin);
-    }
-
-    const slack = new WebClient();
-    const result = await slack.oauth.v2.access({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri,
-    });
-
-    if (!result.ok) {
-      return sendJson(res, 400, { error: result.error }, origin);
-    }
-
-    const token = result.access_token;
-    const frontendUrl = process.env.VITE_API_URL || `http://localhost:${process.env.PORT || 3000}`;
-    res.writeHead(302, { Location: `${frontendUrl}/?token=${encodeURIComponent(token || '')}` });
-    res.end();
-  } catch (error) {
-    logger?.error('OAuth callback error:', error);
-    sendJson(res, 500, { error: 'OAuth exchange failed' }, origin);
-  }
-};
 
 const handleAuthVerify: RequestHandler = async (req, res, logger, origin) => {
   sendJson(res, 200, { ok: true, user: (req as any).user }, origin);
@@ -211,8 +147,6 @@ type RouteHandler = {
 };
 
 export const apiRoutes: RouteHandler[] = [
-  { path: '/api/oauth/start', method: 'GET', requiresAuth: false, handler: handleOAuthStart },
-  { path: '/api/oauth/callback', method: 'GET', requiresAuth: false, handler: handleOAuthCallback },
   { path: '/api/auth/verify', method: 'GET', requiresAuth: true, handler: handleAuthVerify },
   { path: '/api/runs', method: 'GET', requiresAuth: true, handler: handleGetRuns },
   { path: '/api/runs/:id', method: 'GET', requiresAuth: true, handler: handleGetRunById },

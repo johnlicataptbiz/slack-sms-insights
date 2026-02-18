@@ -5,6 +5,7 @@ import '../styles/RunList.css';
 type Run = {
   id: string;
   timestamp: string;
+  report_date?: string;
   channel_id: string;
   channel_name: string;
   report_type: string;
@@ -15,9 +16,14 @@ type Run = {
 };
 
 export default function RunList({ runs, token }: { runs: Run[]; token: string }) {
-  const [selectedRun, setSelectedRun] = useState<Run | null>(null);
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const selectedRun = runs.find(r => r.id === selectedRunId) || null;
 
-  const formatTime = (isoString: string) => {
+  const formatTime = (isoString: string, reportDate?: string) => {
+    if (reportDate) {
+      const date = new Date(reportDate);
+      return date.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+    }
     const date = new Date(isoString);
     return date.toLocaleString();
   };
@@ -28,7 +34,7 @@ export default function RunList({ runs, token }: { runs: Run[]; token: string })
   };
 
   if (selectedRun) {
-    return <RunDetail run={selectedRun} onBack={() => setSelectedRun(null)} />;
+    return <RunDetail run={selectedRun} onBack={() => setSelectedRunId(null)} />;
   }
 
   return (
@@ -36,7 +42,7 @@ export default function RunList({ runs, token }: { runs: Run[]; token: string })
       <table className="runs-table">
         <thead>
           <tr>
-            <th>Timestamp</th>
+            <th>Report Date</th>
             <th>Channel</th>
             <th>Type</th>
             <th>Status</th>
@@ -46,8 +52,8 @@ export default function RunList({ runs, token }: { runs: Run[]; token: string })
         </thead>
         <tbody>
           {runs.map((run) => (
-            <tr key={run.id} onClick={() => setSelectedRun(run)} style={{ cursor: 'pointer' }}>
-              <td className="timestamp">{formatTime(run.timestamp)}</td>
+            <tr key={run.id} onClick={() => setSelectedRunId(run.id)} style={{ cursor: 'pointer' }}>
+              <td className="timestamp">{formatTime(run.timestamp, run.report_date)}</td>
               <td className="channel">{run.channel_name || run.channel_id}</td>
               <td className="type">{run.report_type}</td>
               <td className="status">{getStatusBadge(run.status)}</td>

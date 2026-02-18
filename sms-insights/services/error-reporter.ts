@@ -5,7 +5,7 @@ export async function reportError(app: App, error: any, context: string) {
 
   app.logger.error(`[${context}] Error:`, error);
 
-  if (!adminChannel) {
+  if (!adminChannel || error?.code === 'slack_webapi_platform_error' && error?.data?.error === 'invalid_auth') {
     return;
   }
 

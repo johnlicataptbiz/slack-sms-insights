@@ -1,58 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import Login from './components/Login';
 import Dashboard from './pages/Dashboard';
 import './styles/App.css';
 
 const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function App() {
-  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check URL params for token (from OAuth callback)
-    const params = new URLSearchParams(window.location.search);
-    const receivedToken = params.get('token');
-    if (receivedToken) {
-      localStorage.setItem('slackToken', receivedToken);
-      setToken(receivedToken);
-      // Clean up URL
-      window.history.replaceState({}, '', window.location.pathname);
-    } else {
-      // Try to get token from localStorage
-      const storedToken = localStorage.getItem('slackToken');
-      if (storedToken) {
-        // Verify token is still valid
-        verifyToken(storedToken);
-      } else {
-        setLoading(false);
-      }
-    }
+    // Bypass authentication - set a dummy token
+    const dummyToken = 'dummy-token-bypass-auth';
+    localStorage.setItem('slackToken', dummyToken);
+    setLoading(false);
   }, []);
 
-  const verifyToken = async (token: string) => {
-    try {
-      const response = await fetch(`${API_URL}/api/auth/verify`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        setToken(token);
-      } else {
-        localStorage.removeItem('slackToken');
-      }
-    } catch (error) {
-      console.error('Token verification failed:', error);
-      localStorage.removeItem('slackToken');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLogout = () => {
-    localStorage.removeItem('slackToken');
-    setToken(null);
+    // No-op for logout since we're bypassing auth
+    window.location.reload();
   };
 
   if (loading) {
@@ -63,9 +27,5 @@ export default function App() {
     );
   }
 
-  if (!token) {
-    return <Login />;
-  }
-
-  return <Dashboard token={token} onLogout={handleLogout} />;
+  return <Dashboard token="dummy-token-bypass-auth" onLogout={handleLogout} />;
 }

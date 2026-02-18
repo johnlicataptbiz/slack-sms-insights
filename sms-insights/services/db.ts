@@ -32,7 +32,6 @@ export const initDatabase = async (logger?: Pick<Logger, 'info' | 'error'>): Pro
   } catch (error) {
     logger?.error('Failed to initialize database connection pool:', error);
     pool = undefined;
-    throw error;
   }
 };
 
@@ -59,6 +58,7 @@ export const initializeSchema = async (): Promise<void> => {
       CREATE TABLE IF NOT EXISTS daily_runs (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         timestamp TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        report_date DATE,
         channel_id TEXT NOT NULL,
         channel_name TEXT,
         report_type TEXT NOT NULL CHECK (report_type IN ('daily', 'manual', 'test')),

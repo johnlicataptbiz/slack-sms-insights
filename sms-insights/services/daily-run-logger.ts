@@ -4,6 +4,7 @@ import type { Logger } from '@slack/bolt';
 export type DailyRunInput = {
   channelId: string;
   channelName?: string;
+  reportDate?: string;
   reportType: 'daily' | 'manual' | 'test';
   status: 'success' | 'error' | 'pending';
   errorMessage?: string | null;
@@ -21,12 +22,13 @@ export const logDailyRun = async (input: DailyRunInput, logger?: Pick<Logger, 'd
 
   try {
     const result = await pool.query(
-      `INSERT INTO daily_runs (channel_id, channel_name, report_type, status, error_message, summary_text, full_report, duration_ms)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO daily_runs (channel_id, channel_name, report_date, report_type, status, error_message, summary_text, full_report, duration_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
       [
         input.channelId,
         input.channelName || null,
+        input.reportDate || null,
         input.reportType,
         input.status,
         input.errorMessage || null,
@@ -69,7 +71,6 @@ export const getDailyRuns = async (
     }
 
     if (options.daysBack) {
-      params.push(options.daysBack);
       query += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
     }
 

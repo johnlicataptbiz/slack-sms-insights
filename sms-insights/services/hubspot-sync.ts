@@ -1,6 +1,7 @@
 import type { Logger } from '@slack/bolt';
 
 const DEFAULT_NOTE_PREFIX = '[AI SMS INSIGHTS]';
+const HUBSPOT_CONTACT_TO_NOTE_ASSOCIATION_TYPE_ID = 202;
 
 export type HubSpotSyncConfig = {
   accessToken: string;
@@ -125,38 +126,48 @@ const findExistingAiNote = async (
   token: string,
   logger: Logger,
 ): Promise<string | undefined> => {
-  // We list notes associated with this contact
-  const response = await fetch(`https://api.hubapi.com/crm/v3/objects/contacts/${contactId}/associations/notes`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const response = await fetch('https://api.hubapi.com/crm/v3/objects/notes/search', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      filterGroups: [
+        {
+          filters: [
+            {
+              propertyName: 'associations.contact',
+              operator: 'EQ',
+              value: contactId,
+            },
+            {
+              propertyName: 'hs_note_body',
+              operator: 'STARTS_WITH',
+              value: prefix,
+            },
+          ],
+        },
+      ],
+      sorts: [
+        {
+          propertyName: 'hs_lastmodifieddate',
+          direction: 'DESCENDING',
+        },
+      ],
+      properties: ['hs_note_body'],
+      limit: 1,
+    }),
   });
 
-  if (!response.ok) return undefined;
-
-  const assocData = (await response.json()) as {
-    results: Array<{ id: string }>;
-  };
-  if (!assocData.results || assocData.results.length === 0) return undefined;
-
-  // For each note, check if it starts with the prefix
-  // Reversing to check the latest first might be better, but HubSpot API typically returns oldest first if not sorted
-  for (const assoc of assocData.results) {
-    const noteResponse = await fetch(
-      `https://api.hubapi.com/crm/v3/objects/notes/${assoc.id}?properties=hs_note_body`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      },
-    );
-    if (!noteResponse.ok) continue;
-
-    const noteData = (await noteResponse.json()) as {
-      properties: { hs_note_body?: string };
-    };
-    if (noteData.properties.hs_note_body?.startsWith(prefix)) {
-      return assoc.id;
-    }
+  if (!response.ok) {
+    const errText = await response.text();
+    logger.debug(`HubSpot Note Search failed: ${response.status} - ${errText}`);
+    return undefined;
   }
 
-  return undefined;
+  const data = (await response.json()) as { results: Array<{ id: string }> };
+  return data.results?.[0]?.id;
 };
 
 const createNoteWithAssociation = async (
@@ -183,7 +194,7 @@ const createNoteWithAssociation = async (
       associations: [
         {
           to: { id: contactId },
-          types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: 202 }], // contact to note is typically 202
+          types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: HUBSPOT_CONTACT_TO_NOTE_ASSOCIATION_TYPE_ID }],
         },
       ],
     }),

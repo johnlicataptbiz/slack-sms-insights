@@ -24,8 +24,8 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
   const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
   const [channels, setChannels] = useState<any[]>([]);
 
-  const fetchRuns = async () => {
-    setLoading(true);
+  const fetchRuns = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams({
@@ -77,8 +77,8 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
   }, [token]);
 
   useEffect(() => {
-    fetchRuns();
-    const interval = setInterval(fetchRuns, 10000); // Refresh every 10 seconds
+    fetchRuns(true);
+    const interval = setInterval(() => fetchRuns(false), 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
   }, [daysBack, selectedChannelId, token]);
 

@@ -1,63 +1,48 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import type { WorkItem } from './types';
 
-export type StreamEvent = { type: string; [key: string]: unknown };
-
-export type UseEventStreamOptions = {
-  enabled?: boolean;
-  onEvent: (event: StreamEvent) => void;
-  onError?: (err: unknown) => void;
-};
-
-const getAuthToken = (): string | null => {
-  try {
-    return localStorage.getItem('slackToken');
-  } catch {
-    return null;
-  }
-};
-
-export const useEventStream = ({ enabled = true, onEvent, onError }: UseEventStreamOptions) => {
-  const onEventRef = useRef(onEvent);
-  onEventRef.current = onEvent;
-
-  const onErrorRef = useRef(onError);
-  onErrorRef.current = onError;
+export function useEventStream() {
+  const qc = useQueryClient();
 
   useEffect(() => {
-    if (!enabled) return;
+    // In a real app, we'd use the configured base URL
+    const es = new EventSource('/api/events/stream');
 
-    const token = getAuthToken();
-    if (!token) return;
-
-    // EventSource cannot set Authorization headers, so we pass token via query param.
-    // Backend currently expects Authorization header; for now we rely on dummy bypass token in dev
-    // or you can extend backend to accept ?token=... for SSE only.
-    const url = `/api/stream?token=${encodeURIComponent(token)}`;
-
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource(url);
-    } catch (err) {
-      onErrorRef.current?.(err);
-      return;
-    }
-
-    es.onmessage = (msg) => {
+    es.addEventListener('work-item-updated', (event: MessageEvent) => {
       try {
-        const data = JSON.parse(msg.data) as StreamEvent;
-        onEventRef.current(data);
+        const payload = JSON.parse(event.data) as Partial<WorkItem> & { id: string };
+        qc.setQueryData<WorkItem[]>(['workItems'], (old) =>
+          (old ?? []).map((w) => (w.id === payload.id ? { ...w, ...payload } : w))
+        );
+        // Also invalidate metrics as they might have changed
+        qc.invalidateQueries({ queryKey: ['metrics'] });
       } catch (err) {
-        onErrorRef.current?.(err);
+        console.error('Failed to parse work-item-updated event', err);
       }
-    };
+    });
+
+    es.addEventListener('work-item-created', (event: MessageEvent) => {
+      try {
+        const payload = JSON.parse(event.data) as WorkItem;
+        qc.setQueryData<WorkItem[]>(['workItems'], (old) => [payload, ...(old ?? [])]);
+        qc.invalidateQueries({ queryKey: ['metrics'] });
+      } catch (err) {
+        console.error('Failed to parse work-item-created event', err);
+      }
+    });
+
+    es.addEventListener('metrics-updated', () => {
+      qc.invalidateQueries({ queryKey: ['metrics'] });
+    });
 
     es.onerror = (err) => {
-      onErrorRef.current?.(err);
-      // Let browser handle reconnect; if it hard-fails, polling still works.
+      console.error('EventSource failed:', err);
+      es.close();
     };
 
     return () => {
-      es?.close();
+      es.close();
     };
-  }, [enabled]);
-};
+  }, [qc]);
+}

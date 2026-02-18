@@ -10,7 +10,7 @@ import {
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
-import { decodeWorkItemCursor, listOpenWorkItems } from '../services/work-items.js';
+import { decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem, assignWorkItem } from '../services/work-items.js';
 
 type RequestHandler = (
   req: IncomingMessage & { body?: unknown; user?: unknown },
@@ -201,38 +201,60 @@ const handleGetConversationEvents: RequestHandler = async (req, res, logger, ori
   sendJson(res, 200, { events }, origin);
 };
 
-const handleGetMetricsOverview: RequestHandler = async (req, res, logger, origin) => {
+const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const days = Math.min(Number.parseInt(url.searchParams.get('days') || '7', 10) || 7, 90);
-  const repId = url.searchParams.get('repId') || undefined;
+  const fromStr = url.searchParams.get('from');
+  const toStr = url.searchParams.get('to');
 
-  const overview = await getMetricsOverview({ windowDays: days, repId }, logger);
-  sendJson(res, 200, { overview }, origin);
-};
+  if (!fromStr || !toStr) {
+    return sendJson(res, 400, { error: 'Missing from/to params' }, origin);
+  }
 
-const handleGetMetricsSla: RequestHandler = async (req, res, logger, origin) => {
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const days = Math.min(Number.parseInt(url.searchParams.get('days') || '7', 10) || 7, 90);
-  const repId = url.searchParams.get('repId') || undefined;
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+  const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+  const windowDays = Math.max(1, Math.min(days, 90));
 
-  const sla = await getSlaMetrics({ windowDays: days, repId }, logger);
-  sendJson(res, 200, { sla }, origin);
-};
+  const [overview, sla, workload, volume] = await Promise.all([
+    getMetricsOverview({ windowDays }, logger),
+    getSlaMetrics({ windowDays }, logger),
+    getWorkloadByRepMetrics({ windowDays }, logger),
+    getVolumeByDayMetrics({ windowDays }, logger),
+  ]);
 
-const handleGetMetricsWorkloadByRep: RequestHandler = async (req, res, logger, origin) => {
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const days = Math.min(Number.parseInt(url.searchParams.get('days') || '7', 10) || 7, 90);
+  // Transform to frontend MetricsSummary format
+  const summary = {
+    timeRange: { from: fromStr, to: toStr },
+    totalConversations: volume.rows.reduce((acc, r) => acc + r.inbound + r.outbound, 0), // Rough proxy
+    newConversations: volume.rows.reduce((acc, r) => acc + r.inbound, 0), // Rough proxy
+    responseTimeBuckets: [
+      { bucket: '0-5', count: 0 }, // Placeholder until we have real buckets
+      { bucket: '5-15', count: 0 },
+      { bucket: '15-60', count: 0 },
+      { bucket: '60-180', count: 0 },
+      { bucket: '180+', count: 0 },
+    ],
+    reps: workload.rows.map(r => ({
+      repId: r.repId || 'unassigned',
+      repName: r.repId || 'Unassigned', // We'd need a rep lookup here
+      conversationsHandled: 0, // Placeholder
+      avgFirstResponseMinutes: null,
+      p90FirstResponseMinutes: null,
+      followupLagMinutesAvg: null,
+      openWorkItems: r.openWorkItems,
+      overdueWorkItems: r.overdueWorkItems,
+      conversionRate: null,
+    })),
+    pipelineVelocity: {
+      avgTimeToFirstResponseMinutes: sla.p50Minutes,
+      avgTimeToQualifiedMinutes: null,
+      avgTimeToCloseWonMinutes: null,
+    },
+    openWorkItems: overview.openWorkItems,
+    overdueWorkItems: overview.overdueWorkItems,
+  };
 
-  const workload = await getWorkloadByRepMetrics({ windowDays: days }, logger);
-  sendJson(res, 200, { workload }, origin);
-};
-
-const handleGetMetricsVolumeByDay: RequestHandler = async (req, res, logger, origin) => {
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const days = Math.min(Number.parseInt(url.searchParams.get('days') || '7', 10) || 7, 90);
-
-  const volume = await getVolumeByDayMetrics({ windowDays: days }, logger);
-  sendJson(res, 200, { volume }, origin);
+  sendJson(res, 200, summary, origin);
 };
 
 const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
@@ -261,7 +283,20 @@ const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
   writeEvent({ type: 'hello', ts: new Date().toISOString() });
 
   const unsubscribe = subscribeRealtimeEvents((event) => {
-    writeEvent(event);
+    // Map internal event types to frontend event types if needed
+    // Currently they match or are compatible
+    if (event.type === 'work-item-updated') {
+        res.write('event: work-item-updated\n');
+        res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
+    } else if (event.type === 'work-item-created') {
+        res.write('event: work-item-created\n');
+        res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
+    } else if (event.type === 'metrics-updated') {
+        res.write('event: metrics-updated\n');
+        res.write(`data: {}\n\n`);
+    } else {
+        writeEvent(event);
+    }
   });
 
   const ping = setInterval(() => {
@@ -282,6 +317,7 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
   const severity = (url.searchParams.get('severity') || undefined) as 'low' | 'med' | 'high' | undefined;
   const overdueOnly = url.searchParams.get('overdueOnly') === 'true';
   const dueBefore = url.searchParams.get('dueBefore') || undefined;
+  const search = url.searchParams.get('search') || undefined; // Not implemented in service yet, but good to have param
 
   const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200);
   const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
@@ -291,8 +327,8 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
 
   const { items, nextCursor } = await listOpenWorkItems(
     {
-      type,
-      repId,
+      type: type === 'ALL' ? undefined : type,
+      repId: repId === 'all' ? undefined : repId === 'me' ? 'dummy-user' : repId, // Handle 'me' and 'all'
       severity,
       overdueOnly,
       dueBefore,
@@ -303,7 +339,62 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
     logger,
   );
 
-  sendJson(res, 200, { items, nextCursor }, origin);
+  // Transform to frontend WorkItem format
+  const frontendItems = items.map(item => ({
+    id: item.id,
+    type: item.type,
+    status: item.resolved_at ? 'resolved' : 'open',
+    conversationId: item.conversation_id,
+    contactName: item.contact_phone || 'Unknown', // Use phone as name fallback
+    repId: item.rep_id,
+    repName: item.rep_id ? 'Assigned Rep' : null, // Placeholder
+    createdAt: item.created_at,
+    dueAt: item.due_at,
+    priority: item.severity === 'med' ? 'medium' : item.severity,
+    slaMinutes: null,
+    currentLagMinutes: null, // Calculate if needed
+    tags: [],
+    slackPermalink: undefined, // Add if available
+  }));
+
+  sendJson(res, 200, frontendItems, origin);
+};
+
+const handleResolveWorkItem: RequestHandler = async (req, res, logger, origin) => {
+  const id = req.url?.split('/')[3]; // /api/work-items/:id/resolve
+  if (!id) {
+    return sendJson(res, 400, { error: 'Missing work item ID' }, origin);
+  }
+
+  const success = await resolveWorkItem(id, logger);
+  if (!success) {
+    return sendJson(res, 404, { error: 'Work item not found or already resolved' }, origin);
+  }
+
+  sendJson(res, 200, { success: true }, origin);
+};
+
+const handleAssignWorkItem: RequestHandler = async (req, res, logger, origin) => {
+  const id = req.url?.split('/')[3]; // /api/work-items/:id/assign
+  if (!id) {
+    return sendJson(res, 400, { error: 'Missing work item ID' }, origin);
+  }
+
+  try {
+    const body = await parseJsonBody(req) as { repId: string };
+    if (!body.repId) {
+        return sendJson(res, 400, { error: 'Missing repId' }, origin);
+    }
+
+    const success = await assignWorkItem(id, body.repId, logger);
+    if (!success) {
+        return sendJson(res, 404, { error: 'Work item not found' }, origin);
+    }
+
+    sendJson(res, 200, { success: true }, origin);
+  } catch (error) {
+      sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  }
 };
 
 type ApiRoute = {
@@ -328,14 +419,13 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/conversations/:id', requiresAuth: true, handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', requiresAuth: true, handler: handleGetConversationEvents },
 
-  { method: 'GET', path: '/api/metrics/overview', requiresAuth: true, handler: handleGetMetricsOverview },
-  { method: 'GET', path: '/api/metrics/sla', requiresAuth: true, handler: handleGetMetricsSla },
-  { method: 'GET', path: '/api/metrics/workload-by-rep', requiresAuth: true, handler: handleGetMetricsWorkloadByRep },
-  { method: 'GET', path: '/api/metrics/volume-by-day', requiresAuth: true, handler: handleGetMetricsVolumeByDay },
+  { method: 'GET', path: '/api/metrics', requiresAuth: true, handler: handleGetMetrics },
 
   { method: 'GET', path: '/api/stream', requiresAuth: true, handler: handleGetStream },
 
   { method: 'GET', path: '/api/work-items', requiresAuth: true, handler: handleGetWorkItems },
+  { method: 'POST', path: '/api/work-items/:id/resolve', requiresAuth: true, handler: handleResolveWorkItem },
+  { method: 'POST', path: '/api/work-items/:id/assign', requiresAuth: true, handler: handleAssignWorkItem },
 ];
 
 export const handleApiRoute = async (

@@ -1,9 +1,12 @@
 import type { Logger } from '@slack/bolt';
 
 export type RealtimeEvent =
-  | { type: 'work_item_created'; id: string; ts: string }
-  | { type: 'work_item_resolved'; id: string; ts: string }
+  | { type: 'work-item-created'; payload: any }
+  | { type: 'work-item-updated'; payload: any }
+  | { type: 'work_item_created'; id: string; ts: string } // legacy
+  | { type: 'work_item_resolved'; id: string; ts: string } // legacy
   | { type: 'conversation_updated'; id: string; ts: string }
+  | { type: 'metrics-updated'; ts: string }
   | { type: 'ping'; ts: string };
 
 type Listener = (event: RealtimeEvent) => void;

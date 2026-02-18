@@ -1,6 +1,7 @@
 import type { Logger } from '@slack/bolt';
 import type { Pool } from 'pg';
 import { getPool } from './db.js';
+import { publishRealtimeEvent } from './realtime.js';
 
 export type WorkItemListRow = {
   id: string;
@@ -9,6 +10,7 @@ export type WorkItemListRow = {
   due_at: string;
   created_at: string;
   resolved_at: string | null;
+  rep_id: string | null;
 
   conversation_id: string;
   contact_key: string;
@@ -95,21 +97,29 @@ export const listOpenWorkItems = async (
 
     // Cursor pagination (preferred): stable ordering by (due_at, id)
     if (params.cursor) {
+      // Note: this assumes we are ordering by due_at ASC.
+      // If we want to paginate forward, we look for items > cursor.
+      // Since due_at can be null, we need to handle that if we allow null due_at in sorting.
+      // For now assuming due_at is not null for open items we care about ordering.
       where.push(`(wi.due_at, wi.id) > ($${i++}::timestamptz, $${i++}::uuid)`);
       values.push(params.cursor.dueAt, params.cursor.id);
     }
 
     const limit = Math.max(1, Math.min(params.limit, 200));
-    values.push(limit + 1);
-    const limitParam = `$${i++}`;
-
+    // Fetch limit + 1 to know if there is a next page
+    const fetchLimit = limit + 1;
+    
     // Legacy offset pagination (fallback)
     let offsetSql = '';
-    if (typeof params.offset === 'number') {
+    if (typeof params.offset === 'number' && !params.cursor) {
       values.push(Math.max(0, params.offset));
       const offsetParam = `$${i++}`;
       offsetSql = ` OFFSET ${offsetParam}`;
     }
+
+    // Add limit param
+    values.push(fetchLimit);
+    const limitParam = `$${i++}`;
 
     const sql = `
       SELECT
@@ -119,6 +129,7 @@ export const listOpenWorkItems = async (
         wi.due_at,
         wi.created_at,
         wi.resolved_at,
+        wi.rep_id,
         c.id as conversation_id,
         c.contact_key,
         c.contact_id,
@@ -146,6 +157,75 @@ export const listOpenWorkItems = async (
     return { items, nextCursor };
   } catch (err) {
     logger?.error('listOpenWorkItems failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const resolveWorkItem = async (
+  id: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<boolean> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `
+      UPDATE work_items
+      SET resolved_at = NOW()
+      WHERE id = $1 AND resolved_at IS NULL
+      RETURNING id, conversation_id, type
+      `,
+      [id],
+    );
+
+    if (result.rowCount && result.rowCount > 0) {
+      const row = result.rows[0];
+      publishRealtimeEvent({
+        type: 'work-item-updated',
+        payload: { id: row.id, status: 'resolved', resolvedAt: new Date().toISOString() },
+      });
+      return true;
+    }
+    return false;
+  } catch (err) {
+    logger?.error('resolveWorkItem failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const assignWorkItem = async (
+  id: string,
+  repId: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<boolean> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `
+      UPDATE work_items
+      SET rep_id = $2
+      WHERE id = $1
+      RETURNING id, rep_id
+      `,
+      [id, repId],
+    );
+
+    if (result.rowCount && result.rowCount > 0) {
+      const row = result.rows[0];
+      publishRealtimeEvent({
+        type: 'work-item-updated',
+        payload: { id: row.id, repId: row.rep_id },
+      });
+      return true;
+    }
+    return false;
+  } catch (err) {
+    logger?.error('assignWorkItem failed', err);
     throw err;
   } finally {
     client.release();

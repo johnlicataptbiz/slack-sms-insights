@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Dashboard from './pages/Dashboard';
-import Inbox from './pages/Inbox';
-import Insights from './pages/Insights';
+import { Inbox } from './pages/Inbox';
+import { Insights } from './pages/Insights';
 import './styles/App.css';
+
+// Create a client
+const queryClient = new QueryClient();
 
 type View = 'dashboard' | 'inbox' | 'insights';
 
@@ -33,28 +37,44 @@ export default function App() {
   const token = 'dummy-token-bypass-auth';
 
   return (
-    <div>
-      <div style={{ display: 'flex', gap: 8, padding: 12, borderBottom: '1px solid #eee' }}>
-        <button onClick={() => setView('inbox')} disabled={view === 'inbox'}>
-          Inbox
-        </button>
-        <button onClick={() => setView('insights')} disabled={view === 'insights'}>
-          Insights
-        </button>
-        <button onClick={() => setView('dashboard')} disabled={view === 'dashboard'}>
-          Daily Runs
-        </button>
-        <div style={{ flex: 1 }} />
-        <button onClick={handleLogout}>Logout</button>
-      </div>
+    <QueryClientProvider client={queryClient}>
+      <div className="AppShell">
+        <nav className="AppShell__nav">
+          <div className="AppShell__logo">SMS Insights</div>
+          <div className="AppShell__links">
+            <button 
+              className={view === 'inbox' ? 'active' : ''} 
+              onClick={() => setView('inbox')}
+            >
+              Inbox
+            </button>
+            <button 
+              className={view === 'insights' ? 'active' : ''} 
+              onClick={() => setView('insights')}
+            >
+              Insights
+            </button>
+            <button 
+              className={view === 'dashboard' ? 'active' : ''} 
+              onClick={() => setView('dashboard')}
+            >
+              Daily Runs
+            </button>
+          </div>
+          <div style={{ flex: 1 }} />
+          <button className="AppShell__logout" onClick={handleLogout}>Logout</button>
+        </nav>
 
-      {view === 'inbox' ? (
-        <Inbox token={token} />
-      ) : view === 'insights' ? (
-        <Insights token={token} />
-      ) : (
-        <Dashboard token={token} onLogout={handleLogout} />
-      )}
-    </div>
+        <div className="AppShell__content">
+          {view === 'inbox' ? (
+            <Inbox />
+          ) : view === 'insights' ? (
+            <Insights />
+          ) : (
+            <Dashboard token={token} onLogout={handleLogout} />
+          )}
+        </div>
+      </div>
+    </QueryClientProvider>
   );
 }

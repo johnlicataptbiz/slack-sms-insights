@@ -53,3 +53,13 @@ export const apiFetch = async <T>(
 
   return body as T;
 };
+
+export const client = {
+  get: <T>(path: string, options?: RequestInit) => apiFetch<T>(path, { method: 'GET', ...options }),
+  post: <T>(path: string, body: unknown, options?: RequestInit) =>
+    apiFetch<T>(path, { method: 'POST', body: JSON.stringify(body), ...options }),
+  put: <T>(path: string, body: unknown, options?: RequestInit) =>
+    apiFetch<T>(path, { method: 'PUT', body: JSON.stringify(body), ...options }),
+  delete: <T>(path: string, options?: RequestInit) =>
+    apiFetch<T>(path, { method: 'DELETE', ...options }),
+};

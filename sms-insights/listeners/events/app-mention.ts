@@ -5,8 +5,8 @@ import { isAlowareChannel, isReplyGenerationRequest, REPLY_BLOCKED_MESSAGE } fro
 import { isChannelAllowed } from '../../services/channel-access.js';
 import { requestDailyAnalysisHandoff } from '../../services/daily-analysis-handoff.js';
 import { buildDailyReportSummary, isDailySnapshotReport } from '../../services/daily-report-summary.js';
-import { timeOperation } from '../../services/telemetry.js';
 import { logDailyRun } from '../../services/daily-run-logger.js';
+import { timeOperation } from '../../services/telemetry.js';
 
 const SLACK_TEXT_CHUNK_LIMIT = 3500;
 
@@ -238,13 +238,16 @@ const appMentionCallback = async ({
     if (isAloware) {
       try {
         const summaryText = reportText.split('\n').slice(0, 5).join('\n');
-        await logDailyRun({
-          channelId: event.channel,
-          reportType: event.thread_ts ? 'manual' : 'daily',
-          status: 'success',
-          summaryText,
-          fullReport: reportText,
-        }, logger);
+        await logDailyRun(
+          {
+            channelId: event.channel,
+            reportType: event.thread_ts ? 'manual' : 'daily',
+            status: 'success',
+            summaryText,
+            fullReport: reportText,
+          },
+          logger,
+        );
       } catch (logError) {
         logger.warn('Failed to log report run:', logError);
       }
@@ -254,12 +257,15 @@ const appMentionCallback = async ({
 
     // Log the failed report run
     try {
-      await logDailyRun({
-        channelId: event.channel,
-        reportType: 'manual',
-        status: 'error',
-        errorMessage: error instanceof Error ? error.message : String(error),
-      }, logger);
+      await logDailyRun(
+        {
+          channelId: event.channel,
+          reportType: 'manual',
+          status: 'error',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        },
+        logger,
+      );
     } catch (logError) {
       logger.warn('Failed to log error run:', logError);
     }

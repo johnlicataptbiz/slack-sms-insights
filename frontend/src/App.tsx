@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import Dashboard from './pages/Dashboard';
+import Inbox from './pages/Inbox';
 import './styles/App.css';
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
+type View = 'dashboard' | 'inbox';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<View>('inbox');
 
   useEffect(() => {
     // Bypass authentication - set a dummy token
@@ -27,5 +29,22 @@ export default function App() {
     );
   }
 
-  return <Dashboard token="dummy-token-bypass-auth" onLogout={handleLogout} />;
+  const token = 'dummy-token-bypass-auth';
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 8, padding: 12, borderBottom: '1px solid #eee' }}>
+        <button onClick={() => setView('inbox')} disabled={view === 'inbox'}>
+          Inbox
+        </button>
+        <button onClick={() => setView('dashboard')} disabled={view === 'dashboard'}>
+          Daily Runs
+        </button>
+        <div style={{ flex: 1 }} />
+        <button onClick={handleLogout}>Logout</button>
+      </div>
+
+      {view === 'inbox' ? <Inbox token={token} /> : <Dashboard token={token} onLogout={handleLogout} />}
+    </div>
+  );
 }

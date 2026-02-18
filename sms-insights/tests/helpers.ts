@@ -1,5 +1,5 @@
 import { mock } from 'node:test';
-import { LogLevel, type AckFn, type SayFn } from '@slack/bolt';
+import { type AckFn, LogLevel, type SayFn } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
 
 export const fakeLogger = {

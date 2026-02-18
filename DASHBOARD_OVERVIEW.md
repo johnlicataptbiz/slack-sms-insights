@@ -177,6 +177,7 @@ VITE_API_URL=https://your-railway-url.up.railway.app
 
 ## ✅ What's Implemented
 
+### v1 (Daily Runs Dashboard)
 - ✅ Database connection pool with retry logic
 - ✅ OAuth 2.0 Slack authentication
 - ✅ Report logging on success and error
@@ -187,6 +188,13 @@ VITE_API_URL=https://your-railway-url.up.railway.app
 - ✅ TypeScript throughout
 - ✅ Graceful error handling (logging failures don't break Slack replies)
 - ✅ Responsive UI
+
+### v2 foundation (Operational Command Center)
+- ✅ Additive DB tables: `sms_events`, `conversations`, `work_items`
+- ✅ Slack message ingestion for Aloware channel → normalized `sms_events`
+- ✅ Conversation projection + basic SLA work item generation (`needs_reply`)
+- ✅ New API endpoint: `GET /api/work-items`
+- ✅ New frontend view: **Inbox** (polls work items every 10s)
 
 ## 📝 Next Steps
 

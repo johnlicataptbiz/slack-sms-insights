@@ -1,7 +1,7 @@
 import assert from 'node:assert';
 import { beforeEach, describe, it, mock } from 'node:test';
 import type { WebClient } from '@slack/web-api';
-import { requestSetterFeedback, __resetSetterFeedbackCacheForTests } from '../../services/setter-feedback.js';
+import { __resetSetterFeedbackCacheForTests, requestSetterFeedback } from '../../services/setter-feedback.js';
 import { fakeClient, fakeLogger } from '../helpers.js';
 
 describe('setter-feedback service', () => {
@@ -26,7 +26,13 @@ describe('setter-feedback service', () => {
       sequence: 'BOOK- BUYER Intro Flow',
     } as any;
 
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.100', channelId: 'C1234' });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.100',
+      channelId: 'C1234',
+    });
 
     assert.equal(postSpy.mock.callCount(), 0);
   });
@@ -46,7 +52,13 @@ describe('setter-feedback service', () => {
       sequence: '',
     } as any;
 
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.101', channelId: 'C1234' });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.101',
+      channelId: 'C1234',
+    });
 
     assert.equal(postSpy.mock.callCount(), 1);
     const callArgs = postSpy.mock.calls[0]?.arguments[0] as { text?: string };
@@ -73,14 +85,32 @@ describe('setter-feedback service', () => {
     } as any;
 
     // first call -> should post
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.200', channelId: 'C1234' });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.200',
+      channelId: 'C1234',
+    });
     // second call within dedupe window -> should NOT post
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.200', channelId: 'C1234' });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.200',
+      channelId: 'C1234',
+    });
 
     assert.equal(postSpy.mock.callCount(), 1);
 
     // different thread -> should post again
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.201', channelId: 'C1234' });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.201',
+      channelId: 'C1234',
+    });
     assert.equal(postSpy.mock.callCount(), 2);
   });
 
@@ -104,8 +134,20 @@ describe('setter-feedback service', () => {
       sequence: '',
     } as any;
 
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.300', channelId: 'C1234' });
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.300', channelId: 'C1234' });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.300',
+      channelId: 'C1234',
+    });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.300',
+      channelId: 'C1234',
+    });
 
     assert.equal(postSpy.mock.callCount(), 1);
   });
@@ -128,7 +170,13 @@ describe('setter-feedback service', () => {
       sequence: '',
     } as any;
 
-    await requestSetterFeedback({ client: fakeClient as unknown as WebClient, fields, logger: fakeLogger, ts: '171000.400', channelId: 'C1234' });
+    await requestSetterFeedback({
+      client: fakeClient as unknown as WebClient,
+      fields,
+      logger: fakeLogger,
+      ts: '171000.400',
+      channelId: 'C1234',
+    });
 
     // should not post because CLAUDE_ASSISTANT_USER_ID is explicitly disabled
     assert.equal(postSpy.mock.callCount(), 0);

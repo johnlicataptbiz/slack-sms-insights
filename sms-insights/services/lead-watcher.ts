@@ -231,9 +231,7 @@ const hasAttachmentField = (attachments: LeadWatcherAttachment[] | undefined, fi
 const isLikelyAlowareSmsEvent = (message: LeadWatcherMessageInput): boolean => {
   const text = message.text || '';
   const normalizedText = text.replace(/\s+/g, ' ').trim();
-  const hasSmsVerb = /\b(has\s+(received|sent)\s+an\s+sms|received\s+an\s+sms|sent\s+an\s+sms)\b/i.test(
-    normalizedText,
-  );
+  const hasSmsVerb = /\b(has\s+(received|sent)\s+an\s+sms|received\s+an\s+sms|sent\s+an\s+sms)\b/i.test(normalizedText);
   const hasStructuredFields = /contact/i.test(normalizedText) && /message/i.test(normalizedText);
   if (hasSmsVerb && hasStructuredFields) {
     return true;

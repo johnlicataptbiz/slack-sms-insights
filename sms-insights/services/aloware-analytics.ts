@@ -547,9 +547,7 @@ const isValidDate = (year: number, month: number, day: number): boolean => {
     return false;
   }
   const parsed = new Date(Date.UTC(year, month - 1, day));
-  return (
-    parsed.getUTCFullYear() === year && parsed.getUTCMonth() + 1 === month && parsed.getUTCDate() === day
-  );
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() + 1 === month && parsed.getUTCDate() === day;
 };
 
 const normalizePromptDateYear = (rawYear?: string): number | undefined => {
@@ -2871,9 +2869,8 @@ const buildDailySnapshotSectionLines = ({
   const summaries = buildConversationSummaries(messages24h, replyWindowSeconds);
   const dayPipeline = buildPipelineMetrics(summaries);
   const dayTouches = buildOutreachTouches(messages24h, replyWindowSeconds);
-  const attributionSource = sequenceAttributionMessages && sequenceAttributionMessages.length > 0
-    ? sequenceAttributionMessages
-    : allMessages;
+  const attributionSource =
+    sequenceAttributionMessages && sequenceAttributionMessages.length > 0 ? sequenceAttributionMessages : allMessages;
   const attributionTouches = buildOutreachTouches(attributionSource, replyWindowSeconds);
   const sequencePerformanceAll = buildSequenceConversionPerformance(
     attributionTouches,
@@ -3574,9 +3571,7 @@ const buildReportFromRawMessages = ({
     if (normalizedAttributionMessages.length === 0) {
       return messages;
     }
-    return dedupeEnabled
-      ? dedupeLikelyDuplicateMessages(normalizedAttributionMessages)
-      : normalizedAttributionMessages;
+    return dedupeEnabled ? dedupeLikelyDuplicateMessages(normalizedAttributionMessages) : normalizedAttributionMessages;
   })();
   if (dedupeEnabled && messages.length !== normalizedMessages.length) {
     logger?.debug?.(

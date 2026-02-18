@@ -1,13 +1,13 @@
 import { App, LogLevel } from '@slack/bolt';
 import 'dotenv/config';
-import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import registerListeners from './listeners/index.js';
-import { reportError } from './services/error-reporter.js';
-import { initDatabase, initializeSchema } from './services/db.js';
 import { handleApiRoute } from './api/routes.js';
+import registerListeners from './listeners/index.js';
+import { initDatabase, initializeSchema } from './services/db.js';
+import { reportError } from './services/error-reporter.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 
@@ -96,7 +96,6 @@ app.error(async (error) => {
     // 🕒 Schedule 6:00 AM Daily Report
     const { scheduleDailyReport } = await import('./services/scheduler.js');
     await scheduleDailyReport(app);
-
   } catch (error) {
     await reportError(app, error, 'Startup Failure');
   }

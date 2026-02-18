@@ -15,7 +15,7 @@ export const hasRecentPersistentFeedback = async ({
   const client = await pool.connect();
   try {
     const res = await client.query(
-      `SELECT created_at FROM setter_feedback_dedupe WHERE channel_id = $1 AND thread_ts = $2 LIMIT 1`,
+      'SELECT created_at FROM setter_feedback_dedupe WHERE channel_id = $1 AND thread_ts = $2 LIMIT 1',
       [channelId, threadTs],
     );
     if (!res.rows || res.rows.length === 0) return false;

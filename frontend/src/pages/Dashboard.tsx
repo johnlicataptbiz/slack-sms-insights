@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import RunList from '../components/RunList';
 import '../styles/Dashboard.css';
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 type Run = {
   id: string;
@@ -97,7 +97,7 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
       <div className="filters">
         <div className="filter-group">
           <label>Days Back:</label>
-          <select value={daysBack} onChange={(e) => setDaysBack(Number(e.target.value))}>
+          <select aria-label="Days back" value={daysBack} onChange={(e) => setDaysBack(Number(e.target.value))}>
             <option value={1}>Last 24 hours</option>
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
@@ -107,7 +107,11 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
 
         <div className="filter-group">
           <label>Channel:</label>
-          <select value={selectedChannelId || ''} onChange={(e) => setSelectedChannelId(e.target.value || null)}>
+          <select
+            aria-label="Channel"
+            value={selectedChannelId || ''}
+            onChange={(e) => setSelectedChannelId(e.target.value || null)}
+          >
             <option value="">All Channels</option>
             {channels.map((ch) => (
               <option key={ch.channel_id} value={ch.channel_id}>
@@ -117,7 +121,7 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
           </select>
         </div>
 
-        <button onClick={fetchRuns} className="refresh-button">
+        <button onClick={() => fetchRuns(false)} className="refresh-button">
           🔄 Refresh
         </button>
       </div>

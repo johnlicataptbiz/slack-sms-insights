@@ -1,5 +1,5 @@
-import { getPool } from './db.js';
 import type { Logger } from '@slack/bolt';
+import { getPool } from './db.js';
 
 export type DailyRunInput = {
   channelId: string;
@@ -13,7 +13,10 @@ export type DailyRunInput = {
   durationMs?: number;
 };
 
-export const logDailyRun = async (input: DailyRunInput, logger?: Pick<Logger, 'debug' | 'warn' | 'error'>): Promise<string | null> => {
+export const logDailyRun = async (
+  input: DailyRunInput,
+  logger?: Pick<Logger, 'debug' | 'warn' | 'error'>,
+): Promise<string | null> => {
   const pool = getPool();
   if (!pool) {
     logger?.debug('Database not initialized; skipping run log');

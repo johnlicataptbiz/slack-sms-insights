@@ -152,8 +152,11 @@ export const requestSetterFeedback = async ({
 
   if (!isJack) return;
 
-  // Additional check to ensure it's a manual message from Jack
-  if (fields.user !== 'Jack Licata' || (fields.sequence && fields.sequence.trim().length > 0)) {
+  // Additional check to ensure it's a manual message from Jack.
+  // Accept both "Jack" and "Jack Licata" since upstream formatting can vary.
+  const normalizedUser = fields.user.trim().toLowerCase();
+  const isJackUser = normalizedUser === 'jack' || normalizedUser === 'jack licata';
+  if (!isJackUser || (fields.sequence && fields.sequence.trim().length > 0)) {
     return;
   }
 

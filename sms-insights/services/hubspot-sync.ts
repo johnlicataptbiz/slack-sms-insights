@@ -194,7 +194,9 @@ const createNoteWithAssociation = async (
       associations: [
         {
           to: { id: contactId },
-          types: [{ associationCategory: 'HUBSPOT_DEFINED', associationTypeId: HUBSPOT_CONTACT_TO_NOTE_ASSOCIATION_TYPE_ID }],
+          types: [
+            { associationCategory: 'HUBSPOT_DEFINED', associationTypeId: HUBSPOT_CONTACT_TO_NOTE_ASSOCIATION_TYPE_ID },
+          ],
         },
       ],
     }),

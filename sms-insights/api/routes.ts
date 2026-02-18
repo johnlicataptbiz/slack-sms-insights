@@ -215,12 +215,18 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
   const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
   const windowDays = Math.max(1, Math.min(days, 90));
 
-  const [overview, sla, workload, volume] = await Promise.all([
-    getMetricsOverview({ windowDays }, logger),
-    getSlaMetrics({ windowDays }, logger),
-    getWorkloadByRepMetrics({ windowDays }, logger),
-    getVolumeByDayMetrics({ windowDays }, logger),
-  ]);
+  let overview, sla, workload, volume;
+  try {
+    [overview, sla, workload, volume] = await Promise.all([
+      getMetricsOverview({ windowDays }, logger),
+      getSlaMetrics({ windowDays }, logger),
+      getWorkloadByRepMetrics({ windowDays }, logger),
+      getVolumeByDayMetrics({ windowDays }, logger),
+    ]);
+  } catch (err) {
+    logger?.error('Failed to fetch metrics:', err);
+    return sendJson(res, 500, { error: 'Failed to fetch metrics', details: err instanceof Error ? err.message : String(err) }, origin);
+  }
 
   // Transform to frontend MetricsSummary format
   const summary = {

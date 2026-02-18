@@ -1,7 +1,7 @@
 import React from 'react';
 import '../styles/Login.css';
 
-const API_URL = process.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function Login() {
   return (

@@ -1,5 +1,6 @@
 {
   "name": "sms-insights-dashboard",
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/dist"
+  "rootDirectory": "frontend",
+  "buildCommand": "npm install && npm run build",
+  "outputDirectory": "dist"
 }

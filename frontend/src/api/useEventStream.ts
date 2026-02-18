@@ -35,6 +35,13 @@ export function useEventStream() {
       }
     });
 
+    es.addEventListener('runs-updated', () => {
+      // New report run logged; refresh dashboard run lists/details.
+      qc.invalidateQueries({ queryKey: ['runs'] });
+      qc.invalidateQueries({ queryKey: ['run'] });
+      qc.invalidateQueries({ queryKey: ['channels'] });
+    });
+
     es.addEventListener('metrics-updated', () => {
       qc.invalidateQueries({ queryKey: ['metrics'] });
     });

@@ -5,6 +5,34 @@ const DEFAULT_OPENAI_TIMEOUT_MS = 15_000;
 const DEFAULT_OPENAI_MAX_RETRIES = 2;
 const DEFAULT_OPENAI_RETRY_BASE_MS = 500;
 
+// Guardrail: prevent accidentally sending huge prompts (e.g. full reports / logs)
+// Default is conservative; override via OPENAI_MAX_PROMPT_CHARS if needed.
+const DEFAULT_OPENAI_MAX_PROMPT_CHARS = 24_000;
+
+const getOpenAiMaxPromptChars = (): number => {
+  return parsePositiveInt(process.env.OPENAI_MAX_PROMPT_CHARS, DEFAULT_OPENAI_MAX_PROMPT_CHARS);
+};
+
+const truncatePrompt = (prompt: string): { prompt: string; truncated: boolean; originalLength: number } => {
+  const maxChars = getOpenAiMaxPromptChars();
+  if (prompt.length <= maxChars) {
+    return { prompt, truncated: false, originalLength: prompt.length };
+  }
+
+  // Keep the *end* too (often contains the actual question / instructions).
+  const headChars = Math.floor(maxChars * 0.7);
+  const tailChars = maxChars - headChars;
+
+  const head = prompt.slice(0, headChars);
+  const tail = prompt.slice(prompt.length - tailChars);
+
+  return {
+    prompt: `${head}\n\n[TRUNCATED: original_length=${prompt.length} max_chars=${maxChars}]\n\n${tail}`,
+    truncated: true,
+    originalLength: prompt.length,
+  };
+};
+
 type OpenAiErrorMeta = {
   cause?: unknown;
   retryable: boolean;
@@ -89,6 +117,8 @@ const requestOpenAiResponse = async ({
     controller.abort();
   }, timeoutMs);
 
+  const { prompt: safePrompt } = truncatePrompt(prompt);
+
   try {
     return await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -98,7 +128,7 @@ const requestOpenAiResponse = async ({
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: 'user', content: prompt }],
+        messages: [{ role: 'user', content: safePrompt }],
         temperature: DEFAULT_OPENAI_TEMPERATURE,
         max_tokens: DEFAULT_OPENAI_MAX_OUTPUT_TOKENS,
       }),

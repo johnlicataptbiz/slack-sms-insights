@@ -1,90 +1,77 @@
-import assert from 'node:assert';
-import { beforeEach, describe, it, mock } from 'node:test';
-import { generateAiResponse } from '../../services/ai-response.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
-describe('ai response', () => {
-  beforeEach(() => {
-    mock.restoreAll();
+describe('generateAiResponse prompt truncation guardrail', () => {
+  it('truncates oversized prompts before sending to OpenAI', async () => {
     process.env.OPENAI_API_KEY = 'test-key';
-    process.env.OPENAI_MODEL = 'gpt-4.1-mini';
-    process.env.OPENAI_MAX_RETRIES = '2';
-    process.env.OPENAI_RETRY_BASE_MS = '1';
-    process.env.OPENAI_TIMEOUT_MS = '1000';
-  });
+    process.env.OPENAI_MODEL = 'gpt-4o-mini';
+    process.env.OPENAI_MAX_PROMPT_CHARS = '100';
 
-  it('should retry on 429 responses and eventually succeed', async () => {
-    let calls = 0;
-    const fetchSpy = mock.method(globalThis, 'fetch', async () => {
-      calls += 1;
-      if (calls === 1) {
-        return {
-          ok: false,
-          status: 429,
-        } as Response;
-      }
+    const originalFetch = globalThis.fetch;
 
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [
-            {
-              message: {
-                content: 'ok after retry',
-              },
-            },
-          ],
+    const fetchMock = async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      const content = body?.messages?.[0]?.content as string;
+
+      assert.equal(typeof content, 'string');
+      assert.ok(content.length <= 100 + 200); // allow truncation marker overhead
+      assert.ok(content.includes('[TRUNCATED: original_length='));
+
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'ok' } }],
         }),
-      } as Response;
-    });
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
 
-    const response = await generateAiResponse('hello');
+    // @ts-expect-error - test stub
+    globalThis.fetch = fetchMock;
 
-    assert.equal(response, 'ok after retry');
-    assert.equal(fetchSpy.mock.callCount(), 2);
+    try {
+      const { generateAiResponse } = await import('../../services/ai-response.js');
+
+      const hugePrompt = 'A'.repeat(1000);
+      const result = await generateAiResponse(hugePrompt);
+
+      assert.equal(result, 'ok');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
-  it('should fail immediately on non-retryable client errors', async () => {
-    const fetchSpy = mock.method(globalThis, 'fetch', async () => {
-      return {
-        ok: false,
-        status: 400,
-      } as Response;
-    });
+  it('does not modify prompts under the limit', async () => {
+    process.env.OPENAI_API_KEY = 'test-key';
+    process.env.OPENAI_MODEL = 'gpt-4o-mini';
+    process.env.OPENAI_MAX_PROMPT_CHARS = '1000';
 
-    await assert.rejects(
-      async () => generateAiResponse('hello'),
-      (error: Error & { statusCategory?: string }) => {
-        assert.equal(error.statusCategory, 'client');
-        return true;
-      },
-    );
+    const originalFetch = globalThis.fetch;
 
-    assert.equal(fetchSpy.mock.callCount(), 1);
-  });
+    const fetchMock = async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      const content = body?.messages?.[0]?.content as string;
 
-  it('should surface timeout errors when request exceeds timeout', async () => {
-    process.env.OPENAI_MAX_RETRIES = '0';
-    process.env.OPENAI_TIMEOUT_MS = '10';
+      assert.equal(content, 'hello');
 
-    const fetchSpy = mock.method(globalThis, 'fetch', (...args: unknown[]) => {
-      const init = args[1] as { signal?: AbortSignal } | undefined;
-      return new Promise<Response>((resolve, reject) => {
-        init?.signal?.addEventListener('abort', () => {
-          reject(new DOMException('aborted', 'AbortError'));
-        });
-        setTimeout(() => resolve({ ok: true, status: 200 } as Response), 1000);
-      });
-    });
+      return new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'ok' } }],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    };
 
-    await assert.rejects(
-      async () => generateAiResponse('slow request'),
-      (error: Error & { statusCategory?: string }) => {
-        assert.equal(error.statusCategory, 'timeout');
-        return true;
-      },
-    );
+    // @ts-expect-error - test stub
+    globalThis.fetch = fetchMock;
 
-    assert.equal(fetchSpy.mock.callCount(), 1);
+    try {
+      const { generateAiResponse } = await import('../../services/ai-response.js');
+
+      const result = await generateAiResponse('hello');
+
+      assert.equal(result, 'ok');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });

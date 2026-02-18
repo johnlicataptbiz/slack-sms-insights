@@ -341,6 +341,9 @@ const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
     } else if (event.type === 'work-item-created') {
       res.write('event: work-item-created\n');
       res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
+    } else if (event.type === 'runs-updated') {
+      res.write('event: runs-updated\n');
+      res.write(`data: ${JSON.stringify(event.payload)}\n\n`);
     } else if (event.type === 'metrics-updated') {
       res.write('event: metrics-updated\n');
       res.write('data: {}\n\n');

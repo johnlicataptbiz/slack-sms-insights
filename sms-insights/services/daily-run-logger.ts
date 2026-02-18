@@ -1,5 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { getPool } from './db.js';
+import { publishRealtimeEvent } from './realtime.js';
 
 export type DailyRunInput = {
   channelId: string;
@@ -15,7 +16,7 @@ export type DailyRunInput = {
 
 export const logDailyRun = async (
   input: DailyRunInput,
-  logger?: Pick<Logger, 'debug' | 'warn' | 'error'>,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<string | null> => {
   const pool = getPool();
   if (!pool) {
@@ -43,6 +44,17 @@ export const logDailyRun = async (
 
     const runId = result.rows[0]?.id;
     logger?.debug(`Logged daily run: ${runId}`);
+
+    if (runId) {
+      // Notify SSE subscribers (dashboard) that runs have changed.
+      // Frontend can invalidate/refetch runs immediately.
+      publishRealtimeEvent({
+        type: 'runs-updated',
+        ts: new Date().toISOString(),
+        payload: { runId, channelId: input.channelId, reportType: input.reportType, status: input.status },
+      });
+    }
+
     return runId;
   } catch (error) {
     logger?.warn('Failed to log daily run to database:', error);

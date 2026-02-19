@@ -66,17 +66,17 @@ export function Insights() {
 
       <section className="Insights__kpis">
         <MetricCard label="Messages sent" value={metrics?.totals.messagesSent ?? 0} />
-        <MetricCard label="Manual sent" value={metrics?.totals.manualMessagesSent ?? 0} />
-        <MetricCard label="Sequence sent" value={metrics?.totals.sequenceMessagesSent ?? 0} />
-        <MetricCard label="Replies (unique)" value={metrics?.totals.repliesReceived ?? 0} />
+        <MetricCard label="Manual texts sent" value={metrics?.totals.manualMessagesSent ?? 0} />
+        <MetricCard label="Sequence texts sent" value={metrics?.totals.sequenceMessagesSent ?? 0} />
+        <MetricCard label="People who replied" value={metrics?.totals.repliesReceived ?? 0} />
         <MetricCard label="Reply rate" value={formatPct(metrics?.totals.replyRatePct)} />
-        <MetricCard label="Booked" value={metrics?.totals.booked ?? 0} />
+        <MetricCard label="Calls booked" value={metrics?.totals.booked ?? 0} />
         <MetricCard label="Opt-outs" value={metrics?.totals.optOuts ?? 0} tone="danger" />
       </section>
 
       {metrics?.bookedCalls ? (
         <section className="Insights__table" style={{ marginTop: 18 }}>
-          <h3>Booked breakdown (Slack)</h3>
+          <h3>Calls booked — credit (from Slack)</h3>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
@@ -116,7 +116,7 @@ export function Insights() {
             </table>
           </div>
           <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
-            Booked is sourced from HubSpot Slack posts in #bookedcalls. Attribution uses reactions (:jack: and :me:).
+            Calls booked are sourced from HubSpot Slack posts in #bookedcalls. Credit uses reactions (:jack: and :me:).
           </div>
         </section>
       ) : null}

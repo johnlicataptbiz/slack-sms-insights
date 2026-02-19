@@ -22,7 +22,10 @@ export const initDatabase = async (logger?: Pick<Logger, 'info' | 'error'>): Pro
     connectionString: databaseUrl,
     max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
+    // Railway proxy can be latent; avoid frequent timeouts in local dev.
+    connectionTimeoutMillis: Number.parseInt(process.env.PG_CONNECT_TIMEOUT_MS || '20000', 10),
+    query_timeout: Number.parseInt(process.env.PG_QUERY_TIMEOUT_MS || '60000', 10),
+    statement_timeout: Number.parseInt(process.env.PG_STATEMENT_TIMEOUT_MS || '60000', 10),
   });
 
   pool.on('error', (err) => {

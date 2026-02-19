@@ -107,8 +107,8 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
             onChange={(e) => setSelectedChannelId(e.target.value || null)}
           >
             <option value="">All Channels</option>
-            {channels.map((ch) => (
-              <option key={ch.channel_id} value={ch.channel_id}>
+            {channels.map((ch, idx) => (
+              <option key={`${ch.channel_id}-${ch.channel_name ?? ''}-${idx}`} value={ch.channel_id}>
                 {ch.channel_name || ch.channel_id} ({ch.run_count})
               </option>
             ))}

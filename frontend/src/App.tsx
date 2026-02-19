@@ -5,7 +5,7 @@ import { useEventStream } from './api/useEventStream';
 import { useMetrics } from './api/queries';
 import './styles/App.css';
 
-type View = 'dashboard' | 'insights';
+type View = 'dashboard' | 'insights' | 'rep-jack' | 'rep-brandon' | 'rep-attribution';
 
 function getTodayRange() {
   const to = new Date();
@@ -58,17 +58,29 @@ export default function App() {
         <div className="AppShell__logo">Command Center</div>
         
         <div className="AppShell__links">
-          <button 
-            className={view === 'insights' ? 'active' : ''} 
-            onClick={() => setView('insights')}
-          >
-            <span role="img" aria-label="insights">📊</span> Insights
-          </button>
-          <button 
-            className={view === 'dashboard' ? 'active' : ''} 
-            onClick={() => setView('dashboard')}
-          >
+          <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>
             <span role="img" aria-label="history">🕒</span> Daily Runs
+          </button>
+
+          <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12, paddingLeft: 6 }}>Reps</div>
+
+          <button className={view === 'rep-jack' ? 'active' : ''} onClick={() => setView('rep-jack')}>
+            <span role="img" aria-label="rep">👤</span> Jack
+          </button>
+          <button className={view === 'rep-brandon' ? 'active' : ''} onClick={() => setView('rep-brandon')}>
+            <span role="img" aria-label="rep">👤</span> Brandon
+          </button>
+
+          <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12, paddingLeft: 6 }}>Deep Dives</div>
+
+          <button className={view === 'rep-attribution' ? 'active' : ''} onClick={() => setView('rep-attribution')}>
+            <span role="img" aria-label="attribution">🧾</span> Attribution
+          </button>
+
+          <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12, paddingLeft: 6 }}>Legacy</div>
+
+          <button className={view === 'insights' ? 'active' : ''} onClick={() => setView('insights')}>
+            <span role="img" aria-label="insights">📊</span> Team Insights
           </button>
         </div>
 
@@ -79,10 +91,24 @@ export default function App() {
       </nav>
 
       <main className="AppShell__content">
-        {view === 'insights' ? (
+        {view === 'dashboard' ? (
+          <Dashboard token={token} onLogout={handleLogout} />
+        ) : view === 'insights' ? (
           <Insights />
         ) : (
-          <Dashboard token={token} onLogout={handleLogout} />
+          <div style={{ padding: 20 }}>
+            <h1 style={{ marginTop: 0 }}>
+              {view === 'rep-jack'
+                ? 'Jack — Scorecard'
+                : view === 'rep-brandon'
+                  ? 'Brandon — Scorecard'
+                  : 'Attribution / Sequence Tracking'}
+            </h1>
+            <div style={{ opacity: 0.75 }}>
+              Placeholder page. Next: build scorecard KPIs (booked, response time, follow-ups, open convos) and an
+              attribution + sequence timeline deep dive.
+            </div>
+          </div>
         )}
       </main>
     </div>

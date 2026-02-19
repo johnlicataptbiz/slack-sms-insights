@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { client } from './client';
-import type { WorkItem, Conversation, MetricsSummary } from './types';
+import type { WorkItem, Conversation, MetricsSummary, SalesMetricsSummary } from './types';
 
 export function useWorkItems(params: {
   status?: 'open' | 'snoozed' | 'resolved';
@@ -39,6 +39,19 @@ export function useMetrics(params: { from: string; to: string }) {
   return useQuery({
     queryKey: ['metrics', params],
     queryFn: () => client.get<MetricsSummary>(`/api/metrics?${searchParams.toString()}`),
+    staleTime: 60_000,
+    retry: false,
+  });
+}
+
+export function useSalesMetrics(params: { from: string; to: string }) {
+  const searchParams = new URLSearchParams();
+  searchParams.set('from', params.from);
+  searchParams.set('to', params.to);
+
+  return useQuery({
+    queryKey: ['salesMetrics', params],
+    queryFn: () => client.get<SalesMetricsSummary>(`/api/sales-metrics?${searchParams.toString()}`),
     staleTime: 60_000,
     retry: false,
   });

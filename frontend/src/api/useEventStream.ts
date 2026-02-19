@@ -11,6 +11,12 @@ export function useEventStream() {
     //
     // NOTE: Vercel serverless functions are not a great fit for long-lived SSE connections and can
     // intermittently return 502s. We keep the UI functional by making realtime optional in production.
+    //
+    // Local dev: if the backend isn't running (or proxy is disabled), don't spam the console with
+    // EventSource MIME/404 errors. Allow opting in via VITE_ENABLE_REALTIME=1.
+    const enableRealtime = import.meta.env.VITE_ENABLE_REALTIME === '1';
+    if (!enableRealtime) return;
+
     const token = localStorage.getItem('slackToken') || 'dummy-token-bypass-auth';
 
     let es: EventSource | null = null;

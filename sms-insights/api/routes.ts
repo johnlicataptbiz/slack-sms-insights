@@ -10,6 +10,7 @@ import {
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
+import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
 
 type RequestHandler = (
@@ -309,6 +310,32 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
   sendJson(res, 200, summary, origin);
 };
 
+const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const fromStr = url.searchParams.get('from');
+  const toStr = url.searchParams.get('to');
+
+  if (!fromStr || !toStr) {
+    return sendJson(res, 400, { error: 'Missing from/to params' }, origin);
+  }
+
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+
+  try {
+    const summary = await getSalesMetricsSummary({ from, to }, logger);
+    sendJson(res, 200, summary, origin);
+  } catch (err) {
+    logger?.error('Failed to fetch sales metrics:', err);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch sales metrics', details: err instanceof Error ? err.message : String(err) },
+      origin,
+    );
+  }
+};
+
 const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
   // SSE endpoint for realtime invalidation.
   // Note: we intentionally do not use sendJson here.
@@ -475,6 +502,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/conversations/:id/events', requiresAuth: true, handler: handleGetConversationEvents },
 
   { method: 'GET', path: '/api/metrics', requiresAuth: true, handler: handleGetMetrics },
+  { method: 'GET', path: '/api/sales-metrics', requiresAuth: true, handler: handleGetSalesMetrics },
 
   { method: 'GET', path: '/api/stream', requiresAuth: true, handler: handleGetStream },
 

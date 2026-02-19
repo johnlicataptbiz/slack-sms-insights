@@ -88,3 +88,47 @@ export interface MetricsSummary {
   openWorkItems: number;
   overdueWorkItems: number;
 }
+
+export type SalesTrendPoint = {
+  day: string; // YYYY-MM-DD
+  messagesSent: number;
+  manualMessagesSent: number;
+  sequenceMessagesSent: number;
+  repliesReceived: number;
+  replyRatePct: number;
+  booked: number;
+  optOuts: number;
+};
+
+export type TopSequenceRow = {
+  label: string;
+  messagesSent: number;
+  repliesReceived: number;
+  replyRatePct: number;
+  booked: number;
+  optOuts: number;
+};
+
+export type RepLeaderboardRow = {
+  repName: string;
+  outboundConversations: number;
+  booked: number;
+  optOuts: number;
+  replyRatePct: number | null;
+};
+
+export type SalesMetricsSummary = {
+  timeRange: { from: string; to: string };
+  totals: {
+    messagesSent: number;
+    manualMessagesSent: number;
+    sequenceMessagesSent: number;
+    repliesReceived: number;
+    replyRatePct: number;
+    booked: number;
+    optOuts: number;
+  };
+  trendByDay: SalesTrendPoint[];
+  topSequences: TopSequenceRow[];
+  repLeaderboard: RepLeaderboardRow[];
+};

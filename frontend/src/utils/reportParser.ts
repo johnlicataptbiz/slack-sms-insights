@@ -28,12 +28,12 @@ export interface ParsedReport {
 }
 
 const SEQUENCE_LINE_PATTERN =
-  /^-\s*(.+?):\s*sent\s+(\d+).*?(?:replies(?:\s+received)?|replied)\s+(\d+)\s*\(([0-9.]+)%[^)]*\).*?book(?:ings?|ed)\s+(\d+).*?opt-outs\s+(\d+)/i;
+  /^-\s*(.+?):\s*sent\s+(\d+).*?(?:replies(?:\s+received)?|replied)\s+(\d+)\s*\(([0-9.]+)%[^)]*\).*?book(?:ings?|ed)\s+(\d+).*?opt[-\s]?outs?\s+(\d+)/i;
 
 const REP_PATTERN = /^\*Rep:\s*(.+)\*/i;
 const OUTBOUND_CONV_PATTERN = /- Outbound Conversations:\s*(\d+)/i;
-const BOOKINGS_PATTERN = /- Bookings:\s*(\d+)/i;
-const OPT_OUTS_PATTERN = /- Opt Outs:\s*(\d+)/i;
+const BOOKINGS_PATTERN = /- Book(?:ings?|ed):\s*(\d+)/i;
+const OPT_OUTS_PATTERN = /- Opt[-\s]?Outs?:\s*(\d+)/i;
 const DATE_PATTERN = /^Date:\s*(.+)$/im;
 
 export function parseReport(reportText: string): ParsedReport {
@@ -120,8 +120,13 @@ export function parseReport(reportText: string): ParsedReport {
 
   const totalMessagesSent = allSequences.reduce((sum, s) => sum + s.messagesSent, 0);
   const totalRepliesReceived = allSequences.reduce((sum, s) => sum + s.repliesReceived, 0);
-  const totalBooked = reps.reduce((sum, r) => sum + r.bookings, 0);
-  const totalOptOuts = reps.reduce((sum, r) => sum + r.optOuts, 0);
+
+  // Prefer sequence-level totals for "Bookings" and "Opt-Outs" because the raw report's
+  // rep-level "Core Metrics" can be inconsistent with the per-sequence breakdown.
+  // Example: rep core metrics may show "Bookings: 8" while the top sequence shows 3;
+  // the dashboard should reflect the true total across sequences (3+1+0+2+2+... = 8).
+  const totalBooked = allSequences.reduce((sum, s) => sum + s.booked, 0);
+  const totalOptOuts = allSequences.reduce((sum, s) => sum + s.optOuts, 0);
 
   return {
     title: "Daily SMS Snapshot",

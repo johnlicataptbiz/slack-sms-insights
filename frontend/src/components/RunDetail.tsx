@@ -6,6 +6,7 @@ import '../styles/RunDetail.css';
 type Run = {
   id: string;
   timestamp: string;
+  report_date?: string; // YYYY-MM-DD (preferred for daily reports)
   channel_id: string;
   channel_name: string;
   report_type: string;
@@ -27,7 +28,7 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
 
   const salesRange = useMemo(() => {
     // Prefer report_date if present; fall back to timestamp.
-    const base = new Date((run as any).report_date || run.timestamp);
+    const base = new Date(run.report_date || run.timestamp);
     if (!Number.isFinite(base.getTime())) return null;
 
     const from = new Date(base);

@@ -52,7 +52,17 @@ export const getBookedCallsSummary = async (
     trendMap.set(day, point);
   };
 
+  const looksLikeBookedCall = (text: string | null): boolean => {
+    const t = (text || '').toLowerCase();
+    if (!t) return false;
+    // Heuristic: HubSpot booked-call posts usually contain a booking signal.
+    // This filters out random chatter in #bookedcalls.
+    return t.includes('call booked') || t.includes('booked') || t.includes('appointment') || t.includes('scheduled');
+  };
+
   for (const c of calls) {
+    if (!looksLikeBookedCall(c.text)) continue;
+
     const day = dayKey(c.event_ts);
     if (!day) continue;
 

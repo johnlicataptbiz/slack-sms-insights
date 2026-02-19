@@ -6,8 +6,16 @@ export type SalesTrendPoint = {
   messagesSent: number;
   manualMessagesSent: number;
   sequenceMessagesSent: number;
+
   repliesReceived: number;
   replyRatePct: number;
+
+  manualRepliesReceived: number;
+  manualReplyRatePct: number;
+
+  sequenceRepliesReceived: number;
+  sequenceReplyRatePct: number;
+
   booked: number;
   optOuts: number;
 };
@@ -35,8 +43,16 @@ export type SalesMetricsSummary = {
     messagesSent: number;
     manualMessagesSent: number;
     sequenceMessagesSent: number;
+
     repliesReceived: number;
     replyRatePct: number;
+
+    manualRepliesReceived: number;
+    manualReplyRatePct: number;
+
+    sequenceRepliesReceived: number;
+    sequenceReplyRatePct: number;
+
     booked: number;
     optOuts: number;
   };
@@ -213,25 +229,97 @@ export const getSalesMetricsSummary = async (
     events.push({ ...r, _contactKey: key, _day: day });
   }
 
+  const ATTRIBUTION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+  const eventsByContact = new Map<string, EventRow[]>();
+  for (const e of events) {
+    const list = eventsByContact.get(e._contactKey) || [];
+    list.push(e);
+    eventsByContact.set(e._contactKey, list);
+  }
+  for (const list of eventsByContact.values()) {
+    list.sort((a, b) => new Date(a.event_ts).getTime() - new Date(b.event_ts).getTime());
+  }
+
   const trendMap = new Map<string, SalesTrendPoint>();
   const seqMap = new Map<string, TopSequenceRow>();
   const repMap = new Map<string, RepLeaderboardRow>();
+
+  const emptyPoint = (day: string): SalesTrendPoint => ({
+    day,
+    messagesSent: 0,
+    manualMessagesSent: 0,
+    sequenceMessagesSent: 0,
+
+    repliesReceived: 0,
+    replyRatePct: 0,
+
+    manualRepliesReceived: 0,
+    manualReplyRatePct: 0,
+
+    sequenceRepliesReceived: 0,
+    sequenceReplyRatePct: 0,
+
+    booked: 0,
+    optOuts: 0,
+  });
+
+  // Exclusion rule:
+  // Exclude ALL manual outbound texts for 14 days after a sequence-triggered reply.
+  // (User clarified: "Exclude all manual outbounds for 14 days after the sequence reply")
+  const isManualOutboundExcluded = (contactEvents: EventRow[], outbound: EventRow): boolean => {
+    if (outbound.direction !== 'outbound') return false;
+    const isManual = (outbound.sequence || '').trim().length === 0;
+    if (!isManual) return false;
+
+    const outboundTs = new Date(outbound.event_ts).getTime();
+    if (!Number.isFinite(outboundTs)) return false;
+
+    // Find the most recent inbound at/before this outbound.
+    // If that inbound is attributed to a sequenced outbound touch, exclude this manual outbound.
+    let latestInbound: EventRow | undefined;
+    for (const e of contactEvents) {
+      const ts = new Date(e.event_ts).getTime();
+      if (!Number.isFinite(ts)) continue;
+      if (ts > outboundTs) break;
+      if (e.direction === 'inbound') latestInbound = e;
+    }
+    if (!latestInbound) return false;
+
+    const inboundTs = new Date(latestInbound.event_ts).getTime();
+    if (!Number.isFinite(inboundTs)) return false;
+    if (outboundTs - inboundTs > ATTRIBUTION_WINDOW_MS) return false;
+
+    // Attribute that inbound to latest outbound within 14 days (prefer sequenced).
+    let latestOutbound: EventRow | undefined;
+    let latestSequencedOutbound: EventRow | undefined;
+    for (const candidate of contactEvents) {
+      if (candidate.direction !== 'outbound') continue;
+      const candidateTs = new Date(candidate.event_ts).getTime();
+      if (!Number.isFinite(candidateTs)) continue;
+      if (candidateTs > inboundTs) break;
+      if (inboundTs - candidateTs > ATTRIBUTION_WINDOW_MS) continue;
+
+      latestOutbound = candidate;
+      if ((candidate.sequence || '').trim().length > 0) latestSequencedOutbound = candidate;
+    }
+
+    const attributedTouch = latestSequencedOutbound || latestOutbound;
+    if (!attributedTouch) return false;
+
+    const inboundWasSequenceReply = (attributedTouch.sequence || '').trim().length > 0;
+    return inboundWasSequenceReply;
+  };
 
   // messages sent (volume) + rep outbound conversations (approx)
   const outboundSeenByContact = new Set<string>();
   for (const e of events) {
     if (e.direction !== 'outbound') continue;
 
-    const point = trendMap.get(e._day) || {
-      day: e._day,
-      messagesSent: 0,
-      manualMessagesSent: 0,
-      sequenceMessagesSent: 0,
-      repliesReceived: 0,
-      replyRatePct: 0,
-      booked: 0,
-      optOuts: 0,
-    };
+    const contactEvents = eventsByContact.get(e._contactKey) || [];
+    if (isManualOutboundExcluded(contactEvents, e)) continue;
+
+    const point = trendMap.get(e._day) || emptyPoint(e._day);
 
     point.messagesSent += 1;
     const hasSequence = Boolean((e.sequence || '').trim());
@@ -260,25 +348,66 @@ export const getSalesMetricsSummary = async (
   }
 
   // repliesReceived: unique contacts with inbound in range (max 1 per contact), credited to inbound day
+  // Also split into manual vs sequence replies based on attribution to latest outbound touch within 14 days (prefer sequenced).
   const repliedContactsByDay = new Map<string, Set<string>>();
-  for (const e of events) {
-    if (e.direction !== 'inbound') continue;
-    const set = repliedContactsByDay.get(e._day) || new Set<string>();
-    set.add(e._contactKey);
-    repliedContactsByDay.set(e._day, set);
+  const manualRepliedContactsByDay = new Map<string, Set<string>>();
+  const sequenceRepliedContactsByDay = new Map<string, Set<string>>();
+
+  for (const [contactKey, list] of eventsByContact.entries()) {
+    const inboundEvents = list.filter((e) => e.direction === 'inbound');
+    if (inboundEvents.length === 0) continue;
+
+    for (const inbound of inboundEvents) {
+      const inboundTs = new Date(inbound.event_ts).getTime();
+      if (!Number.isFinite(inboundTs)) continue;
+
+      // overall replied
+      const allSet = repliedContactsByDay.get(inbound._day) || new Set<string>();
+      allSet.add(contactKey);
+      repliedContactsByDay.set(inbound._day, allSet);
+
+      // attribute inbound to latest outbound within 14 days (prefer sequenced)
+      let latestOutbound: EventRow | undefined;
+      let latestSequencedOutbound: EventRow | undefined;
+      for (const candidate of list) {
+        if (candidate.direction !== 'outbound') continue;
+        const candidateTs = new Date(candidate.event_ts).getTime();
+        if (!Number.isFinite(candidateTs)) continue;
+        if (candidateTs > inboundTs) break;
+        if (inboundTs - candidateTs > ATTRIBUTION_WINDOW_MS) continue;
+
+        latestOutbound = candidate;
+        if ((candidate.sequence || '').trim().length > 0) latestSequencedOutbound = candidate;
+      }
+
+      const attributedTouch = latestSequencedOutbound || latestOutbound;
+      const isSequenceReply = (attributedTouch?.sequence || '').trim().length > 0;
+
+      if (isSequenceReply) {
+        const set = sequenceRepliedContactsByDay.get(inbound._day) || new Set<string>();
+        set.add(contactKey);
+        sequenceRepliedContactsByDay.set(inbound._day, set);
+      } else {
+        const set = manualRepliedContactsByDay.get(inbound._day) || new Set<string>();
+        set.add(contactKey);
+        manualRepliedContactsByDay.set(inbound._day, set);
+      }
+    }
   }
+
   for (const [day, contacts] of repliedContactsByDay.entries()) {
-    const point = trendMap.get(day) || {
-      day,
-      messagesSent: 0,
-      manualMessagesSent: 0,
-      sequenceMessagesSent: 0,
-      repliesReceived: 0,
-      replyRatePct: 0,
-      booked: 0,
-      optOuts: 0,
-    };
+    const point = trendMap.get(day) || emptyPoint(day);
     point.repliesReceived += contacts.size;
+    trendMap.set(day, point);
+  }
+  for (const [day, contacts] of manualRepliedContactsByDay.entries()) {
+    const point = trendMap.get(day) || emptyPoint(day);
+    point.manualRepliesReceived += contacts.size;
+    trendMap.set(day, point);
+  }
+  for (const [day, contacts] of sequenceRepliedContactsByDay.entries()) {
+    const point = trendMap.get(day) || emptyPoint(day);
+    point.sequenceRepliesReceived += contacts.size;
     trendMap.set(day, point);
   }
 
@@ -293,33 +422,12 @@ export const getSalesMetricsSummary = async (
     optOutContactsByDay.set(e._day, set);
   }
   for (const [day, contacts] of optOutContactsByDay.entries()) {
-    const point = trendMap.get(day) || {
-      day,
-      messagesSent: 0,
-      manualMessagesSent: 0,
-      sequenceMessagesSent: 0,
-      repliesReceived: 0,
-      replyRatePct: 0,
-      booked: 0,
-      optOuts: 0,
-    };
+    const point = trendMap.get(day) || emptyPoint(day);
     point.optOuts += contacts.size;
     trendMap.set(day, point);
   }
 
   // booking attribution: for each contact, find booking events in range; attribute each booking to latest outbound touch within 14 days
-  const eventsByContact = new Map<string, EventRow[]>();
-  for (const e of events) {
-    const list = eventsByContact.get(e._contactKey) || [];
-    list.push(e);
-    eventsByContact.set(e._contactKey, list);
-  }
-  for (const list of eventsByContact.values()) {
-    list.sort((a, b) => new Date(a.event_ts).getTime() - new Date(b.event_ts).getTime());
-  }
-
-  const ATTRIBUTION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
-
   for (const [_contactKey, list] of eventsByContact.entries()) {
     for (const e of list) {
       const body = (e.body || '').trim();
@@ -351,16 +459,7 @@ export const getSalesMetricsSummary = async (
 
       // credit booking to booking day
       const bookingDay = e._day;
-      const point = trendMap.get(bookingDay) || {
-        day: bookingDay,
-        messagesSent: 0,
-        manualMessagesSent: 0,
-        sequenceMessagesSent: 0,
-        repliesReceived: 0,
-        replyRatePct: 0,
-        booked: 0,
-        optOuts: 0,
-      };
+      const point = trendMap.get(bookingDay) || emptyPoint(bookingDay);
       point.booked += 1;
       trendMap.set(bookingDay, point);
 
@@ -392,7 +491,9 @@ export const getSalesMetricsSummary = async (
     }
   }
 
-  // Fill sequence messagesSent/repliesReceived/optOuts from outbound/inbound events (simple v1)
+  // Fill sequence messagesSent from outbound events.
+  // NOTE: manual outbound exclusion does NOT apply here because this table is "by sequence";
+  // excluded manual outbounds are not part of any sequence label anyway.
   for (const e of events) {
     if (e.direction !== 'outbound') continue;
     const label = (e.sequence || '').trim() || 'No sequence (manual/direct)';
@@ -512,9 +613,13 @@ export const getSalesMetricsSummary = async (
     seqMap.set(label, row);
   }
 
-  // finalize trend replyRatePct
+  // finalize trend reply rates
   for (const point of trendMap.values()) {
     point.replyRatePct = point.messagesSent > 0 ? (point.repliesReceived / point.messagesSent) * 100 : 0;
+    point.manualReplyRatePct =
+      point.manualMessagesSent > 0 ? (point.manualRepliesReceived / point.manualMessagesSent) * 100 : 0;
+    point.sequenceReplyRatePct =
+      point.sequenceMessagesSent > 0 ? (point.sequenceRepliesReceived / point.sequenceMessagesSent) * 100 : 0;
   }
 
   const trendByDay = [...trendMap.values()].sort((a, b) => a.day.localeCompare(b.day));
@@ -530,15 +635,32 @@ export const getSalesMetricsSummary = async (
       acc.messagesSent += d.messagesSent;
       acc.manualMessagesSent += d.manualMessagesSent;
       acc.sequenceMessagesSent += d.sequenceMessagesSent;
+
       acc.repliesReceived += d.repliesReceived;
+      acc.manualRepliesReceived += d.manualRepliesReceived;
+      acc.sequenceRepliesReceived += d.sequenceRepliesReceived;
+
       acc.booked += d.booked;
       acc.optOuts += d.optOuts;
       return acc;
     },
-    { messagesSent: 0, manualMessagesSent: 0, sequenceMessagesSent: 0, repliesReceived: 0, booked: 0, optOuts: 0 },
+    {
+      messagesSent: 0,
+      manualMessagesSent: 0,
+      sequenceMessagesSent: 0,
+      repliesReceived: 0,
+      manualRepliesReceived: 0,
+      sequenceRepliesReceived: 0,
+      booked: 0,
+      optOuts: 0,
+    },
   );
 
   const replyRatePct = totals.messagesSent > 0 ? (totals.repliesReceived / totals.messagesSent) * 100 : 0;
+  const manualReplyRatePct =
+    totals.manualMessagesSent > 0 ? (totals.manualRepliesReceived / totals.manualMessagesSent) * 100 : 0;
+  const sequenceReplyRatePct =
+    totals.sequenceMessagesSent > 0 ? (totals.sequenceRepliesReceived / totals.sequenceMessagesSent) * 100 : 0;
 
   logger?.debug?.('sales metrics computed', {
     days: trendByDay.length,
@@ -548,7 +670,7 @@ export const getSalesMetricsSummary = async (
 
   return {
     timeRange: { from: fromIso, to: toIso },
-    totals: { ...totals, replyRatePct },
+    totals: { ...totals, replyRatePct, manualReplyRatePct, sequenceReplyRatePct },
     trendByDay,
     topSequences,
     repLeaderboard,

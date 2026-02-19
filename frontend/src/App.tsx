@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import { Insights } from './pages/Insights';
+import RepScorecard from './pages/RepScorecard';
+import AttributionDeepDive from './pages/AttributionDeepDive';
 import { useEventStream } from './api/useEventStream';
 import { useMetrics } from './api/queries';
 import './styles/App.css';
@@ -95,20 +97,12 @@ export default function App() {
           <Dashboard token={token} onLogout={handleLogout} />
         ) : view === 'insights' ? (
           <Insights />
+        ) : view === 'rep-jack' ? (
+          <RepScorecard rep="jack" />
+        ) : view === 'rep-brandon' ? (
+          <RepScorecard rep="brandon" />
         ) : (
-          <div style={{ padding: 20 }}>
-            <h1 style={{ marginTop: 0 }}>
-              {view === 'rep-jack'
-                ? 'Jack — Scorecard'
-                : view === 'rep-brandon'
-                  ? 'Brandon — Scorecard'
-                  : 'Attribution / Sequence Tracking'}
-            </h1>
-            <div style={{ opacity: 0.75 }}>
-              Placeholder page. Next: build scorecard KPIs (booked, response time, follow-ups, open convos) and an
-              attribution + sequence timeline deep dive.
-            </div>
-          </div>
+          <AttributionDeepDive />
         )}
       </main>
     </div>

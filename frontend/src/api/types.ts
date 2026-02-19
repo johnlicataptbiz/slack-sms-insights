@@ -94,8 +94,16 @@ export type SalesTrendPoint = {
   messagesSent: number;
   manualMessagesSent: number;
   sequenceMessagesSent: number;
+
   repliesReceived: number;
   replyRatePct: number;
+
+  manualRepliesReceived: number;
+  manualReplyRatePct: number;
+
+  sequenceRepliesReceived: number;
+  sequenceReplyRatePct: number;
+
   booked: number;
   optOuts: number;
 };
@@ -123,8 +131,16 @@ export type SalesMetricsSummary = {
     messagesSent: number;
     manualMessagesSent: number;
     sequenceMessagesSent: number;
+
     repliesReceived: number;
     replyRatePct: number;
+
+    manualRepliesReceived: number;
+    manualReplyRatePct: number;
+
+    sequenceRepliesReceived: number;
+    sequenceReplyRatePct: number;
+
     booked: number;
     optOuts: number;
   };

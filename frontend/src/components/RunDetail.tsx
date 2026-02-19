@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSalesMetrics } from '../api/queries';
 import { parseReport } from '../utils/reportParser';
 import '../styles/RunDetail.css';
 
@@ -23,6 +24,24 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
     const date = new Date(isoString);
     return date.toLocaleString();
   };
+
+  const salesRange = useMemo(() => {
+    // Prefer report_date if present; fall back to timestamp.
+    const base = new Date((run as any).report_date || run.timestamp);
+    if (!Number.isFinite(base.getTime())) return null;
+
+    const from = new Date(base);
+    from.setHours(0, 0, 0, 0);
+
+    const to = new Date(base);
+    to.setHours(23, 59, 59, 999);
+
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, [run]);
+
+  const { data: sales, isLoading: salesLoading, error: salesError } = useSalesMetrics(
+    salesRange || { from: new Date().toISOString(), to: new Date().toISOString() },
+  );
 
   const parsedData = useMemo(() => {
     if (run.full_report && run.status === 'success') {
@@ -126,27 +145,99 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
 
       {hasStructuredData && (
         <div className="structured-report">
+          <div className="report-section section-primary">
+            <div className="section-header">
+              <div className="section-icon">✅</div>
+              <div className="section-content">
+                <h3>Source-of-truth metrics (sms_events + Slack booked calls)</h3>
+                <p className="section-description">
+                  This panel is computed from the same sources as Team Insights / Attribution. The legacy report below is kept for sequence tables.
+                </p>
+              </div>
+            </div>
+
+            {salesRange === null ? (
+              <div style={{ padding: 12, opacity: 0.8 }}>No valid date found for this run.</div>
+            ) : salesLoading ? (
+              <div style={{ padding: 12, opacity: 0.8 }}>Loading source-of-truth metrics…</div>
+            ) : salesError ? (
+              <div style={{ padding: 12, color: '#b00020' }}>Failed to load source-of-truth metrics.</div>
+            ) : (
+              <div className="metrics-grid">
+                <div className="metric-card">
+                  <div className="metric-icon">📤</div>
+                  <span className="metric-label">Messages sent</span>
+                  <span className="metric-value">{(sales?.totals?.messagesSent ?? 0).toLocaleString()}</span>
+                </div>
+
+                <div className="metric-card">
+                  <div className="metric-icon">🧑‍💻</div>
+                  <span className="metric-label">Manual texts sent</span>
+                  <span className="metric-value">{(sales?.totals?.manualMessagesSent ?? 0).toLocaleString()}</span>
+                </div>
+
+                <div className="metric-card">
+                  <div className="metric-icon">🤖</div>
+                  <span className="metric-label">Sequence texts sent</span>
+                  <span className="metric-value">{(sales?.totals?.sequenceMessagesSent ?? 0).toLocaleString()}</span>
+                </div>
+
+                <div className="metric-card">
+                  <div className="metric-icon">💬</div>
+                  <span className="metric-label">Reply rate</span>
+                  <span className="metric-value">{(sales?.totals?.replyRatePct ?? 0).toFixed(1)}%</span>
+                  <span className="metric-subtext">{sales?.totals?.repliesReceived ?? 0} people who replied</span>
+                </div>
+
+                <div className="metric-card highlight">
+                  <div className="metric-icon">📞</div>
+                  <span className="metric-label">Calls booked (Slack)</span>
+                  <span className="metric-value">{sales?.bookedCalls?.booked ?? 0}</span>
+                  <span className="metric-subtext">
+                    Jack {sales?.bookedCalls?.jack ?? 0} · Brandon {sales?.bookedCalls?.brandon ?? 0} · Self {sales?.bookedCalls?.selfBooked ?? 0}
+                  </span>
+                </div>
+
+                <div className="metric-card warning">
+                  <div className="metric-icon">🚫</div>
+                  <span className="metric-label">Opt-outs</span>
+                  <span className="metric-value">{sales?.totals?.optOuts ?? 0}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="report-section section-secondary">
+            <div className="section-header">
+              <div className="section-icon">🧾</div>
+              <div className="section-content">
+                <h3>Legacy report (sequence tables)</h3>
+                <p className="section-description">Kept for continuity; may differ from source-of-truth metrics above.</p>
+              </div>
+            </div>
+          </div>
+
           <div className="metrics-grid">
             <div className="metric-card">
               <div className="metric-icon">📤</div>
-              <span className="metric-label">Total Sent</span>
+              <span className="metric-label">Total Sent (legacy)</span>
               <span className="metric-value">{parsedData.totalMessagesSent.toLocaleString()}</span>
             </div>
             <div className="metric-card">
               <div className="metric-icon">💬</div>
-              <span className="metric-label">Reply Rate</span>
+              <span className="metric-label">Reply Rate (legacy)</span>
               <span className="metric-value">{parsedData.overallReplyRate.toFixed(1)}%</span>
               <span className="metric-subtext">{parsedData.totalRepliesReceived} replies</span>
             </div>
             <div className="metric-card highlight">
               <div className="metric-icon">🎯</div>
-              <span className="metric-label">Bookings</span>
+              <span className="metric-label">Bookings (legacy)</span>
               <span className="metric-value">{parsedData.totalBooked}</span>
               <div className="metric-trend positive">+{parsedData.totalBooked > 0 ? 'Active' : 'Monitor'}</div>
             </div>
             <div className="metric-card warning">
               <div className="metric-icon">🚫</div>
-              <span className="metric-label">Opt-Outs</span>
+              <span className="metric-label">Opt-Outs (legacy)</span>
               <span className="metric-value">{parsedData.totalOptOuts}</span>
               <div className="metric-trend negative">{parsedData.totalOptOuts > 10 ? 'High Risk' : 'Normal'}</div>
             </div>

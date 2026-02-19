@@ -74,6 +74,53 @@ export function Insights() {
         <MetricCard label="Opt-outs" value={metrics?.totals.optOuts ?? 0} tone="danger" />
       </section>
 
+      {metrics?.bookedCalls ? (
+        <section className="Insights__table" style={{ marginTop: 18 }}>
+          <h3>Booked breakdown (Slack)</h3>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '8px 6px' }}>Bucket</th>
+                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booked</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>Jack (:jack:)</td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {metrics.bookedCalls.jack}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>Brandon (:me:)</td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {metrics.bookedCalls.brandon}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>Self-booked</td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {metrics.bookedCalls.selfBooked}
+                  </td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <strong>Total</strong>
+                  </td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <strong>{metrics.bookedCalls.booked}</strong>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
+            Booked is sourced from HubSpot Slack posts in #bookedcalls. Attribution uses reactions (:jack: and :me:).
+          </div>
+        </section>
+      ) : null}
+
       <section className="Insights__main">
         <div className="Insights__chart">
           <h3>Sales Trend</h3>

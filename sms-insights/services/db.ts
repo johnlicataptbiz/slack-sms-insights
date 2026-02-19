@@ -90,6 +90,32 @@ export const initializeSchema = async (): Promise<void> => {
 
     // --- v2 operational command center tables (additive) ---
 
+    // HubSpot booked calls posted into Slack (#bookedcalls) + reactions for setter attribution.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS booked_calls (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        slack_team_id TEXT NOT NULL,
+        slack_channel_id TEXT NOT NULL,
+        slack_message_ts TEXT NOT NULL,
+        event_ts TIMESTAMPTZ NOT NULL,
+        text TEXT,
+        raw JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (slack_channel_id, slack_message_ts)
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS booked_call_reactions (
+        booked_call_id UUID NOT NULL REFERENCES booked_calls(id) ON DELETE CASCADE,
+        reaction_name TEXT NOT NULL,
+        reaction_count INTEGER NOT NULL DEFAULT 0,
+        users JSONB,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (booked_call_id, reaction_name)
+      );
+    `);
+
     // Append-only normalized SMS events (ingested from Slack Aloware integration messages).
     await client.query(`
       CREATE TABLE IF NOT EXISTS sms_events (
@@ -161,6 +187,16 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_daily_runs_timestamp
       ON daily_runs (timestamp DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_booked_calls_event_ts
+      ON booked_calls (event_ts DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_booked_calls_channel_ts
+      ON booked_calls (slack_channel_id, slack_message_ts);
     `);
 
     await client.query(`

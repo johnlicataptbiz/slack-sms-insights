@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
+import { getBookedCallsSummary } from '../services/booked-calls.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import {
@@ -323,8 +324,24 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
   const to = new Date(toStr);
 
   try {
-    const summary = await getSalesMetricsSummary({ from, to }, logger);
-    sendJson(res, 200, summary, origin);
+    const [summary, bookedCalls] = await Promise.all([
+      getSalesMetricsSummary({ from, to }, logger),
+      getBookedCallsSummary({ from, to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID }, logger),
+    ]);
+
+    // Override "booked" with Slack source-of-truth.
+    // Keep SMS-derived booked out of the UI to avoid inflated counts.
+    const patched = {
+      ...summary,
+      totals: { ...summary.totals, booked: bookedCalls.totals.booked },
+      trendByDay: summary.trendByDay.map((d) => {
+        const match = bookedCalls.trendByDay.find((b) => b.day === d.day);
+        return { ...d, booked: match?.booked ?? 0 };
+      }),
+      bookedCalls: bookedCalls.totals,
+    };
+
+    sendJson(res, 200, patched, origin);
   } catch (err) {
     logger?.error('Failed to fetch sales metrics:', err);
     sendJson(

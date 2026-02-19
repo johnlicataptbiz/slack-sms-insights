@@ -131,4 +131,10 @@ export type SalesMetricsSummary = {
   trendByDay: SalesTrendPoint[];
   topSequences: TopSequenceRow[];
   repLeaderboard: RepLeaderboardRow[];
+  bookedCalls?: {
+    booked: number;
+    jack: number;
+    brandon: number;
+    selfBooked: number;
+  };
 };

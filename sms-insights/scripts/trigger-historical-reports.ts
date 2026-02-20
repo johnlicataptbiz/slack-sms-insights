@@ -13,6 +13,7 @@ async function run() {
   const client = new WebClient(process.env.SLACK_BOT_TOKEN);
 
   const dates = [
+    '2026-02-18', // Backfill missing day
     '2026-02-17', // Yesterday
     '2026-02-16', // Day prior
     '2026-02-15', // Two days prior

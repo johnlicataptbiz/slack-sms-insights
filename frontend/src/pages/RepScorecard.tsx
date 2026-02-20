@@ -19,6 +19,8 @@ const titleFor = (rep: RepKey) => (rep === 'jack' ? 'Jack' : 'Brandon');
 export default function RepScorecard({ rep }: Props) {
   const { data, isLoading, error } = useSalesMetrics(getTodayRange());
 
+  // Back-compat: API returns bookedCalls buckets keyed by "jack"/"brandon".
+  // Some older deployments may return rep names in repLeaderboard only.
   const repBooked =
     rep === 'jack'
       ? data?.bookedCalls?.jack ?? null
@@ -39,7 +41,10 @@ export default function RepScorecard({ rep }: Props) {
       {isLoading ? (
         <div>Loading…</div>
       ) : error ? (
-        <div style={{ color: '#b00020' }}>Failed to load metrics.</div>
+        <div style={{ color: '#b00020' }}>
+          Failed to load metrics.
+          <div style={{ marginTop: 8, opacity: 0.8, fontSize: 12 }}>{String((error as any)?.message ?? error)}</div>
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 12 }}>
           <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>

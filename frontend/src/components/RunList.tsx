@@ -21,11 +21,12 @@ export default function RunList({ runs, token }: { runs: Run[]; token: string })
   const selectedRun = runs.find(r => r.id === selectedRunId) || null;
 
   const formatTime = (isoString: string, reportDate?: string) => {
+    const date = new Date(reportDate || isoString);
     if (reportDate) {
-      const date = new Date(reportDate);
+      // For historical reports with just a date, show the date in UTC to avoid shifting
       return date.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
     }
-    const date = new Date(isoString);
+    // For real-time runs, show the full local timestamp
     return date.toLocaleString();
   };
 

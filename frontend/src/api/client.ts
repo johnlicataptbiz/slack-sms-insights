@@ -54,7 +54,19 @@ export const apiFetch = async <T>(
 
   const contentType = res.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
+  const isHtml = contentType.includes('text/html');
+
   const body = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
+
+  // Dev guardrail: if we asked for JSON from /api/* but got HTML, it almost always means
+  // the Vite dev proxy isn't active (e.g. VITE_DISABLE_PROXY set) or is targeting the wrong backend.
+  if (import.meta.env.DEV && path.startsWith('/api/') && isHtml) {
+    throw new ApiError(
+      'Received HTML for an API request. Vite proxy is likely disabled/misconfigured (check VITE_DISABLE_PROXY / VITE_API_TARGET) or the backend is not reachable.',
+      res.status,
+      body,
+    );
+  }
 
   if (!res.ok) {
     const message =

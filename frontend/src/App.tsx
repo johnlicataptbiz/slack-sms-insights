@@ -24,9 +24,12 @@ export default function App() {
   // This prevents a first-render 401 when localStorage is empty.
   //
   // NOTE: In dev, React.StrictMode intentionally double-invokes render/effects.
-  // We set the token unconditionally to keep the app stable during local dev.
+  // For local preview builds, we still want a stable token so the app can load without OAuth.
   if (typeof window !== 'undefined') {
-    localStorage.setItem('slackToken', localStorage.getItem('slackToken') || 'dummy-token-bypass-auth');
+    const existing = localStorage.getItem('slackToken');
+    if (!existing && (import.meta.env.DEV || window.location.hostname === 'localhost')) {
+      localStorage.setItem('slackToken', 'dummy-token-bypass-auth');
+    }
   }
 
   // Initialize real-time event stream

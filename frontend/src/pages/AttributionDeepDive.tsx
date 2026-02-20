@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { ApiError } from '../api/client';
 import { useSalesMetrics } from '../api/queries';
 
 function getTodayRange() {
@@ -11,7 +12,16 @@ function getTodayRange() {
 export default function AttributionDeepDive() {
   // Memoize params so React Query's queryKey stays stable and doesn't refetch forever.
   const range = useMemo(() => getTodayRange(), []);
-  const { data, isLoading, error } = useSalesMetrics(range);
+  const { data, isLoading, error, refetch, isFetching } = useSalesMetrics(range);
+
+  const errorMessage = (() => {
+    if (!error) return null;
+    if (error instanceof ApiError) {
+      return `${error.message} (status ${error.status})`;
+    }
+    if (error instanceof Error) return error.message;
+    return String(error);
+  })();
 
   return (
     <div style={{ padding: 20 }}>
@@ -24,10 +34,39 @@ export default function AttributionDeepDive() {
       {isLoading ? (
         <div>Loading…</div>
       ) : error ? (
-        <div style={{ color: '#b00020' }}>Failed to load sales metrics.</div>
+        <div
+          style={{
+            border: '1px solid rgba(176, 0, 32, 0.35)',
+            background: 'rgba(176, 0, 32, 0.06)',
+            borderRadius: 8,
+            padding: 12,
+            color: '#b00020',
+          }}
+        >
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>Failed to load sales metrics</div>
+          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12 }}>
+            {errorMessage ?? 'Unknown error'}
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <button
+              onClick={() => refetch()}
+              style={{
+                padding: '8px 10px',
+                borderRadius: 6,
+                border: '1px solid rgba(176, 0, 32, 0.35)',
+                background: '#fff',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       ) : (
         <>
-          <h2 style={{ marginTop: 0 }}>Today — Reply rates</h2>
+          <h2 style={{ marginTop: 0 }}>
+            Today — Reply rates {isFetching ? <span style={{ fontSize: 12, opacity: 0.6 }}>(refreshing…)</span> : null}
+          </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: 12 }}>
             <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
               <div style={{ fontSize: 12, opacity: 0.7 }}>Overall reply rate</div>

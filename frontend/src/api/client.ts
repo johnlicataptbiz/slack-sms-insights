@@ -1,6 +1,7 @@
 export type ApiClientOptions = {
   baseUrl?: string; // default: '' (same origin / Vite proxy)
   token?: string;
+  timeoutMs?: number; // default: 30s
 };
 
 export class ApiError extends Error {
@@ -44,13 +45,34 @@ export const apiFetch = async <T>(
 ): Promise<T> => {
   const baseUrl = options.baseUrl ?? '';
   const token = getAuthToken(init.token ?? options.token ?? undefined);
+  const timeoutMs = options.timeoutMs ?? 30_000;
 
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
-  const res = await fetch(`${baseUrl}${path}`, { ...init, headers });
+  // Timeout + abort support
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  // If caller provided a signal, abort our controller when theirs aborts.
+  if (init.signal) {
+    if (init.signal.aborted) controller.abort();
+    else init.signal.addEventListener('abort', () => controller.abort(), { once: true });
+  }
+
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, { ...init, headers, signal: controller.signal });
+  } catch (e) {
+    if (controller.signal.aborted) {
+      throw new ApiError(`Request timed out after ${timeoutMs}ms`, 408, { timeoutMs, path });
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   const contentType = res.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');

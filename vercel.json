@@ -8,6 +8,10 @@
       "destination": "https://sms-insights-production.up.railway.app/api/:path*"
     },
     {
+      "source": "/assets/(.*)",
+      "destination": "/assets/$1"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

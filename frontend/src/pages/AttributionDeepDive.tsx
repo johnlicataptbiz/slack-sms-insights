@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useSalesMetrics } from '../api/queries';
 
 function getTodayRange() {
@@ -9,7 +9,9 @@ function getTodayRange() {
 }
 
 export default function AttributionDeepDive() {
-  const { data, isLoading, error } = useSalesMetrics(getTodayRange());
+  // Memoize params so React Query's queryKey stays stable and doesn't refetch forever.
+  const range = useMemo(() => getTodayRange(), []);
+  const { data, isLoading, error } = useSalesMetrics(range);
 
   return (
     <div style={{ padding: 20 }}>

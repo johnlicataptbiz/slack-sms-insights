@@ -17,7 +17,9 @@ function getTodayRange() {
 const titleFor = (rep: RepKey) => (rep === 'jack' ? 'Jack' : 'Brandon');
 
 export default function RepScorecard({ rep }: Props) {
-  const { data, isLoading, error } = useSalesMetrics(getTodayRange());
+  // Important: keep params stable so React Query doesn't treat every render as a new query.
+  const range = React.useMemo(() => getTodayRange(), []);
+  const { data, isLoading, error } = useSalesMetrics(range);
 
   // Back-compat: API returns bookedCalls buckets keyed by "jack"/"brandon".
   // Some older deployments may return rep names in repLeaderboard only.

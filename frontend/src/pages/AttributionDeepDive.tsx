@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../api/client';
 import { useSalesMetrics } from '../api/queries';
 
@@ -12,7 +12,14 @@ function getTodayRange() {
 export default function AttributionDeepDive() {
   // Memoize params so React Query's queryKey stays stable and doesn't refetch forever.
   const range = useMemo(() => getTodayRange(), []);
-  const { data, isLoading, error, refetch, isFetching } = useSalesMetrics(range);
+  const { data, isLoading, error, refetch, isFetching, fetchStatus, status } = useSalesMetrics(range);
+  const [stuck, setStuck] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading) return;
+    const id = window.setTimeout(() => setStuck(true), 8000);
+    return () => window.clearTimeout(id);
+  }, [isLoading]);
 
   const errorMessage = (() => {
     if (!error) return null;
@@ -31,9 +38,9 @@ export default function AttributionDeepDive() {
         This page explains what we’re counting and why (manual vs sequence), plus how we credit replies and bookings.
       </div>
 
-      {isLoading ? (
+      {isLoading && !stuck ? (
         <div>Loading…</div>
-      ) : error ? (
+      ) : error || stuck ? (
         <div
           style={{
             border: '1px solid rgba(176, 0, 32, 0.35)',
@@ -43,9 +50,20 @@ export default function AttributionDeepDive() {
             color: '#b00020',
           }}
         >
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>Failed to load sales metrics</div>
-          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: 12 }}>
-            {errorMessage ?? 'Unknown error'}
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>
+            {stuck ? 'Still loading sales metrics (possible hang)' : 'Failed to load sales metrics'}
+          </div>
+          <div
+            style={{
+              fontFamily:
+                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              fontSize: 12,
+              whiteSpace: 'pre-wrap',
+            }}
+          >
+            {stuck
+              ? `status=${String(status)} fetchStatus=${String(fetchStatus)} isLoading=${String(isLoading)} isFetching=${String(isFetching)}`
+              : errorMessage ?? 'Unknown error'}
           </div>
           <div style={{ marginTop: 10 }}>
             <button

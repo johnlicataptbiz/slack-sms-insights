@@ -509,17 +509,19 @@ const routeMatches = (pathname: string, pattern: string): boolean => {
 };
 
 const apiRoutes: ApiRoute[] = [
+  // Public read-only endpoints (dashboard is public)
+  { method: 'GET', path: '/api/metrics', requiresAuth: false, handler: handleGetMetrics },
+  { method: 'GET', path: '/api/sales-metrics', requiresAuth: false, handler: handleGetSalesMetrics },
+  { method: 'GET', path: '/api/runs', requiresAuth: false, handler: handleGetRuns },
+  { method: 'GET', path: '/api/runs/:id', requiresAuth: false, handler: handleGetRunById },
+  { method: 'GET', path: '/api/channels', requiresAuth: false, handler: handleGetChannels },
+
+  // Authenticated endpoints (mutations / sensitive data)
   { method: 'GET', path: '/api/auth/verify', requiresAuth: true, handler: handleAuthVerify },
-  { method: 'GET', path: '/api/runs', requiresAuth: true, handler: handleGetRuns },
-  { method: 'GET', path: '/api/runs/:id', requiresAuth: true, handler: handleGetRunById },
   { method: 'POST', path: '/api/runs', requiresAuth: false, handler: handlePostRun },
-  { method: 'GET', path: '/api/channels', requiresAuth: true, handler: handleGetChannels },
 
   { method: 'GET', path: '/api/conversations/:id', requiresAuth: true, handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', requiresAuth: true, handler: handleGetConversationEvents },
-
-  { method: 'GET', path: '/api/metrics', requiresAuth: true, handler: handleGetMetrics },
-  { method: 'GET', path: '/api/sales-metrics', requiresAuth: true, handler: handleGetSalesMetrics },
 
   { method: 'GET', path: '/api/stream', requiresAuth: true, handler: handleGetStream },
 

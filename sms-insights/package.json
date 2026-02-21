@@ -9,7 +9,7 @@
     "build": "npm run clean && tsc && npm run build:frontend",
     "build:frontend:optional": "cd ../frontend && npm run build",
     "build:watch": "tsc --watch",
-    "build:frontend": "cd ../frontend && npm run build",
+    "build:frontend": "sh -c 'if [ -d ../frontend ]; then cd ../frontend && npm run build; else echo \"frontend directory not present in build context; skipping frontend build\"; fi'",
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
     "backfill:slack": "node --import tsx ./scripts/backfill-slack-events.ts",
     "dev": "node --import tsx app.ts",

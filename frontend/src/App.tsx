@@ -29,10 +29,6 @@ export default function App() {
       <nav className="AppShell__nav">
         <div className="AppShell__logo">
           <img className="AppShell__logoMark" src="/sidebar-logo.png" alt="PT Biz SMS" />
-          <div className="AppShell__logoText">
-            <span className="AppShell__logoTitle">Command Center</span>
-            <span className="AppShell__logoSub">PT Biz SMS</span>
-          </div>
         </div>
 
         <div className="AppShell__links">

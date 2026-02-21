@@ -7,19 +7,12 @@ type Props = {
   rep: RepKey;
 };
 
-function getTodayRange() {
-  const to = new Date();
-  const from = new Date();
-  from.setHours(0, 0, 0, 0);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
+const BUSINESS_TIME_ZONE = 'America/Chicago';
 
 const titleFor = (rep: RepKey) => (rep === 'jack' ? 'Jack' : 'Brandon');
 
 export default function RepScorecard({ rep }: Props) {
-  // Important: keep params stable so React Query doesn't treat every render as a new query.
-  const range = React.useMemo(() => getTodayRange(), []);
-  const { data, isLoading, error } = useSalesMetrics(range);
+  const { data, isLoading, error } = useSalesMetrics({ range: 'today', tz: BUSINESS_TIME_ZONE });
 
   // Back-compat: API returns bookedCalls buckets keyed by "jack"/"brandon".
   // Some older deployments may return rep names in repLeaderboard only.

@@ -1,11 +1,15 @@
 import type { Logger } from '@slack/bolt';
 import { getPool } from './db.js';
+import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
 
 export type SalesTrendPoint = {
   day: string; // YYYY-MM-DD
   messagesSent: number;
   manualMessagesSent: number;
   sequenceMessagesSent: number;
+  peopleContacted: number;
+  manualPeopleContacted: number;
+  sequencePeopleContacted: number;
 
   repliesReceived: number;
   replyRatePct: number;
@@ -25,14 +29,16 @@ export type TopSequenceRow = {
   messagesSent: number;
   repliesReceived: number;
   replyRatePct: number;
-  booked: number;
+  bookingSignalsSms: number;
+  booked: number; // deprecated alias, kept for one compatibility release
   optOuts: number;
 };
 
 export type RepLeaderboardRow = {
   repName: string;
   outboundConversations: number;
-  booked: number;
+  bookingSignalsSms: number;
+  booked: number; // deprecated alias, kept for one compatibility release
   optOuts: number;
   replyRatePct: number | null;
 };
@@ -43,6 +49,9 @@ export type SalesMetricsSummary = {
     messagesSent: number;
     manualMessagesSent: number;
     sequenceMessagesSent: number;
+    peopleContacted: number;
+    manualPeopleContacted: number;
+    sequencePeopleContacted: number;
 
     repliesReceived: number;
     replyRatePct: number;
@@ -65,14 +74,14 @@ type SequenceRow = {
   label: string;
   messagesSent: number;
   repliesReceived: number;
-  booked: number;
+  bookingSignalsSms: number;
   optOuts: number;
 };
 
 type RepRow = {
   repName: string;
   outboundConversations: number;
-  booked: number;
+  bookingSignalsSms: number;
   optOuts: number;
 };
 
@@ -84,6 +93,22 @@ const OPT_OUTS_PATTERN = /- Opt[-\s]?Outs?:\s*(\d+)/i;
 
 const SEQUENCE_LINE_PATTERN =
   /^-\s*(.+?):\s*sent\s+(\d+).*?(?:replies(?:\s+received)?|replied)\s+(\d+)\s*\(([0-9.]+)%[^)]*\).*?book(?:ings?|ed)\s+(\d+).*?opt[-\s]?outs?\s+(\d+)/i;
+
+const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
+const HIGH_CONFIDENCE_BOOKING_PATTERN =
+  /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
+const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
+
+export const isHighConfidenceBookingSignal = (direction: string, body: string): boolean => {
+  if (!body) return false;
+  if (BOOKED_CONFIRMATION_LINK_PATTERN.test(body)) return true;
+  // Only inbound booking intent is treated as a booking signal; outbound is counted only via confirmation link.
+  return direction === 'inbound' && HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) && !CANCELLATION_PATTERN.test(body);
+};
+
+const isOptOutSignal = (direction: string, body: string): boolean => {
+  return direction === 'inbound' && CANCELLATION_PATTERN.test(body);
+};
 
 const normalizeDay = (dateStr: string): string | null => {
   const d = new Date(dateStr);
@@ -108,7 +133,7 @@ export const parseDailySnapshot = (
   for (const line of lines) {
     const repMatch = line.match(REP_PATTERN);
     if (repMatch) {
-      currentRep = { repName: repMatch[1].trim(), outboundConversations: 0, booked: 0, optOuts: 0 };
+      currentRep = { repName: repMatch[1].trim(), outboundConversations: 0, bookingSignalsSms: 0, optOuts: 0 };
       reps.push(currentRep);
       continue;
     }
@@ -121,7 +146,7 @@ export const parseDailySnapshot = (
       }
       const booked = line.match(BOOKINGS_PATTERN);
       if (booked) {
-        currentRep.booked = Number.parseInt(booked[1] || '0', 10);
+        currentRep.bookingSignalsSms = Number.parseInt(booked[1] || '0', 10);
         continue;
       }
       const opt = line.match(OPT_OUTS_PATTERN);
@@ -137,7 +162,7 @@ export const parseDailySnapshot = (
         label: (seq[1] || '').trim(),
         messagesSent: Number.parseInt(seq[2] || '0', 10),
         repliesReceived: Number.parseInt(seq[3] || '0', 10),
-        booked: Number.parseInt(seq[5] || '0', 10),
+        bookingSignalsSms: Number.parseInt(seq[5] || '0', 10),
         optOuts: Number.parseInt(seq[6] || '0', 10),
       });
     }
@@ -147,7 +172,7 @@ export const parseDailySnapshot = (
 };
 
 export const getSalesMetricsSummary = async (
-  params: { from: Date; to: Date },
+  params: { from: Date; to: Date; timeZone?: string },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SalesMetricsSummary> => {
   const pool = getPool();
@@ -155,6 +180,7 @@ export const getSalesMetricsSummary = async (
 
   const fromIso = params.from.toISOString();
   const toIso = params.to.toISOString();
+  const timeZone = (params.timeZone || '').trim() || DEFAULT_BUSINESS_TIMEZONE;
 
   // Attribution rules (v1):
   // - messagesSent: count outbound sms_events in range
@@ -195,29 +221,8 @@ export const getSalesMetricsSummary = async (
     return null;
   };
 
-  const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
-  const BOOKING_PATTERN =
-    /\b(book|booking|appointment|schedule|scheduled|availability|available|wednesday|thursday|friday|monday|tuesday|saturday|sunday|\d{1,2}:\d{2}\s*(am|pm)|strategy call|call)\b/i;
-  const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
-
-  const isBookingEvent = (direction: string, body: string): boolean => {
-    if (BOOKED_CONFIRMATION_LINK_PATTERN.test(body)) return true;
-    // inbound booking intent counts as booking signal; outbound confirmation link counts too
-    if (direction === 'inbound' && BOOKING_PATTERN.test(body) && !CANCELLATION_PATTERN.test(body)) return true;
-    return false;
-  };
-
-  const isOptOutEvent = (direction: string, body: string): boolean => {
-    return direction === 'inbound' && CANCELLATION_PATTERN.test(body);
-  };
-
   const dayKey = (ts: string): string | null => {
-    const d = new Date(ts);
-    if (!Number.isFinite(d.getTime())) return null;
-    const yyyy = d.getUTCFullYear();
-    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const dd = String(d.getUTCDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
+    return dayKeyInTimeZone(ts, timeZone);
   };
 
   type EventRow = (typeof rows)[number] & { _contactKey: string; _day: string };
@@ -250,6 +255,9 @@ export const getSalesMetricsSummary = async (
     messagesSent: 0,
     manualMessagesSent: 0,
     sequenceMessagesSent: 0,
+    peopleContacted: 0,
+    manualPeopleContacted: 0,
+    sequencePeopleContacted: 0,
 
     repliesReceived: 0,
     replyRatePct: 0,
@@ -313,6 +321,13 @@ export const getSalesMetricsSummary = async (
 
   // messages sent (volume) + rep outbound conversations (approx)
   const outboundSeenByContact = new Set<string>();
+  const contactedByDay = new Map<string, Set<string>>();
+  const manualContactedByDay = new Map<string, Set<string>>();
+  const sequenceContactedByDay = new Map<string, Set<string>>();
+  const contactedOverall = new Set<string>();
+  const manualContactedOverall = new Set<string>();
+  const sequenceContactedOverall = new Set<string>();
+
   for (const e of events) {
     if (e.direction !== 'outbound') continue;
 
@@ -326,6 +341,23 @@ export const getSalesMetricsSummary = async (
     if (hasSequence) point.sequenceMessagesSent += 1;
     else point.manualMessagesSent += 1;
 
+    const allSet = contactedByDay.get(e._day) || new Set<string>();
+    allSet.add(e._contactKey);
+    contactedByDay.set(e._day, allSet);
+    contactedOverall.add(e._contactKey);
+
+    if (hasSequence) {
+      const seqSet = sequenceContactedByDay.get(e._day) || new Set<string>();
+      seqSet.add(e._contactKey);
+      sequenceContactedByDay.set(e._day, seqSet);
+      sequenceContactedOverall.add(e._contactKey);
+    } else {
+      const manualSet = manualContactedByDay.get(e._day) || new Set<string>();
+      manualSet.add(e._contactKey);
+      manualContactedByDay.set(e._day, manualSet);
+      manualContactedOverall.add(e._contactKey);
+    }
+
     trendMap.set(e._day, point);
 
     // rep leaderboard: outboundConversations = unique contacts with outbound in range for that rep
@@ -337,7 +369,8 @@ export const getSalesMetricsSummary = async (
         const repRow = repMap.get(repName) || {
           repName,
           outboundConversations: 0,
-          booked: 0,
+          bookingSignalsSms: 0,
+          booked: 0, // deprecated alias
           optOuts: 0,
           replyRatePct: null,
         };
@@ -347,11 +380,30 @@ export const getSalesMetricsSummary = async (
     }
   }
 
+  for (const [day, contacts] of contactedByDay.entries()) {
+    const point = trendMap.get(day) || emptyPoint(day);
+    point.peopleContacted = contacts.size;
+    trendMap.set(day, point);
+  }
+  for (const [day, contacts] of manualContactedByDay.entries()) {
+    const point = trendMap.get(day) || emptyPoint(day);
+    point.manualPeopleContacted = contacts.size;
+    trendMap.set(day, point);
+  }
+  for (const [day, contacts] of sequenceContactedByDay.entries()) {
+    const point = trendMap.get(day) || emptyPoint(day);
+    point.sequencePeopleContacted = contacts.size;
+    trendMap.set(day, point);
+  }
+
   // repliesReceived: unique contacts with inbound in range (max 1 per contact), credited to inbound day
   // Also split into manual vs sequence replies based on attribution to latest outbound touch within 14 days (prefer sequenced).
   const repliedContactsByDay = new Map<string, Set<string>>();
   const manualRepliedContactsByDay = new Map<string, Set<string>>();
   const sequenceRepliedContactsByDay = new Map<string, Set<string>>();
+  const repliedContactsOverall = new Set<string>();
+  const manualRepliedContactsOverall = new Set<string>();
+  const sequenceRepliedContactsOverall = new Set<string>();
 
   for (const [contactKey, list] of eventsByContact.entries()) {
     const inboundEvents = list.filter((e) => e.direction === 'inbound');
@@ -360,11 +412,6 @@ export const getSalesMetricsSummary = async (
     for (const inbound of inboundEvents) {
       const inboundTs = new Date(inbound.event_ts).getTime();
       if (!Number.isFinite(inboundTs)) continue;
-
-      // overall replied
-      const allSet = repliedContactsByDay.get(inbound._day) || new Set<string>();
-      allSet.add(contactKey);
-      repliedContactsByDay.set(inbound._day, allSet);
 
       // attribute inbound to latest outbound within 14 days (prefer sequenced)
       let latestOutbound: EventRow | undefined;
@@ -381,16 +428,25 @@ export const getSalesMetricsSummary = async (
       }
 
       const attributedTouch = latestSequencedOutbound || latestOutbound;
+      if (!attributedTouch) continue;
+
+      const allSet = repliedContactsByDay.get(inbound._day) || new Set<string>();
+      allSet.add(contactKey);
+      repliedContactsByDay.set(inbound._day, allSet);
+      repliedContactsOverall.add(contactKey);
+
       const isSequenceReply = (attributedTouch?.sequence || '').trim().length > 0;
 
       if (isSequenceReply) {
         const set = sequenceRepliedContactsByDay.get(inbound._day) || new Set<string>();
         set.add(contactKey);
         sequenceRepliedContactsByDay.set(inbound._day, set);
+        sequenceRepliedContactsOverall.add(contactKey);
       } else {
         const set = manualRepliedContactsByDay.get(inbound._day) || new Set<string>();
         set.add(contactKey);
         manualRepliedContactsByDay.set(inbound._day, set);
+        manualRepliedContactsOverall.add(contactKey);
       }
     }
   }
@@ -413,13 +469,15 @@ export const getSalesMetricsSummary = async (
 
   // optOuts: unique contacts with opt-out inbound in range, credited to opt-out day
   const optOutContactsByDay = new Map<string, Set<string>>();
+  const optOutContactsOverall = new Set<string>();
   for (const e of events) {
     const body = (e.body || '').trim();
     if (!body) continue;
-    if (!isOptOutEvent(e.direction, body)) continue;
+    if (!isOptOutSignal(e.direction, body)) continue;
     const set = optOutContactsByDay.get(e._day) || new Set<string>();
     set.add(e._contactKey);
     optOutContactsByDay.set(e._day, set);
+    optOutContactsOverall.add(e._contactKey);
   }
   for (const [day, contacts] of optOutContactsByDay.entries()) {
     const point = trendMap.get(day) || emptyPoint(day);
@@ -432,7 +490,7 @@ export const getSalesMetricsSummary = async (
     for (const e of list) {
       const body = (e.body || '').trim();
       if (!body) continue;
-      if (!isBookingEvent(e.direction, body)) continue;
+      if (!isHighConfidenceBookingSignal(e.direction, body)) continue;
 
       const bookingTs = new Date(e.event_ts).getTime();
       if (!Number.isFinite(bookingTs)) continue;
@@ -469,10 +527,12 @@ export const getSalesMetricsSummary = async (
         messagesSent: 0,
         repliesReceived: 0,
         replyRatePct: 0,
-        booked: 0,
+        bookingSignalsSms: 0,
+        booked: 0, // deprecated alias
         optOuts: 0,
       };
-      seqRow.booked += 1;
+      seqRow.bookingSignalsSms += 1;
+      seqRow.booked = seqRow.bookingSignalsSms;
       seqMap.set(sequenceLabel, seqRow);
 
       // attribute to rep leaderboard if we have a rep on the attributed touch
@@ -481,11 +541,13 @@ export const getSalesMetricsSummary = async (
         const repRow = repMap.get(repName) || {
           repName,
           outboundConversations: 0,
-          booked: 0,
+          bookingSignalsSms: 0,
+          booked: 0, // deprecated alias
           optOuts: 0,
           replyRatePct: null,
         };
-        repRow.booked += 1;
+        repRow.bookingSignalsSms += 1;
+        repRow.booked = repRow.bookingSignalsSms;
         repMap.set(repName, repRow);
       }
     }
@@ -502,7 +564,8 @@ export const getSalesMetricsSummary = async (
       messagesSent: 0,
       repliesReceived: 0,
       replyRatePct: 0,
-      booked: 0,
+      bookingSignalsSms: 0,
+      booked: 0, // deprecated alias
       optOuts: 0,
     };
     row.messagesSent += 1;
@@ -557,7 +620,7 @@ export const getSalesMetricsSummary = async (
   for (const [contactKey, list] of eventsByContact.entries()) {
     const optOutEvents = list.filter((e) => {
       const body = (e.body || '').trim();
-      return body && isOptOutEvent(e.direction, body);
+      return body && isOptOutSignal(e.direction, body);
     });
     if (optOutEvents.length === 0) continue;
 
@@ -591,7 +654,8 @@ export const getSalesMetricsSummary = async (
         const repRow = repMap.get(repName) || {
           repName,
           outboundConversations: 0,
-          booked: 0,
+          bookingSignalsSms: 0,
+          booked: 0, // deprecated alias
           optOuts: 0,
           replyRatePct: null,
         };
@@ -606,7 +670,8 @@ export const getSalesMetricsSummary = async (
       messagesSent: 0,
       repliesReceived: 0,
       replyRatePct: 0,
-      booked: 0,
+      bookingSignalsSms: 0,
+      booked: 0, // deprecated alias
       optOuts: 0,
     };
     row.optOuts = contacts.size;
@@ -615,52 +680,40 @@ export const getSalesMetricsSummary = async (
 
   // finalize trend reply rates
   for (const point of trendMap.values()) {
-    point.replyRatePct = point.messagesSent > 0 ? (point.repliesReceived / point.messagesSent) * 100 : 0;
+    point.replyRatePct = point.peopleContacted > 0 ? (point.repliesReceived / point.peopleContacted) * 100 : 0;
     point.manualReplyRatePct =
-      point.manualMessagesSent > 0 ? (point.manualRepliesReceived / point.manualMessagesSent) * 100 : 0;
+      point.manualPeopleContacted > 0 ? (point.manualRepliesReceived / point.manualPeopleContacted) * 100 : 0;
     point.sequenceReplyRatePct =
-      point.sequenceMessagesSent > 0 ? (point.sequenceRepliesReceived / point.sequenceMessagesSent) * 100 : 0;
+      point.sequencePeopleContacted > 0 ? (point.sequenceRepliesReceived / point.sequencePeopleContacted) * 100 : 0;
   }
 
   const trendByDay = [...trendMap.values()].sort((a, b) => a.day.localeCompare(b.day));
   const topSequences = [...seqMap.values()]
-    .sort((a, b) => b.booked - a.booked || b.messagesSent - a.messagesSent)
+    .sort((a, b) => b.bookingSignalsSms - a.bookingSignalsSms || b.messagesSent - a.messagesSent)
     .slice(0, 10);
   const repLeaderboard = [...repMap.values()].sort(
-    (a, b) => b.booked - a.booked || b.outboundConversations - a.outboundConversations,
+    (a, b) => b.bookingSignalsSms - a.bookingSignalsSms || b.outboundConversations - a.outboundConversations,
   );
 
-  const totals = trendByDay.reduce(
-    (acc, d) => {
-      acc.messagesSent += d.messagesSent;
-      acc.manualMessagesSent += d.manualMessagesSent;
-      acc.sequenceMessagesSent += d.sequenceMessagesSent;
+  const totals = {
+    messagesSent: trendByDay.reduce((acc, d) => acc + d.messagesSent, 0),
+    manualMessagesSent: trendByDay.reduce((acc, d) => acc + d.manualMessagesSent, 0),
+    sequenceMessagesSent: trendByDay.reduce((acc, d) => acc + d.sequenceMessagesSent, 0),
+    peopleContacted: contactedOverall.size,
+    manualPeopleContacted: manualContactedOverall.size,
+    sequencePeopleContacted: sequenceContactedOverall.size,
+    repliesReceived: repliedContactsOverall.size,
+    manualRepliesReceived: manualRepliedContactsOverall.size,
+    sequenceRepliesReceived: sequenceRepliedContactsOverall.size,
+    booked: trendByDay.reduce((acc, d) => acc + d.booked, 0),
+    optOuts: optOutContactsOverall.size,
+  };
 
-      acc.repliesReceived += d.repliesReceived;
-      acc.manualRepliesReceived += d.manualRepliesReceived;
-      acc.sequenceRepliesReceived += d.sequenceRepliesReceived;
-
-      acc.booked += d.booked;
-      acc.optOuts += d.optOuts;
-      return acc;
-    },
-    {
-      messagesSent: 0,
-      manualMessagesSent: 0,
-      sequenceMessagesSent: 0,
-      repliesReceived: 0,
-      manualRepliesReceived: 0,
-      sequenceRepliesReceived: 0,
-      booked: 0,
-      optOuts: 0,
-    },
-  );
-
-  const replyRatePct = totals.messagesSent > 0 ? (totals.repliesReceived / totals.messagesSent) * 100 : 0;
+  const replyRatePct = totals.peopleContacted > 0 ? (totals.repliesReceived / totals.peopleContacted) * 100 : 0;
   const manualReplyRatePct =
-    totals.manualMessagesSent > 0 ? (totals.manualRepliesReceived / totals.manualMessagesSent) * 100 : 0;
+    totals.manualPeopleContacted > 0 ? (totals.manualRepliesReceived / totals.manualPeopleContacted) * 100 : 0;
   const sequenceReplyRatePct =
-    totals.sequenceMessagesSent > 0 ? (totals.sequenceRepliesReceived / totals.sequenceMessagesSent) * 100 : 0;
+    totals.sequencePeopleContacted > 0 ? (totals.sequenceRepliesReceived / totals.sequencePeopleContacted) * 100 : 0;
 
   logger?.debug?.('sales metrics computed', {
     days: trendByDay.length,

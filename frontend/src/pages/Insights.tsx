@@ -1,24 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { useSalesMetrics } from '../api/queries';
 import { MetricCard } from '../components/insights/MetricCard';
 import { SalesTrendChart } from '../components/insights/SalesTrendChart';
 import '../styles/Insights.css';
 
-function computeRange(range: 'today' | '7d' | '30d') {
-  const to = new Date();
-  const from = new Date();
-  
-  if (range === 'today') {
-    from.setHours(0, 0, 0, 0);
-  } else if (range === '7d') {
-    from.setDate(from.getDate() - 7);
-  } else if (range === '30d') {
-    from.setDate(from.getDate() - 30);
-  }
-  
-  return { from: from.toISOString(), to: to.toISOString() };
-}
+const BUSINESS_TIME_ZONE = 'America/Chicago';
 
 function formatPct(pct: number | null | undefined) {
   if (pct == null || !Number.isFinite(pct)) return '-';
@@ -27,13 +14,7 @@ function formatPct(pct: number | null | undefined) {
 
 export function Insights() {
   const [range, setRange] = useState<'today' | '7d' | '30d'>('7d');
-
-  // Important: keep from/to stable between renders so React Query can cache and settle.
-  // If we compute `to = new Date()` on every render, the queryKey changes continuously and
-  // the UI can get stuck in a perpetual loading state.
-  const { from, to } = useMemo(() => computeRange(range), [range]);
-
-  const { data: metrics, isLoading, isError, error } = useSalesMetrics({ from, to });
+  const { data: metrics, isLoading, isError, error } = useSalesMetrics({ range, tz: BUSINESS_TIME_ZONE });
 
   if (isLoading) {
     return (
@@ -58,7 +39,7 @@ export function Insights() {
     <div className="Insights">
       <header className="Insights__header">
         <h1>Team Insights</h1>
-        <select aria-label="Time range" value={range} onChange={e => setRange(e.target.value as any)}>
+        <select aria-label="Time range" value={range} onChange={(e) => setRange(e.target.value as any)}>
           <option value="today">Today</option>
           <option value="7d">Last 7 days</option>
           <option value="30d">Last 30 days</option>
@@ -69,8 +50,9 @@ export function Insights() {
         <MetricCard label="Messages sent" value={metrics?.totals.messagesSent ?? 0} />
         <MetricCard label="Manual texts sent" value={metrics?.totals.manualMessagesSent ?? 0} />
         <MetricCard label="Sequence texts sent" value={metrics?.totals.sequenceMessagesSent ?? 0} />
+        <MetricCard label="People contacted" value={metrics?.totals.peopleContacted ?? 0} />
         <MetricCard label="People who replied" value={metrics?.totals.repliesReceived ?? 0} />
-        <MetricCard label="Reply rate" value={formatPct(metrics?.totals.replyRatePct)} />
+        <MetricCard label="Reply rate (people)" value={formatPct(metrics?.totals.replyRatePct)} />
         <MetricCard label="Calls booked (Slack)" value={metrics?.bookedCalls?.booked ?? 0} />
         <MetricCard label="Opt-outs" value={metrics?.totals.optOuts ?? 0} tone="danger" />
       </section>
@@ -118,6 +100,7 @@ export function Insights() {
           </div>
           <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
             Calls booked are sourced from HubSpot Slack posts in #bookedcalls. Credit uses reactions (:jack: and :me:).
+            Time zone: {metrics.meta?.timeZone || BUSINESS_TIME_ZONE}.
           </div>
         </section>
       ) : null}
@@ -131,7 +114,7 @@ export function Insights() {
         <div className="Insights__table">
           <h3>Top Sequences</h3>
           <div style={{ marginTop: 6, opacity: 0.7, fontSize: 12 }}>
-            Note: “Booked” in these tables is an SMS-derived <strong>booking signal</strong> (heuristics), not the Slack “Calls booked” count.
+            Canonical booked metrics are Slack-sourced and shown above. Sequence tables show volume/reply/opt-out performance.
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -141,7 +124,6 @@ export function Insights() {
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Sent</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Replies</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Reply %</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Opt-outs</th>
                 </tr>
               </thead>
@@ -159,16 +141,13 @@ export function Insights() {
                       {formatPct(row.replyRatePct)}
                     </td>
                     <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {row.booked}
-                    </td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                       {row.optOuts}
                     </td>
                   </tr>
                 ))}
                 {(metrics?.topSequences ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ padding: '10px 6px', opacity: 0.7 }}>
+                    <td colSpan={5} style={{ padding: '10px 6px', opacity: 0.7 }}>
                       No sequences
                     </td>
                   </tr>
@@ -180,16 +159,12 @@ export function Insights() {
 
         <div className="Insights__table">
           <h3>Rep Leaderboard</h3>
-          <div style={{ marginTop: 6, opacity: 0.7, fontSize: 12 }}>
-            Note: “Booked” here is an SMS-derived <strong>booking signal</strong> (heuristics), not the Slack “Calls booked” count.
-          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left', padding: '8px 6px' }}>Rep</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Outbound convos</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Opt-outs</th>
                 </tr>
               </thead>
@@ -201,16 +176,13 @@ export function Insights() {
                       {row.outboundConversations}
                     </td>
                     <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {row.booked}
-                    </td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
                       {row.optOuts}
                     </td>
                   </tr>
                 ))}
                 {(metrics?.repLeaderboard ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={4} style={{ padding: '10px 6px', opacity: 0.7 }}>
+                    <td colSpan={3} style={{ padding: '10px 6px', opacity: 0.7 }}>
                       No reps
                     </td>
                   </tr>
@@ -220,6 +192,55 @@ export function Insights() {
           </div>
         </div>
       </section>
+
+      <details style={{ marginTop: 18 }}>
+        <summary style={{ cursor: 'pointer' }}>Advanced diagnostics (SMS booking signals)</summary>
+        <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+          These values are diagnostic heuristics from SMS text analysis and are not the canonical booked KPI.
+        </div>
+
+        <div style={{ marginTop: 10, overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '8px 6px' }}>Sequence</th>
+                <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals (SMS)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(metrics?.topSequences ?? []).map((row) => (
+                <tr key={`diag-seq-${row.label}`}>
+                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>{row.label}</td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {row.bookingSignalsSms}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{ marginTop: 10, overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', padding: '8px 6px' }}>Rep</th>
+                <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals (SMS)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(metrics?.repLeaderboard ?? []).map((row) => (
+                <tr key={`diag-rep-${row.repName}`}>
+                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>{row.repName}</td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    {row.bookingSignalsSms}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

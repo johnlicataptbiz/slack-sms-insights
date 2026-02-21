@@ -13,6 +13,8 @@ import {
 } from '../services/metrics.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
+import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
+import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
 
 type RequestHandler = (
@@ -429,15 +431,21 @@ const handleGetConversationEvents: RequestHandler = async (req, res, logger, ori
 
 const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const fromStr = url.searchParams.get('from');
-  const toStr = url.searchParams.get('to');
-
-  if (!fromStr || !toStr) {
-    return sendJson(res, 400, { error: 'Missing from/to params' }, origin);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range'),
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
   }
 
-  const from = new Date(fromStr);
-  const to = new Date(toStr);
+  const from = resolved.from;
+  const to = resolved.to;
   const days = Math.ceil((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
   const windowDays = Math.max(1, Math.min(days, 90));
 
@@ -463,11 +471,12 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
     return;
   }
 
-  // Transform to frontend MetricsSummary format
+  // Definitions are still being normalized in this endpoint; avoid rough proxy totals.
+  // Return nullable values + explicit metadata instead of misleading approximations.
   const summary = {
-    timeRange: { from: fromStr, to: toStr },
-    totalConversations: volume.rows.reduce((acc, r) => acc + r.inbound + r.outbound, 0), // Rough proxy
-    newConversations: volume.rows.reduce((acc, r) => acc + r.inbound, 0), // Rough proxy
+    timeRange: { from: from.toISOString(), to: to.toISOString() },
+    totalConversations: null,
+    newConversations: null,
     reps: workload.rows.map((r) => ({
       repId: r.repId || 'unassigned',
       repName: repDisplayName(r.repId),
@@ -487,6 +496,17 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
     responseTimeBuckets: sla.buckets,
     openWorkItems: overview.openWorkItems,
     overdueWorkItems: overview.overdueWorkItems,
+    meta: {
+      timeZone: resolved.timeZone,
+      definitionStatus: 'experimental',
+      definitions: {
+        totalConversations: 'experimental-null',
+        newConversations: 'experimental-null',
+        responseTimeBuckets: 'inbound->first outbound approximation',
+        reps: 'open work-item workload by rep_id',
+      },
+      requestedMode: resolved.mode,
+    },
   };
 
   sendJson(res, 200, summary, origin);
@@ -494,32 +514,63 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
 
 const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const fromStr = url.searchParams.get('from');
-  const toStr = url.searchParams.get('to');
-
-  if (!fromStr || !toStr) {
-    return sendJson(res, 400, { error: 'Missing from/to params' }, origin);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range'),
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
   }
 
-  const from = new Date(fromStr);
-  const to = new Date(toStr);
+  const from = resolved.from;
+  const to = resolved.to;
 
   try {
     const [summary, bookedCalls] = await Promise.all([
-      getSalesMetricsSummary({ from, to }, logger),
-      getBookedCallsSummary({ from, to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID }, logger),
+      getSalesMetricsSummary({ from, to, timeZone: resolved.timeZone }, logger),
+      getBookedCallsSummary(
+        { from, to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID, timeZone: resolved.timeZone },
+        logger,
+      ),
     ]);
 
-    // Override "booked" with Slack source-of-truth.
-    // Keep SMS-derived booked out of the UI to avoid inflated counts.
+    const canonical = buildCanonicalSalesMetricsSlice(summary, bookedCalls);
+    if (!canonical.consistency.totalsBookedMatches) {
+      logger?.warn('Booked consistency mismatch', {
+        bookedCallsTotal: bookedCalls.totals.booked,
+        totalsBooked: canonical.totals.booked,
+      });
+    }
+    if (!canonical.consistency.trendBookedMatches) {
+      logger?.warn('Booked consistency mismatch', {
+        bookedCallsTotal: bookedCalls.totals.booked,
+        trendBookedSum: canonical.consistency.trendBookedSum,
+      });
+    }
+
     const patched = {
       ...summary,
-      totals: { ...summary.totals, booked: bookedCalls.totals.booked },
-      trendByDay: summary.trendByDay.map((d) => {
-        const match = bookedCalls.trendByDay.find((b) => b.day === d.day);
-        return { ...d, booked: match?.booked ?? 0 };
-      }),
-      bookedCalls: bookedCalls.totals,
+      timeRange: { from: from.toISOString(), to: to.toISOString() },
+      totals: canonical.totals,
+      trendByDay: canonical.trendByDay,
+      topSequences: canonical.topSequences,
+      repLeaderboard: canonical.repLeaderboard,
+      bookedCalls: canonical.bookedCalls,
+      meta: {
+        bookedSource: 'slack',
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        legacySignalsAvailable: true,
+        deprecations: {
+          topSequencesBookedAlias: true,
+          repLeaderboardBookedAlias: true,
+        },
+        requestedMode: resolved.mode,
+      },
     };
 
     sendJson(res, 200, patched, origin);

@@ -1,5 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { listBookedCallsInRange } from './booked-calls-store.js';
+import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
 
 export type BookedCallsTrendPoint = {
   day: string; // YYYY-MM-DD
@@ -20,15 +21,6 @@ export type BookedCallsSummary = {
   trendByDay: BookedCallsTrendPoint[];
 };
 
-const dayKey = (ts: string): string | null => {
-  const d = new Date(ts);
-  if (!Number.isFinite(d.getTime())) return null;
-  const yyyy = d.getUTCFullYear();
-  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(d.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
-
 const hasReaction = (
   reactions: Array<{ reaction_name: string; users: unknown }>,
   name: string,
@@ -43,11 +35,12 @@ const hasReaction = (
 };
 
 export const getBookedCallsSummary = async (
-  params: { from: Date; to: Date; channelId?: string },
+  params: { from: Date; to: Date; channelId?: string; timeZone?: string },
   _logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<BookedCallsSummary> => {
   const fromIso = params.from.toISOString();
   const toIso = params.to.toISOString();
+  const timeZone = (params.timeZone || '').trim() || DEFAULT_BUSINESS_TIMEZONE;
 
   const calls = await listBookedCallsInRange({ from: params.from, to: params.to, channelId: params.channelId });
 
@@ -95,7 +88,7 @@ export const getBookedCallsSummary = async (
 
     if (!isValid) continue;
 
-    const day = dayKey(c.event_ts);
+    const day = dayKeyInTimeZone(c.event_ts, timeZone);
     if (!day) continue;
 
     if (isJack) bump(day, 'jack');

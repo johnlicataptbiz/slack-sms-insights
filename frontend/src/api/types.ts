@@ -80,13 +80,19 @@ export interface PipelineVelocity {
 
 export interface MetricsSummary {
   timeRange: { from: string; to: string };
-  totalConversations: number;
-  newConversations: number;
+  totalConversations: number | null;
+  newConversations: number | null;
   responseTimeBuckets: ResponseTimeBucket[];
   reps: RepPerformance[];
   pipelineVelocity: PipelineVelocity;
   openWorkItems: number;
   overdueWorkItems: number;
+  meta?: {
+    timeZone: string;
+    definitionStatus: 'experimental' | 'stable';
+    definitions?: Record<string, string>;
+    requestedMode?: 'day' | 'range' | 'from-to';
+  };
 }
 
 export type SalesTrendPoint = {
@@ -94,6 +100,9 @@ export type SalesTrendPoint = {
   messagesSent: number;
   manualMessagesSent: number;
   sequenceMessagesSent: number;
+  peopleContacted: number;
+  manualPeopleContacted: number;
+  sequencePeopleContacted: number;
 
   repliesReceived: number;
   replyRatePct: number;
@@ -113,16 +122,29 @@ export type TopSequenceRow = {
   messagesSent: number;
   repliesReceived: number;
   replyRatePct: number;
-  booked: number;
+  bookingSignalsSms: number;
+  booked: number; // deprecated alias (compatibility)
   optOuts: number;
 };
 
 export type RepLeaderboardRow = {
   repName: string;
   outboundConversations: number;
-  booked: number;
+  bookingSignalsSms: number;
+  booked: number; // deprecated alias (compatibility)
   optOuts: number;
   replyRatePct: number | null;
+};
+
+export type SalesMetricsMeta = {
+  bookedSource: 'slack';
+  timeZone: string;
+  legacySignalsAvailable: boolean;
+  deprecations?: {
+    topSequencesBookedAlias?: boolean;
+    repLeaderboardBookedAlias?: boolean;
+  };
+  requestedMode?: 'day' | 'range' | 'from-to';
 };
 
 export type SalesMetricsSummary = {
@@ -131,6 +153,9 @@ export type SalesMetricsSummary = {
     messagesSent: number;
     manualMessagesSent: number;
     sequenceMessagesSent: number;
+    peopleContacted: number;
+    manualPeopleContacted: number;
+    sequencePeopleContacted: number;
 
     repliesReceived: number;
     replyRatePct: number;
@@ -153,4 +178,5 @@ export type SalesMetricsSummary = {
     brandon: number;
     selfBooked: number;
   };
+  meta?: SalesMetricsMeta;
 };

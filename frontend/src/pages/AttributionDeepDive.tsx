@@ -2,17 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../api/client';
 import { useSalesMetrics } from '../api/queries';
 
-function getTodayRange() {
-  const to = new Date();
-  const from = new Date();
-  from.setHours(0, 0, 0, 0);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
+const BUSINESS_TIME_ZONE = 'America/Chicago';
 
 export default function AttributionDeepDive() {
-  // Memoize params so React Query's queryKey stays stable and doesn't refetch forever.
-  const range = useMemo(() => getTodayRange(), []);
-  const { data, isLoading, error, refetch, isFetching, fetchStatus, status } = useSalesMetrics(range);
+  const salesQuery = useMemo(
+    () => ({ range: 'today' as const, tz: BUSINESS_TIME_ZONE }),
+    [],
+  );
+  const { data, isLoading, error, refetch, isFetching, fetchStatus, status } = useSalesMetrics(salesQuery);
   const [stuck, setStuck] = useState(false);
 
   useEffect(() => {
@@ -83,7 +80,8 @@ export default function AttributionDeepDive() {
       ) : (
         <>
           <h2 style={{ marginTop: 0 }}>
-            Today — Reply rates {isFetching ? <span style={{ fontSize: 12, opacity: 0.6 }}>(refreshing…)</span> : null}
+            Today — Reply rates (people-based)
+            {isFetching ? <span style={{ fontSize: 12, opacity: 0.6 }}> (refreshing…)</span> : null}
           </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: 12 }}>
             <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
@@ -92,7 +90,8 @@ export default function AttributionDeepDive() {
                 {data?.totals?.replyRatePct != null ? `${data.totals.replyRatePct.toFixed(1)}%` : '—'}
               </div>
               <div style={{ fontSize: 12, opacity: 0.7 }}>
-                {data?.totals?.repliesReceived ?? '—'} replies / {data?.totals?.messagesSent ?? '—'} texts sent
+                {data?.totals?.repliesReceived ?? '—'} people replied / {data?.totals?.peopleContacted ?? '—'} people
+                contacted
               </div>
             </div>
 
@@ -102,8 +101,8 @@ export default function AttributionDeepDive() {
                 {data?.totals?.manualReplyRatePct != null ? `${data.totals.manualReplyRatePct.toFixed(1)}%` : '—'}
               </div>
               <div style={{ fontSize: 12, opacity: 0.7 }}>
-                {data?.totals?.manualRepliesReceived ?? '—'} replies / {data?.totals?.manualMessagesSent ?? '—'} manual
-                texts
+                {data?.totals?.manualRepliesReceived ?? '—'} people replied / {data?.totals?.manualPeopleContacted ?? '—'}{' '}
+                people contacted manually
               </div>
             </div>
 
@@ -113,8 +112,8 @@ export default function AttributionDeepDive() {
                 {data?.totals?.sequenceReplyRatePct != null ? `${data.totals.sequenceReplyRatePct.toFixed(1)}%` : '—'}
               </div>
               <div style={{ fontSize: 12, opacity: 0.7 }}>
-                {data?.totals?.sequenceRepliesReceived ?? '—'} replies / {data?.totals?.sequenceMessagesSent ?? '—'}{' '}
-                sequence texts
+                {data?.totals?.sequenceRepliesReceived ?? '—'} people replied /{' '}
+                {data?.totals?.sequencePeopleContacted ?? '—'} people contacted by sequence
               </div>
             </div>
           </div>
@@ -132,6 +131,9 @@ export default function AttributionDeepDive() {
           </div>
 
           <h2>Booked calls — credit (from Slack)</h2>
+          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
+            Canonical booked KPI source: Slack. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 12 }}>
             <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
               <div style={{ fontSize: 12, opacity: 0.7 }}>Total booked</div>
@@ -150,6 +152,27 @@ export default function AttributionDeepDive() {
               <div style={{ fontSize: 24, fontWeight: 700 }}>{data?.bookedCalls?.selfBooked ?? '—'}</div>
             </div>
           </div>
+
+          <details style={{ marginTop: 14 }}>
+            <summary style={{ cursor: 'pointer' }}>Show diagnostic SMS booking signals (non-canonical)</summary>
+            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
+              These values come from SMS text heuristics and are for diagnostics only.
+            </div>
+            <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 12 }}>
+              <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>Sequence-level SMS booking signals</div>
+                <div style={{ fontSize: 24, fontWeight: 700 }}>
+                  {(data?.topSequences ?? []).reduce((sum, row) => sum + row.bookingSignalsSms, 0)}
+                </div>
+              </div>
+              <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
+                <div style={{ fontSize: 12, opacity: 0.7 }}>Rep-level SMS booking signals</div>
+                <div style={{ fontSize: 24, fontWeight: 700 }}>
+                  {(data?.repLeaderboard ?? []).reduce((sum, row) => sum + row.bookingSignalsSms, 0)}
+                </div>
+              </div>
+            </div>
+          </details>
         </>
       )}
     </div>

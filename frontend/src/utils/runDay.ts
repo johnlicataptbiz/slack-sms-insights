@@ -1,4 +1,5 @@
 const ISO_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DAY_PREFIX_PATTERN = /^\d{4}-\d{2}-\d{2}(?:T.*)?$/;
 
 export const DEFAULT_BUSINESS_TIME_ZONE = 'America/Chicago';
 
@@ -28,5 +29,6 @@ export const dayKeyInTimeZone = (isoTimestamp: string, timeZone: string): string
 export const resolveRunBusinessDay = (run: RunDayInput, timeZone = DEFAULT_BUSINESS_TIME_ZONE): string | null => {
   const reportDay = (run.report_date || '').trim();
   if (ISO_DAY_PATTERN.test(reportDay)) return reportDay;
+  if (ISO_DAY_PREFIX_PATTERN.test(reportDay)) return reportDay.slice(0, 10);
   return dayKeyInTimeZone(run.timestamp, timeZone);
 };

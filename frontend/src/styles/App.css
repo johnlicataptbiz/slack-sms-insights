@@ -99,20 +99,6 @@ select {
   overflow: hidden;
 }
 
-.AppShell__nav::after {
-  content: '';
-  position: absolute;
-  right: -40px;
-  bottom: 22px;
-  width: 200px;
-  height: 58px;
-  background: url('../assets/ptbiz-logo-sm.jpg') center / contain no-repeat;
-  opacity: 0.16;
-  filter: grayscale(1) saturate(0.2) brightness(1.3);
-  pointer-events: none;
-  transform: rotate(-4deg);
-}
-
 .AppShell__logo {
   padding: 0 24px;
   margin-bottom: 28px;
@@ -125,11 +111,13 @@ select {
 }
 
 .AppShell__logoMark {
-  width: 64px;
-  height: auto;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  width: 58px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(15, 23, 42, 0.55);
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.4);
 }
 
 .AppShell__logoText {
@@ -288,34 +276,6 @@ select {
   padding: 24px;
 }
 
-.AppShell__content::before,
-.AppShell__content::after {
-  content: '';
-  position: fixed;
-  pointer-events: none;
-  z-index: 0;
-  background-repeat: no-repeat;
-  background-size: contain;
-  opacity: 0.06;
-  filter: grayscale(1) saturate(0.2);
-}
-
-.AppShell__content::before {
-  width: min(44vw, 520px);
-  height: min(12vw, 160px);
-  top: 14px;
-  right: 16px;
-  background-image: url('../assets/ptbiz-logo-lg.jpg');
-}
-
-.AppShell__content::after {
-  width: min(28vw, 320px);
-  height: min(8vw, 95px);
-  bottom: 16px;
-  left: 16px;
-  background-image: url('../assets/ptbiz-logo-sm.jpg');
-}
-
 .AppShell__content > * {
   position: relative;
   z-index: 1;
@@ -346,15 +306,8 @@ select {
   }
 
   .AppShell__logoMark {
-    width: 52px;
-  }
-
-  .AppShell__logoTitle {
-    font-size: 1.08rem;
-  }
-
-  .AppShell__logoSub {
-    font-size: 0.65rem;
+    width: 48px;
+    height: 48px;
   }
 
   .AppShell__links {
@@ -383,21 +336,5 @@ select {
 
   .AppShell__content {
     padding: 14px;
-  }
-
-  .AppShell__content::before {
-    width: min(58vw, 360px);
-    height: 90px;
-    top: 72px;
-    right: 12px;
-    opacity: 0.04;
-  }
-
-  .AppShell__content::after {
-    width: min(42vw, 220px);
-    height: 70px;
-    bottom: 10px;
-    left: 12px;
-    opacity: 0.04;
   }
 }

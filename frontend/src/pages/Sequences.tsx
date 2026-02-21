@@ -16,9 +16,9 @@ type SortKey =
   | 'repliesReceived'
   | 'replyRatePct'
   | 'slackBookedCalls'
-  | 'slackCloseRatePct'
+  | 'slackBookedRatePct'
   | 'bookingSignalsSms'
-  | 'closeRatePct'
+  | 'smsSignalRatePct'
   | 'optOuts'
   | 'optOutRatePct'
   | 'volumeSharePct'
@@ -36,10 +36,10 @@ type SequenceKpiRow = {
   slackBookedJack: number;
   slackBookedBrandon: number;
   slackBookedSelf: number;
-  slackCloseRatePct: number;
+  slackBookedRatePct: number;
   bookingSignalsSms: number;
   optOuts: number;
-  closeRatePct: number;
+  smsSignalRatePct: number;
   optOutRatePct: number;
   volumeSharePct: number;
   signalSharePct: number;
@@ -98,7 +98,6 @@ export default function SequencesDeepDive() {
   const rows = useMemo((): SequenceKpiRow[] => {
     const sourceRows = data?.topSequences ?? [];
     const totalSent = sourceRows.reduce((sum, row) => sum + row.messagesSent, 0);
-    const totalSignals = sourceRows.reduce((sum, row) => sum + row.bookingSignalsSms, 0);
     const totalSlackBooked = sourceRows.reduce((sum, row) => sum + (row.slackBookedCalls ?? 0), 0);
     const searchText = search.trim().toLowerCase();
 
@@ -107,8 +106,8 @@ export default function SequencesDeepDive() {
       .filter((row) => (searchText ? row.label.toLowerCase().includes(searchText) : true))
       .map((row) => {
         const slackBookedCalls = row.slackBookedCalls ?? 0;
-        const slackCloseRatePct = row.repliesReceived > 0 ? (slackBookedCalls / row.repliesReceived) * 100 : 0;
-        const closeRatePct = row.repliesReceived > 0 ? (row.bookingSignalsSms / row.repliesReceived) * 100 : 0;
+        const slackBookedRatePct = row.messagesSent > 0 ? (slackBookedCalls / row.messagesSent) * 100 : 0;
+        const smsSignalRatePct = row.messagesSent > 0 ? (row.bookingSignalsSms / row.messagesSent) * 100 : 0;
         const optOutRatePct = row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0;
         const volumeSharePct = totalSent > 0 ? (row.messagesSent / totalSent) * 100 : 0;
         const signalSharePct = totalSlackBooked > 0 ? (slackBookedCalls / totalSlackBooked) * 100 : 0;
@@ -116,7 +115,7 @@ export default function SequencesDeepDive() {
         const healthScore = toHealthScore({
           messagesSent: row.messagesSent,
           replyRatePct: row.replyRatePct,
-          closeRatePct: slackCloseRatePct,
+          closeRatePct: slackBookedRatePct,
           optOutRatePct,
         });
 
@@ -129,10 +128,10 @@ export default function SequencesDeepDive() {
           slackBookedJack: row.slackBookedJack ?? 0,
           slackBookedBrandon: row.slackBookedBrandon ?? 0,
           slackBookedSelf: row.slackBookedSelf ?? 0,
-          slackCloseRatePct,
+          slackBookedRatePct,
           bookingSignalsSms: row.bookingSignalsSms,
           optOuts: row.optOuts,
-          closeRatePct,
+          smsSignalRatePct,
           optOutRatePct,
           volumeSharePct,
           signalSharePct,
@@ -169,8 +168,8 @@ export default function SequencesDeepDive() {
       totalOptOuts,
       highRiskCount,
       weightedReplyRatePct: totalSent > 0 ? (totalReplies / totalSent) * 100 : 0,
-      weightedSlackCloseRatePct: totalReplies > 0 ? (totalSlackBooked / totalReplies) * 100 : 0,
-      weightedSignalCloseRatePct: totalReplies > 0 ? (totalSignals / totalReplies) * 100 : 0,
+      weightedSlackBookedRatePct: totalSent > 0 ? (totalSlackBooked / totalSent) * 100 : 0,
+      weightedSignalRatePct: totalSent > 0 ? (totalSignals / totalSent) * 100 : 0,
       weightedOptOutRatePct: totalSent > 0 ? (totalOptOuts / totalSent) * 100 : 0,
     };
   }, [rows]);
@@ -206,14 +205,14 @@ export default function SequencesDeepDive() {
       </div>
 
       <p className="DataPage__subtitle">
-        Detailed sequence KPIs from canonical sms_events attribution. Sequence names are preserved exactly as stored
-        (for example, 1.2 and 1.3 remain separate labels).
+        Clear sequence performance metrics. Sequence names are preserved exactly as stored (for example, 1.2 and 1.3
+        stay separate).
       </p>
 
       <section className="DataPanel">
         <div className="SequencesPage__controls">
           <label className="SequencesPage__control">
-            <span>Window</span>
+            <span>Date range</span>
             <select value={mode} onChange={(e) => setMode(e.target.value as RangeMode)}>
               <option value="previous-day">Previous Day</option>
               <option value="7d">Last 7 Days</option>
@@ -222,7 +221,7 @@ export default function SequencesDeepDive() {
           </label>
 
           <label className="SequencesPage__control SequencesPage__control--search">
-            <span>Search</span>
+            <span>Find sequence</span>
             <input
               type="search"
               value={search}
@@ -233,14 +232,13 @@ export default function SequencesDeepDive() {
 
           <label className="SequencesPage__toggle">
             <input type="checkbox" checked={includeManual} onChange={(e) => setIncludeManual(e.target.checked)} />
-            Include "{MANUAL_LABEL}"
+            Include "{MANUAL_LABEL}" row
           </label>
         </div>
         <p className="DataPanel__caption">
-          Range: {rangeLabel}. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}. Slack booked-call attribution
-          model: {data?.meta?.sequenceBookedAttribution?.model ?? 'unavailable'}.
+          Date range: {rangeLabel}. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
           {data?.meta?.sequenceBookedAttribution
-            ? ` Matched ${data.meta.sequenceBookedAttribution.matchedCalls}/${data.meta.sequenceBookedAttribution.totalCalls} calls (${formatPct((data.meta.sequenceBookedAttribution.matchedCalls / Math.max(1, data.meta.sequenceBookedAttribution.totalCalls)) * 100)}).`
+            ? ` Matched ${data.meta.sequenceBookedAttribution.matchedCalls}/${data.meta.sequenceBookedAttribution.totalCalls} Slack booked calls to a sequence (${formatPct((data.meta.sequenceBookedAttribution.matchedCalls / Math.max(1, data.meta.sequenceBookedAttribution.totalCalls)) * 100)}).`
             : ''}
         </p>
       </section>
@@ -262,31 +260,31 @@ export default function SequencesDeepDive() {
                 <div className="DataCard__value">{summary.sequences}</div>
               </div>
               <div className="DataCard">
-                <div className="DataCard__label">Sequence messages sent</div>
+                <div className="DataCard__label">Messages sent</div>
                 <div className="DataCard__value">{summary.totalSent.toLocaleString()}</div>
               </div>
               <div className="DataCard">
-                <div className="DataCard__label">People replied</div>
+                <div className="DataCard__label">People who replied</div>
                 <div className="DataCard__value">{summary.totalReplies.toLocaleString()}</div>
-                <p className="DataCard__meta">{formatPct(summary.weightedReplyRatePct)} weighted reply rate</p>
+                <p className="DataCard__meta">{formatPct(summary.weightedReplyRatePct)} reply rate (people)</p>
               </div>
               <div className="DataCard">
                 <div className="DataCard__label">Booked calls (Slack)</div>
                 <div className="DataCard__value">{summary.totalSlackBooked.toLocaleString()}</div>
-                <p className="DataCard__meta">{formatPct(summary.weightedSlackCloseRatePct)} reply→booked close rate</p>
+                <p className="DataCard__meta">{formatPct(summary.weightedSlackBookedRatePct)} booked rate (booked calls / messages sent)</p>
               </div>
               <div className="DataCard">
-                <div className="DataCard__label">Booking signals (SMS)</div>
+                <div className="DataCard__label">SMS booking hints (diagnostic)</div>
                 <div className="DataCard__value">{summary.totalSignals.toLocaleString()}</div>
-                <p className="DataCard__meta">{formatPct(summary.weightedSignalCloseRatePct)} diagnostic close rate</p>
+                <p className="DataCard__meta">{formatPct(summary.weightedSignalRatePct)} hint rate (hints / messages sent)</p>
               </div>
               <div className="DataCard">
                 <div className="DataCard__label">Opt-outs</div>
                 <div className="DataCard__value">{summary.totalOptOuts.toLocaleString()}</div>
-                <p className="DataCard__meta">{formatPct(summary.weightedOptOutRatePct)} weighted opt-out rate</p>
+                <p className="DataCard__meta">{formatPct(summary.weightedOptOutRatePct)} opt-out rate</p>
               </div>
               <div className="DataCard">
-                <div className="DataCard__label">High-risk sequences</div>
+                <div className="DataCard__label">High-risk sequences (opt-out)</div>
                 <div className="DataCard__value">{summary.highRiskCount}</div>
               </div>
             </div>
@@ -305,17 +303,17 @@ export default function SequencesDeepDive() {
                     </th>
                     <th className="is-right">
                       <button className="SequencesSortButton" onClick={() => onSort('messagesSent')}>
-                        Sent{sortIndicator('messagesSent')}
+                        Messages sent{sortIndicator('messagesSent')}
                       </button>
                     </th>
                     <th className="is-right">
                       <button className="SequencesSortButton" onClick={() => onSort('repliesReceived')}>
-                        Replies{sortIndicator('repliesReceived')}
+                        People replied{sortIndicator('repliesReceived')}
                       </button>
                     </th>
                     <th className="is-right">
                       <button className="SequencesSortButton" onClick={() => onSort('replyRatePct')}>
-                        Reply % {sortIndicator('replyRatePct')}
+                        Reply rate {sortIndicator('replyRatePct')}
                       </button>
                     </th>
                     <th className="is-right">
@@ -324,18 +322,18 @@ export default function SequencesDeepDive() {
                       </button>
                     </th>
                     <th className="is-right">
-                      <button className="SequencesSortButton" onClick={() => onSort('slackCloseRatePct')}>
-                        Slack Close % {sortIndicator('slackCloseRatePct')}
+                      <button className="SequencesSortButton" onClick={() => onSort('slackBookedRatePct')}>
+                        Booked rate {sortIndicator('slackBookedRatePct')}
                       </button>
                     </th>
                     <th className="is-right">
                       <button className="SequencesSortButton" onClick={() => onSort('bookingSignalsSms')}>
-                        Booking Signals (SMS){sortIndicator('bookingSignalsSms')}
+                        SMS booking hints{sortIndicator('bookingSignalsSms')}
                       </button>
                     </th>
                     <th className="is-right">
-                      <button className="SequencesSortButton" onClick={() => onSort('closeRatePct')}>
-                        Close % {sortIndicator('closeRatePct')}
+                      <button className="SequencesSortButton" onClick={() => onSort('smsSignalRatePct')}>
+                        SMS hint rate {sortIndicator('smsSignalRatePct')}
                       </button>
                     </th>
                     <th className="is-right">
@@ -345,17 +343,17 @@ export default function SequencesDeepDive() {
                     </th>
                     <th className="is-right">
                       <button className="SequencesSortButton" onClick={() => onSort('optOutRatePct')}>
-                        Opt-out % {sortIndicator('optOutRatePct')}
+                        Opt-out rate {sortIndicator('optOutRatePct')}
                       </button>
                     </th>
                     <th className="is-right">
                       <button className="SequencesSortButton" onClick={() => onSort('volumeSharePct')}>
-                        Volume Share{sortIndicator('volumeSharePct')}
+                        Share of messages{sortIndicator('volumeSharePct')}
                       </button>
                     </th>
                     <th className="is-right">
                       <button className="SequencesSortButton" onClick={() => onSort('signalSharePct')}>
-                        Signal Share{sortIndicator('signalSharePct')}
+                        Share of booked calls{sortIndicator('signalSharePct')}
                       </button>
                     </th>
                     <th className="is-right">
@@ -384,13 +382,13 @@ export default function SequencesDeepDive() {
                           {row.slackBookedCalls.toLocaleString()}
                           {row.slackBookedCalls > 0 ? (
                             <span className="SequencesCellMeta">
-                              J{row.slackBookedJack}/B{row.slackBookedBrandon}/S{row.slackBookedSelf}
+                              Jack {row.slackBookedJack} / Brandon {row.slackBookedBrandon} / Self {row.slackBookedSelf}
                             </span>
                           ) : null}
                         </td>
-                        <td className="is-right">{formatPct(row.slackCloseRatePct)}</td>
+                        <td className="is-right">{formatPct(row.slackBookedRatePct)}</td>
                         <td className="is-right">{row.bookingSignalsSms.toLocaleString()}</td>
-                        <td className="is-right">{formatPct(row.closeRatePct)}</td>
+                        <td className="is-right">{formatPct(row.smsSignalRatePct)}</td>
                         <td className="is-right">{row.optOuts.toLocaleString()}</td>
                         <td className="is-right">{formatPct(row.optOutRatePct)}</td>
                         <td className="is-right">{formatPct(row.volumeSharePct)}</td>

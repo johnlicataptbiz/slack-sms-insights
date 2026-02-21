@@ -29,9 +29,17 @@ const dayKey = (ts: string): string | null => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-const hasReaction = (reactions: Array<{ reaction_name: string }>, name: string): boolean => {
+const hasReaction = (
+  reactions: Array<{ reaction_name: string; users: unknown }>,
+  name: string,
+  userId?: string,
+): boolean => {
   const target = name.trim().toLowerCase();
-  return reactions.some((r) => (r.reaction_name || '').trim().toLowerCase() === target);
+  return reactions.some((r) => {
+    if ((r.reaction_name || '').trim().toLowerCase() !== target) return false;
+    if (!userId) return true; // Fallback if no user ID configured
+    return Array.isArray(r.users) && r.users.includes(userId);
+  });
 };
 
 export const getBookedCallsSummary = async (
@@ -60,19 +68,35 @@ export const getBookedCallsSummary = async (
     return t.includes('call booked') || t.includes('booked') || t.includes('appointment') || t.includes('scheduled');
   };
 
+  const looksLikeManualOneOff = (text: string | null): boolean => {
+    const t = (text || '').toLowerCase();
+    if (!t) return false;
+    // Allow "automation" (e.g. "Automation didn't fire") or "set" (e.g. "Set 2/8") for manual reports
+    return t.includes('automation') || t.includes('set');
+  };
+
+  const jackId = process.env.ALOWARE_WATCHER_JACK_USER_ID;
+  const brandonId = process.env.ALOWARE_WATCHER_BRANDON_USER_ID;
+
   for (const c of calls) {
-    if (!looksLikeBookedCall(c.text)) continue;
+    const reactions = c.reactions || [];
+    const isJack = hasReaction(reactions, 'jack', jackId);
+    const isBrandon = hasReaction(reactions, 'me', brandonId);
+    const hasAttribution = isJack || isBrandon;
+
+    let isValid = false;
+    if (hasAttribution) {
+      // If attributed, allow standard keywords OR manual one-off keywords
+      isValid = looksLikeBookedCall(c.text) || looksLikeManualOneOff(c.text);
+    } else {
+      // If not attributed, only allow standard keywords (strict) to avoid counting chatter as self-booked
+      isValid = looksLikeBookedCall(c.text);
+    }
+
+    if (!isValid) continue;
 
     const day = dayKey(c.event_ts);
     if (!day) continue;
-
-    // Attribution rules:
-    // - :jack: reaction => Jack
-    // - :me: reaction => Brandon
-    // - else => self booked
-    const reactions = c.reactions || [];
-    const isJack = hasReaction(reactions, 'jack');
-    const isBrandon = hasReaction(reactions, 'me');
 
     if (isJack) bump(day, 'jack');
     else if (isBrandon) bump(day, 'brandon');

@@ -37,6 +37,31 @@
   max-width: 880px;
 }
 
+.Insights__brandMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.Insights__brandMark img {
+  width: 56px;
+  height: auto;
+  border-radius: 6px;
+}
+
+.Insights__brandMark span {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
 .Insights__rangeControl {
   display: grid;
   gap: 8px;

@@ -24,6 +24,20 @@
 
 .RepHero__identity {
   min-width: 0;
+  position: relative;
+  padding-right: 92px;
+}
+
+.RepHero__logo {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 84px;
+  height: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  opacity: 0.92;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
 }
 
 .RepHero__eyebrow {
@@ -272,6 +286,18 @@
 }
 
 @media (max-width: 720px) {
+  .RepHero__identity {
+    padding-right: 0;
+    padding-top: 54px;
+  }
+
+  .RepHero__logo {
+    width: 72px;
+    top: 0;
+    left: 0;
+    right: auto;
+  }
+
   .RepHero__name {
     font-size: 1.65rem;
   }

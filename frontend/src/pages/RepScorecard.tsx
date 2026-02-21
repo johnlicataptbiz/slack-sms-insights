@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useSalesMetrics } from '../api/queries';
 import { resolveCurrentBusinessDay, shiftIsoDay } from '../utils/runDay';
+import brandLogo from '../assets/ptbiz-logo-sm.jpg';
 import '../styles/DataPages.css';
 import '../styles/RepScorecard.css';
 
@@ -124,6 +125,7 @@ export default function RepScorecard({ rep }: Props) {
         <>
           <section className="RepHero">
             <div className="RepHero__identity">
+              <img className="RepHero__logo" src={brandLogo} alt="PT Biz SMS logo" />
               <div className="RepHero__eyebrow">{aliasFor(rep)}</div>
               <h2 className="RepHero__name">{repName}</h2>
               <p className="RepHero__meta">

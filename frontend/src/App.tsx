@@ -6,6 +6,7 @@ import AttributionDeepDive from './pages/AttributionDeepDive';
 import SequencesDeepDive from './pages/Sequences';
 import { useEventStream } from './api/useEventStream';
 import './styles/App.css';
+import brandLogo from './assets/ptbiz-logo-sm.jpg';
 
 type View = 'dashboard' | 'insights' | 'rep-jack' | 'rep-brandon' | 'rep-attribution' | 'sequences';
 
@@ -27,7 +28,13 @@ export default function App() {
   return (
     <div className="AppShell">
       <nav className="AppShell__nav">
-        <div className="AppShell__logo">Command Center</div>
+        <div className="AppShell__logo">
+          <img className="AppShell__logoMark" src={brandLogo} alt="PT Biz SMS" />
+          <div className="AppShell__logoText">
+            <span className="AppShell__logoTitle">Command Center</span>
+            <span className="AppShell__logoSub">PT Biz SMS</span>
+          </div>
+        </div>
 
         <div className="AppShell__links">
           <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>

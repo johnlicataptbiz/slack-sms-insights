@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
-import { getBookedCallsSummary } from '../services/booked-calls.js';
+import { getBookedCallAttributionSources, getBookedCallsSummary } from '../services/booked-calls.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import {
@@ -14,6 +14,7 @@ import {
 import { subscribeRealtimeEvents } from '../services/realtime.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
+import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
 
@@ -535,15 +536,30 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
   const to = resolved.to;
 
   try {
-    const [summary, bookedCalls] = await Promise.all([
+    const [summary, bookedCalls, bookedAttributionSources] = await Promise.all([
       getSalesMetricsSummary({ from, to, timeZone: resolved.timeZone }, logger),
       getBookedCallsSummary(
         { from, to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID, timeZone: resolved.timeZone },
         logger,
       ),
+      getBookedCallAttributionSources({ from, to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID }),
     ]);
 
     const canonical = buildCanonicalSalesMetricsSlice(summary, bookedCalls);
+    const sequenceBookedAttribution = attributeSlackBookedCallsToSequences(
+      canonical.topSequences,
+      bookedAttributionSources,
+    );
+    const topSequences = canonical.topSequences.map((row) => {
+      const booked = sequenceBookedAttribution.byLabel.get(row.label);
+      return {
+        ...row,
+        slackBookedCalls: booked?.booked ?? 0,
+        slackBookedJack: booked?.jack ?? 0,
+        slackBookedBrandon: booked?.brandon ?? 0,
+        slackBookedSelf: booked?.selfBooked ?? 0,
+      };
+    });
     if (!canonical.consistency.totalsBookedMatches) {
       logger?.warn('Booked consistency mismatch', {
         bookedCallsTotal: bookedCalls.totals.booked,
@@ -562,7 +578,7 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
       timeRange: { from: from.toISOString(), to: to.toISOString() },
       totals: canonical.totals,
       trendByDay: canonical.trendByDay,
-      topSequences: canonical.topSequences,
+      topSequences,
       repLeaderboard: canonical.repLeaderboard,
       bookedCalls: canonical.bookedCalls,
       meta: {
@@ -570,6 +586,14 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
         timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
         legacySignalsAvailable: true,
         sequenceLabelPolicy: 'preserve-exact',
+        sequenceBookedAttribution: {
+          source: 'slack_booked_calls',
+          model: 'hubspot_first_conversion_fuzzy_v1',
+          totalCalls: sequenceBookedAttribution.totals.totalCalls,
+          matchedCalls: sequenceBookedAttribution.totals.matchedCalls,
+          unattributedCalls: sequenceBookedAttribution.totals.unattributedCalls,
+          manualCalls: sequenceBookedAttribution.totals.manualCalls,
+        },
         deprecations: {
           topSequencesBookedAlias: true,
           repLeaderboardBookedAlias: true,

@@ -74,6 +74,13 @@
   min-width: 240px;
 }
 
+.SequencesCellMeta {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
 .SequencesTable__row--high td {
   background: rgba(239, 68, 68, 0.08);
 }

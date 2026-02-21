@@ -125,6 +125,10 @@ export type TopSequenceRow = {
   bookingSignalsSms: number;
   booked: number; // deprecated alias (compatibility)
   optOuts: number;
+  slackBookedCalls?: number;
+  slackBookedJack?: number;
+  slackBookedBrandon?: number;
+  slackBookedSelf?: number;
 };
 
 export type RepLeaderboardRow = {
@@ -141,6 +145,14 @@ export type SalesMetricsMeta = {
   timeZone: string;
   legacySignalsAvailable: boolean;
   sequenceLabelPolicy?: 'preserve-exact';
+  sequenceBookedAttribution?: {
+    source: 'slack_booked_calls';
+    model: string;
+    totalCalls: number;
+    matchedCalls: number;
+    unattributedCalls: number;
+    manualCalls: number;
+  };
   deprecations?: {
     topSequencesBookedAlias?: boolean;
     repLeaderboardBookedAlias?: boolean;

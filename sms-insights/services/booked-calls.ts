@@ -21,6 +21,15 @@ export type BookedCallsSummary = {
   trendByDay: BookedCallsTrendPoint[];
 };
 
+export type BookedCallAttributionBucket = 'jack' | 'brandon' | 'selfBooked';
+
+export type BookedCallAttributionSource = {
+  eventTs: string;
+  bucket: BookedCallAttributionBucket;
+  firstConversion: string | null;
+  text: string | null;
+};
+
 const hasReaction = (
   reactions: Array<{ reaction_name: string; users: unknown }>,
   name: string,
@@ -34,6 +43,22 @@ const hasReaction = (
   });
 };
 
+const parseFallbackField = (fallback: string, label: string): string | null => {
+  if (!fallback) return null;
+  const pattern = new RegExp(`\\*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\*:\\s*(.*)$`, 'im');
+  const match = fallback.match(pattern);
+  const value = (match?.[1] || '').trim();
+  return value.length > 0 ? value : null;
+};
+
+const fallbackFromRaw = (raw: unknown): string => {
+  if (!raw || typeof raw !== 'object') return '';
+  const typed = raw as { attachments?: Array<{ fallback?: string }> };
+  const first = Array.isArray(typed.attachments) ? typed.attachments[0] : null;
+  if (!first) return '';
+  return String(first.fallback || '');
+};
+
 export const getBookedCallsSummary = async (
   params: { from: Date; to: Date; channelId?: string; timeZone?: string },
   _logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
@@ -42,7 +67,11 @@ export const getBookedCallsSummary = async (
   const toIso = params.to.toISOString();
   const timeZone = (params.timeZone || '').trim() || DEFAULT_BUSINESS_TIMEZONE;
 
-  const calls = await listBookedCallsInRange({ from: params.from, to: params.to, channelId: params.channelId });
+  const calls = await getBookedCallAttributionSources({
+    from: params.from,
+    to: params.to,
+    channelId: params.channelId,
+  });
 
   const trendMap = new Map<string, BookedCallsTrendPoint>();
 
@@ -53,47 +82,11 @@ export const getBookedCallsSummary = async (
     trendMap.set(day, point);
   };
 
-  const looksLikeBookedCall = (text: string | null): boolean => {
-    const t = (text || '').toLowerCase();
-    if (!t) return false;
-    // Heuristic: HubSpot booked-call posts usually contain a booking signal.
-    // This filters out random chatter in #bookedcalls.
-    return t.includes('call booked') || t.includes('booked') || t.includes('appointment') || t.includes('scheduled');
-  };
-
-  const looksLikeManualOneOff = (text: string | null): boolean => {
-    const t = (text || '').toLowerCase();
-    if (!t) return false;
-    // Allow "automation" (e.g. "Automation didn't fire") or "set" (e.g. "Set 2/8") for manual reports
-    return t.includes('automation') || t.includes('set');
-  };
-
-  const jackId = process.env.ALOWARE_WATCHER_JACK_USER_ID;
-  const brandonId = process.env.ALOWARE_WATCHER_BRANDON_USER_ID;
-
   for (const c of calls) {
-    const reactions = c.reactions || [];
-    const isJack = hasReaction(reactions, 'jack', jackId);
-    const isBrandon = hasReaction(reactions, 'me', brandonId);
-    const hasAttribution = isJack || isBrandon;
-
-    let isValid = false;
-    if (hasAttribution) {
-      // If attributed, allow standard keywords OR manual one-off keywords
-      isValid = looksLikeBookedCall(c.text) || looksLikeManualOneOff(c.text);
-    } else {
-      // If not attributed, only allow standard keywords (strict) to avoid counting chatter as self-booked
-      isValid = looksLikeBookedCall(c.text);
-    }
-
-    if (!isValid) continue;
-
-    const day = dayKeyInTimeZone(c.event_ts, timeZone);
+    const day = dayKeyInTimeZone(c.eventTs, timeZone);
     if (!day) continue;
 
-    if (isJack) bump(day, 'jack');
-    else if (isBrandon) bump(day, 'brandon');
-    else bump(day, 'selfBooked');
+    bump(day, c.bucket);
   }
 
   const trendByDay = [...trendMap.values()].sort((a, b) => a.day.localeCompare(b.day));
@@ -113,4 +106,53 @@ export const getBookedCallsSummary = async (
     totals,
     trendByDay,
   };
+};
+
+export const getBookedCallAttributionSources = async (params: {
+  from: Date;
+  to: Date;
+  channelId?: string;
+}): Promise<BookedCallAttributionSource[]> => {
+  const calls = await listBookedCallsInRange({ from: params.from, to: params.to, channelId: params.channelId });
+  const jackId = process.env.ALOWARE_WATCHER_JACK_USER_ID;
+  const brandonId = process.env.ALOWARE_WATCHER_BRANDON_USER_ID;
+
+  const looksLikeBookedCall = (text: string | null): boolean => {
+    const t = (text || '').toLowerCase();
+    if (!t) return false;
+    return t.includes('call booked') || t.includes('booked') || t.includes('appointment') || t.includes('scheduled');
+  };
+
+  const looksLikeManualOneOff = (text: string | null): boolean => {
+    const t = (text || '').toLowerCase();
+    if (!t) return false;
+    return t.includes('automation') || t.includes('set');
+  };
+
+  const normalized: BookedCallAttributionSource[] = [];
+
+  for (const c of calls) {
+    const reactions = c.reactions || [];
+    const isJack = hasReaction(reactions, 'jack', jackId);
+    const isBrandon = hasReaction(reactions, 'me', brandonId);
+    const hasAttribution = isJack || isBrandon;
+
+    const isValid = hasAttribution
+      ? looksLikeBookedCall(c.text) || looksLikeManualOneOff(c.text)
+      : looksLikeBookedCall(c.text);
+    if (!isValid) continue;
+
+    const fallback = fallbackFromRaw(c.raw);
+    const firstConversion = parseFallbackField(fallback, 'First Conversion');
+    const bucket: BookedCallAttributionBucket = isJack ? 'jack' : isBrandon ? 'brandon' : 'selfBooked';
+
+    normalized.push({
+      eventTs: c.event_ts,
+      bucket,
+      firstConversion,
+      text: c.text,
+    });
+  }
+
+  return normalized;
 };

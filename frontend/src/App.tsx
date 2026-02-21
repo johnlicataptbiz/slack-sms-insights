@@ -1,90 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Dashboard from './pages/Dashboard';
 import { Insights } from './pages/Insights';
 import RepScorecard from './pages/RepScorecard';
 import AttributionDeepDive from './pages/AttributionDeepDive';
 import { useEventStream } from './api/useEventStream';
-import Login from './components/Login';
 import './styles/App.css';
 
 type View = 'dashboard' | 'insights' | 'rep-jack' | 'rep-brandon' | 'rep-attribution';
-const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('slackToken');
   });
-  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>(() =>
-    token ? 'checking' : 'unauthenticated',
-  );
   const [view, setView] = useState<View>('insights');
 
   // Initialize real-time event stream
-  useEventStream(authState === 'authenticated' ? token : null);
-
-  useEffect(() => {
-    if (!token) {
-      setAuthState('unauthenticated');
-      return;
-    }
-
-    let cancelled = false;
-
-    const verify = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/auth/verify`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (cancelled) return;
-        if (!response.ok) {
-          localStorage.removeItem('slackToken');
-          setToken(null);
-          setAuthState('unauthenticated');
-          return;
-        }
-
-        setAuthState('authenticated');
-      } catch {
-        if (!cancelled) {
-          setAuthState('unauthenticated');
-        }
-      }
-    };
-
-    setAuthState('checking');
-    verify();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [token]);
-
-  useEffect(() => {
-    if (!token) return;
-    localStorage.setItem('slackToken', token);
-  }, [token]);
+  useEventStream(token);
 
   const handleLogout = () => {
     localStorage.removeItem('slackToken');
     setToken(null);
-    setAuthState('unauthenticated');
   };
-
-  if (!token || authState === 'unauthenticated') {
-    return <Login />;
-  }
-
-  if (authState === 'checking') {
-    return (
-      <div style={{ padding: '20px', textAlign: 'center' }}>
-        <p>Verifying Slack session...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="AppShell">
@@ -119,14 +56,16 @@ export default function App() {
         </div>
 
 
-        <button className="AppShell__logout" onClick={handleLogout}>
-          Logout
-        </button>
+        {token ? (
+          <button className="AppShell__logout" onClick={handleLogout}>
+            Logout
+          </button>
+        ) : null}
       </nav>
 
       <main className="AppShell__content">
         {view === 'dashboard' ? (
-          <Dashboard token={token} onLogout={handleLogout} />
+          <Dashboard />
         ) : view === 'insights' ? (
           <Insights />
         ) : view === 'rep-jack' ? (

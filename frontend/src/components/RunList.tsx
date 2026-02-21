@@ -15,7 +15,7 @@ type Run = {
   duration_ms: number;
 };
 
-export default function RunList({ runs, token }: { runs: Run[]; token: string }) {
+export default function RunList({ runs }: { runs: Run[] }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'timestamp', direction: 'desc' });
   const selectedRun = runs.find(r => r.id === selectedRunId) || null;

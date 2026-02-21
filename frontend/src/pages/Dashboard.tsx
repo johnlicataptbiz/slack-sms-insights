@@ -16,7 +16,7 @@ type Run = {
   duration_ms: number;
 };
 
-export default function Dashboard({ token, onLogout }: { token: string; onLogout: () => void }) {
+export default function Dashboard() {
   const [runs, setRuns] = useState<Run[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,11 +36,7 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
         params.append('channelId', selectedChannelId);
       }
 
-      const response = await fetch(`${API_URL}/api/runs?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(`${API_URL}/api/runs?${params}`);
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`);
@@ -57,11 +53,7 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
 
   const fetchChannels = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/channels`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(`${API_URL}/api/channels`);
 
       if (response.ok) {
         const data = await response.json();
@@ -74,13 +66,13 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
 
   useEffect(() => {
     fetchChannels();
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     fetchRuns(true);
     const interval = setInterval(() => fetchRuns(false), 10000); // Refresh every 10 seconds
     return () => clearInterval(interval);
-  }, [daysBack, selectedChannelId, token]);
+  }, [daysBack, selectedChannelId]);
 
   return (
     <div className="dashboard-container">
@@ -129,7 +121,7 @@ export default function Dashboard({ token, onLogout }: { token: string; onLogout
           <p>No reports found for the selected period</p>
         </div>
       ) : (
-        <RunList runs={runs} token={token} />
+        <RunList runs={runs} />
       )}
     </div>
   );

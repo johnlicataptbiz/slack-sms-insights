@@ -140,6 +140,7 @@ export type SalesMetricsMeta = {
   bookedSource: 'slack';
   timeZone: string;
   legacySignalsAvailable: boolean;
+  sequenceLabelPolicy?: 'preserve-exact';
   deprecations?: {
     topSequencesBookedAlias?: boolean;
     repLeaderboardBookedAlias?: boolean;

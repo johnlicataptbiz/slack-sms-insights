@@ -1,0 +1,133 @@
+.SequencesPage {
+  display: grid;
+  gap: 14px;
+}
+
+.SequencesPage__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.SequencesPage__control {
+  display: grid;
+  gap: 6px;
+  min-width: 170px;
+}
+
+.SequencesPage__control span {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.SequencesPage__control select,
+.SequencesPage__control input[type='search'] {
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: #fff;
+  padding: 9px 10px;
+  color: var(--color-text);
+  font-size: 0.92rem;
+}
+
+.SequencesPage__control--search {
+  min-width: 260px;
+  flex: 1;
+}
+
+.SequencesPage__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.SequencesSortButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.SequencesSortButton:hover {
+  color: var(--color-primary-dark);
+}
+
+.SequencesTable__empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 20px 12px;
+}
+
+.SequencesTable__name {
+  font-weight: 700;
+  min-width: 240px;
+}
+
+.SequencesTable__row--high td {
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.SequencesTable__row--medium td {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.SequencesRisk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.SequencesRisk--low {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.14);
+}
+
+.SequencesRisk--medium {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.SequencesRisk--high {
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.2);
+}
+
+@media (max-width: 900px) {
+  .SequencesPage__control {
+    min-width: 150px;
+  }
+
+  .SequencesPage__control--search {
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 640px) {
+  .SequencesPage__controls {
+    align-items: stretch;
+  }
+
+  .SequencesPage__control,
+  .SequencesPage__control--search {
+    min-width: unset;
+    width: 100%;
+  }
+}

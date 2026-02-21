@@ -16,6 +16,7 @@ function formatPct(pct: number | null | undefined) {
 export function Insights() {
   const [range, setRange] = useState<'today' | '7d' | '30d'>('7d');
   const { data: metrics, isLoading, isError, error } = useSalesMetrics({ range, tz: BUSINESS_TIME_ZONE });
+  const topSequenceRows = (metrics?.topSequences ?? []).slice(0, 10);
 
   if (isLoading) {
     return (
@@ -107,7 +108,7 @@ export function Insights() {
         </div>
 
         <div className="Insights__table">
-          <h3>Top Sequences</h3>
+          <h3>Top Sequences (Top 10)</h3>
           <div className="Insights__caption">
             Canonical booked metrics are Slack-sourced and shown above. Sequence tables show volume/reply/opt-out performance.
           </div>
@@ -123,7 +124,7 @@ export function Insights() {
                 </tr>
               </thead>
               <tbody>
-                {(metrics?.topSequences ?? []).map((row) => (
+                {topSequenceRows.map((row) => (
                   <tr key={row.label}>
                     <td>{row.label}</td>
                     <td className="is-right">{row.messagesSent}</td>
@@ -132,7 +133,7 @@ export function Insights() {
                     <td className="is-right">{row.optOuts}</td>
                   </tr>
                 ))}
-                {(metrics?.topSequences ?? []).length === 0 ? (
+                {topSequenceRows.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="Insights__emptyCell">
                       No sequences

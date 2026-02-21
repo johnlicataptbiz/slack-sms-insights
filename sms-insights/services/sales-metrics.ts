@@ -688,9 +688,11 @@ export const getSalesMetricsSummary = async (
   }
 
   const trendByDay = [...trendMap.values()].sort((a, b) => a.day.localeCompare(b.day));
-  const topSequences = [...seqMap.values()]
-    .sort((a, b) => b.bookingSignalsSms - a.bookingSignalsSms || b.messagesSent - a.messagesSent)
-    .slice(0, 10);
+  // Preserve exact sequence names from source data and return the full set.
+  // Frontend surfaces can choose their own display limits.
+  const topSequences = [...seqMap.values()].sort(
+    (a, b) => b.bookingSignalsSms - a.bookingSignalsSms || b.messagesSent - a.messagesSent,
+  );
   const repLeaderboard = [...repMap.values()].sort(
     (a, b) => b.bookingSignalsSms - a.bookingSignalsSms || b.outboundConversations - a.outboundConversations,
   );

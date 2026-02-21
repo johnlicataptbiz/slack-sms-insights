@@ -3,10 +3,11 @@ import Dashboard from './pages/Dashboard';
 import { Insights } from './pages/Insights';
 import RepScorecard from './pages/RepScorecard';
 import AttributionDeepDive from './pages/AttributionDeepDive';
+import SequencesDeepDive from './pages/Sequences';
 import { useEventStream } from './api/useEventStream';
 import './styles/App.css';
 
-type View = 'dashboard' | 'insights' | 'rep-jack' | 'rep-brandon' | 'rep-attribution';
+type View = 'dashboard' | 'insights' | 'rep-jack' | 'rep-brandon' | 'rep-attribution' | 'sequences';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(() => {
@@ -44,6 +45,10 @@ export default function App() {
 
           <div className="AppShell__sectionLabel">Deep Dives</div>
 
+          <button className={view === 'sequences' ? 'active' : ''} onClick={() => setView('sequences')}>
+            <span role="img" aria-label="sequences">🧬</span> Sequences
+          </button>
+
           <button className={view === 'rep-attribution' ? 'active' : ''} onClick={() => setView('rep-attribution')}>
             <span role="img" aria-label="attribution">🧾</span> Attribution
           </button>
@@ -72,6 +77,8 @@ export default function App() {
           <RepScorecard rep="jack" />
         ) : view === 'rep-brandon' ? (
           <RepScorecard rep="brandon" />
+        ) : view === 'sequences' ? (
+          <SequencesDeepDive />
         ) : (
           <AttributionDeepDive />
         )}

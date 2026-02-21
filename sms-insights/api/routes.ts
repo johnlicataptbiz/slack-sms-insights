@@ -569,6 +569,7 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
         bookedSource: 'slack',
         timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
         legacySignalsAvailable: true,
+        sequenceLabelPolicy: 'preserve-exact',
         deprecations: {
           topSequencesBookedAlias: true,
           repLeaderboardBookedAlias: true,

@@ -111,13 +111,14 @@ select {
 }
 
 .AppShell__logoMark {
-  width: 58px;
-  height: 58px;
-  object-fit: cover;
-  border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(15, 23, 42, 0.55);
-  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.4);
+  width: 92px;
+  height: 60px;
+  object-fit: contain;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 4px 10px rgba(2, 6, 23, 0.35));
 }
 
 .AppShell__logoText {
@@ -306,7 +307,7 @@ select {
   }
 
   .AppShell__logoMark {
-    width: 48px;
+    width: 74px;
     height: 48px;
   }
 

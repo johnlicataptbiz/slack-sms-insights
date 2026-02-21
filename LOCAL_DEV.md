@@ -73,6 +73,10 @@ cp .env.sample .env
 # - SLACK_CLIENT_SECRET
 # - OPENAI_API_KEY
 # - DASHBOARD_AUTH_REDIRECT_URI=http://localhost:3000/api/oauth/callback
+# - DASHBOARD_AUTH_SUCCESS_URL=http://localhost:5173
+# - DASHBOARD_OAUTH_USER_SCOPES=users:read
+# - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+# - ALLOW_DUMMY_AUTH_TOKEN=false
 # - VITE_API_URL=http://localhost:3000
 ```
 

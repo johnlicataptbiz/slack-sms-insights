@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
@@ -20,6 +21,60 @@ type RequestHandler = (
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
   origin?: string,
 ) => Promise<void>;
+
+const OAUTH_STATE_COOKIE_NAME = 'dashboard_oauth_state';
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://ptbizsms.com',
+  'https://www.ptbizsms.com',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+const getAllowedOrigins = (): Set<string> => {
+  const configured = (process.env.ALLOWED_ORIGINS || process.env.CORS_ALLOWED_ORIGINS || '').trim();
+  if (!configured) {
+    return new Set(DEFAULT_ALLOWED_ORIGINS);
+  }
+
+  const values = configured
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+  return new Set(values);
+};
+
+const resolveCorsOrigin = (requestOrigin?: string): string | undefined => {
+  if (!requestOrigin) return undefined;
+  return getAllowedOrigins().has(requestOrigin) ? requestOrigin : undefined;
+};
+
+const parseCookies = (rawCookies: string | undefined): Record<string, string> => {
+  if (!rawCookies) return {};
+
+  const entries = rawCookies.split(';').map((part) => part.trim());
+  const cookies: Record<string, string> = {};
+  for (const entry of entries) {
+    const eq = entry.indexOf('=');
+    if (eq < 0) continue;
+    const key = entry.slice(0, eq).trim();
+    const value = entry.slice(eq + 1).trim();
+    if (!key) continue;
+    cookies[key] = decodeURIComponent(value);
+  }
+  return cookies;
+};
+
+const buildCookie = (name: string, value: string, maxAgeSeconds: number): string => {
+  return [
+    `${name}=${encodeURIComponent(value)}`,
+    'Path=/',
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    `Max-Age=${maxAgeSeconds}`,
+  ].join('; ');
+};
 
 // Parse JSON body
 const parseJsonBody = async (req: IncomingMessage): Promise<unknown> => {
@@ -57,8 +112,8 @@ const verifyToken = async (req: IncomingMessage & { user?: unknown }): Promise<b
 
   if (!token) return false;
 
-  // Accept dummy token for bypassing auth
-  if (token === 'dummy-token-bypass-auth') {
+  const allowDummyToken = (process.env.ALLOW_DUMMY_AUTH_TOKEN || '').trim().toLowerCase() === 'true';
+  if (allowDummyToken && token === 'dummy-token-bypass-auth') {
     (req as { user?: unknown }).user = { user_id: 'dummy-user', team_id: 'dummy-team' };
     return true;
   }
@@ -74,7 +129,10 @@ const verifyToken = async (req: IncomingMessage & { user?: unknown }): Promise<b
 };
 
 const sendJson = (res: ServerResponse, statusCode: number, data: unknown, origin?: string) => {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Vary: 'Origin',
+  };
   if (origin) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
@@ -85,8 +143,129 @@ const sendJson = (res: ServerResponse, statusCode: number, data: unknown, origin
   res.end(JSON.stringify(data));
 };
 
+const repDisplayName = (repId: string | null | undefined): string => {
+  if (!repId) return 'Unassigned';
+
+  const normalized = repId.trim();
+  const jackId = (process.env.ALOWARE_WATCHER_JACK_USER_ID || '').trim();
+  const brandonId = (process.env.ALOWARE_WATCHER_BRANDON_USER_ID || '').trim();
+
+  if (jackId && normalized === jackId) return 'Jack';
+  if (brandonId && normalized === brandonId) return 'Brandon';
+
+  if (/jack/i.test(normalized)) return 'Jack';
+  if (/brandon/i.test(normalized)) return 'Brandon';
+
+  return normalized;
+};
+
 const handleAuthVerify: RequestHandler = async (req, res, _logger, origin) => {
   sendJson(res, 200, { ok: true, user: (req as { user?: unknown }).user }, origin);
+};
+
+const handleOauthStart: RequestHandler = async (_req, res, logger) => {
+  const clientId = (process.env.SLACK_CLIENT_ID || '').trim();
+  const redirectUri = (process.env.DASHBOARD_AUTH_REDIRECT_URI || '').trim();
+  const userScopes = (process.env.DASHBOARD_OAUTH_USER_SCOPES || 'users:read').trim();
+
+  if (!clientId || !redirectUri) {
+    sendJson(res, 500, { error: 'OAuth is not configured on the server' });
+    return;
+  }
+
+  const state = randomBytes(16).toString('hex');
+  const authorizeUrl = new URL('https://slack.com/oauth/v2/authorize');
+  authorizeUrl.searchParams.set('client_id', clientId);
+  authorizeUrl.searchParams.set('redirect_uri', redirectUri);
+  authorizeUrl.searchParams.set('state', state);
+  if (userScopes) {
+    authorizeUrl.searchParams.set('user_scope', userScopes);
+  }
+
+  const headers: Record<string, string> = {
+    Location: authorizeUrl.toString(),
+    'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, state, 600),
+  };
+  res.writeHead(302, headers);
+  res.end();
+  logger?.info('Started dashboard OAuth flow');
+};
+
+const handleOauthCallback: RequestHandler = async (req, res, logger) => {
+  const clientId = (process.env.SLACK_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.SLACK_CLIENT_SECRET || '').trim();
+  const redirectUri = (process.env.DASHBOARD_AUTH_REDIRECT_URI || '').trim();
+
+  if (!clientId || !clientSecret || !redirectUri) {
+    sendJson(res, 500, { error: 'OAuth is not configured on the server' });
+    return;
+  }
+
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const code = (url.searchParams.get('code') || '').trim();
+  const returnedState = (url.searchParams.get('state') || '').trim();
+  const oauthError = (url.searchParams.get('error') || '').trim();
+  const cookies = parseCookies(req.headers.cookie);
+  const expectedState = (cookies[OAUTH_STATE_COOKIE_NAME] || '').trim();
+
+  if (oauthError) {
+    sendJson(res, 400, { error: `OAuth denied: ${oauthError}` });
+    return;
+  }
+
+  if (!code) {
+    sendJson(res, 400, { error: 'Missing OAuth code' });
+    return;
+  }
+
+  if (!returnedState || !expectedState || returnedState !== expectedState) {
+    sendJson(res, 400, { error: 'Invalid OAuth state' });
+    return;
+  }
+
+  const slack = new WebClient();
+  try {
+    const response = await slack.oauth.v2.access({
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+      redirect_uri: redirectUri,
+    });
+
+    const token = response.authed_user?.access_token || response.access_token;
+    if (!token) {
+      sendJson(res, 500, { error: 'OAuth succeeded but no user token was returned' });
+      return;
+    }
+
+    const successUrl = (process.env.DASHBOARD_AUTH_SUCCESS_URL || 'https://ptbizsms.com').trim();
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Signing in…</title>
+  </head>
+  <body>
+    <script>
+      localStorage.setItem('slackToken', ${JSON.stringify(token)});
+      window.location.replace(${JSON.stringify(successUrl)});
+    </script>
+    <p>Signed in. <a href="${successUrl}">Continue</a></p>
+  </body>
+</html>`;
+
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', 0),
+      'Cache-Control': 'no-store',
+    });
+    res.end(html);
+    logger?.info('Completed dashboard OAuth callback');
+  } catch (error) {
+    logger?.error('OAuth callback failed', error);
+    sendJson(res, 500, { error: 'OAuth callback failed' });
+  }
 };
 
 const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
@@ -206,7 +385,7 @@ const handleGetConversationById: RequestHandler = async (req, res, logger, origi
     contactId: conversation.contact_id,
     contactName: conversation.contact_phone, // Fallback
     repId: conversation.current_rep_id,
-    repName: conversation.current_rep_id ? 'Assigned Rep' : null,
+    repName: conversation.current_rep_id ? repDisplayName(conversation.current_rep_id) : null,
     lastMessageAt: conversation.last_touch_at,
     lastInboundAt: conversation.last_inbound_at,
     lastOutboundAt: conversation.last_outbound_at,
@@ -291,8 +470,8 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
     newConversations: volume.rows.reduce((acc, r) => acc + r.inbound, 0), // Rough proxy
     reps: workload.rows.map((r) => ({
       repId: r.repId || 'unassigned',
-      repName: r.repId || 'Unassigned', // We'd need a rep lookup here
-      conversationsHandled: 0, // Placeholder
+      repName: repDisplayName(r.repId),
+      conversationsHandled: r.conversationsWithOpenItems,
       avgFirstResponseMinutes: null,
       p90FirstResponseMinutes: null,
       followupLagMinutesAvg: null,
@@ -448,7 +627,7 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
     conversationId: item.conversation_id,
     contactName: item.contact_phone || 'Unknown', // Use phone as name fallback
     repId: item.rep_id,
-    repName: item.rep_id ? 'Assigned Rep' : null, // Placeholder
+    repName: item.rep_id ? repDisplayName(item.rep_id) : null,
     createdAt: item.created_at,
     dueAt: item.due_at,
     priority: item.severity === 'med' ? 'medium' : item.severity,
@@ -511,6 +690,9 @@ const routeMatches = (pathname: string, pattern: string): boolean => {
 };
 
 const apiRoutes: ApiRoute[] = [
+  { method: 'GET', path: '/api/oauth/start', requiresAuth: false, handler: handleOauthStart },
+  { method: 'GET', path: '/api/oauth/callback', requiresAuth: false, handler: handleOauthCallback },
+
   // Public read-only endpoints (dashboard is public)
   { method: 'GET', path: '/api/metrics', requiresAuth: false, handler: handleGetMetrics },
   { method: 'GET', path: '/api/sales-metrics', requiresAuth: false, handler: handleGetSalesMetrics },
@@ -539,11 +721,16 @@ export const handleApiRoute = async (
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<boolean> => {
   const method = req.method?.toUpperCase() || 'GET';
+  const requestOrigin = req.headers.origin;
+  const origin = resolveCorsOrigin(requestOrigin);
+
+  if (requestOrigin && !origin) {
+    sendJson(res, 403, { error: 'Origin is not allowed' });
+    return true;
+  }
 
   // Handle CORS preflight requests
   if (method === 'OPTIONS') {
-    const requestOrigin = req.headers.origin;
-    const origin = requestOrigin ? requestOrigin : 'http://localhost:5173';
     sendJson(res, 200, {}, origin);
     return true;
   }
@@ -553,23 +740,15 @@ export const handleApiRoute = async (
       if (route.requiresAuth) {
         const isValid = await verifyToken(req);
         if (!isValid) {
-          const origin = req.headers.origin || 'http://localhost:5173';
           sendJson(res, 401, { error: 'Unauthorized' }, origin);
           return true;
         }
       }
 
       try {
-        // Add origin to handler calls.
-        // In production, the dashboard is hosted on Vercel, so we must allow that origin for CORS.
-        // If no Origin header is present, fall back to localhost for local dev.
-        const requestOrigin = req.headers.origin;
-        const origin = requestOrigin ? requestOrigin : 'http://localhost:5173';
         await route.handler(req, res, logger, origin);
       } catch (error) {
         logger?.error('API route error:', error);
-        const requestOrigin = req.headers.origin;
-        const origin = requestOrigin ? requestOrigin : 'http://localhost:5173';
         sendJson(res, 500, { error: 'Internal server error' }, origin);
       }
       return true;

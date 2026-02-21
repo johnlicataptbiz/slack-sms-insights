@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { type DailyRunRow, getDailyRuns } from '../../services/daily-run-logger.js';
-import { getPool } from '../../services/db.js';
+import {
+  __resetGetPoolForTests,
+  __setGetPoolForTests,
+  type DailyRunRow,
+  getDailyRuns,
+} from '../../services/daily-run-logger.js';
 
 type FakePool = {
   query: (sql: string, params?: Array<string | number>) => Promise<{ rows: DailyRunRow[] }>;
@@ -49,9 +53,7 @@ test('getDailyRuns canonical mode: prefers non-placeholder over placeholder', as
     },
   };
 
-  // Monkeypatch getPool for this test
-  const originalGetPool = getPool;
-  (require('../../services/db.js') as { getPool: () => FakePool | null }).getPool = () => fakePool;
+  __setGetPoolForTests(() => fakePool as never);
 
   try {
     const rows = await getDailyRuns({ daysBack: 7 });
@@ -63,8 +65,7 @@ test('getDailyRuns canonical mode: prefers non-placeholder over placeholder', as
     assert.match(calls[0].sql, /ROW_NUMBER\(\) OVER/i);
     assert.match(calls[0].sql, /ILIKE 'backfilled placeholder%'/i);
   } finally {
-    // restore
-    (require('../../services/db.js') as { getPool: () => unknown }).getPool = originalGetPool;
+    __resetGetPoolForTests();
   }
 });
 
@@ -77,8 +78,7 @@ test('getDailyRuns raw mode: uses simple SELECT * query', async () => {
     },
   };
 
-  const originalGetPool = getPool;
-  (require('../../services/db.js') as { getPool: () => FakePool | null }).getPool = () => fakePool;
+  __setGetPoolForTests(() => fakePool as never);
 
   try {
     const rows = await getDailyRuns({ raw: true, daysBack: 7, limit: 10, offset: 0 });
@@ -90,6 +90,6 @@ test('getDailyRuns raw mode: uses simple SELECT * query', async () => {
     assert.match(calls[0].sql, /^SELECT \* FROM daily_runs/i);
     assert.match(calls[0].sql, /ORDER BY timestamp DESC/i);
   } finally {
-    (require('../../services/db.js') as { getPool: () => unknown }).getPool = originalGetPool;
+    __resetGetPoolForTests();
   }
 });

@@ -25,15 +25,8 @@ const getAuthToken = (explicit?: string): string | null => {
       return t.replace(/^['"]|['"]$/g, '');
     }
     if (t) return t;
-
-    // Local dev convenience: allow hitting the local API without a real Slack token.
-    // The backend explicitly accepts this token as an auth bypass.
-    if (import.meta.env.DEV) return 'dummy-token-bypass-auth';
-
     return null;
   } catch {
-    // If localStorage is unavailable (e.g. privacy mode), still allow local dev.
-    if (import.meta.env.DEV) return 'dummy-token-bypass-auth';
     return null;
   }
 };

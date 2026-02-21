@@ -1,23 +1,14 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { WorkItem } from './types';
 
-export function useEventStream() {
+export function useEventStream(token: string | null) {
   const qc = useQueryClient();
 
   useEffect(() => {
-    // Inbox is removed from the Command Center UI, so we don't need work-item realtime updates.
-    // Keep realtime only for Insights + Daily Runs.
-    //
-    // NOTE: Vercel serverless functions are not a great fit for long-lived SSE connections and can
-    // intermittently return 502s. We keep the UI functional by making realtime optional in production.
-    //
-    // Local dev: if the backend isn't running (or proxy is disabled), don't spam the console with
-    // EventSource MIME/404 errors. Allow opting in via VITE_ENABLE_REALTIME=1.
-    const enableRealtime = import.meta.env.VITE_ENABLE_REALTIME === '1';
+    // Keep realtime on by default and allow explicit opt-out.
+    const enableRealtime = import.meta.env.VITE_ENABLE_REALTIME !== '0';
     if (!enableRealtime) return;
-
-    const token = localStorage.getItem('slackToken') || 'dummy-token-bypass-auth';
+    if (!token) return;
 
     let es: EventSource | null = null;
 
@@ -49,5 +40,5 @@ export function useEventStream() {
     return () => {
       es?.close();
     };
-  }, [qc]);
+  }, [qc, token]);
 }

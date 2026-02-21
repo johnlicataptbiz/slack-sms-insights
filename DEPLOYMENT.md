@@ -48,9 +48,13 @@ railway variables set SLACK_CLIENT_ID=...
 railway variables set SLACK_CLIENT_SECRET=...
 railway variables set OPENAI_API_KEY=sk-...
 railway variables set VITE_API_URL=https://your-railway-app.up.railway.app
+railway variables set ALLOWED_ORIGINS=https://your-project.vercel.app,https://www.ptbizsms.com,https://ptbizsms.com
+railway variables set ALLOW_DUMMY_AUTH_TOKEN=false
 
 # Add dashboard redirect URI (replace with your Railway URL)
 railway variables set DASHBOARD_AUTH_REDIRECT_URI=https://your-railway-app.up.railway.app/api/oauth/callback
+railway variables set DASHBOARD_AUTH_SUCCESS_URL=https://your-project.vercel.app
+railway variables set DASHBOARD_OAUTH_USER_SCOPES=users:read
 ```
 
 ### 1.4 Deploy

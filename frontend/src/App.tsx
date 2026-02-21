@@ -4,58 +4,87 @@ import { Insights } from './pages/Insights';
 import RepScorecard from './pages/RepScorecard';
 import AttributionDeepDive from './pages/AttributionDeepDive';
 import { useEventStream } from './api/useEventStream';
-import { useMetrics } from './api/queries';
+import Login from './components/Login';
 import './styles/App.css';
 
 type View = 'dashboard' | 'insights' | 'rep-jack' | 'rep-brandon' | 'rep-attribution';
-
-function getTodayRange() {
-  const to = new Date();
-  const from = new Date();
-  from.setHours(0, 0, 0, 0);
-  return { from: from.toISOString(), to: to.toISOString() };
-}
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function App() {
-  const [loading, setLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('slackToken');
+  });
+  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>(() =>
+    token ? 'checking' : 'unauthenticated',
+  );
   const [view, setView] = useState<View>('insights');
 
-  // Ensure a token exists before any queries fire (React Query runs during render).
-  // This prevents a first-render 401 when localStorage is empty.
-  //
-  // NOTE: In dev, React.StrictMode intentionally double-invokes render/effects.
-  // For local preview builds, we still want a stable token so the app can load without OAuth.
-  if (typeof window !== 'undefined') {
-    const existing = localStorage.getItem('slackToken');
-    if (!existing && (import.meta.env.DEV || window.location.hostname === 'localhost')) {
-      localStorage.setItem('slackToken', 'dummy-token-bypass-auth');
-    }
-  }
-
   // Initialize real-time event stream
-  useEventStream();
-
-  // Fetch today's metrics for the sidebar
-  const { data: metrics } = useMetrics(getTodayRange());
+  useEventStream(authState === 'authenticated' ? token : null);
 
   useEffect(() => {
-    setLoading(false);
-  }, []);
+    if (!token) {
+      setAuthState('unauthenticated');
+      return;
+    }
+
+    let cancelled = false;
+
+    const verify = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/auth/verify`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (cancelled) return;
+        if (!response.ok) {
+          localStorage.removeItem('slackToken');
+          setToken(null);
+          setAuthState('unauthenticated');
+          return;
+        }
+
+        setAuthState('authenticated');
+      } catch {
+        if (!cancelled) {
+          setAuthState('unauthenticated');
+        }
+      }
+    };
+
+    setAuthState('checking');
+    verify();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    localStorage.setItem('slackToken', token);
+  }, [token]);
 
   const handleLogout = () => {
-    // No-op for logout since we're bypassing auth
-    window.location.reload();
+    localStorage.removeItem('slackToken');
+    setToken(null);
+    setAuthState('unauthenticated');
   };
 
-  if (loading) {
+  if (!token || authState === 'unauthenticated') {
+    return <Login />;
+  }
+
+  if (authState === 'checking') {
     return (
       <div style={{ padding: '20px', textAlign: 'center' }}>
-        <p>Loading...</p>
+        <p>Verifying Slack session...</p>
       </div>
     );
   }
-
-  const token = localStorage.getItem('slackToken') || 'dummy-token-bypass-auth';
 
   return (
     <div className="AppShell">

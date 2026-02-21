@@ -1,4 +1,4 @@
-tmport { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { useSalesMetrics } from '../api/queries';
 import { MetricCard } from '../components/insights/MetricCard';

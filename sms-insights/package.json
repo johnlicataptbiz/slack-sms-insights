@@ -5,17 +5,18 @@
   "main": "dist/app.js",
   "type": "module",
   "scripts": {
-    "build": "tsc && npm run build:frontend:optional",
-    "build:frontend:optional": "cd ../frontend && npm run build 2>/dev/null || true",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "npm run clean && tsc && npm run build:frontend",
+    "build:frontend:optional": "cd ../frontend && npm run build",
     "build:watch": "tsc --watch",
-    "build:frontend": "cd frontend && npm run build",
+    "build:frontend": "cd ../frontend && npm run build",
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
     "backfill:slack": "node --import tsx ./scripts/backfill-slack-events.ts",
     "dev": "node --import tsx app.ts",
     "start": "node ./dist/app.js",
     "lint": "npx @biomejs/biome check *.ts listeners services tests api",
     "lint:fix": "npx @biomejs/biome check --write *.ts listeners services tests api",
-    "test": "npm run build && npm run lint && node --import tsx --test"
+    "test": "npm run build && npm run lint && node --import tsx --test tests/**/*.test.ts"
   },
   "author": "Slack Technologies, LLC",
   "license": "MIT",

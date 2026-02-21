@@ -2,6 +2,16 @@ import type { Logger } from '@slack/bolt';
 import { getPool } from './db.js';
 import { publishRealtimeEvent } from './realtime.js';
 
+let getPoolImpl: typeof getPool = getPool;
+
+export const __setGetPoolForTests = (next: typeof getPool): void => {
+  getPoolImpl = next;
+};
+
+export const __resetGetPoolForTests = (): void => {
+  getPoolImpl = getPool;
+};
+
 export type DailyRunInput = {
   channelId: string;
   channelName?: string;
@@ -18,7 +28,7 @@ export const logDailyRun = async (
   input: DailyRunInput,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<string | null> => {
-  const pool = getPool();
+  const pool = getPoolImpl();
   if (!pool) {
     logger?.debug('Database not initialized; skipping run log');
     return null;
@@ -93,7 +103,7 @@ export const getDailyRuns = async (
   } = {},
   logger?: Pick<Logger, 'warn'>,
 ): Promise<DailyRunRow[]> => {
-  const pool = getPool();
+  const pool = getPoolImpl();
   if (!pool) {
     return [];
   }
@@ -215,7 +225,7 @@ export const getDailyRuns = async (
 };
 
 export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>): Promise<DailyRunRow | null> => {
-  const pool = getPool();
+  const pool = getPoolImpl();
   if (!pool) {
     return null;
   }
@@ -230,7 +240,7 @@ export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>)
 };
 
 export const getChannelsWithRuns = async (logger?: Pick<Logger, 'warn'>): Promise<ChannelWithRunsRow[]> => {
-  const pool = getPool();
+  const pool = getPoolImpl();
   if (!pool) {
     return [];
   }

@@ -1,4 +1,4 @@
-itmport React, { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useSalesMetrics } from '../api/queries';
 import { parseReport } from '../utils/reportParser';
 import '../styles/RunDetail.css';

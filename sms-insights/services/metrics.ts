@@ -37,6 +37,7 @@ export type SlaMetrics = {
 
 export type WorkloadByRepRow = {
   repId: string | null;
+  conversationsWithOpenItems: number;
   openWorkItems: number;
   overdueWorkItems: number;
   openNeedsReply: number;
@@ -277,6 +278,7 @@ export const getWorkloadByRepMetrics = async (
   try {
     const result = await client.query<{
       rep_id: string | null;
+      conversations_with_open_items: string;
       open_work_items: string;
       overdue_work_items: string;
       open_needs_reply: string;
@@ -291,6 +293,7 @@ export const getWorkloadByRepMetrics = async (
       )
       SELECT
         rep_id,
+        COUNT(DISTINCT conversation_id) AS conversations_with_open_items,
         COUNT(*) AS open_work_items,
         COUNT(*) FILTER (WHERE due_at IS NOT NULL AND due_at < NOW()) AS overdue_work_items,
         COUNT(*) FILTER (WHERE type = 'needs_reply') AS open_needs_reply,
@@ -310,6 +313,7 @@ export const getWorkloadByRepMetrics = async (
       windowDays: params.windowDays,
       rows: result.rows.map((r) => ({
         repId: r.rep_id,
+        conversationsWithOpenItems: Number.parseInt(r.conversations_with_open_items ?? '0', 10),
         openWorkItems: Number.parseInt(r.open_work_items ?? '0', 10),
         overdueWorkItems: Number.parseInt(r.overdue_work_items ?? '0', 10),
         openNeedsReply: Number.parseInt(r.open_needs_reply ?? '0', 10),

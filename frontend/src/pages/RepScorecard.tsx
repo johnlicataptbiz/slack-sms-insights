@@ -13,7 +13,7 @@ type Props = {
 const BUSINESS_TIME_ZONE = 'America/Chicago';
 
 const titleFor = (rep: RepKey) => (rep === 'jack' ? 'Jack' : 'Brandon');
-const aliasFor = (rep: RepKey) => (rep === 'jack' ? 'Closer Card' : 'Setter Card');
+const aliasFor = (rep: RepKey) => (rep === 'jack' ? 'Daily Snapshot' : 'Daily Snapshot');
 
 function formatCount(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return '-';
@@ -27,14 +27,6 @@ function toPct(numerator: number, denominator: number): number {
 
 function formatPct(value: number): string {
   return `${value.toFixed(1)}%`;
-}
-
-function scoreTier(score: number): string {
-  if (score >= 85) return 'All-Star';
-  if (score >= 70) return 'Strong Day';
-  if (score >= 50) return 'Solid';
-  if (score >= 30) return 'Building';
-  return 'Cold Start';
 }
 
 export default function RepScorecard({ rep }: Props) {
@@ -58,50 +50,19 @@ export default function RepScorecard({ rep }: Props) {
   const jackBooked = data?.bookedCalls?.jack ?? 0;
   const brandonBooked = data?.bookedCalls?.brandon ?? 0;
   const repBooked = rep === 'jack' ? jackBooked : brandonBooked;
-  const otherBooked = rep === 'jack' ? brandonBooked : jackBooked;
   const teamBooked = data?.bookedCalls?.booked ?? 0;
-  const setterBookedTotal = jackBooked + brandonBooked;
   const repBookedShareTeam = toPct(repBooked, teamBooked);
-  const repBookedShareSetter = toPct(repBooked, setterBookedTotal);
 
   const repRows = data?.repLeaderboard ?? [];
   const repNeedle = rep === 'jack' ? 'jack' : 'brandon';
   const repRow = repRows.find((row) => row.repName.toLowerCase().includes(repNeedle)) ?? null;
   const totalOutboundConvos = repRows.reduce((sum, row) => sum + row.outboundConversations, 0);
-  const maxOutboundConvos = Math.max(1, ...repRows.map((row) => row.outboundConversations));
   const outboundConversations = repRow?.outboundConversations ?? 0;
   const outboundShare = toPct(outboundConversations, totalOutboundConvos);
+  const repReplyRate = repRow?.replyRatePct ?? null;
   const optOuts = repRow?.optOuts ?? 0;
   const optOutRate = toPct(optOuts, outboundConversations);
   const bookingSignalsSms = repRow?.bookingSignalsSms ?? 0;
-
-  const bookedComponent = setterBookedTotal > 0 ? (repBooked / Math.max(1, jackBooked, brandonBooked)) * 60 : 0;
-  const activityComponent = (outboundConversations / maxOutboundConvos) * 25;
-  const disciplinePenalty = Math.min(15, optOuts * 3 + optOutRate * 0.8);
-  const disciplineComponent = Math.max(0, 15 - disciplinePenalty);
-  const gameScore = Math.round(bookedComponent + activityComponent + disciplineComponent);
-  const tier = scoreTier(gameScore);
-
-  const scoreRows = [
-    {
-      label: 'Booked impact',
-      points: bookedComponent,
-      max: 60,
-      detail: 'Compared to the top setter in this window',
-    },
-    {
-      label: 'Activity volume',
-      points: activityComponent,
-      max: 25,
-      detail: 'Outbound conversation volume',
-    },
-    {
-      label: 'List discipline',
-      points: disciplineComponent,
-      max: 15,
-      detail: 'Lower opt-outs preserve score',
-    },
-  ];
 
   return (
     <div className={`DataPage RepScorecard RepScorecard--${rep}`}>
@@ -110,7 +71,7 @@ export default function RepScorecard({ rep }: Props) {
       </div>
 
       <p className="DataPage__subtitle">
-        Player-card view for the previous business day. Canonical booked credit comes from Slack reactions.
+        Daily activity summary for the previous business day. Canonical booked credit comes from Slack reactions.
       </p>
 
       {isLoading ? (
@@ -130,10 +91,19 @@ export default function RepScorecard({ rep }: Props) {
                 {periodLabel} | Business day {businessDay ?? 'auto'} | Time zone {BUSINESS_TIME_ZONE}
               </p>
             </div>
-            <div className="RepHero__score">
-              <div className="RepHero__scoreLabel">Game Score</div>
-              <div className="RepHero__scoreValue">{gameScore}</div>
-              <div className="RepHero__scoreTier">{tier}</div>
+            <div className="RepHero__summary">
+              <div className="RepHero__summaryItem">
+                <span>Booked credits</span>
+                <strong>{formatCount(repBooked)}</strong>
+              </div>
+              <div className="RepHero__summaryItem">
+                <span>Outbound convos</span>
+                <strong>{formatCount(outboundConversations)}</strong>
+              </div>
+              <div className="RepHero__summaryItem">
+                <span>Opt-outs</span>
+                <strong>{formatCount(optOuts)}</strong>
+              </div>
             </div>
           </section>
 
@@ -144,9 +114,9 @@ export default function RepScorecard({ rep }: Props) {
               <div className="RepStatCard__meta">{formatPct(repBookedShareTeam)} of team booked calls</div>
             </article>
             <article className="RepStatCard">
-              <div className="RepStatCard__label">Setter share</div>
-              <div className="RepStatCard__value">{formatPct(repBookedShareSetter)}</div>
-              <div className="RepStatCard__meta">Share vs Jack + Brandon only</div>
+              <div className="RepStatCard__label">Reply rate</div>
+              <div className="RepStatCard__value">{repReplyRate == null ? '-' : formatPct(repReplyRate)}</div>
+              <div className="RepStatCard__meta">People-based reply rate for this rep</div>
             </article>
             <article className="RepStatCard">
               <div className="RepStatCard__label">Outbound convos</div>
@@ -172,27 +142,18 @@ export default function RepScorecard({ rep }: Props) {
 
           <section className="RepPanels">
             <article className="RepPanel">
-              <h3 className="RepPanel__title">Score Breakdown</h3>
-              <div className="RepMeters">
-                {scoreRows.map((row) => (
-                  <div key={row.label} className="RepMeter">
-                    <div className="RepMeter__head">
-                      <span>{row.label}</span>
-                      <strong>
-                        {row.points.toFixed(1)} / {row.max}
-                      </strong>
-                    </div>
-                    <div className="RepMeter__track">
-                      <div className="RepMeter__fill" style={{ width: `${toPct(row.points, row.max)}%` }} />
-                    </div>
-                    <div className="RepMeter__detail">{row.detail}</div>
-                  </div>
-                ))}
-              </div>
+              <h3 className="RepPanel__title">How to read this card</h3>
+              <p className="RepPanel__caption">
+                This page is a daily summary, not a ranking. It shows activity, booked-call credit, and list health for
+                one rep.
+              </p>
+              <p className="RepPanel__caption">
+                Booked credit is Slack-based (:jack: and :me: reactions). SMS booking hints are diagnostic only.
+              </p>
             </article>
 
             <article className="RepPanel">
-              <h3 className="RepPanel__title">Booked Credit Board</h3>
+              <h3 className="RepPanel__title">Booked Credit Breakdown (Team)</h3>
               <table className="RepBoard">
                 <thead>
                   <tr>
@@ -202,12 +163,12 @@ export default function RepScorecard({ rep }: Props) {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className={rep === 'jack' ? 'RepBoard__row--active' : ''}>
+                  <tr>
                     <td>Jack</td>
                     <td className="is-right">{formatCount(jackBooked)}</td>
                     <td className="is-right">{formatPct(toPct(jackBooked, teamBooked))}</td>
                   </tr>
-                  <tr className={rep === 'brandon' ? 'RepBoard__row--active' : ''}>
+                  <tr>
                     <td>Brandon</td>
                     <td className="is-right">{formatCount(brandonBooked)}</td>
                     <td className="is-right">{formatPct(toPct(brandonBooked, teamBooked))}</td>
@@ -228,10 +189,6 @@ export default function RepScorecard({ rep }: Props) {
                   </tr>
                 </tbody>
               </table>
-              <p className="RepPanel__caption">
-                Current matchup: {repName} {formatCount(repBooked)} vs {rep === 'jack' ? 'Brandon' : 'Jack'}{' '}
-                {formatCount(otherBooked)} booked credits.
-              </p>
             </article>
           </section>
         </>

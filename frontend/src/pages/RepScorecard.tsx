@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useSalesMetrics } from '../api/queries';
+import { resolveCurrentBusinessDay } from '../utils/runDay';
 import '../styles/DataPages.css';
 
 type RepKey = 'jack' | 'brandon';
@@ -13,7 +14,14 @@ const BUSINESS_TIME_ZONE = 'America/Chicago';
 const titleFor = (rep: RepKey) => (rep === 'jack' ? 'Jack' : 'Brandon');
 
 export default function RepScorecard({ rep }: Props) {
-  const { data, isLoading, error } = useSalesMetrics({ range: 'today', tz: BUSINESS_TIME_ZONE });
+  const businessDay = useMemo(
+    () => resolveCurrentBusinessDay({ timeZone: BUSINESS_TIME_ZONE, startHour: 4 }),
+    [],
+  );
+  const salesQuery = businessDay
+    ? { day: businessDay.day, tz: BUSINESS_TIME_ZONE }
+    : { range: 'today' as const, tz: BUSINESS_TIME_ZONE };
+  const { data, isLoading, error } = useSalesMetrics(salesQuery);
 
   // Back-compat: API returns bookedCalls buckets keyed by "jack"/"brandon".
   // Some older deployments may return rep names in repLeaderboard only.
@@ -25,6 +33,7 @@ export default function RepScorecard({ rep }: Props) {
         : null;
 
   const repSelfBooked = data?.bookedCalls?.selfBooked ?? null;
+  const periodLabel = businessDay?.isCarryOver ? 'Yesterday' : 'Today';
 
   return (
     <div className="DataPage">
@@ -33,7 +42,7 @@ export default function RepScorecard({ rep }: Props) {
       </div>
 
       <p className="DataPage__subtitle">
-        Sales-first view for today. (Uses Slack booked-call credit where available.)
+        Sales-first view for the current business day. (Uses Slack booked-call credit where available.)
       </p>
 
       {isLoading ? (
@@ -45,8 +54,11 @@ export default function RepScorecard({ rep }: Props) {
         </div>
       ) : (
         <div className="DataPanel">
-          <h2 className="DataPanel__title">Today</h2>
-          <p className="DataPanel__caption">Canonical booked KPI source: Slack ({BUSINESS_TIME_ZONE}).</p>
+          <h2 className="DataPanel__title">{periodLabel}</h2>
+          <p className="DataPanel__caption">
+            Business day: {businessDay?.day ?? 'auto'} {businessDay?.isCarryOver ? '(carry-over before 4:00 AM CT)' : ''}
+            . Canonical booked KPI source: Slack ({BUSINESS_TIME_ZONE}).
+          </p>
           <div className="DataGrid DataGrid--tight">
             <div className="DataCard DataCard--accent">
               <div className="DataCard__label">Calls booked credit</div>

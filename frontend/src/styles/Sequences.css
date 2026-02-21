@@ -39,6 +39,47 @@
   flex: 1;
 }
 
+.SequencesPage__dayNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+}
+
+.SequencesPage__dayButton {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: #fff;
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.SequencesPage__dayButton:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+}
+
+.SequencesPage__dayButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.SequencesPage__dayLabel {
+  min-width: 220px;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
 .SequencesPage__toggle {
   display: inline-flex;
   align-items: center;
@@ -125,6 +166,10 @@
   .SequencesPage__control--search {
     min-width: 220px;
   }
+
+  .SequencesPage__dayLabel {
+    min-width: 200px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -136,5 +181,14 @@
   .SequencesPage__control--search {
     min-width: unset;
     width: 100%;
+  }
+
+  .SequencesPage__dayNav {
+    width: 100%;
+  }
+
+  .SequencesPage__dayLabel {
+    flex: 1;
+    min-width: 0;
   }
 }

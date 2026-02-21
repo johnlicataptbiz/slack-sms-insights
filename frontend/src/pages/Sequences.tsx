@@ -8,7 +8,7 @@ import '../styles/Sequences.css';
 const BUSINESS_TIME_ZONE = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
 
-type RangeMode = 'previous-day' | '7d' | '30d';
+type RangeMode = 'day' | '7d' | '30d';
 type SortDirection = 'asc' | 'desc';
 type SortKey =
   | 'label'
@@ -44,6 +44,22 @@ type SequenceKpiRow = {
 };
 
 const formatPct = (value: number): string => `${value.toFixed(1)}%`;
+const dayLabelFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: BUSINESS_TIME_ZONE,
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+const formatBusinessDayLabel = (day: string | null): string => {
+  if (!day) return 'Unknown day';
+  const parts = day.split('-').map((part) => Number.parseInt(part, 10));
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return day;
+  const [year, month, date] = parts;
+  const instant = new Date(Date.UTC(year || 0, (month || 1) - 1, date || 1, 12, 0, 0, 0));
+  return `${dayLabelFormatter.format(instant)} (${day})`;
+};
 
 const getRiskLevel = (params: { optOutRatePct: number; optOuts: number; messagesSent: number }): RiskLevel => {
   const { optOutRatePct, optOuts, messagesSent } = params;
@@ -69,25 +85,38 @@ const toHealthScore = (row: {
 };
 
 export default function SequencesDeepDive() {
-  const [mode, setMode] = useState<RangeMode>('previous-day');
+  const today = useMemo(() => dayKeyInTimeZone(new Date(), BUSINESS_TIME_ZONE), []);
+  const previousDay = useMemo(() => {
+    if (!today) return null;
+    return shiftIsoDay(today, -1);
+  }, [today]);
+
+  const [mode, setMode] = useState<RangeMode>('day');
+  const [selectedDay, setSelectedDay] = useState<string | null>(previousDay);
   const [search, setSearch] = useState('');
   const [includeManual, setIncludeManual] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('messagesSent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  const previousDay = useMemo(() => {
-    const today = dayKeyInTimeZone(new Date(), BUSINESS_TIME_ZONE);
-    if (!today) return null;
-    return shiftIsoDay(today, -1);
-  }, []);
+  const activeDay = selectedDay || previousDay;
+  const canStepForward = mode === 'day' && Boolean(activeDay && today && activeDay < today);
+
+  const moveDay = (delta: number) => {
+    if (!activeDay) return;
+    if (delta > 0 && !canStepForward) return;
+    setSelectedDay(shiftIsoDay(activeDay, delta));
+  };
 
   const salesQuery = useMemo(() => {
-    if (mode === 'previous-day' && previousDay) {
-      return { day: previousDay, tz: BUSINESS_TIME_ZONE } as const;
+    if (mode === 'day' && activeDay) {
+      return { day: activeDay, tz: BUSINESS_TIME_ZONE } as const;
     }
     if (mode === '7d') return { range: '7d' as const, tz: BUSINESS_TIME_ZONE };
-    return { range: '30d' as const, tz: BUSINESS_TIME_ZONE };
-  }, [mode, previousDay]);
+    if (mode === '30d') return { range: '30d' as const, tz: BUSINESS_TIME_ZONE };
+    const today = dayKeyInTimeZone(new Date(), BUSINESS_TIME_ZONE);
+    if (today) return { day: shiftIsoDay(today, -1), tz: BUSINESS_TIME_ZONE } as const;
+    return { range: '7d' as const, tz: BUSINESS_TIME_ZONE };
+  }, [activeDay, mode]);
 
   const { data, isLoading, error } = useSalesMetrics(salesQuery);
 
@@ -166,7 +195,11 @@ export default function SequencesDeepDive() {
   }, [rows]);
 
   const rangeLabel =
-    mode === 'previous-day' ? `Previous Day (${previousDay ?? 'auto'})` : mode === '7d' ? 'Last 7 Days' : 'Last 30 Days';
+    mode === 'day'
+      ? `Business day ${formatBusinessDayLabel(activeDay)}`
+      : mode === '7d'
+        ? 'Last 7 Days'
+        : 'Last 30 Days';
 
   const sortIndicator = (key: SortKey): string => {
     if (sortKey !== key) return '';
@@ -203,13 +236,45 @@ export default function SequencesDeepDive() {
       <section className="DataPanel">
         <div className="SequencesPage__controls">
           <label className="SequencesPage__control">
-            <span>Date range</span>
-            <select value={mode} onChange={(e) => setMode(e.target.value as RangeMode)}>
-              <option value="previous-day">Previous Day</option>
+            <span>View</span>
+            <select
+              value={mode}
+              onChange={(e) => {
+                const nextMode = e.target.value as RangeMode;
+                setMode(nextMode);
+                if (nextMode === 'day' && !selectedDay && previousDay) {
+                  setSelectedDay(previousDay);
+                }
+              }}
+            >
+              <option value="day">Day by day</option>
               <option value="7d">Last 7 Days</option>
               <option value="30d">Last 30 Days</option>
             </select>
           </label>
+
+          {mode === 'day' ? (
+            <div className="SequencesPage__dayNav" aria-label="Business day navigation">
+              <button
+                className="SequencesPage__dayButton"
+                type="button"
+                onClick={() => moveDay(-1)}
+                aria-label="Go to previous day"
+              >
+                ←
+              </button>
+              <div className="SequencesPage__dayLabel">{formatBusinessDayLabel(activeDay)}</div>
+              <button
+                className="SequencesPage__dayButton"
+                type="button"
+                onClick={() => moveDay(1)}
+                disabled={!canStepForward}
+                aria-label="Go to next day"
+              >
+                →
+              </button>
+            </div>
+          ) : null}
 
           <label className="SequencesPage__control SequencesPage__control--search">
             <span>Find sequence</span>
@@ -227,7 +292,7 @@ export default function SequencesDeepDive() {
           </label>
         </div>
         <p className="DataPanel__caption">
-          Date range: {rangeLabel}. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
+          View: {rangeLabel}. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
           {data?.meta?.sequenceBookedAttribution
             ? ` Matched ${data.meta.sequenceBookedAttribution.matchedCalls}/${data.meta.sequenceBookedAttribution.totalCalls} Slack booked calls to a sequence (${formatPct((data.meta.sequenceBookedAttribution.matchedCalls / Math.max(1, data.meta.sequenceBookedAttribution.totalCalls)) * 100)}).`
             : ''}

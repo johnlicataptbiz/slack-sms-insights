@@ -1,26 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../api/client';
 import { useSalesMetrics } from '../api/queries';
-import { resolveCurrentBusinessDay } from '../utils/runDay';
+import { resolveCurrentBusinessDay, shiftIsoDay } from '../utils/runDay';
 import '../styles/DataPages.css';
 
 const BUSINESS_TIME_ZONE = 'America/Chicago';
 
 export default function AttributionDeepDive() {
-  const businessDay = useMemo(
+  const currentBusinessDay = useMemo(
     () => resolveCurrentBusinessDay({ timeZone: BUSINESS_TIME_ZONE, startHour: 4 }),
     [],
+  );
+  const businessDay = useMemo(
+    () => (currentBusinessDay ? shiftIsoDay(currentBusinessDay.day, -1) : null),
+    [currentBusinessDay],
   );
   const salesQuery = useMemo(
     () =>
       businessDay
-        ? { day: businessDay.day, tz: BUSINESS_TIME_ZONE }
+        ? { day: businessDay, tz: BUSINESS_TIME_ZONE }
         : ({ range: 'today' as const, tz: BUSINESS_TIME_ZONE }),
     [businessDay],
   );
   const { data, isLoading, error, refetch, isFetching, fetchStatus, status } = useSalesMetrics(salesQuery);
   const [stuck, setStuck] = useState(false);
-  const periodLabel = businessDay?.isCarryOver ? 'Yesterday' : 'Today';
+  const periodLabel = 'Previous Day';
 
   useEffect(() => {
     if (!isLoading) return;
@@ -71,8 +75,7 @@ export default function AttributionDeepDive() {
               {isFetching ? <span className="DataPanel__status">Refreshing...</span> : null}
             </div>
             <p className="DataPanel__caption">
-              Business day: {businessDay?.day ?? 'auto'} {businessDay?.isCarryOver ? '(carry-over before 4:00 AM CT)' : ''}
-              .
+              Business day: {businessDay ?? 'auto'} (previous-day view).
             </p>
             <div className="DataGrid">
               <div className="DataCard DataCard--accent">
@@ -124,7 +127,7 @@ export default function AttributionDeepDive() {
           <section className="DataPanel">
             <h2 className="DataPanel__title">Booked calls credit (Slack)</h2>
             <p className="DataPanel__caption">
-              Business day: {businessDay?.day ?? 'auto'}. Canonical booked KPI source: Slack. Time zone:{' '}
+              Business day: {businessDay ?? 'auto'}. Canonical booked KPI source: Slack. Time zone:{' '}
               {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
             </p>
             <div className="DataGrid DataGrid--tight">

@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useSalesMetrics } from '../api/queries';
-import { resolveCurrentBusinessDay } from '../utils/runDay';
+import { resolveCurrentBusinessDay, shiftIsoDay } from '../utils/runDay';
 import '../styles/DataPages.css';
 
 type RepKey = 'jack' | 'brandon';
@@ -14,12 +14,16 @@ const BUSINESS_TIME_ZONE = 'America/Chicago';
 const titleFor = (rep: RepKey) => (rep === 'jack' ? 'Jack' : 'Brandon');
 
 export default function RepScorecard({ rep }: Props) {
-  const businessDay = useMemo(
+  const currentBusinessDay = useMemo(
     () => resolveCurrentBusinessDay({ timeZone: BUSINESS_TIME_ZONE, startHour: 4 }),
     [],
   );
+  const businessDay = useMemo(
+    () => (currentBusinessDay ? shiftIsoDay(currentBusinessDay.day, -1) : null),
+    [currentBusinessDay],
+  );
   const salesQuery = businessDay
-    ? { day: businessDay.day, tz: BUSINESS_TIME_ZONE }
+    ? { day: businessDay, tz: BUSINESS_TIME_ZONE }
     : { range: 'today' as const, tz: BUSINESS_TIME_ZONE };
   const { data, isLoading, error } = useSalesMetrics(salesQuery);
 
@@ -33,7 +37,7 @@ export default function RepScorecard({ rep }: Props) {
         : null;
 
   const repSelfBooked = data?.bookedCalls?.selfBooked ?? null;
-  const periodLabel = businessDay?.isCarryOver ? 'Yesterday' : 'Today';
+  const periodLabel = 'Previous Day';
 
   return (
     <div className="DataPage">
@@ -42,7 +46,7 @@ export default function RepScorecard({ rep }: Props) {
       </div>
 
       <p className="DataPage__subtitle">
-        Sales-first view for the current business day. (Uses Slack booked-call credit where available.)
+        Sales-first view for the previous business day. (Uses Slack booked-call credit where available.)
       </p>
 
       {isLoading ? (
@@ -56,8 +60,8 @@ export default function RepScorecard({ rep }: Props) {
         <div className="DataPanel">
           <h2 className="DataPanel__title">{periodLabel}</h2>
           <p className="DataPanel__caption">
-            Business day: {businessDay?.day ?? 'auto'} {businessDay?.isCarryOver ? '(carry-over before 4:00 AM CT)' : ''}
-            . Canonical booked KPI source: Slack ({BUSINESS_TIME_ZONE}).
+            Business day: {businessDay ?? 'auto'} (previous-day view). Canonical booked KPI source: Slack (
+            {BUSINESS_TIME_ZONE}).
           </p>
           <div className="DataGrid DataGrid--tight">
             <div className="DataCard DataCard--accent">

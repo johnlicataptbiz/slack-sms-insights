@@ -44,7 +44,7 @@ const getTimeZoneParts = (input: Date | string, timeZone: string): TimeZoneParts
   return { year, month, day, hour };
 };
 
-const shiftIsoDay = (day: string, deltaDays: number): string => {
+export const shiftIsoDay = (day: string, deltaDays: number): string => {
   const [year, month, date] = day.split('-').map((value) => Number.parseInt(value, 10));
   const shifted = new Date(Date.UTC(year, month - 1, date + deltaDays, 0, 0, 0, 0));
   const yyyy = shifted.getUTCFullYear();

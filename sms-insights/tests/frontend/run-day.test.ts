@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { resolveCurrentBusinessDay, resolveRunBusinessDay } from '../../../frontend/src/utils/runDay.js';
+import { resolveCurrentBusinessDay, resolveRunBusinessDay, shiftIsoDay } from '../../../frontend/src/utils/runDay.js';
 
 describe('run day resolution', () => {
   it('uses report_date directly when provided', () => {
@@ -69,5 +69,10 @@ describe('current business day resolution', () => {
       startHour: 4,
     });
     assert.equal(context, null);
+  });
+
+  it('shifts ISO day strings without timezone side effects', () => {
+    assert.equal(shiftIsoDay('2026-02-21', -1), '2026-02-20');
+    assert.equal(shiftIsoDay('2026-03-01', -1), '2026-02-28');
   });
 });

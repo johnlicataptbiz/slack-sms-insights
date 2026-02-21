@@ -3,7 +3,6 @@ import { useMemo, useState } from 'react';
 import { useSalesMetrics } from '../api/queries';
 import { MetricCard } from '../components/insights/MetricCard';
 import { SalesTrendChart } from '../components/insights/SalesTrendChart';
-import brandLogo from '../assets/ptbiz-logo-sm.jpg';
 import '../styles/DataPages.css';
 import '../styles/Insights.css';
 
@@ -134,10 +133,6 @@ export function Insights() {
           <p className="Insights__subtitle">
             High-level command view for team performance. Sequence-level breakdown now lives in the Sequences tab.
           </p>
-          <div className="Insights__brandMark">
-            <img src={brandLogo} alt="PT Biz SMS logo" />
-            <span>PT Biz SMS Analytics</span>
-          </div>
           <p className="Insights__caption">
             Time zone: {metrics?.meta?.timeZone || BUSINESS_TIME_ZONE}. Canonical booked KPI source: Slack.
           </p>

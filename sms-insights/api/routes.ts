@@ -95,6 +95,7 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
   const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 100);
   const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
   const daysBack = Number.parseInt(url.searchParams.get('daysBack') || '7', 10) || 7;
+  const raw = url.searchParams.get('raw') === 'true';
 
   const runs = await getDailyRuns(
     {
@@ -102,6 +103,7 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
       limit,
       offset,
       daysBack,
+      raw,
     },
     logger,
   );

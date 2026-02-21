@@ -89,6 +89,7 @@ export const getDailyRuns = async (
     limit?: number;
     offset?: number;
     daysBack?: number;
+    raw?: boolean;
   } = {},
   logger?: Pick<Logger, 'warn'>,
 ): Promise<DailyRunRow[]> => {
@@ -98,31 +99,114 @@ export const getDailyRuns = async (
   }
 
   try {
-    let query = 'SELECT * FROM daily_runs WHERE 1=1';
     const params: Array<string | number> = [];
+
+    // Base filter (applies to both raw + canonical)
+    let where = 'WHERE 1=1';
 
     if (options.channelId) {
       params.push(options.channelId);
-      query += ` AND channel_id = $${params.length}`;
+      where += ` AND channel_id = $${params.length}`;
     }
 
     if (options.daysBack) {
-      query += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
+      // Keep this as a literal interval to avoid parameter type issues.
+      where += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
     }
 
-    query += ' ORDER BY timestamp DESC';
+    // Raw mode: preserve existing behavior for debugging/back-compat.
+    if (options.raw) {
+      let query = `SELECT * FROM daily_runs ${where} ORDER BY timestamp DESC`;
+
+      if (options.limit) {
+        params.push(options.limit);
+        query += ` LIMIT $${params.length}`;
+      }
+
+      if (options.offset) {
+        params.push(options.offset);
+        query += ` OFFSET $${params.length}`;
+      }
+
+      const result = await pool.query<DailyRunRow>(query, params);
+      return result.rows;
+    }
+
+    // Canonical mode: 1 run per (channel_id, report_type, day)
+    // day = COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date)
+    // Ranking:
+    //   1) non-placeholder over placeholder
+    //   2) status: success > pending > error
+    //   3) latest timestamp
+    //   4) stable tie-breaker by id
+    const canonicalQuery = `
+      WITH ranked AS (
+        SELECT
+          *,
+          COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date) AS canonical_day,
+          CASE
+            WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
+            WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
+            ELSE 0
+          END AS is_placeholder,
+          CASE status
+            WHEN 'success' THEN 0
+            WHEN 'pending' THEN 1
+            WHEN 'error' THEN 2
+            ELSE 3
+          END AS status_rank,
+          ROW_NUMBER() OVER (
+            PARTITION BY channel_id, report_type, COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date)
+            ORDER BY
+              CASE
+                WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
+                WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
+                ELSE 0
+              END ASC,
+              CASE status
+                WHEN 'success' THEN 0
+                WHEN 'pending' THEN 1
+                WHEN 'error' THEN 2
+                ELSE 3
+              END ASC,
+              timestamp DESC,
+              id DESC
+          ) AS rn
+        FROM daily_runs
+        ${where}
+      )
+      SELECT
+        id,
+        timestamp,
+        channel_id,
+        channel_name,
+        report_date,
+        report_type,
+        status,
+        error_message,
+        summary_text,
+        full_report,
+        duration_ms,
+        created_at
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY timestamp DESC
+    `;
+
+    // Apply pagination to canonical results.
+    let pagedQuery = canonicalQuery;
 
     if (options.limit) {
       params.push(options.limit);
-      query += ` LIMIT $${params.length}`;
+      pagedQuery += ` LIMIT $${params.length}`;
     }
 
     if (options.offset) {
       params.push(options.offset);
-      query += ` OFFSET $${params.length}`;
+      pagedQuery += ` OFFSET $${params.length}`;
     }
 
-    const result = await pool.query<DailyRunRow>(query, params);
+    const result = await pool.query<DailyRunRow>(pagedQuery, params);
     return result.rows;
   } catch (error) {
     logger?.warn('Failed to fetch daily runs:', error);

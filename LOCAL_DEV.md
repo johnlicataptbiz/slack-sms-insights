@@ -42,6 +42,9 @@ railway variables | grep DATABASE_URL
 # Copy the value
 ```
 
+Note: if you copy/paste commands from a web page and see `&&` or `<<` in your terminal, those are HTML-escaped operators.
+Replace them with the real shell operators (`&&`, `<<`) or the command will fail in zsh with a parse error.
+
 ## Setup & Run
 
 ### 1. Install dependencies

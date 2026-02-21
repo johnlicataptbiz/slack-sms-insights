@@ -1,201 +1,158 @@
-# Implementation Plan — Sales Intelligence Command Center (React + Vite + Slack Bolt)
+# Implementation Plan
 
 [Overview]
-This repo already has:
-- v1: “Daily Runs Dashboard” (daily report logs in `daily_runs`, rendered in `Dashboard`/`RunDetail`).
-- v2 foundation: operational command center tables + ingestion + basic “Inbox” (`sms_events`, `conversations`, `work_items`, `/api/work-items`, `frontend/src/pages/Inbox.tsx`).
+Canonicalize Daily Runs so the dashboard shows exactly one “best” run per day per channel, eliminating duplicates and placeholder confusion.
 
-The next step is to evolve v2 from “a table of needs_reply work items” into a high-performance sales intelligence command center that:
-- Improves response speed and accountability (SLA, follow-up lag, ownership).
-- Improves visibility for leadership (distributions, trends, rep comparisons).
-- Stays fast and simple (server-side aggregation, cursor pagination, minimal UI complexity).
-- Scales cleanly (append-only event log + projections + work queue + rollups).
+The Daily Runs UI currently lists raw `daily_runs` rows returned by `GET /api/runs`, which are ordered by `timestamp DESC` and filtered only by `timestamp > NOW() - INTERVAL '<daysBack> days'`. This allows multiple runs per day to appear (e.g., multiple triggers, retries, historical backfills) and also allows “placeholder” backfill rows to appear even when a real run exists for the same `report_date`.
 
-Key architectural decision:
-- Treat `sms_events` as the canonical append-only log.
-- Treat `conversations` as the “current state” projection.
-- Treat `work_items` as the action queue (what needs doing now).
-- Add a small set of “metrics rollups” endpoints (server-side aggregation) rather than parsing text reports in the browser.
+We will implement canonicalization in the backend `getDailyRuns()` query path so the frontend receives a deduped list by default. Canonicalization rules:
+- Group by `(channel_id, report_type, canonical_day)` where `canonical_day` is:
+  - `report_date` when present (historical/backfilled runs)
+  - otherwise `DATE(timestamp AT TIME ZONE 'UTC')` (or `DATE(timestamp)` in Postgres, which is UTC for timestamptz casts)
+- Prefer non-placeholder runs over placeholder runs.
+- Prefer `status='success'` over `pending` over `error` (optional but recommended for robustness).
+- Prefer the most recent `timestamp` among remaining candidates.
 
-Immediate product shift:
-- Dashboard becomes “Command Center” with 2 primary surfaces:
-  1) Inbox (action queue): prioritized work items with fast filters + drill-in.
-  2) Insights (leadership): SLA distributions, follow-up lag, conversion velocity proxies, rep accountability.
+We will also harden the backfill/trigger scripts so they do not create placeholder runs when a real run exists for the same `(channel_id, report_type, report_date)`.
+
+This approach keeps the database append-only (no destructive deletes required), preserves auditability, and makes the UI stable and understandable.
 
 [Types]
-Backend (existing)
-- `SmsEventRow` (`sms-insights/services/sms-event-store.ts`)
-  - Unique key: `(slack_channel_id, slack_message_ts)` idempotent insert.
-  - Fields: `event_ts`, `direction`, `contact_id/phone/name`, `aloware_user`, `sequence`, `line`, `raw`.
-- `ConversationRow` (`sms-insights/services/conversation-projector.ts`)
-  - Key: `contact_key` = `contact:${contact_id}` or `phone:${digits(phone)}`
-  - Fields: `current_rep_id`, `status`, `last_inbound_at`, `last_outbound_at`, `last_touch_at`, `unreplied_inbound_count`, `next_followup_due_at`.
-- `WorkItemRow` (`sms-insights/services/work-item-engine.ts`)
-  - Types: `needs_reply | sla_breach | hot_lead | unowned | followup_due` (only `needs_reply` implemented)
-  - Fields: `conversation_id`, `rep_id`, `severity`, `due_at`, `resolved_at`, `resolution`, `source_event_id`.
-- `WorkItemListRow` (`sms-insights/services/work-items.ts`)
-  - Join of `work_items` + `conversations` for list rendering.
+Type system changes are limited to adding explicit “canonicalization” metadata and placeholder detection helpers.
 
-Frontend (existing)
-- `Inbox` page defines a local `WorkItem` type mirroring `WorkItemListRow`.
-- `Dashboard`/`RunDetail` uses `Run` and parses `full_report` text via `parseReport()`.
+Backend (TypeScript) additions in `sms-insights/services/daily-run-logger.ts`:
+- `export type DailyRunCanonicalKey = { channel_id: string; report_type: DailyRunRow["report_type"]; day: string }`
+- `export type DailyRunCanonicalizationOptions = {`
+  - `mode: 'canonical-per-day' | 'raw'` (default `'canonical-per-day'`)
+  - `preferStatusOrder?: Array<DailyRunRow["status"]>` (default `['success','pending','error']`)
+  - `placeholderPredicate?: (row: DailyRunRow) => boolean` (default uses summary/full_report heuristics)
+  - `}`
 
-New/expanded types (proposed)
-- `WorkItemType` (frontend shared): union of known types.
-- `WorkItemStatus`: `open | resolved`.
-- `WorkItemListQuery`: `{ type?: WorkItemType; repId?: string; severity?: ...; dueBefore?: ...; limit; cursor? }`
-- `ConversationDetail`: conversation + recent events preview (needed for drill-in).
-- `Metrics`:
-  - `SlaDistribution`: p50/p75/p90/p95, breach rate, open breaches.
-  - `FollowUpLag`: distribution of time since last inbound with no outbound.
-  - `RepAccountability`: open items by rep, breach rate by rep, median response time by rep.
-  - `Volume`: inbound/outbound counts by day, by rep, by sequence.
+Frontend types remain unchanged because the API response shape stays `{ runs: Run[] }`. We will not require the frontend to implement dedupe logic.
+
+Placeholder detection helper:
+- `export const isPlaceholderRun = (row: Pick<DailyRunRow,'summary_text'|'full_report'|'duration_ms'>): boolean`
+  - Returns true if `summary_text` starts with `"Backfilled placeholder run"` (case-insensitive) OR `full_report` contains that phrase.
+  - Optionally treat `duration_ms === 0` as a weak signal only when combined with the phrase (avoid false positives).
 
 [Files]
-Backend
-- Existing:
-  - `sms-insights/api/routes.ts` — current endpoints: `/api/runs`, `/api/channels`, `/api/work-items`, `/api/auth/verify`.
-  - `sms-insights/services/db.ts` — schema init (additive), tables + indexes.
-  - `sms-insights/services/sms-event-store.ts` — insert events.
-  - `sms-insights/services/conversation-projector.ts` — upsert conversation.
-  - `sms-insights/services/work-item-engine.ts` — needs_reply SLA v1.
-  - `sms-insights/services/work-items.ts` — list open work items.
-- To add/modify:
-  - `sms-insights/api/routes.ts` — add new endpoints for metrics + conversation drill-in + realtime.
-  - `sms-insights/services/metrics.ts` (new) — server-side aggregation queries.
-  - `sms-insights/services/conversation-store.ts` (new) — fetch conversation + events by contact_key.
-  - `sms-insights/services/sms-event-store.ts` — add list-by-contact_key helper (by contact_id/phone).
-  - `sms-insights/services/work-items.ts` — add cursor pagination + more filters (severity, due windows).
-  - `sms-insights/services/work-item-engine.ts` — add additional work item types incrementally (sla_breach, unowned, followup_due).
+Changes will modify backend run listing and add canonicalization utilities; scripts will be updated to avoid placeholder creation when a real run exists.
 
-Frontend
-- Existing:
-  - `frontend/src/pages/Inbox.tsx` — polls `/api/work-items` every 10s.
-  - `frontend/src/pages/Dashboard.tsx` — polls `/api/runs` every 10s via `setInterval`.
-  - `frontend/src/components/RunList.tsx`, `RunDetail.tsx`, `frontend/src/utils/reportParser.ts`.
-- To add/modify:
-  - `frontend/src/api/client.ts` (new) — typed fetch wrapper (auth header, base URL, error handling).
-  - `frontend/src/api/queries.ts` (new) — React Query hooks for work items, metrics, conversation detail.
-  - `frontend/src/features/inbox/*` (new) — inbox table, filters, row, drill-in drawer.
-  - `frontend/src/features/insights/*` (new) — leadership metrics cards + charts (minimal).
-  - `frontend/src/state/filters.ts` (new) — URL-synced filter state (search params).
-  - `frontend/src/pages/CommandCenter.tsx` (new) — replaces/augments current Dashboard navigation.
-  - Keep `Dashboard` (daily runs) as “Reports” section for now to avoid breaking v1.
+Existing files to modify:
+- `sms-insights/services/daily-run-logger.ts`
+  - Add placeholder detection helper.
+  - Add a new canonicalized query function (or extend `getDailyRuns`) to return one run per day per channel.
+  - Ensure `getChannelsWithRuns` remains correct (may optionally count canonical runs vs raw; keep raw for now).
+- `sms-insights/api/routes.ts`
+  - Keep `GET /api/runs` but make it return canonicalized runs by default.
+  - Add an opt-out query param `raw=true` to return raw rows for debugging/admin use.
+- `sms-insights/scripts/trigger-historical-reports.ts`
+  - Before calling `logDailyRun` for a `reportDate`, check if a non-placeholder run already exists for that `(channel_id, report_type='daily', report_date=date)`; if so, skip.
+- (Optional) `sms-insights/scripts/backfill-daily-runs.ts`
+  - This script currently only updates `report_date` and `summary_text` for existing rows; no placeholder creation. No change required unless we want it to also mark placeholders or normalize.
+- (Optional) `sms-insights/scripts/cleanup-daily-runs.ts`
+  - Keep as-is; it’s a conservative dedupe-by-content tool. Not required for canonicalization.
 
-Docs
-- `DASHBOARD_OVERVIEW.md` — update “v2 next steps” to reflect command center roadmap.
+No new files are strictly required, but if we want cleaner separation:
+- New file (optional): `sms-insights/services/daily-run-canonicalizer.ts`
+  - Contains SQL and helper functions for canonicalization.
+
+No files will be deleted.
 
 [Functions]
-Backend (existing)
-- `handleApiRoute()` routes requests and verifies Slack token via `slack.auth.test()` (or dummy bypass token).
-- `listOpenWorkItems({ type, repId, limit, offset })` returns open items ordered by `due_at`.
-- `upsertConversationFromEvent(event)` updates conversation projection.
-- `upsertNeedsReplyWorkItem(conversation, inboundEvent)` creates/updates a single open needs_reply item.
-- `resolveNeedsReplyOnOutbound(conversationId, outboundEvent)` resolves needs_reply.
+We will add/modify functions to support canonical run selection and script safety checks.
 
-Backend (to implement)
-1) Work items: better querying + pagination
-- `listOpenWorkItemsCursor(params)`:
-  - Replace offset pagination with cursor based on `(due_at, id)` for stability and performance.
-  - Add filters: `severity`, `dueBefore`, `overdueOnly`, `repId`, `type`.
-2) Conversation drill-in
-- `getConversationById(id)` and/or `getConversationByContactKey(contactKey)`
-- `listSmsEventsForConversation(conversation)`:
-  - Until `sms_events` has `conversation_id`, query by `contact_id` or normalized `contact_phone`.
-  - Return last N events for preview (direction/body/event_ts).
-3) Metrics aggregation (server-side)
-- `getSlaMetrics({ windowDays, repId?, channelId? })`
-  - Response time distribution: compute from inbound event to first outbound after it (approx v1).
-  - Breach rate: open needs_reply past due.
-- `getWorkloadMetrics({ windowDays, repId? })`
-  - Open items count, overdue count, by severity/type.
-- `getVolumeMetrics({ windowDays, repId?, sequence? })`
-  - inbound/outbound counts by day, by rep, by sequence.
-4) Realtime updates
-- `GET /api/stream` (SSE) emitting:
-  - `work_item_created`, `work_item_resolved`, `conversation_updated`
-  - Minimal payload: ids + timestamps; frontend invalidates relevant queries.
+1) `isPlaceholderRun`
+- Signature:
+  - `export const isPlaceholderRun = (row: Pick<DailyRunRow, 'summary_text' | 'full_report' | 'duration_ms'>): boolean`
+- Behavior:
+  - Returns true if the run appears to be a placeholder backfill.
+- Error handling:
+  - Pure function; no throws.
 
-Frontend (to implement)
-- `apiFetch(path, { token, signal })` in `frontend/src/api/client.ts`
-- React Query hooks:
-  - `useWorkItems(filters)` with `keepPreviousData`, `select` for derived view models.
-  - `useMetrics(filters)`
-  - `useConversationDetail(conversationId)`
-- SSE hook:
-  - `useEventStream({ token, onEvent })` that invalidates query keys.
+2) `getDailyRunsCanonicalPerDay` (new) OR extend `getDailyRuns`
+- Signature (option A - new function):
+  - `export const getDailyRunsCanonicalPerDay = async (options: { channelId?: string; limit?: number; offset?: number; daysBack?: number; reportType?: DailyRunInput['reportType'] }, logger?: Pick<Logger,'warn'>): Promise<DailyRunRow[]>`
+- Purpose:
+  - Return one canonical run per day per channel (and per report_type) within the lookback window.
+- Key details:
+  - Uses a SQL query with window functions:
+    - Compute `canonical_day = COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date)`
+    - Compute `is_placeholder` via SQL `CASE` using `summary_text ILIKE 'backfilled placeholder run%' OR full_report ILIKE '%backfilled placeholder run%'`
+    - Rank rows per `(channel_id, report_type, canonical_day)` by:
+      1. `is_placeholder ASC` (false first)
+      2. `status` order (success first) (implemented via `CASE status WHEN 'success' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END`)
+      3. `timestamp DESC`
+    - Select `WHERE rn = 1`
+  - Apply `daysBack` filter using `timestamp > NOW() - INTERVAL '<daysBack> days'` (keeps current behavior).
+  - Order final results by `timestamp DESC` (or by `canonical_day DESC` then timestamp).
+- Error handling:
+  - Catch DB errors and return `[]` with logger warn (consistent with existing style).
+
+3) `handleGetRuns` (modify)
+- Signature unchanged.
+- Behavior changes:
+  - If `raw=true` query param: call existing raw `getDailyRuns`.
+  - Else: call canonicalized function.
+- Return shape unchanged: `{ runs }`.
+
+4) `hasNonPlaceholderRunForReportDate` (new helper for scripts)
+- Signature:
+  - `export const hasNonPlaceholderRunForReportDate = async (args: { channelId: string; reportType: DailyRunInput['reportType']; reportDate: string }, logger?: Pick<Logger,'warn'>): Promise<boolean>`
+- Behavior:
+  - Query `daily_runs` for matching `channel_id`, `report_type`, `report_date = $date` and `NOT is_placeholder`.
+  - Return true if any exists.
+- Used by `trigger-historical-reports.ts` to skip inserting duplicates/placeholders.
 
 [Changes]
-Backend API changes (additive; keep existing endpoints)
-- Add:
-  - `GET /api/conversations/:id` → conversation + computed fields (e.g., “time since last inbound”).
-  - `GET /api/conversations/:id/events?limit=50` → recent sms events for drill-in.
-  - `GET /api/metrics/overview?days=7&repId=...` → leadership cards.
-  - `GET /api/metrics/sla?days=7&repId=...` → SLA distribution + breach rate.
-  - `GET /api/stream` → SSE for realtime invalidation.
-- Improve:
-  - `GET /api/work-items`:
-    - Add `severity`, `overdueOnly`, `cursor` (optional) while keeping `limit/offset` for backward compatibility initially.
-    - Return `{ items, nextCursor? }`.
+Implementation will canonicalize at the API layer (backend) and harden scripts to avoid creating confusing rows.
 
-Backend data model improvements (additive)
-- Add partial unique index for “one open needs_reply per conversation” to remove update-then-insert race:
-  - `CREATE UNIQUE INDEX ... ON work_items(conversation_id) WHERE type='needs_reply' AND resolved_at IS NULL;`
-  - (Note: current schema init is additive; index creation is safe.)
-- Add `conversation_id` to `sms_events` later (optional) once projector is stable:
-  - For now, drill-in queries by `contact_id`/`contact_phone`.
+1. Add placeholder detection logic
+   - Implement `isPlaceholderRun` in `sms-insights/services/daily-run-logger.ts`.
+   - Mirror the same predicate in SQL for canonicalization ranking.
 
-Frontend UX changes (incremental)
-- Introduce “Command Center” navigation:
-  - Inbox (action queue)
-  - Insights (leadership)
-  - Reports (existing daily runs)
-- Inbox upgrades:
-  - Filters: rep, severity, overdue, type, search by phone/contact id.
-  - Row actions: “Open in Slack thread” (deep link), “Mark resolved” (future), “Assign” (future).
-  - Drill-in drawer: last 10 messages, timestamps, SLA clock, suggested next action.
-- Insights upgrades:
-  - SLA distribution chart (simple histogram or percentile cards).
-  - Rep leaderboard: open items, overdue, median response time.
-  - Trend: inbound volume vs replies (proxy for coverage).
+2. Implement canonicalized query
+   - Add `getDailyRunsCanonicalPerDay` using a CTE + `ROW_NUMBER()` partitioned by `(channel_id, report_type, canonical_day)`.
+   - Ensure `channelId` filter is supported.
+   - Ensure `limit/offset` apply to the final canonicalized result set (not the raw rows).
 
-State management decisions (avoid overengineering)
-- Use React Query for server state everywhere (already present in Inbox).
-- Use URLSearchParams for filter state (shareable links, back/forward works).
-- Keep local UI state in components; avoid global stores unless needed.
+3. Update API route behavior
+   - In `sms-insights/api/routes.ts` `handleGetRuns`, parse `raw` query param.
+   - Default to canonicalized results.
+   - Keep response `{ runs }` unchanged.
 
-Performance strategy (practical)
-- Server-side aggregation for metrics; avoid parsing `full_report` for leadership views.
-- Cursor pagination for work items.
-- Frontend:
-  - `select` in React Query to compute derived view models without re-rendering whole trees.
-  - `React.memo` for row components.
-  - Virtualize long lists (only if > ~200 rows; otherwise keep simple).
-- Realtime:
-  - SSE to invalidate queries; fallback to 10s polling (current behavior) if SSE fails.
+4. Harden historical trigger script
+   - In `sms-insights/scripts/trigger-historical-reports.ts`, before `logDailyRun`, call `hasNonPlaceholderRunForReportDate`.
+   - If true, log and `continue` to next date.
+   - This prevents re-running the script from creating duplicates for the same day.
 
-Slack integration improvements (incremental)
-- Work item alerts:
-  - When `needs_reply` created: post/update a thread message with SLA due time and “Open Inbox” link.
-  - Escalate on breach: notify rep + manager channel (role-based routing later).
-- Dedupe:
-  - Use existing DB patterns (like `setter_feedback_dedupe`) to avoid repeated alerts.
+5. Verification
+   - Call `GET /api/runs?daysBack=7&limit=50` and confirm it returns ~1 per day (per channel) and excludes placeholder when a real run exists.
+   - Confirm `raw=true` still returns all rows for debugging.
 
 [Tests]
-Backend
-- Add unit tests for:
-  - `computeContactKey()` normalization.
-  - `upsertNeedsReplyWorkItem()` idempotency behavior.
-  - New metrics queries (use a test DB or pg test harness).
-- Add integration tests for new API routes:
-  - `/api/work-items` new filters/cursor.
-  - `/api/conversations/:id/events`.
-  - `/api/metrics/*`.
-Frontend
-- Minimal:
-  - Type-level safety via TS.
-  - Component tests only for critical filter logic (optional).
-- Manual verification checklist:
-  - Inbox loads, filters work, drill-in works.
-  - SSE invalidation updates UI without full refresh.
-  - Existing Reports dashboard remains functional.
+Testing will focus on canonicalization correctness and placeholder suppression.
+
+Unit tests (backend):
+- Add tests for `isPlaceholderRun`:
+  - Detects placeholder via `summary_text` prefix.
+  - Detects placeholder via `full_report` containing phrase.
+  - Does not mark normal runs as placeholder.
+- Add tests for canonicalization ranking logic (prefer non-placeholder, prefer success, prefer latest timestamp).
+  - If SQL is hard to unit test, extract ranking comparator into a pure function and test it, and keep SQL aligned.
+
+Integration tests:
+- Add a test for `GET /api/runs` handler (or service-level test) using a seeded in-memory/temporary DB (if existing test infra supports it) OR mock `getPool().query`.
+- Validate:
+  - Multiple rows for same day collapse to one.
+  - Placeholder is excluded when a real run exists for same day.
+  - `raw=true` returns raw list.
+
+Edge cases:
+- Days where only placeholder exists: placeholder should be returned (since it’s the only available run).
+- Mixed `report_date` and null `report_date` for same day: ensure grouping uses `report_date` when present; otherwise timestamp date.
+- Multiple channels: canonicalization is per channel.
+- Manual/test report types: ensure canonicalization applies only to `report_type='daily'` unless explicitly desired; default should canonicalize all types or only daily (decide in implementation; recommended: canonicalize all types but keep `report_type` in partition key).
+
+Performance:
+- Query uses window functions; ensure indexes on `(channel_id, timestamp)` exist (they do). Consider adding `(channel_id, report_type, report_date)` index if needed later.

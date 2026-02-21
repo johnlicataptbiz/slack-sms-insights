@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+itmport React, { useMemo, useState } from 'react';
 import { useSalesMetrics } from '../api/queries';
 import { parseReport } from '../utils/reportParser';
 import '../styles/RunDetail.css';
@@ -152,7 +152,7 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
               <div className="section-content">
                 <h3>Source-of-truth metrics (sms_events + Slack booked calls)</h3>
                 <p className="section-description">
-                  This panel is computed from the same sources as Team Insights / Attribution. The legacy report below is kept for sequence tables.
+                  This panel is computed from the same sources as Team Insights / Attribution. The legacy report below is kept only for sequence tables and may not match these totals.
                 </p>
               </div>
             </div>
@@ -192,7 +192,7 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
 
                 <div className="metric-card highlight">
                   <div className="metric-icon">📞</div>
-                  <span className="metric-label">Calls booked (Slack)</span>
+                  <span className="metric-label">Appointments set (Slack)</span>
                   <span className="metric-value">{sales?.bookedCalls?.booked ?? 0}</span>
                   <span className="metric-subtext">
                     Jack {sales?.bookedCalls?.jack ?? 0} · Brandon {sales?.bookedCalls?.brandon ?? 0} · Self {sales?.bookedCalls?.selfBooked ?? 0}
@@ -213,7 +213,9 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
               <div className="section-icon">🧾</div>
               <div className="section-content">
                 <h3>Legacy report (sequence tables)</h3>
-                <p className="section-description">Kept for continuity; may differ from source-of-truth metrics above.</p>
+                <p className="section-description">
+                  This is the original text report that was generated and stored at the time. It uses different definitions (e.g., “sent” and “reply rate”) and can disagree with the source-of-truth panel above.
+                </p>
               </div>
             </div>
           </div>
@@ -223,12 +225,13 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
               <div className="metric-icon">📤</div>
               <span className="metric-label">Total Sent (legacy)</span>
               <span className="metric-value">{parsedData.totalMessagesSent.toLocaleString()}</span>
+              <span className="metric-subtext">Legacy definition (sequence report)</span>
             </div>
             <div className="metric-card">
               <div className="metric-icon">💬</div>
               <span className="metric-label">Reply Rate (legacy)</span>
               <span className="metric-value">{parsedData.overallReplyRate.toFixed(1)}%</span>
-              <span className="metric-subtext">{parsedData.totalRepliesReceived} replies</span>
+              <span className="metric-subtext">{parsedData.totalRepliesReceived} replies (legacy)</span>
             </div>
             <div className="metric-card highlight">
               <div className="metric-icon">🎯</div>

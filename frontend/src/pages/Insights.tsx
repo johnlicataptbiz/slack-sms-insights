@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+tmport { useMemo, useState } from 'react';
+
 import { useSalesMetrics } from '../api/queries';
 import { MetricCard } from '../components/insights/MetricCard';
 import { SalesTrendChart } from '../components/insights/SalesTrendChart';
@@ -70,7 +71,7 @@ export function Insights() {
         <MetricCard label="Sequence texts sent" value={metrics?.totals.sequenceMessagesSent ?? 0} />
         <MetricCard label="People who replied" value={metrics?.totals.repliesReceived ?? 0} />
         <MetricCard label="Reply rate" value={formatPct(metrics?.totals.replyRatePct)} />
-        <MetricCard label="Calls booked" value={metrics?.totals.booked ?? 0} />
+        <MetricCard label="Calls booked (Slack)" value={metrics?.bookedCalls?.booked ?? 0} />
         <MetricCard label="Opt-outs" value={metrics?.totals.optOuts ?? 0} tone="danger" />
       </section>
 
@@ -129,6 +130,9 @@ export function Insights() {
 
         <div className="Insights__table">
           <h3>Top Sequences</h3>
+          <div style={{ marginTop: 6, opacity: 0.7, fontSize: 12 }}>
+            Note: “Booked” in these tables is an SMS-derived <strong>booking signal</strong> (heuristics), not the Slack “Calls booked” count.
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
@@ -137,7 +141,7 @@ export function Insights() {
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Sent</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Replies</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Reply %</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booked</th>
+                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Opt-outs</th>
                 </tr>
               </thead>
@@ -176,13 +180,16 @@ export function Insights() {
 
         <div className="Insights__table">
           <h3>Rep Leaderboard</h3>
+          <div style={{ marginTop: 6, opacity: 0.7, fontSize: 12 }}>
+            Note: “Booked” here is an SMS-derived <strong>booking signal</strong> (heuristics), not the Slack “Calls booked” count.
+          </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr>
                   <th style={{ textAlign: 'left', padding: '8px 6px' }}>Rep</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Outbound convos</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booked</th>
+                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals</th>
                   <th style={{ textAlign: 'right', padding: '8px 6px' }}>Opt-outs</th>
                 </tr>
               </thead>

@@ -80,6 +80,12 @@ export const initializeSchema = async (): Promise<void> => {
       );
     `);
 
+    // v3: legacy run archival flag.
+    await client.query(`
+      ALTER TABLE daily_runs
+      ADD COLUMN IF NOT EXISTS is_legacy BOOLEAN NOT NULL DEFAULT FALSE;
+    `);
+
     // Persistent cache for setter-feedback dedupe so suppression survives restarts.
     await client.query(`
       CREATE TABLE IF NOT EXISTS setter_feedback_dedupe (
@@ -190,6 +196,11 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_daily_runs_timestamp
       ON daily_runs (timestamp DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_daily_runs_legacy_timestamp
+      ON daily_runs (is_legacy, timestamp DESC);
     `);
 
     await client.query(`

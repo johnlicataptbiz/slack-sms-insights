@@ -153,11 +153,11 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
           </div>
 
           {businessDay === null ? (
-            <div style={{ padding: 12, opacity: 0.8 }}>No valid business day found for this run.</div>
+            <div className="run-detail__state">No valid business day found for this run.</div>
           ) : salesLoading ? (
-            <div style={{ padding: 12, opacity: 0.8 }}>Loading source-of-truth metrics…</div>
+            <div className="run-detail__state">Loading source-of-truth metrics…</div>
           ) : salesError ? (
-            <div style={{ padding: 12, color: '#b00020' }}>Failed to load source-of-truth metrics.</div>
+            <div className="run-detail__state run-detail__state--error">Failed to load source-of-truth metrics.</div>
           ) : (
             <div className="metrics-grid">
               <div className="metric-card">
@@ -208,12 +208,10 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
         </div>
 
         {hasStructuredData && (
-          <details className="report-section section-secondary" style={{ marginTop: 16 }}>
-            <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
-              Show legacy diagnostics (stored report parsing)
-            </summary>
+          <details className="report-section section-secondary diagnostics-details">
+            <summary className="diagnostics-details__summary">Show legacy diagnostics (stored report parsing)</summary>
 
-            <div style={{ marginTop: 12 }}>
+            <div className="diagnostics-details__body">
               <div className="section-header">
                 <div className="section-icon">🧾</div>
                 <div className="section-content">
@@ -381,11 +379,11 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
       </div>
 
       {run.full_report && (
-        <details className="report-content" style={{ marginTop: 16 }}>
-          <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
+        <details className="report-content report-content--details">
+          <summary className="diagnostics-details__summary">
             {hasStructuredData ? 'Show legacy raw report text' : 'Show full report text'}
           </summary>
-          <pre className="report-text" style={{ marginTop: 10 }}>
+          <pre className="report-text report-text--top-spaced">
             {run.full_report}
           </pre>
         </details>

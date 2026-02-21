@@ -1,0 +1,268 @@
+.DataPage {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.DataPage__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.DataPage__title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--color-text);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.DataPage__subtitle {
+  margin: 0 0 20px;
+  color: var(--color-text-muted);
+  font-size: 0.98rem;
+  line-height: 1.45;
+}
+
+.DataPanel {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  padding: 18px;
+  box-shadow: var(--shadow-sm);
+}
+
+.DataPanel + .DataPanel {
+  margin-top: 14px;
+}
+
+.DataPanel__title {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.DataPanel__titleRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.DataPanel__status {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.DataPanel__caption {
+  margin: 0 0 12px;
+  font-size: 0.84rem;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.DataGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.DataGrid--tight {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.DataCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  padding: 14px;
+}
+
+.DataCard--accent {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.09), rgba(99, 102, 241, 0.02));
+}
+
+.DataCard__label {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  font-weight: 700;
+}
+
+.DataCard__value {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.DataCard__meta {
+  margin: 7px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.DataText {
+  margin: 0;
+  color: var(--color-text);
+  line-height: 1.55;
+}
+
+.DataText + .DataText {
+  margin-top: 8px;
+}
+
+.DataSplit {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+  margin-top: 14px;
+}
+
+.DataSplit--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.DataTableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+}
+
+.DataTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.DataTable th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  background: #f9fafb;
+}
+
+.DataTable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.DataTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.DataTable tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.DataTable .is-right {
+  text-align: right;
+}
+
+.DataDetails {
+  margin-top: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: #ffffff;
+}
+
+.DataDetails > summary {
+  cursor: pointer;
+  padding: 11px 13px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.DataDetails > summary::-webkit-details-marker {
+  color: var(--color-primary);
+}
+
+.DataDetails__body {
+  border-top: 1px solid var(--color-border);
+  padding: 12px 13px 13px;
+}
+
+.DataError {
+  border: 1px solid rgba(176, 0, 32, 0.35);
+  background: rgba(176, 0, 32, 0.06);
+  border-radius: var(--border-radius);
+  color: #b00020;
+  padding: 12px;
+}
+
+.DataError__title {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.DataCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+.DataBtn {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.DataBtn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+}
+
+.DataLoading {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+  .DataSplit--2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .DataPage {
+    padding: 16px;
+  }
+
+  .DataPage__title {
+    font-size: 1.6rem;
+  }
+
+  .DataPanel {
+    padding: 14px;
+  }
+
+  .DataTable th,
+  .DataTable td {
+    padding: 9px 10px;
+  }
+}

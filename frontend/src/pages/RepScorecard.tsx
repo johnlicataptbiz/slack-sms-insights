@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSalesMetrics } from '../api/queries';
+import '../styles/DataPages.css';
 
 type RepKey = 'jack' | 'brandon';
 
@@ -26,35 +27,41 @@ export default function RepScorecard({ rep }: Props) {
   const repSelfBooked = data?.bookedCalls?.selfBooked ?? null;
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1 style={{ marginTop: 0 }}>{titleFor(rep)} — Scorecard</h1>
-
-      <div style={{ opacity: 0.75, marginBottom: 16 }}>
-        Sales-first view for today. (Uses Slack booked-call credit where available.)
+    <div className="DataPage">
+      <div className="DataPage__header">
+        <h1 className="DataPage__title">{titleFor(rep)} Scorecard</h1>
       </div>
 
+      <p className="DataPage__subtitle">
+        Sales-first view for today. (Uses Slack booked-call credit where available.)
+      </p>
+
       {isLoading ? (
-        <div>Loading…</div>
+        <div className="DataLoading">Loading metrics…</div>
       ) : error ? (
-        <div style={{ color: '#b00020' }}>
-          Failed to load metrics.
-          <div style={{ marginTop: 8, opacity: 0.8, fontSize: 12 }}>{String((error as any)?.message ?? error)}</div>
+        <div className="DataError">
+          <div className="DataError__title">Failed to load metrics.</div>
+          <div className="DataCode">{String((error as any)?.message ?? error)}</div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: 12 }}>
-          <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>Calls booked — credit</div>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{repBooked ?? '—'}</div>
-          </div>
+        <div className="DataPanel">
+          <h2 className="DataPanel__title">Today</h2>
+          <p className="DataPanel__caption">Canonical booked KPI source: Slack ({BUSINESS_TIME_ZONE}).</p>
+          <div className="DataGrid DataGrid--tight">
+            <div className="DataCard DataCard--accent">
+              <div className="DataCard__label">Calls booked credit</div>
+              <div className="DataCard__value">{repBooked ?? '—'}</div>
+            </div>
 
-          <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>Team total booked (Slack)</div>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{data?.bookedCalls?.booked ?? '—'}</div>
-          </div>
+            <div className="DataCard">
+              <div className="DataCard__label">Team total booked</div>
+              <div className="DataCard__value">{data?.bookedCalls?.booked ?? '—'}</div>
+            </div>
 
-          <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 12, opacity: 0.7 }}>Self-booked (Slack)</div>
-            <div style={{ fontSize: 28, fontWeight: 700 }}>{repSelfBooked ?? '—'}</div>
+            <div className="DataCard">
+              <div className="DataCard__label">Self-booked</div>
+              <div className="DataCard__value">{repSelfBooked ?? '—'}</div>
+            </div>
           </div>
         </div>
       )}

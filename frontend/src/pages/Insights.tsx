@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useSalesMetrics } from '../api/queries';
 import { MetricCard } from '../components/insights/MetricCard';
 import { SalesTrendChart } from '../components/insights/SalesTrendChart';
+import '../styles/DataPages.css';
 import '../styles/Insights.css';
 
 const BUSINESS_TIME_ZONE = 'America/Chicago';
@@ -18,8 +19,8 @@ export function Insights() {
 
   if (isLoading) {
     return (
-      <div className="Insights" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-        Loading metrics...
+      <div className="Insights Insights--loading">
+        <div className="DataLoading">Loading metrics...</div>
       </div>
     );
   }
@@ -28,7 +29,7 @@ export function Insights() {
     return (
       <div className="Insights__error">
         Failed to load metrics.
-        <pre style={{ whiteSpace: 'pre-wrap', marginTop: 12, opacity: 0.8 }}>
+        <pre className="Insights__errorCode">
           {String((error as any)?.message ?? error)}
         </pre>
       </div>
@@ -58,47 +59,41 @@ export function Insights() {
       </section>
 
       {metrics?.bookedCalls ? (
-        <section className="Insights__table" style={{ marginTop: 18 }}>
+        <section className="Insights__table Insights__table--first">
           <h3>Calls booked — credit (from Slack)</h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="DataTableWrap">
+            <table className="DataTable">
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '8px 6px' }}>Bucket</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booked</th>
+                  <th>Bucket</th>
+                  <th className="is-right">Booked</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
-                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>Jack (:jack:)</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    {metrics.bookedCalls.jack}
-                  </td>
+                  <td>Jack (:jack:)</td>
+                  <td className="is-right">{metrics.bookedCalls.jack}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>Brandon (:me:)</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    {metrics.bookedCalls.brandon}
-                  </td>
+                  <td>Brandon (:me:)</td>
+                  <td className="is-right">{metrics.bookedCalls.brandon}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>Self-booked</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    {metrics.bookedCalls.selfBooked}
-                  </td>
+                  <td>Self-booked</td>
+                  <td className="is-right">{metrics.bookedCalls.selfBooked}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <td>
                     <strong>Total</strong>
                   </td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <td className="is-right">
                     <strong>{metrics.bookedCalls.booked}</strong>
                   </td>
                 </tr>
               </tbody>
             </table>
           </div>
-          <div style={{ marginTop: 8, opacity: 0.7, fontSize: 12 }}>
+          <div className="Insights__caption">
             Calls booked are sourced from HubSpot Slack posts in #bookedcalls. Credit uses reactions (:jack: and :me:).
             Time zone: {metrics.meta?.timeZone || BUSINESS_TIME_ZONE}.
           </div>
@@ -113,41 +108,33 @@ export function Insights() {
 
         <div className="Insights__table">
           <h3>Top Sequences</h3>
-          <div style={{ marginTop: 6, opacity: 0.7, fontSize: 12 }}>
+          <div className="Insights__caption">
             Canonical booked metrics are Slack-sourced and shown above. Sequence tables show volume/reply/opt-out performance.
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="DataTableWrap">
+            <table className="DataTable">
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '8px 6px' }}>Sequence</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Sent</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Replies</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Reply %</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Opt-outs</th>
+                  <th>Sequence</th>
+                  <th className="is-right">Sent</th>
+                  <th className="is-right">Replies</th>
+                  <th className="is-right">Reply %</th>
+                  <th className="is-right">Opt-outs</th>
                 </tr>
               </thead>
               <tbody>
                 {(metrics?.topSequences ?? []).map((row) => (
                   <tr key={row.label}>
-                    <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>{row.label}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {row.messagesSent}
-                    </td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {row.repliesReceived}
-                    </td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {formatPct(row.replyRatePct)}
-                    </td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {row.optOuts}
-                    </td>
+                    <td>{row.label}</td>
+                    <td className="is-right">{row.messagesSent}</td>
+                    <td className="is-right">{row.repliesReceived}</td>
+                    <td className="is-right">{formatPct(row.replyRatePct)}</td>
+                    <td className="is-right">{row.optOuts}</td>
                   </tr>
                 ))}
                 {(metrics?.topSequences ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ padding: '10px 6px', opacity: 0.7 }}>
+                    <td colSpan={5} className="Insights__emptyCell">
                       No sequences
                     </td>
                   </tr>
@@ -159,30 +146,26 @@ export function Insights() {
 
         <div className="Insights__table">
           <h3>Rep Leaderboard</h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <div className="DataTableWrap">
+            <table className="DataTable">
               <thead>
                 <tr>
-                  <th style={{ textAlign: 'left', padding: '8px 6px' }}>Rep</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Outbound convos</th>
-                  <th style={{ textAlign: 'right', padding: '8px 6px' }}>Opt-outs</th>
+                  <th>Rep</th>
+                  <th className="is-right">Outbound convos</th>
+                  <th className="is-right">Opt-outs</th>
                 </tr>
               </thead>
               <tbody>
                 {(metrics?.repLeaderboard ?? []).map((row) => (
                   <tr key={row.repName}>
-                    <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>{row.repName}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {row.outboundConversations}
-                    </td>
-                    <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                      {row.optOuts}
-                    </td>
+                    <td>{row.repName}</td>
+                    <td className="is-right">{row.outboundConversations}</td>
+                    <td className="is-right">{row.optOuts}</td>
                   </tr>
                 ))}
                 {(metrics?.repLeaderboard ?? []).length === 0 ? (
                   <tr>
-                    <td colSpan={3} style={{ padding: '10px 6px', opacity: 0.7 }}>
+                    <td colSpan={3} className="Insights__emptyCell">
                       No reps
                     </td>
                   </tr>
@@ -193,52 +176,56 @@ export function Insights() {
         </div>
       </section>
 
-      <details style={{ marginTop: 18 }}>
-        <summary style={{ cursor: 'pointer' }}>Advanced diagnostics (SMS booking signals)</summary>
-        <div style={{ marginTop: 10, opacity: 0.8, fontSize: 12 }}>
+      <details className="DataDetails Insights__diagnostics">
+        <summary>Advanced diagnostics (SMS booking signals)</summary>
+        <div className="DataDetails__body">
+          <div className="Insights__caption">
           These values are diagnostic heuristics from SMS text analysis and are not the canonical booked KPI.
-        </div>
+          </div>
 
-        <div style={{ marginTop: 10, overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: 'left', padding: '8px 6px' }}>Sequence</th>
-                <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals (SMS)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(metrics?.topSequences ?? []).map((row) => (
-                <tr key={`diag-seq-${row.label}`}>
-                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>{row.label}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    {row.bookingSignalsSms}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          <div className="DataSplit DataSplit--2">
+            <div>
+              <div className="DataTableWrap">
+                <table className="DataTable">
+                  <thead>
+                    <tr>
+                      <th>Sequence</th>
+                      <th className="is-right">Booking signals (SMS)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(metrics?.topSequences ?? []).map((row) => (
+                      <tr key={`diag-seq-${row.label}`}>
+                        <td>{row.label}</td>
+                        <td className="is-right">{row.bookingSignalsSms}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-        <div style={{ marginTop: 10, overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: 'left', padding: '8px 6px' }}>Rep</th>
-                <th style={{ textAlign: 'right', padding: '8px 6px' }}>Booking signals (SMS)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(metrics?.repLeaderboard ?? []).map((row) => (
-                <tr key={`diag-rep-${row.repName}`}>
-                  <td style={{ padding: '8px 6px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>{row.repName}</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    {row.bookingSignalsSms}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            <div>
+              <div className="DataTableWrap">
+                <table className="DataTable">
+                  <thead>
+                    <tr>
+                      <th>Rep</th>
+                      <th className="is-right">Booking signals (SMS)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(metrics?.repLeaderboard ?? []).map((row) => (
+                      <tr key={`diag-rep-${row.repName}`}>
+                        <td>{row.repName}</td>
+                        <td className="is-right">{row.bookingSignalsSms}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </details>
     </div>

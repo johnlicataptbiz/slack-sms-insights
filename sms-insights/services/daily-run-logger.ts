@@ -22,6 +22,7 @@ export type DailyRunInput = {
   summaryText?: string;
   fullReport?: string;
   durationMs?: number;
+  isLegacy?: boolean;
 };
 
 export const logDailyRun = async (
@@ -36,8 +37,8 @@ export const logDailyRun = async (
 
   try {
     const result = await pool.query(
-      `INSERT INTO daily_runs (channel_id, channel_name, report_date, report_type, status, error_message, summary_text, full_report, duration_ms)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO daily_runs (channel_id, channel_name, report_date, report_type, status, error_message, summary_text, full_report, duration_ms, is_legacy)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id`,
       [
         input.channelId,
@@ -49,6 +50,7 @@ export const logDailyRun = async (
         input.summaryText || null,
         input.fullReport || null,
         input.durationMs || null,
+        input.isLegacy === true,
       ],
     );
 
@@ -84,6 +86,7 @@ export type DailyRunRow = {
   summary_text: string | null;
   full_report: string | null;
   duration_ms: number | null;
+  is_legacy: boolean | null;
   created_at: string;
 };
 
@@ -100,6 +103,7 @@ export const getDailyRuns = async (
     offset?: number;
     daysBack?: number;
     raw?: boolean;
+    legacyMode?: 'exclude' | 'only' | 'include';
   } = {},
   logger?: Pick<Logger, 'warn'>,
 ): Promise<DailyRunRow[]> => {
@@ -122,6 +126,13 @@ export const getDailyRuns = async (
     if (options.daysBack) {
       // Keep this as a literal interval to avoid parameter type issues.
       where += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
+    }
+
+    const legacyMode = options.legacyMode || 'exclude';
+    if (legacyMode === 'exclude') {
+      where += ' AND COALESCE(is_legacy, FALSE) = FALSE';
+    } else if (legacyMode === 'only') {
+      where += ' AND COALESCE(is_legacy, FALSE) = TRUE';
     }
 
     // Raw mode: preserve existing behavior for debugging/back-compat.
@@ -197,6 +208,7 @@ export const getDailyRuns = async (
         summary_text,
         full_report,
         duration_ms,
+        is_legacy,
         created_at
       FROM ranked
       WHERE rn = 1
@@ -249,6 +261,7 @@ export const getChannelsWithRuns = async (logger?: Pick<Logger, 'warn'>): Promis
     const result = await pool.query<ChannelWithRunsRow>(
       `SELECT DISTINCT channel_id, channel_name, COUNT(*) as run_count
        FROM daily_runs
+       WHERE COALESCE(is_legacy, FALSE) = FALSE
        GROUP BY channel_id, channel_name
        ORDER BY COUNT(*) DESC`,
     );

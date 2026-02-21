@@ -6,6 +6,12 @@
   min-height: 100%;
 }
 
+.Insights--loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .Insights__header {
   display: flex;
   justify-content: space-between;
@@ -154,6 +160,26 @@
   background-clip: text;
 }
 
+.Insights__table--first {
+  margin-top: 18px;
+}
+
+.Insights__caption {
+  margin-top: 8px;
+  opacity: 0.75;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.Insights__emptyCell {
+  padding: 10px 6px;
+  opacity: 0.7;
+}
+
+.Insights__diagnostics {
+  margin-top: 18px;
+}
+
 /* Rep Table */
 .RepTable {
   width: 100%;
@@ -239,4 +265,131 @@
   border: 1px solid var(--color-error);
   font-weight: 500;
   font-size: 1.1rem;
+}
+
+.Insights__errorCode {
+  white-space: pre-wrap;
+  margin-top: 12px;
+  opacity: 0.8;
+  text-align: left;
+}
+
+.SalesTrend {
+  display: grid;
+  gap: 10px;
+}
+
+.SalesTrend__row {
+  display: grid;
+  grid-template-columns: 104px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.SalesTrend__day {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  padding-top: 2px;
+}
+
+.SalesTrend__bars {
+  display: grid;
+  gap: 7px;
+}
+
+.SalesTrend__line {
+  display: grid;
+  grid-template-columns: 90px 1fr 44px;
+  gap: 8px;
+  align-items: center;
+}
+
+.SalesTrend__label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.SalesTrend__track {
+  height: 10px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.SalesTrend__fill {
+  height: 100%;
+  border-radius: inherit;
+  min-width: 2px;
+}
+
+.SalesTrend__fill--sent {
+  background: #2563eb;
+}
+
+.SalesTrend__fill--replies {
+  background: #059669;
+}
+
+.SalesTrend__fill--booked {
+  background: #d97706;
+}
+
+.SalesTrend__fill--optouts {
+  background: #dc2626;
+}
+
+.SalesTrend__value {
+  text-align: right;
+  font-size: 12px;
+  color: var(--color-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.SalesTrend__empty {
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+@media (max-width: 768px) {
+  .Insights {
+    padding: 18px;
+  }
+
+  .Insights__header {
+    margin-bottom: 20px;
+    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .Insights__header h1 {
+    font-size: 1.9rem;
+  }
+
+  .Insights__kpis {
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .Insights__main {
+    gap: 20px;
+  }
+
+  .Insights__chart,
+  .Insights__table {
+    padding: 16px;
+  }
+
+  .SalesTrend__row {
+    grid-template-columns: 1fr;
+  }
+
+  .SalesTrend__day {
+    padding-top: 0;
+  }
+
+  .SalesTrend__line {
+    grid-template-columns: 74px 1fr 36px;
+  }
 }

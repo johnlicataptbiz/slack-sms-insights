@@ -277,6 +277,9 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
   const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
   const daysBack = Number.parseInt(url.searchParams.get('daysBack') || '7', 10) || 7;
   const raw = url.searchParams.get('raw') === 'true';
+  const legacyOnly = url.searchParams.get('legacyOnly') === 'true';
+  const includeLegacy = url.searchParams.get('includeLegacy') === 'true';
+  const legacyMode = legacyOnly ? 'only' : includeLegacy ? 'include' : 'exclude';
 
   const runs = await getDailyRuns(
     {
@@ -285,6 +288,7 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
       offset,
       daysBack,
       raw,
+      legacyMode,
     },
     logger,
   );

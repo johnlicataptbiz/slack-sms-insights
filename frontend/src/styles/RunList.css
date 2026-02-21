@@ -1,7 +1,8 @@
 .run-list {
   background: var(--color-bg-secondary);
   border-radius: var(--border-radius-lg);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--color-border);
 }
@@ -9,6 +10,7 @@
 .runs-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 780px;
 }
 
 .runs-table thead {
@@ -43,9 +45,12 @@
   transition: all 0.3s ease;
 }
 
+.runs-table__row-clickable {
+  cursor: pointer;
+}
+
 .runs-table tbody tr:hover {
   background: var(--color-bg);
-  transform: scale(1.01);
 }
 
 .runs-table td {
@@ -85,7 +90,7 @@
 
 .summary {
   color: var(--color-text-muted);
-  max-width: 250px;
+  max-width: 340px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -119,4 +124,20 @@
   background: var(--color-warning);
   color: #92400e;
   box-shadow: 0 2px 4px rgba(245, 158, 11, 0.2);
+}
+
+@media (max-width: 768px) {
+  .runs-table th,
+  .runs-table td {
+    padding: 12px 14px;
+    font-size: 0.84rem;
+  }
+
+  .runs-table th {
+    font-size: 0.72rem;
+  }
+
+  .summary {
+    max-width: 220px;
+  }
 }

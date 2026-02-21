@@ -18,82 +18,52 @@ export function SalesTrendChart({ points }: Props) {
   };
 
   if (points.length === 0) {
-    return <div style={{ opacity: 0.7 }}>No data</div>;
+    return <div className="SalesTrend__empty">No data</div>;
   }
 
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
+    <div className="SalesTrend">
       {points.map((p) => (
-        <div
-          key={p.day}
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '90px 1fr',
-            gap: 12,
-            alignItems: 'center',
-          }}
-        >
-          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.8 }}>{p.day}</div>
+        <div key={p.day} className="SalesTrend__row">
+          <div className="SalesTrend__day">{p.day}</div>
 
-          <div style={{ display: 'grid', gap: 6 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 60px', gap: 8, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Sent</div>
-              <div style={{ height: 8, background: '#1f2937', borderRadius: 999 }}>
-                <div
-                  style={{
-                    width: `${scale(p.messagesSent, maxSent)}%`,
-                    height: '100%',
-                    background: '#60a5fa',
-                    borderRadius: 999,
-                  }}
-                />
+          <div className="SalesTrend__bars">
+            <div className="SalesTrend__line">
+              <div className="SalesTrend__label">Sent</div>
+              <div className="SalesTrend__track">
+                <div className="SalesTrend__fill SalesTrend__fill--sent" style={{ width: `${scale(p.messagesSent, maxSent)}%` }} />
               </div>
-              <div style={{ fontFamily: 'monospace', fontSize: 12, textAlign: 'right' }}>{p.messagesSent}</div>
+              <div className="SalesTrend__value">{p.messagesSent}</div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 60px', gap: 8, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Replies</div>
-              <div style={{ height: 8, background: '#1f2937', borderRadius: 999 }}>
+            <div className="SalesTrend__line">
+              <div className="SalesTrend__label">Replies</div>
+              <div className="SalesTrend__track">
                 <div
-                  style={{
-                    width: `${scale(p.repliesReceived, maxReplies)}%`,
-                    height: '100%',
-                    background: '#34d399',
-                    borderRadius: 999,
-                  }}
+                  className="SalesTrend__fill SalesTrend__fill--replies"
+                  style={{ width: `${scale(p.repliesReceived, maxReplies)}%` }}
                 />
               </div>
-              <div style={{ fontFamily: 'monospace', fontSize: 12, textAlign: 'right' }}>{p.repliesReceived}</div>
+              <div className="SalesTrend__value">{p.repliesReceived}</div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 60px', gap: 8, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Booked</div>
-              <div style={{ height: 8, background: '#1f2937', borderRadius: 999 }}>
-                <div
-                  style={{
-                    width: `${scale(p.booked, maxBooked)}%`,
-                    height: '100%',
-                    background: '#fbbf24',
-                    borderRadius: 999,
-                  }}
-                />
+            <div className="SalesTrend__line">
+              <div className="SalesTrend__label">Booked</div>
+              <div className="SalesTrend__track">
+                <div className="SalesTrend__fill SalesTrend__fill--booked" style={{ width: `${scale(p.booked, maxBooked)}%` }} />
               </div>
-              <div style={{ fontFamily: 'monospace', fontSize: 12, textAlign: 'right' }}>{p.booked}</div>
+              <div className="SalesTrend__value">{p.booked}</div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 60px', gap: 8, alignItems: 'center' }}>
-              <div style={{ fontSize: 12, opacity: 0.8 }}>Opt-outs</div>
-              <div style={{ height: 8, background: '#1f2937', borderRadius: 999 }}>
+            <div className="SalesTrend__line">
+              <div className="SalesTrend__label">Opt-outs</div>
+              <div className="SalesTrend__track">
                 <div
-                  style={{
-                    width: `${scale(p.optOuts, maxOptOuts)}%`,
-                    height: '100%',
-                    background: '#f87171',
-                    borderRadius: 999,
-                  }}
+                  className="SalesTrend__fill SalesTrend__fill--optouts"
+                  style={{ width: `${scale(p.optOuts, maxOptOuts)}%` }}
                 />
               </div>
-              <div style={{ fontFamily: 'monospace', fontSize: 12, textAlign: 'right' }}>{p.optOuts}</div>
+              <div className="SalesTrend__value">{p.optOuts}</div>
             </div>
           </div>
         </div>

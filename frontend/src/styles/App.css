@@ -126,6 +126,16 @@ select {
   padding: 0 12px;
 }
 
+.AppShell__sectionLabel {
+  margin-top: 12px;
+  padding-left: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 700;
+}
+
 .AppShell__links button {
   background: transparent;
   border: none;
@@ -233,4 +243,58 @@ select {
   overflow: auto;
   background: var(--color-bg);
   padding: 24px;
+}
+
+@media (max-width: 1024px) {
+  .AppShell__nav {
+    width: 232px;
+  }
+}
+
+@media (max-width: 820px) {
+  .AppShell {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .AppShell__nav {
+    width: 100%;
+    padding: 14px 0 10px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .AppShell__logo {
+    margin-bottom: 14px;
+    font-size: 1.2rem;
+  }
+
+  .AppShell__links {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 0 10px;
+    align-items: center;
+  }
+
+  .AppShell__sectionLabel {
+    margin-top: 0;
+    padding-left: 0;
+    min-width: max-content;
+  }
+
+  .AppShell__links button {
+    min-width: max-content;
+    padding: 10px 12px;
+  }
+
+  .AppShell__stats,
+  .AppShell__logout {
+    display: none;
+  }
+
+  .AppShell__content {
+    padding: 14px;
+  }
 }

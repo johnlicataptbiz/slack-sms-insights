@@ -35,6 +35,13 @@ export default function RunList({ runs }: { runs: Run[] }) {
     return <span className={statusClass}>{status.toUpperCase()}</span>;
   };
 
+  const summarize = (text: string): string => {
+    const trimmed = (text || '').trim();
+    if (!trimmed) return '-';
+    if (trimmed.length <= 70) return trimmed;
+    return `${trimmed.substring(0, 67)}...`;
+  };
+
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
     if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
@@ -109,14 +116,14 @@ export default function RunList({ runs }: { runs: Run[] }) {
         </thead>
         <tbody>
           {sortedRuns.map((run) => (
-            <tr key={run.id} onClick={() => setSelectedRunId(run.id)} style={{ cursor: 'pointer' }}>
+            <tr key={run.id} className="runs-table__row-clickable" onClick={() => setSelectedRunId(run.id)}>
               <td className="timestamp">{formatTime(run.timestamp, run.report_date)}</td>
               <td className="channel">{run.channel_name || run.channel_id}</td>
               <td className="type">{run.report_type}</td>
               <td className="status">{getStatusBadge(run.status)}</td>
               <td className="duration">{run.duration_ms ? `${run.duration_ms}ms` : '-'}</td>
               <td className="summary" title={run.summary_text}>
-                {run.summary_text ? run.summary_text.substring(0, 50) + '...' : '-'}
+                {summarize(run.summary_text)}
               </td>
             </tr>
           ))}

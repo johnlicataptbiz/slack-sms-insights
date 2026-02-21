@@ -25,6 +25,7 @@ const makeRow = (overrides: Partial<DailyRunRow>): DailyRunRow => {
     summary_text: null,
     full_report: null,
     duration_ms: null,
+    is_legacy: false,
     created_at: '2026-02-20T00:00:00.000Z',
   };
   return { ...base, ...overrides };

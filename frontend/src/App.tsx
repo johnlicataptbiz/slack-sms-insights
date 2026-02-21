@@ -27,13 +27,13 @@ export default function App() {
     <div className="AppShell">
       <nav className="AppShell__nav">
         <div className="AppShell__logo">Command Center</div>
-        
+
         <div className="AppShell__links">
           <button className={view === 'dashboard' ? 'active' : ''} onClick={() => setView('dashboard')}>
             <span role="img" aria-label="history">🕒</span> Daily Runs
           </button>
 
-          <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12, paddingLeft: 6 }}>Reps</div>
+          <div className="AppShell__sectionLabel">Reps</div>
 
           <button className={view === 'rep-jack' ? 'active' : ''} onClick={() => setView('rep-jack')}>
             <span role="img" aria-label="rep">👤</span> Jack
@@ -42,13 +42,13 @@ export default function App() {
             <span role="img" aria-label="rep">👤</span> Brandon
           </button>
 
-          <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12, paddingLeft: 6 }}>Deep Dives</div>
+          <div className="AppShell__sectionLabel">Deep Dives</div>
 
           <button className={view === 'rep-attribution' ? 'active' : ''} onClick={() => setView('rep-attribution')}>
             <span role="img" aria-label="attribution">🧾</span> Attribution
           </button>
 
-          <div style={{ marginTop: 10, opacity: 0.7, fontSize: 12, paddingLeft: 6 }}>Legacy</div>
+          <div className="AppShell__sectionLabel">Legacy</div>
 
           <button className={view === 'insights' ? 'active' : ''} onClick={() => setView('insights')}>
             <span role="img" aria-label="insights">📊</span> Team Insights

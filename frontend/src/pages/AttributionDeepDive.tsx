@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ApiError } from '../api/client';
 import { useSalesMetrics } from '../api/queries';
+import '../styles/DataPages.css';
 
 const BUSINESS_TIME_ZONE = 'America/Chicago';
 
@@ -28,147 +29,126 @@ export default function AttributionDeepDive() {
   })();
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1 style={{ marginTop: 0 }}>Attribution — Deep Dive</h1>
-
-      <div style={{ opacity: 0.75, marginBottom: 16 }}>
-        This page explains what we’re counting and why (manual vs sequence), plus how we credit replies and bookings.
+    <div className="DataPage">
+      <div className="DataPage__header">
+        <h1 className="DataPage__title">Attribution Deep Dive</h1>
       </div>
 
+      <p className="DataPage__subtitle">
+        This page explains what we’re counting and why (manual vs sequence), plus how we credit replies and bookings.
+      </p>
+
       {isLoading && !stuck ? (
-        <div>Loading…</div>
+        <div className="DataLoading">Loading sales metrics…</div>
       ) : error || stuck ? (
-        <div
-          style={{
-            border: '1px solid rgba(176, 0, 32, 0.35)',
-            background: 'rgba(176, 0, 32, 0.06)',
-            borderRadius: 8,
-            padding: 12,
-            color: '#b00020',
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>
+        <div className="DataError">
+          <div className="DataError__title">
             {stuck ? 'Still loading sales metrics (possible hang)' : 'Failed to load sales metrics'}
           </div>
-          <div
-            style={{
-              fontFamily:
-                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-              fontSize: 12,
-              whiteSpace: 'pre-wrap',
-            }}
-          >
+          <div className="DataCode">
             {stuck
               ? `status=${String(status)} fetchStatus=${String(fetchStatus)} isLoading=${String(isLoading)} isFetching=${String(isFetching)}`
               : errorMessage ?? 'Unknown error'}
           </div>
-          <div style={{ marginTop: 10 }}>
-            <button
-              onClick={() => refetch()}
-              style={{
-                padding: '8px 10px',
-                borderRadius: 6,
-                border: '1px solid rgba(176, 0, 32, 0.35)',
-                background: '#fff',
-                cursor: 'pointer',
-              }}
-            >
-              Retry
-            </button>
-          </div>
+          <button className="DataBtn" onClick={() => refetch()}>
+            Retry
+          </button>
         </div>
       ) : (
         <>
-          <h2 style={{ marginTop: 0 }}>
-            Today — Reply rates (people-based)
-            {isFetching ? <span style={{ fontSize: 12, opacity: 0.6 }}> (refreshing…)</span> : null}
-          </h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: 12 }}>
-            <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Overall reply rate</div>
-              <div style={{ fontSize: 28, fontWeight: 700 }}>
-                {data?.totals?.replyRatePct != null ? `${data.totals.replyRatePct.toFixed(1)}%` : '—'}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                {data?.totals?.repliesReceived ?? '—'} people replied / {data?.totals?.peopleContacted ?? '—'} people
-                contacted
-              </div>
+          <section className="DataPanel">
+            <div className="DataPanel__titleRow">
+              <h2 className="DataPanel__title">Today: reply rates (people-based)</h2>
+              {isFetching ? <span className="DataPanel__status">Refreshing...</span> : null}
             </div>
-
-            <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Manual reply rate</div>
-              <div style={{ fontSize: 28, fontWeight: 700 }}>
-                {data?.totals?.manualReplyRatePct != null ? `${data.totals.manualReplyRatePct.toFixed(1)}%` : '—'}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                {data?.totals?.manualRepliesReceived ?? '—'} people replied / {data?.totals?.manualPeopleContacted ?? '—'}{' '}
-                people contacted manually
-              </div>
-            </div>
-
-            <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Sequence reply rate</div>
-              <div style={{ fontSize: 28, fontWeight: 700 }}>
-                {data?.totals?.sequenceReplyRatePct != null ? `${data.totals.sequenceReplyRatePct.toFixed(1)}%` : '—'}
-              </div>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>
-                {data?.totals?.sequenceRepliesReceived ?? '—'} people replied /{' '}
-                {data?.totals?.sequencePeopleContacted ?? '—'} people contacted by sequence
-              </div>
-            </div>
-          </div>
-
-          <h2>Rule: exclude manual follow-ups after a sequence reply</h2>
-          <div style={{ opacity: 0.85, lineHeight: 1.5 }}>
-            <p style={{ marginTop: 0 }}>
-              If someone replies to a <b>sequence</b>, we treat the next 14 days as “sequence-driven.” During that window,
-              we <b>exclude manual outbound texts</b> from “Manual texts sent” so we don’t inflate manual volume with
-              follow-ups that were triggered by the sequence reply.
-            </p>
-            <p style={{ marginBottom: 0 }}>
-              In other words: manual follow-ups inside that 14-day window are not counted as “new manual sends.”
-            </p>
-          </div>
-
-          <h2>Booked calls — credit (from Slack)</h2>
-          <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 8 }}>
-            Canonical booked KPI source: Slack. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 12 }}>
-            <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Total booked</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{data?.bookedCalls?.booked ?? '—'}</div>
-            </div>
-            <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Jack</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{data?.bookedCalls?.jack ?? '—'}</div>
-            </div>
-            <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Brandon</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{data?.bookedCalls?.brandon ?? '—'}</div>
-            </div>
-            <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 12, opacity: 0.7 }}>Self-booked</div>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{data?.bookedCalls?.selfBooked ?? '—'}</div>
-            </div>
-          </div>
-
-          <details style={{ marginTop: 14 }}>
-            <summary style={{ cursor: 'pointer' }}>Show diagnostic SMS booking signals (non-canonical)</summary>
-            <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8 }}>
-              These values come from SMS text heuristics and are for diagnostics only.
-            </div>
-            <div style={{ marginTop: 8, display: 'grid', gridTemplateColumns: 'repeat(2, minmax(220px, 1fr))', gap: 12 }}>
-              <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Sequence-level SMS booking signals</div>
-                <div style={{ fontSize: 24, fontWeight: 700 }}>
-                  {(data?.topSequences ?? []).reduce((sum, row) => sum + row.bookingSignalsSms, 0)}
+            <div className="DataGrid">
+              <div className="DataCard DataCard--accent">
+                <div className="DataCard__label">Overall reply rate</div>
+                <div className="DataCard__value">
+                  {data?.totals?.replyRatePct != null ? `${data.totals.replyRatePct.toFixed(1)}%` : '—'}
                 </div>
+                <p className="DataCard__meta">
+                  {data?.totals?.repliesReceived ?? '—'} people replied / {data?.totals?.peopleContacted ?? '—'} people
+                  contacted
+                </p>
               </div>
-              <div style={{ border: '1px solid #eee', borderRadius: 8, padding: 12 }}>
-                <div style={{ fontSize: 12, opacity: 0.7 }}>Rep-level SMS booking signals</div>
-                <div style={{ fontSize: 24, fontWeight: 700 }}>
-                  {(data?.repLeaderboard ?? []).reduce((sum, row) => sum + row.bookingSignalsSms, 0)}
+
+              <div className="DataCard">
+                <div className="DataCard__label">Manual reply rate</div>
+                <div className="DataCard__value">
+                  {data?.totals?.manualReplyRatePct != null ? `${data.totals.manualReplyRatePct.toFixed(1)}%` : '—'}
+                </div>
+                <p className="DataCard__meta">
+                  {data?.totals?.manualRepliesReceived ?? '—'} people replied /{' '}
+                  {data?.totals?.manualPeopleContacted ?? '—'} people contacted manually
+                </p>
+              </div>
+
+              <div className="DataCard">
+                <div className="DataCard__label">Sequence reply rate</div>
+                <div className="DataCard__value">
+                  {data?.totals?.sequenceReplyRatePct != null ? `${data.totals.sequenceReplyRatePct.toFixed(1)}%` : '—'}
+                </div>
+                <p className="DataCard__meta">
+                  {data?.totals?.sequenceRepliesReceived ?? '—'} people replied /{' '}
+                  {data?.totals?.sequencePeopleContacted ?? '—'} people contacted by sequence
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section className="DataPanel">
+            <h2 className="DataPanel__title">Rule: exclude manual follow-ups after a sequence reply</h2>
+            <p className="DataText">
+              If someone replies to a <b>sequence</b>, the next 14 days are treated as sequence-driven. During that
+              window, manual outbound texts are excluded from manual volume.
+            </p>
+            <p className="DataText">
+              This prevents manual counts from being inflated by follow-ups that were triggered by a sequence reply.
+            </p>
+          </section>
+
+          <section className="DataPanel">
+            <h2 className="DataPanel__title">Booked calls credit (Slack)</h2>
+            <p className="DataPanel__caption">
+              Canonical booked KPI source: Slack. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
+            </p>
+            <div className="DataGrid DataGrid--tight">
+              <div className="DataCard DataCard--accent">
+                <div className="DataCard__label">Total booked</div>
+                <div className="DataCard__value">{data?.bookedCalls?.booked ?? '—'}</div>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">Jack</div>
+                <div className="DataCard__value">{data?.bookedCalls?.jack ?? '—'}</div>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">Brandon</div>
+                <div className="DataCard__value">{data?.bookedCalls?.brandon ?? '—'}</div>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">Self-booked</div>
+                <div className="DataCard__value">{data?.bookedCalls?.selfBooked ?? '—'}</div>
+              </div>
+            </div>
+          </section>
+
+          <details className="DataDetails">
+            <summary>Show diagnostic SMS booking signals (non-canonical)</summary>
+            <div className="DataDetails__body">
+              <p className="DataPanel__caption">These values come from SMS text heuristics and are for diagnostics only.</p>
+              <div className="DataGrid DataGrid--tight">
+                <div className="DataCard">
+                  <div className="DataCard__label">Sequence-level SMS booking signals</div>
+                  <div className="DataCard__value">
+                    {(data?.topSequences ?? []).reduce((sum, row) => sum + row.bookingSignalsSms, 0)}
+                  </div>
+                </div>
+                <div className="DataCard">
+                  <div className="DataCard__label">Rep-level SMS booking signals</div>
+                  <div className="DataCard__value">
+                    {(data?.repLeaderboard ?? []).reduce((sum, row) => sum + row.bookingSignalsSms, 0)}
+                  </div>
                 </div>
               </div>
             </div>

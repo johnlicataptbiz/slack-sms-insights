@@ -31,6 +31,29 @@ const isObject = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
 };
 
+const deriveErrorMessage = (status: number, payload: unknown): string => {
+  if (typeof payload === 'string' && payload.trim().length > 0) {
+    return payload.trim();
+  }
+  if (isObject(payload)) {
+    const error = typeof payload.error === 'string' ? payload.error.trim() : '';
+    if (error) return error;
+    const message = typeof payload.message === 'string' ? payload.message.trim() : '';
+    if (message) return message;
+    const errors = payload.errors;
+    if (isObject(errors)) {
+      const flattened = Object.values(errors)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .map((value) => (typeof value === 'string' ? value.trim() : ''))
+        .filter((value) => value.length > 0);
+      if (flattened.length > 0) {
+        return flattened.join('; ');
+      }
+    }
+  }
+  return `Aloware request failed (${status})`;
+};
+
 const redactSensitiveQueryInPath = (path: string): string => {
   const [basePath, query = ''] = path.split('?', 2);
   if (!query) return path;
@@ -74,12 +97,13 @@ const requestAloware = async (
   }
 
   if (!response.ok) {
+    const message = deriveErrorMessage(response.status, parsed);
     logger?.warn?.('Aloware request failed', {
       path: redactSensitiveQueryInPath(path),
       status: response.status,
       body: parsed,
     });
-    throw new AlowareClientError(`Aloware request failed (${response.status})`, response.status, parsed);
+    throw new AlowareClientError(message, response.status, parsed);
   }
 
   return parsed;

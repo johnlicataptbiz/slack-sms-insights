@@ -1514,6 +1514,11 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       slack_channel_id: event.slack_channel_id,
       slack_message_ts: event.slack_message_ts,
     }));
+    messages.sort((a, b) => {
+      const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
+      if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
+      return a.id.localeCompare(b.id);
+    });
   }
   const drafts = await listDraftSuggestionsForConversation(conversationId, 20, logger);
   const mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
@@ -1622,6 +1627,11 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
       slack_channel_id: event.slack_channel_id,
       slack_message_ts: event.slack_message_ts,
     }));
+    messages.sort((a, b) => {
+      const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
+      if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
+      return a.id.localeCompare(b.id);
+    });
   }
 
   const draft = await generateDraftSuggestion(

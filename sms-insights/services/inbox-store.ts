@@ -575,20 +575,34 @@ export const listMessagesForConversation = async (
     const result = await client.query<InboxMessageRow>(
       `
       SELECT
-        id,
-        conversation_id,
-        event_ts,
-        direction,
-        body,
-        sequence,
-        line,
-        aloware_user,
-        slack_channel_id,
-        slack_message_ts
-      FROM sms_events
-      WHERE conversation_id = $1
-      ORDER BY event_ts ASC
-      LIMIT $2;
+        recent.id,
+        recent.conversation_id,
+        recent.event_ts,
+        recent.direction,
+        recent.body,
+        recent.sequence,
+        recent.line,
+        recent.aloware_user,
+        recent.slack_channel_id,
+        recent.slack_message_ts
+      FROM (
+        SELECT
+          id,
+          conversation_id,
+          event_ts,
+          direction,
+          body,
+          sequence,
+          line,
+          aloware_user,
+          slack_channel_id,
+          slack_message_ts
+        FROM sms_events
+        WHERE conversation_id = $1
+        ORDER BY event_ts DESC, id DESC
+        LIMIT $2
+      ) AS recent
+      ORDER BY recent.event_ts ASC, recent.id ASC;
       `,
       [conversationId, Math.max(1, Math.min(limit, 500))],
     );

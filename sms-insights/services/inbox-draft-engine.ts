@@ -89,6 +89,36 @@ const getCanonicalSources = (): CanonicalSources => {
 };
 
 const normalize = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
+const toEpochMs = (value: string): number => {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+};
+const compareChronological = (a: InboxMessageRow, b: InboxMessageRow): number => {
+  const byTime = toEpochMs(a.event_ts) - toEpochMs(b.event_ts);
+  if (byTime !== 0) return byTime;
+  return a.id.localeCompare(b.id);
+};
+const orderMessagesChronologically = (messages: InboxMessageRow[]): InboxMessageRow[] =>
+  [...messages].sort(compareChronological);
+const formatTimestamp = (value: string): string => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toISOString();
+};
+const findLatestMessageByDirection = (
+  messages: InboxMessageRow[],
+  direction: InboxMessageRow['direction'],
+): InboxMessageRow | null => {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.direction === direction && (message.body || '').trim().length > 0) {
+      return message;
+    }
+  }
+  return null;
+};
+const timelineSpeakerLabel = (message: InboxMessageRow): string =>
+  message.direction === 'inbound' ? 'Lead' : (message.aloware_user || 'Setter');
 
 const hasPattern = (text: string, patterns: RegExp[]): boolean => patterns.some((pattern) => pattern.test(text));
 
@@ -132,7 +162,8 @@ export const classifyEscalationLevel = (messages: InboxMessageRow[], state?: Con
     };
   }
 
-  const inboundText = messages
+  const orderedMessages = orderMessagesChronologically(messages);
+  const inboundText = orderedMessages
     .filter((message) => message.direction === 'inbound' && Boolean(message.body))
     .slice(-6)
     .map((message) => message.body || '')
@@ -296,10 +327,25 @@ const buildPrompt = (params: {
   canonical: CanonicalSources;
   previousIssues?: DraftLintIssue[];
 }): string => {
-  const recentThread = params.messages
-    .slice(-12)
-    .map((message) => `${message.direction.toUpperCase()}: ${message.body || ''}`)
+  const orderedMessages = orderMessagesChronologically(params.messages);
+  const latestInbound = findLatestMessageByDirection(orderedMessages, 'inbound');
+  const latestOutbound = findLatestMessageByDirection(orderedMessages, 'outbound');
+  const recentThread = orderedMessages
+    .slice(-24)
+    .map((message) => {
+      const body = (message.body || '').trim();
+      if (!body) return '';
+      return `[${formatTimestamp(message.event_ts)}] ${timelineSpeakerLabel(message)}: ${body}`;
+    })
+    .filter((line) => line.length > 0)
     .join('\n');
+  const latestInboundSummary = latestInbound
+    ? `[${formatTimestamp(latestInbound.event_ts)}] ${truncate(latestInbound.body || '', 900)}`
+    : 'none';
+  const latestOutboundSummary = latestOutbound
+    ? `[${formatTimestamp(latestOutbound.event_ts)}] ${timelineSpeakerLabel(latestOutbound)}: ${truncate(latestOutbound.body || '', 900)}`
+    : 'none';
+  const latestOutboundLine = (latestOutbound?.line || '').trim() || 'unknown';
 
   const canonicalExamples = parseNumberedExamples(params.canonical.conversionMessages)
     .slice(0, 4)
@@ -341,8 +387,15 @@ const buildPrompt = (params: {
     'PT Biz resource reference:',
     truncate(params.canonical.referenceDoc, 2200),
     '',
-    'Recent conversation:',
-    truncate(recentThread, 2500),
+    'Most recent inbound from lead:',
+    latestInboundSummary,
+    '',
+    'Most recent outbound from setter:',
+    latestOutboundSummary,
+    `Most recent outbound line: ${latestOutboundLine}`,
+    '',
+    'Recent conversation window (oldest to newest):',
+    truncate(recentThread, 4500),
     '',
     retrievedExamples ? `Retrieved successful examples:\n${retrievedExamples}` : 'Retrieved successful examples: none',
     '',
@@ -364,7 +417,8 @@ export const generateDraftSuggestion = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<DraftGenerationResult> => {
   const canonical = getCanonicalSources();
-  const escalation = classifyEscalationLevel(params.messages, params.state);
+  const orderedMessages = orderMessagesChronologically(params.messages);
+  const escalation = classifyEscalationLevel(orderedMessages, params.state);
   const missingFields = missingQualificationFields(params.state);
 
   const examples = await listConversionExamples(
@@ -390,7 +444,7 @@ export const generateDraftSuggestion = async (
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     attempts = attempt;
     const prompt = buildPrompt({
-      messages: params.messages,
+      messages: orderedMessages,
       state: params.state,
       escalationLevel: escalation.level,
       escalationReason: escalation.reason,

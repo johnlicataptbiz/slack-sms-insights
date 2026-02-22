@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { useV2Channels, useV2Runs } from '../../api/v2Queries';
+import { useV2Channels, useV2Runs, useV2SalesMetrics } from '../../api/v2Queries';
 import type { RunV2 } from '../../api/v2-types';
 import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser';
 import { v2Copy } from '../copy';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 
 const savedViewsStorageKey = 'ptbizsms-v2-runs-saved-views';
+const BUSINESS_TZ = 'America/Chicago';
 const DAILY_SNAPSHOT_TITLE_PATTERN = /PT BIZ - DAILY SMS SNAPSHOT/i;
 const DAILY_SETTER_SUMMARY_PATTERN = /Daily Setter Snapshot/i;
 const REPORT_DATE_LINE_PATTERN = /^Date:\s*(.+)$/im;
@@ -146,6 +147,16 @@ const runDateLabel = (run: RunV2): string => {
   const reportDay = extractReportDayLabel(run);
   if (reportDay) return formatReportDay(reportDay);
   return formatDateTime(run.timestamp);
+};
+
+const toIsoDay = (value: string | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
 };
 
 const formatCount = (value: number | null): string => {
@@ -308,6 +319,15 @@ export default function RunsV2() {
   }, [channels]);
 
   const selected = useMemo(() => runsData?.data.items.find((item) => item.id === selectedId) || null, [runsData?.data.items, selectedId]);
+  const selectedReportDay = useMemo(() => {
+    if (!selected) return null;
+    return toIsoDay(extractReportDayLabel(selected));
+  }, [selected]);
+
+  const selectedBookedMetricsQuery = useV2SalesMetrics(
+    selectedReportDay ? { day: selectedReportDay, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ },
+    { enabled: Boolean(selectedReportDay) },
+  );
 
   const viewByRunId = useMemo(() => {
     const map = new Map<string, RunViewModel>();
@@ -318,6 +338,14 @@ export default function RunsV2() {
   }, [runsData?.data.items]);
 
   const selectedView = selected ? viewByRunId.get(selected.id) || buildRunViewModel(selected) : null;
+  const selectedSlackBookedTotal = selectedBookedMetricsQuery.data?.data.totals.canonicalBookedCalls ?? null;
+  const selectedSlackBookedJack = selectedBookedMetricsQuery.data?.data.bookedCredit.jack ?? null;
+  const selectedSlackBookedBrandon = selectedBookedMetricsQuery.data?.data.bookedCredit.brandon ?? null;
+  const selectedSlackBookedSelf = selectedBookedMetricsQuery.data?.data.bookedCredit.selfBooked ?? null;
+  const selectedSlackBookedSplit =
+    selectedSlackBookedJack === null || selectedSlackBookedBrandon === null || selectedSlackBookedSelf === null
+      ? '—'
+      : `${selectedSlackBookedJack.toLocaleString()} / ${selectedSlackBookedBrandon.toLocaleString()} / ${selectedSlackBookedSelf.toLocaleString()}`;
 
   const channelLabel = (run: RunV2): string => {
     return run.channelName || channelNameById.get(run.channelId) || run.channelId;
@@ -572,9 +600,34 @@ export default function RunsV2() {
                   tone="accent"
                 />
                 <V2MetricCard
-                  label="Calls Booked (Slack)"
+                  label="Booked (Run report metric)"
                   value={formatCount(selectedView.booked)}
                   tone={(selectedView.booked ?? 0) > 0 ? 'positive' : 'default'}
+                />
+                <V2MetricCard
+                  label="Booked total (Slack first conversion)"
+                  value={
+                    selectedBookedMetricsQuery.isLoading
+                      ? 'Loading...'
+                      : selectedBookedMetricsQuery.isError
+                        ? 'Error'
+                        : formatCount(selectedSlackBookedTotal)
+                  }
+                  meta={
+                    selectedReportDay
+                      ? `Report day ${selectedReportDay}. Can exceed SMS replies due to non SMS or unknown source.`
+                      : 'Report day not detected for this run.'
+                  }
+                  tone={(selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'}
+                />
+                <V2MetricCard
+                  label="Jack booked / Brandon booked / Self booked"
+                  value={selectedBookedMetricsQuery.isLoading ? 'Loading...' : selectedSlackBookedSplit}
+                  meta={
+                    selectedBookedMetricsQuery.isError
+                      ? `Could not load booked split: ${String((selectedBookedMetricsQuery.error as Error)?.message || selectedBookedMetricsQuery.error)}`
+                      : 'Slack first conversion credit split for this report day.'
+                  }
                 />
                 <V2MetricCard
                   label="Opt-Outs"

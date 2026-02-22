@@ -98,9 +98,10 @@ export const fetchV2SalesMetrics = async (params: SalesMetricsQueryParams) => {
   return response as ApiEnvelope<SalesMetricsV2>;
 };
 
-export const useV2SalesMetrics = (params: SalesMetricsQueryParams) => {
+export const useV2SalesMetrics = (params: SalesMetricsQueryParams, options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ['v2', 'salesMetrics', params],
+    enabled: options?.enabled ?? true,
     queryFn: async () => fetchV2SalesMetrics(params),
     staleTime: 60_000,
     retry: false,

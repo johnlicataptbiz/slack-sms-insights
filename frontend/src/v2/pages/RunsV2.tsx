@@ -288,6 +288,7 @@ export default function RunsV2() {
   const daysBack = parseRange(searchParams.get('range'));
   const channelId = searchParams.get('channel') || null;
   const selectedId = searchParams.get('run');
+  const [isRunDetailFocused, setIsRunDetailFocused] = useState(() => Boolean(selectedId));
 
   const { data: runsData, isLoading, isError, error } = useV2Runs({ daysBack, channelId, limit: 100, offset: 0 });
   const { data: channelsData } = useV2Channels();
@@ -364,6 +365,7 @@ export default function RunsV2() {
       const next = new URLSearchParams(searchParams);
       next.delete('run');
       setSearchParams(next, { replace: true });
+      setIsRunDetailFocused(false);
     }
   }, [runsData, searchParams, selectedId, setSearchParams]);
 
@@ -377,6 +379,7 @@ export default function RunsV2() {
     if (updates.runId !== undefined) {
       if (updates.runId) next.set('run', updates.runId);
       else next.delete('run');
+      setIsRunDetailFocused(Boolean(updates.runId));
     }
     setSearchParams(next, { replace: true });
   };
@@ -533,45 +536,55 @@ export default function RunsV2() {
         </div>
       </V2Panel>
 
-      <div className="V2Grid V2Grid--2-1">
-        <V2Panel title="Run Timeline" caption={`Showing ${runsData.data.items.length} runs`}>
-          <div className="V2RunList">
-            {runsData.data.items.map((run) => {
-              const runView = viewByRunId.get(run.id) || buildRunViewModel(run);
-              return (
-                <button
-                  key={run.id}
-                  className={`V2RunList__item ${selected?.id === run.id ? 'is-active' : ''}`}
-                  type="button"
-                  onClick={() => setSelected(run.id)}
-                >
-                  <div className="V2RunList__head">
-                    <span>{runView.title}</span>
-                    <div className="V2RunList__badges">
-                      <span className={`V2Tag V2Tag--${statusTone(run.status)}`}>{run.status}</span>
-                      <span className="V2Tag V2Tag--accent">{run.reportType}</span>
+      <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
+        {!isRunDetailFocused ? (
+          <V2Panel title="Run Timeline" caption={`Showing ${runsData.data.items.length} runs`} className="V2RunsLayout__timeline">
+            <div className="V2RunList">
+              {runsData.data.items.map((run) => {
+                const runView = viewByRunId.get(run.id) || buildRunViewModel(run);
+                return (
+                  <button
+                    key={run.id}
+                    className={`V2RunList__item ${selected?.id === run.id ? 'is-active' : ''}`}
+                    type="button"
+                    onClick={() => setSelected(run.id)}
+                  >
+                    <div className="V2RunList__head">
+                      <span>{runView.title}</span>
+                      <div className="V2RunList__badges">
+                        <span className={`V2Tag V2Tag--${statusTone(run.status)}`}>{run.status}</span>
+                        <span className="V2Tag V2Tag--accent">{run.reportType}</span>
+                      </div>
                     </div>
-                  </div>
-                  <p className="V2RunList__meta">
-                    {channelLabel(run)} | {runDateLabel(run)}
-                  </p>
-                  <p className="V2RunList__meta">{runView.subtitle}</p>
-                  <div className="V2RunList__kpis">
-                    <span>Sent {formatCount(runView.messagesSent)}</span>
-                    <span>Replies {formatCount(runView.repliesReceived)}</span>
-                    <span>Booked Calls {formatCount(runView.booked)}</span>
-                    <span>Opt-outs {formatCount(runView.optOuts)}</span>
-                  </div>
-                  <p className="V2RunList__summary">{runView.summaryPreview || 'No structured summary stored for this run.'}</p>
-                </button>
-              );
-            })}
-          </div>
-        </V2Panel>
+                    <p className="V2RunList__meta">
+                      {channelLabel(run)} | {runDateLabel(run)}
+                    </p>
+                    <p className="V2RunList__meta">{runView.subtitle}</p>
+                    <div className="V2RunList__kpis">
+                      <span>Sent {formatCount(runView.messagesSent)}</span>
+                      <span>Replies {formatCount(runView.repliesReceived)}</span>
+                      <span>Booked Calls {formatCount(runView.booked)}</span>
+                      <span>Opt-outs {formatCount(runView.optOuts)}</span>
+                    </div>
+                    <p className="V2RunList__summary">{runView.summaryPreview || 'No structured summary stored for this run.'}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </V2Panel>
+        ) : null}
 
-        <V2Panel title="Selected Run" caption="Structured summary first. Expand raw report text only when needed.">
+        <V2Panel title="Selected Run" caption="Structured summary first. Expand raw report text only when needed." className="V2RunsLayout__detail">
           {selected && selectedView ? (
             <div className="V2RunDetail">
+              {isRunDetailFocused ? (
+                <div className="V2RunDetail__topActions">
+                  <button type="button" className="V2RunDetail__backButton" onClick={() => setIsRunDetailFocused(false)}>
+                    <span aria-hidden="true">←</span> Back to run timeline
+                  </button>
+                </div>
+              ) : null}
+
               <header className="V2RunDetail__hero">
                 <div>
                   <p className="V2RunDetail__eyebrow">{selected.reportType === 'daily' ? 'Automated Daily Run' : 'Manual / On-Demand Run'}</p>

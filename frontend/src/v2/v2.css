@@ -68,6 +68,13 @@
   background: linear-gradient(90deg, rgba(245, 251, 255, 0.9), rgba(255, 255, 255, 0.82));
 }
 
+.V2Shell__topStart {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.9rem;
+  min-width: 0;
+}
+
 .V2Shell__menuButton {
   display: inline-block;
   width: 46px;
@@ -385,6 +392,10 @@
   grid-template-columns: 1.6fr 1fr;
 }
 
+.V2RunsLayout.is-detail-focused {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .V2Panel {
   border-radius: var(--v2-radius-lg);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.86));
@@ -694,6 +705,36 @@
 .V2RunDetail {
   display: grid;
   gap: var(--v2-space-3);
+}
+
+.V2RunDetail__topActions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.V2RunDetail__backButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid rgba(7, 19, 36, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--v2-base-800);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  padding: 0.56rem 0.92rem;
+  cursor: pointer;
+}
+
+.V2RunDetail__backButton span {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.V2RunDetail__backButton:hover {
+  border-color: rgba(17, 184, 214, 0.58);
+  background: rgba(232, 249, 252, 0.9);
 }
 
 .V2RunDetail__hero {
@@ -1358,6 +1399,10 @@
   .V2Shell__topbar {
     padding: 0 var(--v2-space-3);
     height: var(--v2-topbar-height-mobile);
+  }
+
+  .V2Shell__topStart {
+    gap: 0.45rem;
   }
 
   .V2Shell__body {

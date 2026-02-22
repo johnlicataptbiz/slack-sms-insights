@@ -99,19 +99,21 @@ export default function V2Shell({ children }: { children: ReactNode }) {
   return (
     <div className="V2Shell">
       <header className="V2Shell__topbar">
-        <button
-          className="V2Shell__menuButton"
-          type="button"
-          aria-label={isMobileViewport ? 'Toggle navigation' : 'Toggle sidebar collapse'}
-          aria-expanded={isMobileViewport ? isMenuOpen : !isDesktopCollapsed}
-          onClick={handleSidebarToggle}
-        >
-          <span />
-          <span />
-        </button>
+        <div className="V2Shell__topStart">
+          <button
+            className="V2Shell__menuButton"
+            type="button"
+            aria-label={isMobileViewport ? 'Toggle navigation' : 'Toggle sidebar collapse'}
+            aria-expanded={isMobileViewport ? isMenuOpen : !isDesktopCollapsed}
+            onClick={handleSidebarToggle}
+          >
+            <span />
+            <span />
+          </button>
 
-        <div className="V2Shell__brand" onClick={() => navigateWithTransition(navigate, '/v2/insights')}>
-          <img className="V2Shell__brandLogo" src={brandLogoUrl} alt="PT Biz logo" />
+          <div className="V2Shell__brand" onClick={() => navigateWithTransition(navigate, '/v2/insights')}>
+            <img className="V2Shell__brandLogo" src={brandLogoUrl} alt="PT Biz logo" />
+          </div>
         </div>
 
         <div className="V2Shell__topActions">

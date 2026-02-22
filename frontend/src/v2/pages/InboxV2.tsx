@@ -62,16 +62,26 @@ const formatSendLineLabel = (params: {
   return parts.join(' · ');
 };
 
+const normalizeFromNumberInput = (value: string): string | null => {
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return `+${digits}`;
+};
+
 export default function InboxV2() {
   const [statusFilter, setStatusFilter] = useState<'open' | 'closed' | 'dnc' | ''>('open');
   const [needsReplyOnly, setNeedsReplyOnly] = useState(true);
+  const [ownerFilter, setOwnerFilter] = useState<'all' | 'jack' | 'brandon' | 'unassigned'>('all');
   const [search, setSearch] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [composerText, setComposerText] = useState('');
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [selectedLineKey, setSelectedLineKey] = useState('');
+  const [manualFromNumber, setManualFromNumber] = useState('');
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
-  const draftPanelAnchorRef = useRef<HTMLDivElement | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [qualificationState, setQualificationState] = useState<QualificationStateV2>({
     fullOrPartTime: 'unknown',
@@ -91,7 +101,15 @@ export default function InboxV2() {
     offset: 0,
   });
 
-  const conversations = listQuery.data?.data.items || [];
+  const conversationsRaw = listQuery.data?.data.items || [];
+  const conversations = conversationsRaw.filter((conversation) => {
+    if (ownerFilter === 'all') return true;
+    const owner = (conversation.ownerLabel || '').toLowerCase();
+    if (ownerFilter === 'jack') return owner === 'jack';
+    if (ownerFilter === 'brandon') return owner === 'brandon';
+    if (ownerFilter === 'unassigned') return owner.length === 0;
+    return true;
+  });
 
   useEffect(() => {
     if (!selectedConversationId && conversations.length > 0) {
@@ -117,7 +135,8 @@ export default function InboxV2() {
   const sendConfig = sendConfigQuery.data?.data || null;
   const lineOptions = sendConfig?.lines || [];
   const selectedLineOption = lineOptions.find((option) => option.key === selectedLineKey) || null;
-  const lineSelectionRequired = Boolean(sendConfig?.requiresSelection) && !selectedLineOption;
+  const normalizedManualFrom = normalizeFromNumberInput(manualFromNumber);
+  const lineSelectionRequired = Boolean(sendConfig?.requiresSelection) && !selectedLineOption && !normalizedManualFrom;
   const savedDefaultSummary = sendConfig?.defaultSelection
     ? formatSendLineLabel(sendConfig.defaultSelection)
     : 'No saved default line';
@@ -163,12 +182,7 @@ export default function InboxV2() {
 
   useEffect(() => {
     if (!selectedConversationId || !detail) return;
-    if (typeof window === 'undefined') return;
-    if (!window.matchMedia('(max-width: 1360px)').matches) return;
-
-    window.requestAnimationFrame(() => {
-      draftPanelAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
+    window.requestAnimationFrame(() => composerRef.current?.focus());
   }, [selectedConversationId, detail?.conversation.id]);
 
   const onGenerateDraft = async () => {
@@ -200,12 +214,14 @@ export default function InboxV2() {
 
     setFlashMessage(null);
     try {
+      const sendFromNumber =
+        selectedLineOption?.lineId == null ? selectedLineOption?.fromNumber || normalizedManualFrom || null : null;
       const result = await sendMutation.mutateAsync({
         conversationId: selectedConversationId,
         body: composerText.trim(),
         idempotencyKey: `inbox-${Date.now()}`,
         ...(selectedLineOption?.lineId != null ? { lineId: selectedLineOption.lineId } : {}),
-        ...(selectedLineOption?.fromNumber ? { fromNumber: selectedLineOption.fromNumber } : {}),
+        ...(sendFromNumber ? { fromNumber: sendFromNumber } : {}),
         ...(selectedDraftId ? { draftId: selectedDraftId } : {}),
       });
       const lineSummary = formatSendLineLabel(result.data.lineSelection);
@@ -222,18 +238,23 @@ export default function InboxV2() {
   };
 
   const onSaveDefaultLine = async () => {
-    if (!selectedLineOption) {
-      setFlashMessage('Choose a line before saving default.');
+    if (!selectedLineOption && !normalizedManualFrom) {
+      setFlashMessage('Choose a line or enter a from number before saving default.');
       return;
     }
 
     setFlashMessage(null);
     try {
+      const defaultFromNumber = selectedLineOption?.fromNumber || normalizedManualFrom || null;
       await setDefaultLineMutation.mutateAsync({
-        lineId: selectedLineOption.lineId,
-        fromNumber: selectedLineOption.fromNumber,
+        ...(selectedLineOption?.lineId != null ? { lineId: selectedLineOption.lineId } : {}),
+        ...(defaultFromNumber ? { fromNumber: defaultFromNumber } : {}),
       });
-      setFlashMessage(`Default send line saved: ${formatSendLineLabel(selectedLineOption)}`);
+      setFlashMessage(
+        `Default send line saved: ${
+          selectedLineOption ? formatSendLineLabel(selectedLineOption) : normalizedManualFrom || 'custom from number'
+        }`,
+      );
     } catch (error) {
       setFlashMessage(`Failed to save default line: ${String((error as Error)?.message || error)}`);
     }
@@ -307,6 +328,15 @@ export default function InboxV2() {
                 placeholder="Name, phone, contact key"
               />
             </label>
+            <label className="V2Control">
+              <span>Owner</span>
+              <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value as typeof ownerFilter)}>
+                <option value="all">All</option>
+                <option value="jack">Jack</option>
+                <option value="brandon">Brandon</option>
+                <option value="unassigned">Unassigned</option>
+              </select>
+            </label>
             <label className="V2Control V2Control--check">
               <input type="checkbox" checked={needsReplyOnly} onChange={(event) => setNeedsReplyOnly(event.target.checked)} />
               <span>Needs reply only</span>
@@ -347,6 +377,7 @@ export default function InboxV2() {
                     <p>{shorten(conversation.lastMessage.body, 110)}</p>
                     <div className="V2Inbox__conversationMeta">
                       <span>{conversation.openNeedsReplyCount > 0 ? `${conversation.openNeedsReplyCount} needs reply` : 'No open reply items'}</span>
+                      <span>{conversation.ownerLabel || 'Unassigned'}</span>
                       <span>{conversation.dnc ? 'DNC' : `Esc L${conversation.escalation.level}`}</span>
                     </div>
                   </button>
@@ -367,12 +398,13 @@ export default function InboxV2() {
             </V2State>
           ) : (
             <>
-              <div ref={draftPanelAnchorRef}>
-                <V2Panel
-                  title="Draft + Send"
-                  caption="Draft only workflow with strict lint guardrails and manual send approval."
-                  className="V2Inbox__draftPanel"
-                >
+              <V2Panel
+                title="Draft + Send"
+                caption={`Draft only workflow with strict lint guardrails and manual send approval. Owner: ${
+                  detail.conversation.ownerLabel || 'Unassigned'
+                }`}
+                className="V2Inbox__draftPanel"
+              >
                   <div className="V2Inbox__sendConfig">
                     {sendConfigQuery.isLoading ? (
                       <p className="V2Inbox__sendMeta">Loading outbound line config...</p>
@@ -380,31 +412,44 @@ export default function InboxV2() {
                       <p className="V2Inbox__sendMeta">
                         Could not load send lines: {String((sendConfigQuery.error as Error)?.message || sendConfigQuery.error)}
                       </p>
-                    ) : lineOptions.length === 0 ? (
-                      <p className="V2Inbox__sendMeta">Outbound line uses Aloware account default. Saved default: {savedDefaultSummary}</p>
                     ) : (
                       <>
+                        {lineOptions.length > 0 ? (
+                          <label className="V2Control">
+                            <span>Send line</span>
+                            <select value={selectedLineKey} onChange={(event) => setSelectedLineKey(event.target.value)}>
+                              {sendConfig?.defaultSelection ? (
+                                <option value="">Use saved default ({formatSendLineLabel(sendConfig.defaultSelection)})</option>
+                              ) : (
+                                <option value="">Select a line</option>
+                              )}
+                              {lineOptions.map((option) => (
+                                <option key={option.key} value={option.key}>
+                                  {formatSendLineLabel(option)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <p className="V2Inbox__sendMeta">
+                            No line catalog detected. You can still send by entering a from number below.
+                          </p>
+                        )}
+
                         <label className="V2Control">
-                          <span>Send line</span>
-                          <select value={selectedLineKey} onChange={(event) => setSelectedLineKey(event.target.value)}>
-                            {sendConfig?.defaultSelection ? (
-                              <option value="">Use saved default ({formatSendLineLabel(sendConfig.defaultSelection)})</option>
-                            ) : (
-                              <option value="">Select a line</option>
-                            )}
-                            {lineOptions.map((option) => (
-                              <option key={option.key} value={option.key}>
-                                {formatSendLineLabel(option)}
-                              </option>
-                            ))}
-                          </select>
+                          <span>From number override</span>
+                          <input
+                            value={manualFromNumber}
+                            onChange={(event) => setManualFromNumber(event.target.value)}
+                            placeholder="+18175809950"
+                          />
                         </label>
 
                         <div className="V2Inbox__actions">
                           <button
                             type="button"
                             onClick={onSaveDefaultLine}
-                            disabled={setDefaultLineMutation.isPending || !selectedLineOption}
+                            disabled={setDefaultLineMutation.isPending || (!selectedLineOption && !normalizedManualFrom)}
                           >
                             {setDefaultLineMutation.isPending ? 'Saving default...' : 'Save as Default'}
                           </button>
@@ -422,6 +467,7 @@ export default function InboxV2() {
                   </div>
 
                   <textarea
+                    ref={composerRef}
                     className="V2Inbox__composer"
                     value={composerText}
                     onChange={(event) => setComposerText(event.target.value)}
@@ -466,8 +512,7 @@ export default function InboxV2() {
                       ))}
                     </div>
                   ) : null}
-                </V2Panel>
-              </div>
+              </V2Panel>
 
               <V2Panel
                 title={

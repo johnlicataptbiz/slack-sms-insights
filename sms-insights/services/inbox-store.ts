@@ -115,6 +115,8 @@ export type InboxConversationListRow = {
   last_message_body: string | null;
   last_message_direction: 'inbound' | 'outbound' | 'unknown' | null;
   last_message_at: string | null;
+  latest_outbound_user: string | null;
+  latest_outbound_line: string | null;
 };
 
 export type InboxMessageRow = {
@@ -374,6 +376,17 @@ export const listInboxConversations = async (
         FROM sms_events
         WHERE conversation_id IS NOT NULL
         ORDER BY conversation_id, event_ts DESC
+      ),
+      latest_outbound AS (
+        SELECT DISTINCT ON (conversation_id)
+          conversation_id,
+          aloware_user,
+          line,
+          event_ts
+        FROM sms_events
+        WHERE conversation_id IS NOT NULL
+          AND direction = 'outbound'
+        ORDER BY conversation_id, event_ts DESC
       )
       SELECT
         c.id,
@@ -413,7 +426,9 @@ export const listInboxConversations = async (
         open_items.needs_reply_due_at,
         latest_message.body AS last_message_body,
         latest_message.direction AS last_message_direction,
-        latest_message.event_ts AS last_message_at
+        latest_message.event_ts AS last_message_at,
+        latest_outbound.aloware_user AS latest_outbound_user,
+        latest_outbound.line AS latest_outbound_line
       FROM conversations c
       LEFT JOIN inbox_contact_profiles p
         ON p.contact_key = c.contact_key
@@ -423,6 +438,8 @@ export const listInboxConversations = async (
         ON open_items.conversation_id = c.id
       LEFT JOIN latest_message
         ON latest_message.conversation_id = c.id
+      LEFT JOIN latest_outbound
+        ON latest_outbound.conversation_id = c.id
       ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY
         CASE WHEN COALESCE(open_items.open_needs_reply_count, 0) > 0 THEN 0 ELSE 1 END ASC,
@@ -468,6 +485,17 @@ export const getInboxConversationById = async (
         FROM sms_events
         WHERE conversation_id IS NOT NULL
         ORDER BY conversation_id, event_ts DESC
+      ),
+      latest_outbound AS (
+        SELECT DISTINCT ON (conversation_id)
+          conversation_id,
+          aloware_user,
+          line,
+          event_ts
+        FROM sms_events
+        WHERE conversation_id IS NOT NULL
+          AND direction = 'outbound'
+        ORDER BY conversation_id, event_ts DESC
       )
       SELECT
         c.id,
@@ -507,7 +535,9 @@ export const getInboxConversationById = async (
         open_items.needs_reply_due_at,
         latest_message.body AS last_message_body,
         latest_message.direction AS last_message_direction,
-        latest_message.event_ts AS last_message_at
+        latest_message.event_ts AS last_message_at,
+        latest_outbound.aloware_user AS latest_outbound_user,
+        latest_outbound.line AS latest_outbound_line
       FROM conversations c
       LEFT JOIN inbox_contact_profiles p
         ON p.contact_key = c.contact_key
@@ -517,6 +547,8 @@ export const getInboxConversationById = async (
         ON open_items.conversation_id = c.id
       LEFT JOIN latest_message
         ON latest_message.conversation_id = c.id
+      LEFT JOIN latest_outbound
+        ON latest_outbound.conversation_id = c.id
       WHERE c.id = $1
       LIMIT 1;
       `,

@@ -226,6 +226,8 @@ export type InboxConversationV2 = {
   contactName: string | null;
   contactPhone: string | null;
   repId: string | null;
+  ownerLabel?: string | null;
+  ownerSource?: 'rep' | 'latest_outbound_user' | 'latest_outbound_line' | 'unknown';
   status: 'open' | 'closed' | 'dnc';
   dnc: boolean;
   lastInboundAt: string | null;

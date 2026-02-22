@@ -183,6 +183,15 @@ const repDisplayName = (repId: string | null | undefined): string => {
   return normalized;
 };
 
+const inferOwnerLabelFromHint = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  if (/\bjack\b/.test(normalized)) return 'Jack';
+  if (/\bbrandon\b/.test(normalized)) return 'Brandon';
+  return null;
+};
+
 const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
   if (!value) return fallback;
   const normalized = value.trim().toLowerCase();
@@ -1009,6 +1018,8 @@ const toInboxConversationV2 = (row: {
   last_message_direction: 'inbound' | 'outbound' | 'unknown' | null;
   last_message_body: string | null;
   last_message_at: string | null;
+  latest_outbound_user: string | null;
+  latest_outbound_line: string | null;
   state_qualification_full_or_part_time: 'full_time' | 'part_time' | 'unknown' | null;
   state_qualification_niche: string | null;
   state_qualification_revenue_mix: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown' | null;
@@ -1020,12 +1031,31 @@ const toInboxConversationV2 = (row: {
   state_cadence_status: 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool' | null;
   state_next_followup_due_at: string | null;
   state_last_podcast_sent_at: string | null;
-}) => ({
+}) => {
+  const ownerFromRep = repDisplayName(row.current_rep_id);
+  const ownerFromUser = inferOwnerLabelFromHint(row.latest_outbound_user);
+  const ownerFromLine = inferOwnerLabelFromHint(row.latest_outbound_line);
+  const ownerLabel =
+    ownerFromRep !== 'Unassigned'
+      ? ownerFromRep
+      : ownerFromUser || ownerFromLine || null;
+  const ownerSource =
+    ownerFromRep !== 'Unassigned'
+      ? 'rep'
+      : ownerFromUser
+        ? 'latest_outbound_user'
+        : ownerFromLine
+          ? 'latest_outbound_line'
+          : 'unknown';
+
+  return {
   id: row.id,
   contactKey: row.contact_key,
   contactName: row.profile_name,
   contactPhone: row.profile_phone || row.contact_phone,
   repId: row.current_rep_id,
+  ownerLabel,
+  ownerSource,
   status: row.status,
   dnc: row.status === 'dnc' || row.profile_dnc === true,
   lastInboundAt: row.last_inbound_at,
@@ -1056,7 +1086,8 @@ const toInboxConversationV2 = (row: {
     nextFollowupDueAt: row.state_next_followup_due_at || null,
     lastPodcastSentAt: row.state_last_podcast_sent_at || null,
   },
-});
+  };
+};
 
 const getConversationIdFromPath = (req: IncomingMessage): string | null => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);

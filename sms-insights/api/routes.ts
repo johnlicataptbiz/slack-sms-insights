@@ -11,9 +11,11 @@ import { generateDraftSuggestion } from '../services/inbox-draft-engine.js';
 import { sendInboxMessage } from '../services/inbox-send.js';
 import {
   ensureConversationState,
+  type ConversationStateRow,
   getDraftSuggestionById,
   getInboxConversationById,
   insertDraftSuggestion,
+  type InboxMessageRow,
   listDraftSuggestionsForConversation,
   listInboxConversations,
   listMessagesForConversation,
@@ -22,6 +24,7 @@ import {
   updateDraftSuggestionFeedback,
   upsertConversionExample,
 } from '../services/inbox-store.js';
+import { inferQualificationStateFromMessages } from '../services/qualification-inference.js';
 import {
   getMetricsOverview,
   getSlaMetrics,
@@ -1000,6 +1003,44 @@ const resolveQualificationProgressStep = (params: {
   return score;
 };
 
+const applyAutoQualificationFromMessages = async (
+  params: {
+    conversationId: string;
+    contactKey: string;
+    contactId: string | null;
+    currentState: ConversationStateRow;
+    messages: InboxMessageRow[];
+  },
+  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+): Promise<ConversationStateRow> => {
+  const inference = inferQualificationStateFromMessages(params.currentState, params.messages, logger);
+  if (!inference.changed) {
+    return params.currentState;
+  }
+
+  const nextState = await updateConversationState(params.conversationId, inference.updates, logger);
+
+  await upsertInboxContactProfile(
+    {
+      contactKey: params.contactKey,
+      conversationId: params.conversationId,
+      contactId: params.contactId,
+      niche: nextState.qualification_niche,
+      employmentStatus: nextState.qualification_full_or_part_time,
+      revenueMixCategory: nextState.qualification_revenue_mix,
+      coachingInterest: nextState.qualification_coaching_interest,
+    },
+    logger,
+  );
+
+  logger?.info?.('Auto qualification state updated from conversation text', {
+    conversationId: params.conversationId,
+    updates: inference.updates,
+  });
+
+  return nextState;
+};
+
 const toInboxConversationV2 = (row: {
   id: string;
   contact_key: string;
@@ -1480,7 +1521,7 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
     return sendJson(res, 404, { error: 'Conversation not found' }, origin);
   }
 
-  const ensuredState = await ensureConversationState(conversationId, logger);
+  let ensuredState = await ensureConversationState(conversationId, logger);
 
   let profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
   if (!profile && conversation.contact_phone) {
@@ -1525,6 +1566,16 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       return a.id.localeCompare(b.id);
     });
   }
+  ensuredState = await applyAutoQualificationFromMessages(
+    {
+      conversationId,
+      contactKey: conversation.contact_key,
+      contactId: conversation.contact_id,
+      currentState: ensuredState,
+      messages,
+    },
+    logger,
+  );
   const drafts = await listDraftSuggestionsForConversation(conversationId, 20, logger);
   const mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
 
@@ -1608,7 +1659,7 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
     return sendJson(res, 400, { error: 'Invalid request body' }, origin);
   }
 
-  const state = await ensureConversationState(conversationId, logger);
+  let state = await ensureConversationState(conversationId, logger);
   let messages = await listMessagesForConversation(conversationId, 250, logger);
   if (messages.length === 0) {
     const legacy = await listSmsEventsForConversation(
@@ -1638,6 +1689,16 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
       return a.id.localeCompare(b.id);
     });
   }
+  state = await applyAutoQualificationFromMessages(
+    {
+      conversationId,
+      contactKey: conversation.contact_key,
+      contactId: conversation.contact_id,
+      currentState: state,
+      messages,
+    },
+    logger,
+  );
 
   const draft = await generateDraftSuggestion(
     {

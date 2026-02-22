@@ -1488,12 +1488,6 @@
   gap: 1rem;
 }
 
-.V2Inbox__draftPanel {
-  position: sticky;
-  top: calc(var(--v2-topbar-height) + 0.8rem);
-  z-index: 2;
-}
-
 .V2Inbox__conversationList {
   display: flex;
   flex-direction: column;
@@ -1562,6 +1556,10 @@
   padding-right: 0.2rem;
 }
 
+.V2Inbox__threadActions {
+  margin-bottom: 0.7rem;
+}
+
 .V2Inbox__message {
   border: 1px solid var(--v2-border);
   border-radius: 12px;
@@ -1623,6 +1621,7 @@
   margin-top: 0.65rem;
   display: flex;
   gap: 0.65rem;
+  flex-wrap: wrap;
 }
 
 .V2Inbox__actions button,
@@ -1709,18 +1708,95 @@
   font-size: 0.8rem;
 }
 
+.V2Inbox__composerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  padding: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, #091022 50%, transparent 50%);
+  backdrop-filter: blur(2px);
+}
+
+.V2Inbox__composerModal {
+  width: min(880px, 100%);
+  max-height: calc(100vh - 2rem);
+  border-radius: 16px;
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface);
+  box-shadow: 0 22px 48px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.V2Inbox__composerModalHeader {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--v2-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.V2Inbox__composerModalHeader h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1.05rem;
+}
+
+.V2Inbox__composerModalHeader p {
+  margin: 0;
+  color: var(--v2-text-muted);
+  font-size: 0.82rem;
+}
+
+.V2Inbox__composerClose {
+  border: 1px solid var(--v2-border);
+  border-radius: 10px;
+  background: var(--v2-surface-2);
+  color: var(--v2-text);
+  font: inherit;
+  padding: 0.42rem 0.65rem;
+  cursor: pointer;
+}
+
+.V2Inbox__composerClose:hover {
+  border-color: var(--v2-accent);
+}
+
+.V2Inbox__composerModalBody {
+  padding: 1rem;
+  overflow: auto;
+}
+
 @media (max-width: 1360px) {
   .V2Inbox__layout {
     grid-template-columns: 1fr;
   }
 
-  .V2Inbox__draftPanel {
-    position: static;
-    top: auto;
-  }
-
   .V2Inbox__conversationList,
   .V2Inbox__thread {
     max-height: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .V2Inbox__composerBackdrop {
+    padding: 0.5rem;
+  }
+
+  .V2Inbox__composerModal {
+    width: 100%;
+    max-height: calc(100vh - 1rem);
+  }
+
+  .V2Inbox__composerModalHeader {
+    padding: 0.75rem 0.8rem;
+  }
+
+  .V2Inbox__composerModalBody {
+    padding: 0.8rem;
   }
 }

@@ -76,6 +76,7 @@ export default function InboxV2() {
   const [ownerFilter, setOwnerFilter] = useState<'all' | 'jack' | 'brandon' | 'unassigned'>('all');
   const [search, setSearch] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [isComposerModalOpen, setIsComposerModalOpen] = useState(false);
   const [composerText, setComposerText] = useState('');
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [selectedLineKey, setSelectedLineKey] = useState('');
@@ -181,9 +182,22 @@ export default function InboxV2() {
   }, [detail, composerText]);
 
   useEffect(() => {
-    if (!selectedConversationId || !detail) return;
+    if (!isComposerModalOpen || !selectedConversationId || !detail) return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
-  }, [selectedConversationId, detail?.conversation.id]);
+  }, [isComposerModalOpen, selectedConversationId, detail?.conversation.id]);
+
+  useEffect(() => {
+    if (!isComposerModalOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsComposerModalOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isComposerModalOpen]);
 
   const onGenerateDraft = async () => {
     if (!selectedConversationId) return;
@@ -368,6 +382,7 @@ export default function InboxV2() {
                       setSelectedConversationId(conversation.id);
                       setComposerText('');
                       setSelectedDraftId(null);
+                      setIsComposerModalOpen(true);
                     }}
                   >
                     <div className="V2Inbox__conversationTop">
@@ -399,122 +414,6 @@ export default function InboxV2() {
           ) : (
             <>
               <V2Panel
-                title="Draft + Send"
-                caption={`Draft only workflow with strict lint guardrails and manual send approval. Owner: ${
-                  detail.conversation.ownerLabel || 'Unassigned'
-                }`}
-                className="V2Inbox__draftPanel"
-              >
-                  <div className="V2Inbox__sendConfig">
-                    {sendConfigQuery.isLoading ? (
-                      <p className="V2Inbox__sendMeta">Loading outbound line config...</p>
-                    ) : sendConfigQuery.isError ? (
-                      <p className="V2Inbox__sendMeta">
-                        Could not load send lines: {String((sendConfigQuery.error as Error)?.message || sendConfigQuery.error)}
-                      </p>
-                    ) : (
-                      <>
-                        {lineOptions.length > 0 ? (
-                          <label className="V2Control">
-                            <span>Send line</span>
-                            <select value={selectedLineKey} onChange={(event) => setSelectedLineKey(event.target.value)}>
-                              {sendConfig?.defaultSelection ? (
-                                <option value="">Use saved default ({formatSendLineLabel(sendConfig.defaultSelection)})</option>
-                              ) : (
-                                <option value="">Select a line</option>
-                              )}
-                              {lineOptions.map((option) => (
-                                <option key={option.key} value={option.key}>
-                                  {formatSendLineLabel(option)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        ) : (
-                          <p className="V2Inbox__sendMeta">
-                            No line catalog detected. You can still send by entering a from number below.
-                          </p>
-                        )}
-
-                        <label className="V2Control">
-                          <span>From number override</span>
-                          <input
-                            value={manualFromNumber}
-                            onChange={(event) => setManualFromNumber(event.target.value)}
-                            placeholder="+18175809950"
-                          />
-                        </label>
-
-                        <div className="V2Inbox__actions">
-                          <button
-                            type="button"
-                            onClick={onSaveDefaultLine}
-                            disabled={setDefaultLineMutation.isPending || (!selectedLineOption && !normalizedManualFrom)}
-                          >
-                            {setDefaultLineMutation.isPending ? 'Saving default...' : 'Save as Default'}
-                          </button>
-                          <button type="button" onClick={onClearDefaultLine} disabled={setDefaultLineMutation.isPending}>
-                            Clear Default
-                          </button>
-                        </div>
-
-                        <p className="V2Inbox__sendMeta">
-                          Saved default: {savedDefaultSummary}
-                          {lineSelectionRequired ? ' · Select a line before sending.' : ''}
-                        </p>
-                      </>
-                    )}
-                  </div>
-
-                  <textarea
-                    ref={composerRef}
-                    className="V2Inbox__composer"
-                    value={composerText}
-                    onChange={(event) => setComposerText(event.target.value)}
-                    placeholder="Generate a draft or type your message here"
-                  />
-                  <div className="V2Inbox__actions">
-                    <button type="button" onClick={onGenerateDraft} disabled={generateDraftMutation.isPending || sendMutation.isPending}>
-                      {generateDraftMutation.isPending ? 'Generating...' : 'Generate Draft'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onSend}
-                      disabled={
-                        sendMutation.isPending ||
-                        composerText.trim().length === 0 ||
-                        lineSelectionRequired ||
-                        sendConfigQuery.isLoading
-                      }
-                    >
-                      {sendMutation.isPending ? 'Sending...' : 'Send Message'}
-                    </button>
-                  </div>
-
-                  {detail.drafts.length > 0 ? (
-                    <div className="V2Inbox__drafts">
-                      <h4>Recent drafts</h4>
-                      {detail.drafts.map((draft) => (
-                        <button
-                          key={draft.id}
-                          type="button"
-                          className={`V2Inbox__draftRow ${selectedDraftId === draft.id ? 'is-active' : ''}`}
-                          onClick={() => {
-                            setComposerText(draft.text);
-                            setSelectedDraftId(draft.id);
-                          }}
-                        >
-                          <span>{shorten(draft.text, 120)}</span>
-                          <em>
-                            lint {draft.lintScore.toFixed(0)} · structural {draft.structuralScore.toFixed(0)}
-                          </em>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-              </V2Panel>
-
-              <V2Panel
                 title={
                   <span>
                     {detail.contactCard.name || detail.contactCard.phone || detail.contactCard.contactKey}
@@ -523,6 +422,11 @@ export default function InboxV2() {
                 }
                 caption={`Last touch: ${fmtDateTime(detail.conversation.lastTouchAt)} · Needs reply due: ${fmtDateTime(detail.conversation.needsReplyDueAt)}`}
               >
+                <div className="V2Inbox__threadActions">
+                  <button type="button" onClick={() => setIsComposerModalOpen(true)}>
+                    Open Draft + Send
+                  </button>
+                </div>
                 <div className="V2Inbox__thread">
                   {detail.messages.map((message) => (
                     <article key={message.id} className={`V2Inbox__message V2Inbox__message--${message.direction}`}>
@@ -661,6 +565,162 @@ export default function InboxV2() {
           )}
         </div>
       </section>
+
+      {isComposerModalOpen ? (
+        <div className="V2Inbox__composerBackdrop" onClick={() => setIsComposerModalOpen(false)}>
+          <section
+            className="V2Inbox__composerModal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Draft and send SMS"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="V2Inbox__composerModalHeader">
+              <div>
+                <h3>Draft + Send</h3>
+                {detail ? (
+                  <p>
+                    {detail.contactCard.name || detail.contactCard.phone || detail.contactCard.contactKey} · Owner:{' '}
+                    {detail.conversation.ownerLabel || 'Unassigned'}
+                  </p>
+                ) : (
+                  <p>Select a conversation to send a message.</p>
+                )}
+              </div>
+              <button type="button" className="V2Inbox__composerClose" onClick={() => setIsComposerModalOpen(false)}>
+                Close
+              </button>
+            </header>
+
+            <div className="V2Inbox__composerModalBody">
+              {!selectedConversationId ? (
+                <V2State kind="empty">Select a conversation to draft a message.</V2State>
+              ) : detailQuery.isLoading ? (
+                <V2State kind="loading">Loading conversation...</V2State>
+              ) : detailQuery.isError || !detail ? (
+                <V2State kind="error">
+                  Failed to load conversation: {String((detailQuery.error as Error)?.message || detailQuery.error)}
+                </V2State>
+              ) : (
+                <>
+                  <p className="V2Inbox__sendMeta">
+                    Draft only workflow with strict lint guardrails and manual send approval. Owner:{' '}
+                    {detail.conversation.ownerLabel || 'Unassigned'}
+                  </p>
+
+                  <div className="V2Inbox__sendConfig">
+                    {sendConfigQuery.isLoading ? (
+                      <p className="V2Inbox__sendMeta">Loading outbound line config...</p>
+                    ) : sendConfigQuery.isError ? (
+                      <p className="V2Inbox__sendMeta">
+                        Could not load send lines: {String((sendConfigQuery.error as Error)?.message || sendConfigQuery.error)}
+                      </p>
+                    ) : (
+                      <>
+                        {lineOptions.length > 0 ? (
+                          <label className="V2Control">
+                            <span>Send line</span>
+                            <select value={selectedLineKey} onChange={(event) => setSelectedLineKey(event.target.value)}>
+                              {sendConfig?.defaultSelection ? (
+                                <option value="">Use saved default ({formatSendLineLabel(sendConfig.defaultSelection)})</option>
+                              ) : (
+                                <option value="">Select a line</option>
+                              )}
+                              {lineOptions.map((option) => (
+                                <option key={option.key} value={option.key}>
+                                  {formatSendLineLabel(option)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ) : (
+                          <p className="V2Inbox__sendMeta">
+                            No line catalog detected. You can still send by entering a from number below.
+                          </p>
+                        )}
+
+                        <label className="V2Control">
+                          <span>From number override</span>
+                          <input
+                            value={manualFromNumber}
+                            onChange={(event) => setManualFromNumber(event.target.value)}
+                            placeholder="+18175809950"
+                          />
+                        </label>
+
+                        <div className="V2Inbox__actions">
+                          <button
+                            type="button"
+                            onClick={onSaveDefaultLine}
+                            disabled={setDefaultLineMutation.isPending || (!selectedLineOption && !normalizedManualFrom)}
+                          >
+                            {setDefaultLineMutation.isPending ? 'Saving default...' : 'Save as Default'}
+                          </button>
+                          <button type="button" onClick={onClearDefaultLine} disabled={setDefaultLineMutation.isPending}>
+                            Clear Default
+                          </button>
+                        </div>
+
+                        <p className="V2Inbox__sendMeta">
+                          Saved default: {savedDefaultSummary}
+                          {lineSelectionRequired ? ' · Select a line before sending.' : ''}
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  <textarea
+                    ref={composerRef}
+                    className="V2Inbox__composer"
+                    value={composerText}
+                    onChange={(event) => setComposerText(event.target.value)}
+                    placeholder="Generate a draft or type your message here"
+                  />
+                  <div className="V2Inbox__actions">
+                    <button type="button" onClick={onGenerateDraft} disabled={generateDraftMutation.isPending || sendMutation.isPending}>
+                      {generateDraftMutation.isPending ? 'Generating...' : 'Generate Draft'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onSend}
+                      disabled={
+                        sendMutation.isPending ||
+                        composerText.trim().length === 0 ||
+                        lineSelectionRequired ||
+                        sendConfigQuery.isLoading
+                      }
+                    >
+                      {sendMutation.isPending ? 'Sending...' : 'Send Message'}
+                    </button>
+                  </div>
+
+                  {detail.drafts.length > 0 ? (
+                    <div className="V2Inbox__drafts">
+                      <h4>Recent drafts</h4>
+                      {detail.drafts.map((draft) => (
+                        <button
+                          key={draft.id}
+                          type="button"
+                          className={`V2Inbox__draftRow ${selectedDraftId === draft.id ? 'is-active' : ''}`}
+                          onClick={() => {
+                            setComposerText(draft.text);
+                            setSelectedDraftId(draft.id);
+                          }}
+                        >
+                          <span>{shorten(draft.text, 120)}</span>
+                          <em>
+                            lint {draft.lintScore.toFixed(0)} · structural {draft.structuralScore.toFixed(0)}
+                          </em>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 }

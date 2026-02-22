@@ -10,6 +10,8 @@ import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Pr
 const savedViewsStorageKey = 'ptbizsms-v2-runs-saved-views';
 const DAILY_SNAPSHOT_TITLE_PATTERN = /PT BIZ - DAILY SMS SNAPSHOT/i;
 const DAILY_SETTER_SUMMARY_PATTERN = /Daily Setter Snapshot/i;
+const REPORT_DATE_LINE_PATTERN = /^Date:\s*(.+)$/im;
+const SUMMARY_DATE_PATTERN = /^Daily Setter Snapshot\s*\|\s*([^|]+?)(?:\s*\||$)/im;
 const TIME_RANGE_LINE_PATTERN = /^Time Range:\s*(.+)$/im;
 const OUTBOUND_CONVERSATIONS_PATTERN = /- Outbound Conversations:\s*([0-9,]+)/gi;
 const MESSAGES_SENT_PATTERN = /Messages sent:\s*([0-9,]+)/i;
@@ -126,6 +128,24 @@ const formatReportDay = (value: string): string => {
   const date = new Date(normalizedValue);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+const extractReportDayLabel = (run: RunV2): string | null => {
+  if (run.reportDate) return run.reportDate;
+
+  const fromReport = run.fullReport?.match(REPORT_DATE_LINE_PATTERN)?.[1]?.trim() || null;
+  if (fromReport) return fromReport;
+
+  const fromSummary = run.summaryText?.match(SUMMARY_DATE_PATTERN)?.[1]?.trim() || null;
+  if (fromSummary) return fromSummary;
+
+  return null;
+};
+
+const runDateLabel = (run: RunV2): string => {
+  const reportDay = extractReportDayLabel(run);
+  if (reportDay) return formatReportDay(reportDay);
+  return formatDateTime(run.timestamp);
 };
 
 const formatCount = (value: number | null): string => {
@@ -505,7 +525,7 @@ export default function RunsV2() {
                     </div>
                   </div>
                   <p className="V2RunList__meta">
-                    {channelLabel(run)} | {run.reportDate ? formatReportDay(run.reportDate) : formatDateTime(run.timestamp)}
+                    {channelLabel(run)} | {runDateLabel(run)}
                   </p>
                   <p className="V2RunList__meta">{runView.subtitle}</p>
                   <div className="V2RunList__kpis">
@@ -587,6 +607,8 @@ export default function RunsV2() {
                     <dd>{channelLabel(selected)}</dd>
                     <dt>Timestamp</dt>
                     <dd>{formatDateTime(selected.timestamp)}</dd>
+                    <dt>Report Day</dt>
+                    <dd>{runDateLabel(selected)}</dd>
                     <dt>Duration</dt>
                     <dd>{formatDuration(selected.durationMs)}</dd>
                   </dl>

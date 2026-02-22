@@ -4,7 +4,11 @@ import { buildAlowareAnalyticsReportBundle, buildDailySnapshotBlocks } from '../
 import { isAlowareChannel, isReplyGenerationRequest, REPLY_BLOCKED_MESSAGE } from '../../services/aloware-policy.js';
 import { isChannelAllowed } from '../../services/channel-access.js';
 import { requestDailyAnalysisHandoff } from '../../services/daily-analysis-handoff.js';
-import { buildDailyReportSummary, isDailySnapshotReport } from '../../services/daily-report-summary.js';
+import {
+  buildDailyReportSummary,
+  extractDailySnapshotReportDate,
+  isDailySnapshotReport,
+} from '../../services/daily-report-summary.js';
 import { logDailyRun } from '../../services/daily-run-logger.js';
 import { timeOperation } from '../../services/telemetry.js';
 
@@ -248,6 +252,7 @@ const appMentionCallback = async ({
           {
             channelId: event.channel,
             channelName: resolveAlowareChannelName(),
+            reportDate: isDailySnapshot ? extractDailySnapshotReportDate(reportText) || undefined : undefined,
             reportType: event.thread_ts ? 'manual' : 'daily',
             status: 'success',
             summaryText,

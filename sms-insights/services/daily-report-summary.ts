@@ -89,6 +89,19 @@ export const isDailySnapshotReport = (report: string): boolean => {
   return DAILY_SNAPSHOT_TITLE_PATTERN.test(report);
 };
 
+export const extractDailySnapshotReportDate = (report: string): string | null => {
+  const raw = report.match(DATE_PATTERN)?.[1]?.trim();
+  if (!raw) return null;
+
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return null;
+
+  const yyyy = parsed.getUTCFullYear();
+  const mm = String(parsed.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(parsed.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export const buildDailyReportSummary = (report: string): string => {
   const booked = sumFromPatterns(report, BOOKINGS_PATTERNS);
   const optOuts = sumFromPatterns(report, OPTOUTS_PATTERNS);

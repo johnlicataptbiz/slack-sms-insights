@@ -1,6 +1,7 @@
 import type { Logger } from '@slack/bolt';
 import type { Pool } from 'pg';
 import { getPool } from './db.js';
+import { syncQualificationFromConversationText } from './qualification-sync.js';
 import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventDirection, SmsEventRow } from './sms-event-store.js';
 import { linkSmsEventToConversation } from './sms-event-store.js';
@@ -111,6 +112,20 @@ export const upsertConversationFromEvent = async (
     const row = result.rows[0] ?? null;
     if (row) {
       await linkSmsEventToConversation(event.id, row.id, logger);
+      void syncQualificationFromConversationText(
+        {
+          conversationId: row.id,
+          contactKey: row.contact_key,
+          contactId: row.contact_id,
+          triggerDirection: event.direction,
+        },
+        logger,
+      ).catch((error) => {
+        logger?.warn?.('Auto qualification sync failed during ingestion', {
+          conversationId: row.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      });
       publishRealtimeEvent({ type: 'conversation_updated', id: row.id, ts: new Date().toISOString() }, logger);
     }
     return row;

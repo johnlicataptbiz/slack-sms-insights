@@ -31,6 +31,18 @@ const isObject = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null;
 };
 
+const redactSensitiveQueryInPath = (path: string): string => {
+  const [basePath, query = ''] = path.split('?', 2);
+  if (!query) return path;
+
+  const params = new URLSearchParams(query);
+  if (params.has('api_token')) {
+    params.set('api_token', '***redacted***');
+  }
+  const nextQuery = params.toString();
+  return nextQuery ? `${basePath}?${nextQuery}` : basePath;
+};
+
 const requestAloware = async (
   path: string,
   init: RequestInit,
@@ -62,7 +74,11 @@ const requestAloware = async (
   }
 
   if (!response.ok) {
-    logger?.warn?.('Aloware request failed', { path, status: response.status, body: parsed });
+    logger?.warn?.('Aloware request failed', {
+      path: redactSensitiveQueryInPath(path),
+      status: response.status,
+      body: parsed,
+    });
     throw new AlowareClientError(`Aloware request failed (${response.status})`, response.status, parsed);
   }
 

@@ -12,6 +12,8 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const oauthRedirectNotice =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'password';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -47,6 +49,9 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
         <img className="PasswordGate__logo" src={brandLogoUrl} alt="PT Biz SMS" />
         <h1>PT Biz Dashboard</h1>
         <p>Enter password to continue.</p>
+        {oauthRedirectNotice ? (
+          <p className="PasswordGate__notice">Slack auth is disabled. Use the dashboard password.</p>
+        ) : null}
         <form onSubmit={handleSubmit}>
           <input
             type="password"

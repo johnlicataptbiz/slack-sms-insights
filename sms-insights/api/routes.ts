@@ -135,6 +135,9 @@ const getDashboardPassword = (): string => {
 const getPersistentSessionTtlSeconds = (): number =>
   parsePositiveInteger(process.env.DASHBOARD_PERSIST_SESSION_TTL_SECONDS, 60 * 60 * 24 * 30);
 
+const isDashboardSlackOauthEnabled = (): boolean =>
+  parseBooleanFlag(process.env.DASHBOARD_SLACK_OAUTH_ENABLED, false);
+
 const shouldUseSecureCookies = (): boolean =>
   parseBooleanFlag(process.env.COOKIE_SECURE, (process.env.NODE_ENV || '').trim() === 'production');
 
@@ -557,6 +560,17 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
 };
 
 const handleOauthStart: RequestHandler = async (_req, res, logger) => {
+  if (!isDashboardSlackOauthEnabled()) {
+    res.writeHead(302, {
+      Location: '/?auth=password',
+      'Cache-Control': 'no-store',
+      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
+    });
+    res.end();
+    logger?.warn('Dashboard OAuth start requested while Slack OAuth is disabled');
+    return;
+  }
+
   const clientId = (process.env.SLACK_CLIENT_ID || '').trim();
   const redirectUri = (process.env.DASHBOARD_AUTH_REDIRECT_URI || '').trim();
   const userScopes = (process.env.DASHBOARD_OAUTH_USER_SCOPES || 'users:read').trim();
@@ -585,6 +599,17 @@ const handleOauthStart: RequestHandler = async (_req, res, logger) => {
 };
 
 const handleOauthCallback: RequestHandler = async (req, res, logger) => {
+  if (!isDashboardSlackOauthEnabled()) {
+    res.writeHead(302, {
+      Location: '/?auth=password',
+      'Cache-Control': 'no-store',
+      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
+    });
+    res.end();
+    logger?.warn('Dashboard OAuth callback requested while Slack OAuth is disabled');
+    return;
+  }
+
   const clientId = (process.env.SLACK_CLIENT_ID || '').trim();
   const clientSecret = (process.env.SLACK_CLIENT_SECRET || '').trim();
   const redirectUri = (process.env.DASHBOARD_AUTH_REDIRECT_URI || '').trim();

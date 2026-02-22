@@ -1,6 +1,7 @@
 export const v2Copy = {
   nav: {
     insights: 'Team Insights',
+    inbox: 'SMS Inbox',
     runs: 'Daily Runs',
     setterJack: 'Jack Scorecard',
     setterBrandon: 'Brandon Scorecard',

@@ -2,9 +2,26 @@ import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
-import { getBookedCallAttributionSources, getBookedCallsSummary } from '../services/booked-calls.js';
+import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallsSummary } from '../services/booked-calls.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
+import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
+import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
+import { generateDraftSuggestion } from '../services/inbox-draft-engine.js';
+import { sendInboxMessage } from '../services/inbox-send.js';
+import {
+  ensureConversationState,
+  getDraftSuggestionById,
+  getInboxConversationById,
+  insertDraftSuggestion,
+  listDraftSuggestionsForConversation,
+  listInboxConversations,
+  listMessagesForConversation,
+  listMondayTrailForContactKey,
+  updateConversationState,
+  updateDraftSuggestionFeedback,
+  upsertConversionExample,
+} from '../services/inbox-store.js';
 import {
   getMetricsOverview,
   getSlaMetrics,
@@ -14,8 +31,10 @@ import {
 import { subscribeRealtimeEvents } from '../services/realtime.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
+import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
+import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
 import { toChannelsV2, toEnvelope, toRunsListV2, toSalesMetricsV2, toWeeklyManagerSummaryV2 } from './v2-contract.js';
@@ -163,6 +182,19 @@ const repDisplayName = (repId: string | null | undefined): string => {
 
   return normalized;
 };
+
+const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  return fallback;
+};
+
+const isV2InboxEnabled = (): boolean => parseBooleanFlag(process.env.V2_INBOX_ENABLED, true);
+const isAlowareSendEnabled = (): boolean => parseBooleanFlag(process.env.ALOWARE_SEND_ENABLED, true);
+const isDraftEngineEnabled = (): boolean => parseBooleanFlag(process.env.AI_DRAFT_ENGINE_ENABLED, true);
+const isStrictLintEnabled = (): boolean => parseBooleanFlag(process.env.AI_DRAFT_STRICT_LINT_ENABLED, true);
 
 const handleAuthVerify: RequestHandler = async (req, res, _logger, origin) => {
   sendJson(res, 200, { ok: true, user: (req as { user?: unknown }).user }, origin);
@@ -626,19 +658,23 @@ const buildSalesMetricsPayload = async (params: {
     }),
   ]);
 
+  const smsReplyLinks = await getBookedCallSmsReplyLinks(bookedAttributionSources, params.logger);
   const canonical = buildCanonicalSalesMetricsSlice(summary, bookedCalls);
   const sequenceBookedAttribution = attributeSlackBookedCallsToSequences(
     canonical.topSequences,
     bookedAttributionSources,
+    smsReplyLinks,
   );
   const topSequences = canonical.topSequences.map((row) => {
     const booked = sequenceBookedAttribution.byLabel.get(row.label);
     return {
       ...row,
       slackBookedCalls: booked?.booked ?? 0,
+      slackBookedAfterSmsReply: booked?.bookedAfterSmsReply ?? 0,
       slackBookedJack: booked?.jack ?? 0,
       slackBookedBrandon: booked?.brandon ?? 0,
       slackBookedSelf: booked?.selfBooked ?? 0,
+      slackBookedAuditRows: booked?.auditRows ?? [],
     };
   });
   if (!canonical.consistency.totalsBookedMatches) {
@@ -674,6 +710,11 @@ const buildSalesMetricsPayload = async (params: {
         matchedCalls: sequenceBookedAttribution.totals.matchedCalls,
         unattributedCalls: sequenceBookedAttribution.totals.unattributedCalls,
         manualCalls: sequenceBookedAttribution.totals.manualCalls,
+        strictSmsReplyLinkedCalls: sequenceBookedAttribution.totals.bookedAfterSmsReply,
+        nonSmsOrUnknownCalls: Math.max(
+          0,
+          sequenceBookedAttribution.totals.totalCalls - sequenceBookedAttribution.totals.bookedAfterSmsReply,
+        ),
       },
       deprecations: {
         topSequencesBookedAlias: true,
@@ -907,6 +948,1031 @@ const handleAssignWorkItem: RequestHandler = async (req, res, logger, origin) =>
   }
 };
 
+type VerifiedSlackUser = {
+  user_id?: string;
+  user?: string;
+  team_id?: string;
+  email?: string;
+};
+
+const getVerifiedSlackUser = (req: IncomingMessage & { user?: unknown }): VerifiedSlackUser => {
+  const user = req.user;
+  if (!user || typeof user !== 'object') return {};
+  return user as VerifiedSlackUser;
+};
+
+const isEmploymentStatus = (value: string): value is 'full_time' | 'part_time' | 'unknown' => {
+  return value === 'full_time' || value === 'part_time' || value === 'unknown';
+};
+
+const isRevenueMix = (value: string): value is 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown' => {
+  return value === 'mostly_cash' || value === 'mostly_insurance' || value === 'balanced' || value === 'unknown';
+};
+
+const isCoachingInterest = (value: string): value is 'high' | 'medium' | 'low' | 'unknown' => {
+  return value === 'high' || value === 'medium' || value === 'low' || value === 'unknown';
+};
+
+const isCadenceStatus = (value: string): value is 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool' => {
+  return value === 'idle' || value === 'podcast_sent' || value === 'call_offered' || value === 'nurture_pool';
+};
+
+const resolveQualificationProgressStep = (params: {
+  fullOrPartTime: 'full_time' | 'part_time' | 'unknown';
+  niche: string | null;
+  revenueMix: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
+  coachingInterest: 'high' | 'medium' | 'low' | 'unknown';
+}): number => {
+  let score = 0;
+  if (params.fullOrPartTime !== 'unknown') score += 1;
+  if (params.niche && params.niche.trim().length > 0) score += 1;
+  if (params.revenueMix !== 'unknown') score += 1;
+  if (params.coachingInterest !== 'unknown') score += 1;
+  return score;
+};
+
+const toInboxConversationV2 = (row: {
+  id: string;
+  contact_key: string;
+  profile_name: string | null;
+  contact_phone: string | null;
+  profile_phone: string | null;
+  current_rep_id: string | null;
+  status: 'open' | 'closed' | 'dnc';
+  profile_dnc: boolean | null;
+  last_inbound_at: string | null;
+  last_outbound_at: string | null;
+  last_touch_at: string | null;
+  unreplied_inbound_count: number;
+  open_needs_reply_count: number;
+  needs_reply_due_at: string | null;
+  last_message_direction: 'inbound' | 'outbound' | 'unknown' | null;
+  last_message_body: string | null;
+  last_message_at: string | null;
+  state_qualification_full_or_part_time: 'full_time' | 'part_time' | 'unknown' | null;
+  state_qualification_niche: string | null;
+  state_qualification_revenue_mix: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown' | null;
+  state_qualification_coaching_interest: 'high' | 'medium' | 'low' | 'unknown' | null;
+  state_qualification_progress_step: number | null;
+  state_escalation_level: number | null;
+  state_escalation_reason: string | null;
+  state_escalation_overridden: boolean | null;
+  state_cadence_status: 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool' | null;
+  state_next_followup_due_at: string | null;
+  state_last_podcast_sent_at: string | null;
+}) => ({
+  id: row.id,
+  contactKey: row.contact_key,
+  contactName: row.profile_name,
+  contactPhone: row.profile_phone || row.contact_phone,
+  repId: row.current_rep_id,
+  status: row.status,
+  dnc: row.status === 'dnc' || row.profile_dnc === true,
+  lastInboundAt: row.last_inbound_at,
+  lastOutboundAt: row.last_outbound_at,
+  lastTouchAt: row.last_touch_at,
+  unrepliedInboundCount: row.unreplied_inbound_count,
+  openNeedsReplyCount: row.open_needs_reply_count,
+  needsReplyDueAt: row.needs_reply_due_at,
+  lastMessage: {
+    direction: row.last_message_direction,
+    body: row.last_message_body,
+    createdAt: row.last_message_at,
+  },
+  qualification: {
+    fullOrPartTime: row.state_qualification_full_or_part_time || 'unknown',
+    niche: row.state_qualification_niche || null,
+    revenueMix: row.state_qualification_revenue_mix || 'unknown',
+    coachingInterest: row.state_qualification_coaching_interest || 'unknown',
+    progressStep: row.state_qualification_progress_step || 0,
+  },
+  escalation: {
+    level: (row.state_escalation_level && row.state_escalation_level >= 1 && row.state_escalation_level <= 4
+      ? row.state_escalation_level
+      : 1) as 1 | 2 | 3 | 4,
+    reason: row.state_escalation_reason || null,
+    overridden: row.state_escalation_overridden === true,
+    cadenceStatus: row.state_cadence_status || 'idle',
+    nextFollowupDueAt: row.state_next_followup_due_at || null,
+    lastPodcastSentAt: row.state_last_podcast_sent_at || null,
+  },
+});
+
+const getConversationIdFromPath = (req: IncomingMessage): string | null => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const parts = url.pathname.split('/').filter(Boolean);
+  // /api/v2/inbox/conversations/:id
+  return parts[4] || null;
+};
+
+const parseLineIdInput = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
+
+const normalizeFromInput = (value: unknown): string | null => {
+  if (typeof value !== 'string') return null;
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  return `+${digits}`;
+};
+
+const resolveSlackUserId = (user: VerifiedSlackUser): string | null => {
+  const id = (user.user_id || user.user || '').trim();
+  return id.length > 0 ? id : null;
+};
+
+const resolveSendLineSelection = async (
+  params: {
+    userId: string | null;
+    requestedLineId: number | null;
+    requestedFromNumber: string | null;
+  },
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<{
+  lineId: number | null;
+  fromNumber: string | null;
+  label: string | null;
+  key: string | null;
+  error: string | null;
+}> => {
+  const options = listSendLineOptions();
+
+  if (params.requestedLineId != null || params.requestedFromNumber) {
+    if (options.length > 0) {
+      const selectedOption = findSendLineOption({
+        lineId: params.requestedLineId,
+        fromNumber: params.requestedFromNumber,
+      });
+      if (!selectedOption) {
+        return {
+          lineId: null,
+          fromNumber: null,
+          label: null,
+          key: null,
+          error: 'Requested line is not in allowed outbound line catalog.',
+        };
+      }
+
+      return {
+        lineId: selectedOption.lineId,
+        fromNumber: selectedOption.fromNumber,
+        label: selectedOption.label,
+        key: selectedOption.key,
+        error: null,
+      };
+    }
+
+    return {
+      lineId: params.requestedLineId,
+      fromNumber: params.requestedFromNumber,
+      label: null,
+      key: null,
+      error: null,
+    };
+  }
+
+  if (params.userId) {
+    const preference = await getUserSendPreferences(params.userId, logger);
+    if (preference && (preference.default_line_id != null || preference.default_from_number)) {
+      if (options.length > 0) {
+        const preferredOption = findSendLineOption({
+          lineId: preference.default_line_id,
+          fromNumber: preference.default_from_number,
+        });
+        if (preferredOption) {
+          return {
+            lineId: preferredOption.lineId,
+            fromNumber: preferredOption.fromNumber,
+            label: preferredOption.label,
+            key: preferredOption.key,
+            error: null,
+          };
+        }
+      } else {
+        return {
+          lineId: preference.default_line_id,
+          fromNumber: preference.default_from_number,
+          label: null,
+          key: null,
+          error: null,
+        };
+      }
+    }
+  }
+
+  if (options.length === 1) {
+    return {
+      lineId: options[0].lineId,
+      fromNumber: options[0].fromNumber,
+      label: options[0].label,
+      key: options[0].key,
+      error: null,
+    };
+  }
+
+  if (options.length > 1) {
+    return {
+      lineId: null,
+      fromNumber: null,
+      label: null,
+      key: null,
+      error: 'Select a send line or save a default line before sending.',
+    };
+  }
+
+  return {
+    lineId: null,
+    fromNumber: null,
+    label: null,
+    key: null,
+    error: null,
+  };
+};
+
+const handleGetInboxSendConfigV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const user = getVerifiedSlackUser(req);
+  const userId = resolveSlackUserId(user);
+  const options = listSendLineOptions();
+  const preference = userId ? await getUserSendPreferences(userId, logger) : null;
+  const preferredOption =
+    preference && (preference.default_line_id != null || preference.default_from_number)
+      ? findSendLineOption({
+          lineId: preference.default_line_id,
+          fromNumber: preference.default_from_number,
+        })
+      : null;
+
+  const payload = {
+    lines: options.map((option) => ({
+      key: option.key,
+      label: option.label,
+      lineId: option.lineId,
+      fromNumber: option.fromNumber,
+    })),
+    defaultSelection: preferredOption
+      ? {
+          key: preferredOption.key,
+          label: preferredOption.label,
+          lineId: preferredOption.lineId,
+          fromNumber: preferredOption.fromNumber,
+        }
+      : preference
+        ? {
+            key:
+              preference.default_line_id != null
+                ? `line:${preference.default_line_id}`
+                : preference.default_from_number
+                  ? `from:${preference.default_from_number}`
+                  : 'none',
+            label: 'Saved Default',
+            lineId: preference.default_line_id,
+            fromNumber: preference.default_from_number,
+          }
+        : null,
+    requiresSelection: options.length > 1 && !preferredOption,
+  };
+
+  sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostInboxSendDefaultV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const user = getVerifiedSlackUser(req);
+  const userId = resolveSlackUserId(user);
+  if (!userId) {
+    return sendJson(res, 400, { error: 'Authenticated Slack user id is required to save defaults' }, origin);
+  }
+
+  let body: {
+    lineId?: number | string | null;
+    fromNumber?: string | null;
+    clear?: boolean;
+  } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch {
+    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  }
+
+  if (body.clear === true) {
+    const updated = await upsertUserSendPreferences(
+      {
+        userId,
+        defaultLineId: null,
+        defaultFromNumber: null,
+      },
+      logger,
+    );
+    return sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: {
+          success: true,
+          defaultSelection: {
+            lineId: updated.default_line_id,
+            fromNumber: updated.default_from_number,
+          },
+        },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  }
+
+  const lineId = parseLineIdInput(body.lineId);
+  const fromNumber = normalizeFromInput(body.fromNumber);
+  const options = listSendLineOptions();
+
+  if (lineId == null && !fromNumber) {
+    return sendJson(res, 400, { error: 'Provide lineId or fromNumber, or use clear=true.' }, origin);
+  }
+
+  if (options.length > 0) {
+    const selectedOption = findSendLineOption({ lineId, fromNumber });
+    if (!selectedOption) {
+      return sendJson(res, 400, { error: 'Selected default line is not in allowed line catalog.' }, origin);
+    }
+
+    const updated = await upsertUserSendPreferences(
+      {
+        userId,
+        defaultLineId: selectedOption.lineId,
+        defaultFromNumber: selectedOption.fromNumber,
+      },
+      logger,
+    );
+
+    return sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: {
+          success: true,
+          defaultSelection: {
+            key: selectedOption.key,
+            label: selectedOption.label,
+            lineId: updated.default_line_id,
+            fromNumber: updated.default_from_number,
+          },
+        },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  }
+
+  const updated = await upsertUserSendPreferences(
+    {
+      userId,
+      defaultLineId: lineId,
+      defaultFromNumber: fromNumber,
+    },
+    logger,
+  );
+
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: {
+        success: true,
+        defaultSelection: {
+          lineId: updated.default_line_id,
+          fromNumber: updated.default_from_number,
+        },
+      },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+const handleGetInboxConversationsV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const statusRaw = (url.searchParams.get('status') || '').trim();
+  const status =
+    statusRaw === 'open' || statusRaw === 'closed' || statusRaw === 'dnc'
+      ? (statusRaw as 'open' | 'closed' | 'dnc')
+      : undefined;
+  const needsReplyOnly = url.searchParams.get('needsReplyOnly') === 'true';
+  const search = (url.searchParams.get('search') || '').trim() || undefined;
+  const limit = Math.max(1, Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200));
+  const offset = Math.max(0, Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0);
+
+  const authUser = getVerifiedSlackUser(req);
+  const repRaw = (url.searchParams.get('repId') || '').trim();
+  const repId = repRaw === 'me' ? authUser.user_id || undefined : repRaw || undefined;
+
+  const rows = await listInboxConversations(
+    {
+      limit,
+      offset,
+      status,
+      repId,
+      needsReplyOnly,
+      search,
+    },
+    logger,
+  );
+
+  const payload = {
+    items: rows.map((row) => toInboxConversationV2(row)),
+    pagination: {
+      limit,
+      offset,
+      count: rows.length,
+    },
+    filters: {
+      status: status || null,
+      repId: repId || null,
+      needsReplyOnly,
+      search: search || null,
+    },
+  };
+
+  sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getInboxConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  const ensuredState = await ensureConversationState(conversationId, logger);
+
+  let profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
+  if (!profile && conversation.contact_phone) {
+    profile = await enrichContactProfileFromAloware(
+      {
+        contactKey: conversation.contact_key,
+        conversationId,
+        phoneNumber: conversation.contact_phone,
+        fallbackName: conversation.profile_name,
+        contactId: conversation.contact_id,
+      },
+      logger,
+    );
+  }
+
+  let messages = await listMessagesForConversation(conversationId, 250, logger);
+  if (messages.length === 0) {
+    const legacy = await listSmsEventsForConversation(
+      {
+        id: conversationId,
+        contact_id: conversation.contact_id,
+        contact_phone: conversation.contact_phone,
+      },
+      250,
+      logger,
+    );
+    messages = legacy.map((event) => ({
+      id: event.id,
+      conversation_id: conversationId,
+      event_ts: event.event_ts,
+      direction: event.direction,
+      body: event.body,
+      sequence: null,
+      line: null,
+      aloware_user: null,
+      slack_channel_id: event.slack_channel_id,
+      slack_message_ts: event.slack_message_ts,
+    }));
+  }
+  const drafts = await listDraftSuggestionsForConversation(conversationId, 20, logger);
+  const mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
+
+  const mergedRow = {
+    ...conversation,
+    state_qualification_full_or_part_time: ensuredState.qualification_full_or_part_time,
+    state_qualification_niche: ensuredState.qualification_niche,
+    state_qualification_revenue_mix: ensuredState.qualification_revenue_mix,
+    state_qualification_coaching_interest: ensuredState.qualification_coaching_interest,
+    state_qualification_progress_step: ensuredState.qualification_progress_step,
+    state_escalation_level: ensuredState.escalation_level,
+    state_escalation_reason: ensuredState.escalation_reason,
+    state_escalation_overridden: ensuredState.escalation_overridden,
+    state_last_podcast_sent_at: ensuredState.last_podcast_sent_at,
+    state_cadence_status: ensuredState.cadence_status,
+    state_next_followup_due_at: ensuredState.next_followup_due_at,
+  };
+
+  const payload = {
+    conversation: toInboxConversationV2(mergedRow),
+    contactCard: {
+      contactKey: conversation.contact_key,
+      contactId: profile?.contact_id || conversation.contact_id,
+      alowareContactId: profile?.aloware_contact_id || null,
+      name: profile?.name || conversation.profile_name || null,
+      phone: profile?.phone || conversation.profile_phone || conversation.contact_phone || null,
+      email: profile?.email || conversation.profile_email || null,
+      timezone: profile?.timezone || conversation.profile_timezone || null,
+      niche: profile?.niche || conversation.profile_niche || ensuredState.qualification_niche || null,
+      dnc: conversation.status === 'dnc' || profile?.dnc === true,
+    },
+    messages: messages.map((msg) => ({
+      id: msg.id,
+      conversationId: msg.conversation_id,
+      direction: msg.direction,
+      body: msg.body,
+      sequence: msg.sequence,
+      line: msg.line,
+      alowareUser: msg.aloware_user,
+      createdAt: msg.event_ts,
+      slackChannelId: msg.slack_channel_id,
+      slackMessageTs: msg.slack_message_ts,
+    })),
+    drafts: drafts.map((draft) => ({
+      id: draft.id,
+      text: draft.generated_text,
+      lintScore: draft.lint_score,
+      structuralScore: draft.structural_score,
+      accepted: draft.accepted,
+      edited: draft.edited,
+      createdAt: draft.created_at,
+    })),
+    mondayTrail,
+  };
+
+  sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  if (!isDraftEngineEnabled()) {
+    return sendJson(res, 403, { error: 'Draft engine is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getInboxConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  let body: { bookedCallLabel?: string } = {};
+  try {
+    body = (await parseJsonBody(req)) as { bookedCallLabel?: string };
+  } catch {
+    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  }
+
+  const state = await ensureConversationState(conversationId, logger);
+  let messages = await listMessagesForConversation(conversationId, 250, logger);
+  if (messages.length === 0) {
+    const legacy = await listSmsEventsForConversation(
+      {
+        id: conversationId,
+        contact_id: conversation.contact_id,
+        contact_phone: conversation.contact_phone,
+      },
+      250,
+      logger,
+    );
+    messages = legacy.map((event) => ({
+      id: event.id,
+      conversation_id: conversationId,
+      event_ts: event.event_ts,
+      direction: event.direction,
+      body: event.body,
+      sequence: null,
+      line: null,
+      aloware_user: null,
+      slack_channel_id: event.slack_channel_id,
+      slack_message_ts: event.slack_message_ts,
+    }));
+  }
+
+  const draft = await generateDraftSuggestion(
+    {
+      conversationId,
+      messages,
+      state,
+      bookedCallLabel: body.bookedCallLabel,
+    },
+    logger,
+  );
+
+  const storedDraft = await insertDraftSuggestion(
+    {
+      conversationId,
+      promptSnapshotHash: draft.promptSnapshotHash,
+      retrievedExemplarIds: draft.retrievedExamples.map((example) => example.id),
+      generatedText: draft.text,
+      lintScore: draft.lint.score,
+      structuralScore: draft.lint.structuralScore,
+      lintIssues: draft.lint.issues.map((issue) => issue.code),
+      raw: {
+        attempts: draft.attempts,
+        escalationReason: draft.escalationReason,
+      },
+    },
+    logger,
+  );
+
+  if (!state.escalation_overridden) {
+    await updateConversationState(
+      conversationId,
+      {
+        escalationLevel: draft.escalationLevel,
+        escalationReason: draft.escalationReason,
+      },
+      logger,
+    );
+  }
+
+  const payload = {
+    id: storedDraft.id,
+    conversationId,
+    text: storedDraft.generated_text,
+    lint: {
+      passed: draft.lint.passed,
+      score: draft.lint.score,
+      structuralScore: draft.lint.structuralScore,
+      issues: draft.lint.issues,
+    },
+    escalation: {
+      level: draft.escalationLevel,
+      reason: draft.escalationReason,
+    },
+    qualification: {
+      step: draft.qualificationStep,
+      missing: draft.qualificationMissing,
+    },
+    attempts: draft.attempts,
+    createdAt: storedDraft.created_at,
+  };
+
+  sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  if (!isAlowareSendEnabled()) {
+    return sendJson(res, 403, { error: 'Outbound send is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  let body: {
+    body?: string;
+    idempotencyKey?: string;
+    lineId?: number | string | null;
+    fromNumber?: string;
+    senderIdentity?: string;
+    draftId?: string;
+  } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch {
+    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  }
+
+  const messageBody = (body.body || '').trim();
+  if (!messageBody) {
+    return sendJson(res, 400, { error: 'Missing message body' }, origin);
+  }
+
+  if (body.draftId && isStrictLintEnabled()) {
+    const linkedDraft = await getDraftSuggestionById(body.draftId, logger);
+    if (linkedDraft) {
+      const unchangedFromDraft = linkedDraft.generated_text.trim() === messageBody;
+      const lintFailed = linkedDraft.lint_score < 80;
+      if (unchangedFromDraft && lintFailed) {
+        return sendJson(res, 400, { error: 'Draft failed strict lint. Edit the message before sending.' }, origin);
+      }
+    }
+  }
+
+  const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
+  const authUser = getVerifiedSlackUser(req);
+  const requestedLineId = parseLineIdInput(body.lineId);
+  const requestedFromNumber = normalizeFromInput(body.fromNumber);
+  const sendLineSelection = await resolveSendLineSelection(
+    {
+      userId: resolveSlackUserId(authUser),
+      requestedLineId,
+      requestedFromNumber,
+    },
+    logger,
+  );
+
+  if (sendLineSelection.error) {
+    return sendJson(res, 400, { error: sendLineSelection.error }, origin);
+  }
+
+  const result = await sendInboxMessage(
+    {
+      conversation,
+      profile,
+      body: messageBody,
+      lineId: sendLineSelection.lineId,
+      fromNumber: sendLineSelection.fromNumber,
+      senderUserId: authUser.user_id || authUser.user || null,
+      senderEmail: authUser.email || null,
+      senderIdentity: body.senderIdentity || null,
+      idempotencyKey: body.idempotencyKey || null,
+    },
+    logger,
+  );
+
+  if (body.draftId && result.outboundEvent?.id) {
+    await updateDraftSuggestionFeedback(
+      body.draftId,
+      {
+        accepted: true,
+        sendLinkedEventId: result.outboundEvent.id,
+      },
+      logger,
+    );
+  }
+
+  const payload = {
+    status: result.status,
+    reason: result.reason,
+    sendAttemptId: result.sendAttempt.id,
+    outboundEventId: result.outboundEvent?.id || null,
+    lineSelection: {
+      key: sendLineSelection.key,
+      label: sendLineSelection.label,
+      lineId: sendLineSelection.lineId,
+      fromNumber: sendLineSelection.fromNumber,
+    },
+  };
+
+  sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostInboxQualificationV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  let body: {
+    fullOrPartTime?: string;
+    niche?: string | null;
+    revenueMix?: string;
+    coachingInterest?: string;
+  } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch {
+    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  }
+
+  const currentState = await ensureConversationState(conversationId, logger);
+  const fullOrPartTime: 'full_time' | 'part_time' | 'unknown' = isEmploymentStatus(body.fullOrPartTime || '')
+    ? ((body.fullOrPartTime || 'unknown') as 'full_time' | 'part_time' | 'unknown')
+    : currentState.qualification_full_or_part_time;
+  const niche = typeof body.niche === 'string' ? body.niche.trim() : currentState.qualification_niche;
+  const revenueMix: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown' = isRevenueMix(body.revenueMix || '')
+    ? ((body.revenueMix || 'unknown') as 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown')
+    : currentState.qualification_revenue_mix;
+  const coachingInterest: 'high' | 'medium' | 'low' | 'unknown' = isCoachingInterest(body.coachingInterest || '')
+    ? ((body.coachingInterest || 'unknown') as 'high' | 'medium' | 'low' | 'unknown')
+    : currentState.qualification_coaching_interest;
+
+  const progressStep = resolveQualificationProgressStep({
+    fullOrPartTime,
+    niche,
+    revenueMix,
+    coachingInterest,
+  });
+
+  const nextState = await updateConversationState(
+    conversationId,
+    {
+      fullOrPartTime,
+      niche,
+      revenueMix,
+      coachingInterest,
+      progressStep,
+    },
+    logger,
+  );
+
+  await upsertInboxContactProfile(
+    {
+      contactKey: conversation.contact_key,
+      conversationId,
+      contactId: conversation.contact_id,
+      niche,
+      employmentStatus: fullOrPartTime,
+      revenueMixCategory: revenueMix,
+      coachingInterest,
+    },
+    logger,
+  );
+
+  const payload = {
+    fullOrPartTime: nextState.qualification_full_or_part_time,
+    niche: nextState.qualification_niche,
+    revenueMix: nextState.qualification_revenue_mix,
+    coachingInterest: nextState.qualification_coaching_interest,
+    progressStep: nextState.qualification_progress_step,
+  };
+
+  sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostInboxEscalationOverrideV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  let body: {
+    level?: number;
+    reason?: string | null;
+    cadenceStatus?: string;
+    nextFollowupDueAt?: string | null;
+    lastPodcastSentAt?: string | null;
+  } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch {
+    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  }
+
+  if (!body.level || body.level < 1 || body.level > 4) {
+    return sendJson(res, 400, { error: 'level must be between 1 and 4' }, origin);
+  }
+
+  const cadenceStatus = body.cadenceStatus && isCadenceStatus(body.cadenceStatus) ? body.cadenceStatus : undefined;
+
+  const nextState = await updateConversationState(
+    conversationId,
+    {
+      escalationLevel: body.level as 1 | 2 | 3 | 4,
+      escalationReason: typeof body.reason === 'string' ? body.reason : body.reason === null ? null : undefined,
+      escalationOverridden: true,
+      cadenceStatus,
+      nextFollowupDueAt: typeof body.nextFollowupDueAt === 'string' ? body.nextFollowupDueAt : undefined,
+      lastPodcastSentAt: typeof body.lastPodcastSentAt === 'string' ? body.lastPodcastSentAt : undefined,
+    },
+    logger,
+  );
+
+  const payload = {
+    level: nextState.escalation_level,
+    reason: nextState.escalation_reason,
+    overridden: nextState.escalation_overridden,
+    cadenceStatus: nextState.cadence_status,
+    nextFollowupDueAt: nextState.next_followup_due_at,
+    lastPodcastSentAt: nextState.last_podcast_sent_at,
+  };
+
+  sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostInboxDraftFeedbackV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const parts = url.pathname.split('/').filter(Boolean);
+  const draftId = parts[4];
+  if (!draftId) {
+    return sendJson(res, 400, { error: 'Missing draft ID' }, origin);
+  }
+
+  let body: {
+    accepted?: boolean;
+    edited?: boolean;
+    sendLinkedEventId?: string;
+    sourceOutboundEventId?: string;
+    bookedCallLabel?: string;
+    closedWonLabel?: string;
+    escalationLevel?: number;
+    structureSignature?: string;
+    qualifierSnapshot?: unknown;
+  } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch {
+    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  }
+
+  const updatedDraft = await updateDraftSuggestionFeedback(
+    draftId,
+    {
+      accepted: typeof body.accepted === 'boolean' ? body.accepted : undefined,
+      edited: typeof body.edited === 'boolean' ? body.edited : undefined,
+      sendLinkedEventId: body.sendLinkedEventId || undefined,
+    },
+    logger,
+  );
+
+  if (!updatedDraft) {
+    return sendJson(res, 404, { error: 'Draft not found' }, origin);
+  }
+
+  const sourceOutboundEventId =
+    body.sourceOutboundEventId || body.sendLinkedEventId || updatedDraft.send_linked_event_id;
+  if (
+    sourceOutboundEventId &&
+    (body.bookedCallLabel || body.closedWonLabel || body.structureSignature || body.escalationLevel)
+  ) {
+    await upsertConversionExample(
+      {
+        sourceOutboundEventId,
+        bookedCallLabel: body.bookedCallLabel || null,
+        closedWonLabel: body.closedWonLabel || null,
+        escalationLevel:
+          body.escalationLevel && body.escalationLevel >= 1 && body.escalationLevel <= 4
+            ? (body.escalationLevel as 1 | 2 | 3 | 4)
+            : 1,
+        structureSignature: body.structureSignature || null,
+        qualifierSnapshot: body.qualifierSnapshot ?? null,
+        channelMarker: 'sms',
+      },
+      logger,
+    );
+  }
+
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: {
+        success: true,
+        draft: {
+          id: updatedDraft.id,
+          accepted: updatedDraft.accepted,
+          edited: updatedDraft.edited,
+          sendLinkedEventId: updatedDraft.send_linked_event_id,
+          updatedAt: updatedDraft.updated_at,
+        },
+      },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
 type ApiRoute = {
   method: 'GET' | 'POST';
   path: string;
@@ -937,6 +2003,40 @@ const apiRoutes: ApiRoute[] = [
   // Authenticated endpoints (mutations / sensitive data)
   { method: 'GET', path: '/api/auth/verify', requiresAuth: true, handler: handleAuthVerify },
   { method: 'POST', path: '/api/runs', requiresAuth: false, handler: handlePostRun },
+  { method: 'GET', path: '/api/v2/inbox/send-config', requiresAuth: true, handler: handleGetInboxSendConfigV2 },
+  { method: 'POST', path: '/api/v2/inbox/send-config/default', requiresAuth: true, handler: handlePostInboxSendDefaultV2 },
+  { method: 'GET', path: '/api/v2/inbox/conversations', requiresAuth: true, handler: handleGetInboxConversationsV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/conversations/:id',
+    requiresAuth: true,
+    handler: handleGetInboxConversationDetailV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/draft',
+    requiresAuth: true,
+    handler: handlePostInboxDraftV2,
+  },
+  { method: 'POST', path: '/api/v2/inbox/conversations/:id/send', requiresAuth: true, handler: handlePostInboxSendV2 },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/qualification',
+    requiresAuth: true,
+    handler: handlePostInboxQualificationV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/escalation-override',
+    requiresAuth: true,
+    handler: handlePostInboxEscalationOverrideV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/drafts/:id/feedback',
+    requiresAuth: true,
+    handler: handlePostInboxDraftFeedbackV2,
+  },
 
   { method: 'GET', path: '/api/conversations/:id', requiresAuth: true, handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', requiresAuth: true, handler: handleGetConversationEvents },

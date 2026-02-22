@@ -33,6 +33,8 @@
   --v2-positive: #13b981;
   --v2-critical: #ef4c62;
   --v2-warning: #f59d0d;
+  --v2-topbar-height: 92px;
+  --v2-topbar-height-mobile: 68px;
 }
 
 .V2Shell,
@@ -55,7 +57,7 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  height: 76px;
+  height: var(--v2-topbar-height);
   padding: 0 var(--v2-space-5);
   display: flex;
   align-items: center;
@@ -67,7 +69,7 @@
 }
 
 .V2Shell__menuButton {
-  display: none;
+  display: inline-block;
   width: 46px;
   height: 40px;
   border: 1px solid rgba(9, 20, 36, 0.14);
@@ -87,8 +89,8 @@
 .V2Shell__brand {
   display: inline-flex;
   align-items: center;
-  width: 180px;
-  height: 44px;
+  width: 270px;
+  height: 66px;
   overflow: hidden;
   cursor: pointer;
 }
@@ -96,10 +98,10 @@
 .V2Shell__brandLogo {
   display: block;
   width: auto;
-  height: 60px;
+  height: 90px;
   max-width: none;
   object-fit: cover;
-  transform: translateX(-6px) translateY(-5px);
+  transform: translateX(-9px) translateY(-8px);
 }
 
 .V2Shell__modeButton {
@@ -147,8 +149,13 @@
 .V2Shell__body {
   display: grid;
   grid-template-columns: 280px 1fr;
-  min-height: calc(100vh - 76px);
+  min-height: calc(100vh - var(--v2-topbar-height));
   overflow-x: clip;
+  transition: grid-template-columns 220ms ease;
+}
+
+.V2Shell__body.is-collapsed {
+  grid-template-columns: 96px 1fr;
 }
 
 .V2Shell__sidebar {
@@ -157,6 +164,11 @@
     linear-gradient(180deg, rgba(8, 18, 35, 0.96), rgba(9, 18, 31, 0.94)),
     radial-gradient(700px 420px at 12% -18%, rgba(17, 184, 214, 0.35), transparent 50%);
   padding: var(--v2-space-5);
+  transition: padding 220ms ease, transform 260ms ease;
+}
+
+.V2Shell__sidebar.is-collapsed {
+  padding: var(--v2-space-3) var(--v2-space-2);
 }
 
 .V2Shell__nav {
@@ -202,6 +214,25 @@
 
 .V2Shell__navLabelShort {
   display: none;
+}
+
+.V2Shell__sidebar.is-collapsed .V2Shell__navItem {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  text-align: center;
+  gap: var(--v2-space-2);
+  padding: 0.66rem 0.35rem;
+}
+
+.V2Shell__sidebar.is-collapsed .V2Shell__navLabel {
+  display: none;
+}
+
+.V2Shell__sidebar.is-collapsed .V2Shell__navLabelShort {
+  display: inline;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .V2Shell__content {
@@ -442,6 +473,67 @@
 
 .V2Table .is-right {
   text-align: right;
+}
+
+.V2SequenceCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.V2SequenceCell__auditToggle {
+  align-self: flex-start;
+  border: 1px solid rgba(7, 19, 36, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--v2-text);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.55rem;
+  cursor: pointer;
+}
+
+.V2SequenceCell__auditToggle:hover {
+  border-color: var(--v2-accent-strong);
+}
+
+.V2Table__auditRow td {
+  background: rgba(245, 247, 252, 0.8);
+}
+
+.V2AuditList {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.V2AuditItem {
+  border: 1px solid rgba(7, 19, 36, 0.1);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.V2AuditItem header {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.V2AuditItem header strong {
+  font-size: 0.82rem;
+}
+
+.V2AuditItem header span {
+  font-size: 0.75rem;
+  color: var(--v2-muted);
+}
+
+.V2AuditItem p {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--v2-text);
+  line-height: 1.3;
 }
 
 .V2RiskTag {
@@ -1216,17 +1308,32 @@
     grid-template-columns: 1fr;
   }
 
-  .V2Shell__menuButton {
-    display: inline-block;
-  }
-
   .V2Shell__sidebar {
     position: fixed;
-    inset: 76px auto 0 0;
+    inset: var(--v2-topbar-height) auto 0 0;
     width: min(82vw, 320px);
     transform: translateX(-106%);
-    transition: transform 260ms ease;
     z-index: 28;
+  }
+
+  .V2Shell__sidebar.is-collapsed {
+    padding: var(--v2-space-5);
+  }
+
+  .V2Shell__sidebar.is-collapsed .V2Shell__navItem {
+    grid-template-columns: 1.9rem 1fr;
+    justify-items: stretch;
+    text-align: left;
+    gap: var(--v2-space-3);
+    padding: 0.78rem 0.85rem;
+  }
+
+  .V2Shell__sidebar.is-collapsed .V2Shell__navLabel {
+    display: inline;
+  }
+
+  .V2Shell__sidebar.is-collapsed .V2Shell__navLabelShort {
+    display: none;
   }
 
   .V2Shell__defsFab {
@@ -1250,11 +1357,15 @@
 @media (max-width: 760px) {
   .V2Shell__topbar {
     padding: 0 var(--v2-space-3);
-    height: 68px;
+    height: var(--v2-topbar-height-mobile);
+  }
+
+  .V2Shell__body {
+    min-height: calc(100vh - var(--v2-topbar-height-mobile));
   }
 
   .V2Shell__sidebar {
-    top: 68px;
+    top: var(--v2-topbar-height-mobile);
   }
 
   .V2Shell__content {
@@ -1343,5 +1454,262 @@
   .V2Shell__sidebar {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Inbox */
+.V2Inbox__controls {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.V2Inbox__flash {
+  margin-bottom: 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid var(--v2-border);
+  background: color-mix(in srgb, var(--v2-surface-2) 80%, white 20%);
+  color: var(--v2-text);
+  font-size: 0.92rem;
+}
+
+.V2Inbox__layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(420px, 1.4fr) minmax(300px, 1fr);
+  gap: 1rem;
+}
+
+.V2Inbox__threadColumn,
+.V2Inbox__sideColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.V2Inbox__conversationList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 74vh;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.V2Inbox__conversationRow {
+  width: 100%;
+  text-align: left;
+  background: color-mix(in srgb, var(--v2-surface-2) 85%, white 15%);
+  border: 1px solid var(--v2-border);
+  border-radius: 12px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  color: var(--v2-text);
+  cursor: pointer;
+}
+
+.V2Inbox__conversationRow.is-active {
+  border-color: var(--v2-accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--v2-accent) 45%, transparent 55%);
+}
+
+.V2Inbox__conversationTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.V2Inbox__conversationTop strong {
+  font-size: 0.9rem;
+}
+
+.V2Inbox__conversationTop span {
+  color: var(--v2-text-muted);
+  font-size: 0.78rem;
+}
+
+.V2Inbox__conversationRow p {
+  margin: 0;
+  color: var(--v2-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.3;
+}
+
+.V2Inbox__conversationMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--v2-text-muted);
+  font-size: 0.77rem;
+}
+
+.V2Inbox__thread {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 40vh;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.V2Inbox__message {
+  border: 1px solid var(--v2-border);
+  border-radius: 12px;
+  padding: 0.6rem 0.75rem;
+  background: color-mix(in srgb, var(--v2-surface-2) 80%, white 20%);
+}
+
+.V2Inbox__message--outbound {
+  border-color: color-mix(in srgb, var(--v2-accent) 45%, var(--v2-border) 55%);
+  background: color-mix(in srgb, var(--v2-accent-soft) 35%, var(--v2-surface-2) 65%);
+}
+
+.V2Inbox__message--inbound {
+  border-color: color-mix(in srgb, #4cb782 35%, var(--v2-border) 65%);
+}
+
+.V2Inbox__message header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--v2-text-muted);
+  font-size: 0.74rem;
+  margin-bottom: 0.35rem;
+}
+
+.V2Inbox__message p {
+  margin: 0;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.V2Inbox__composer {
+  width: 100%;
+  min-height: 130px;
+  border-radius: 12px;
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface-2);
+  color: var(--v2-text);
+  font: inherit;
+  padding: 0.7rem 0.8rem;
+  resize: vertical;
+}
+
+.V2Inbox__sendConfig {
+  margin-bottom: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.V2Inbox__sendMeta {
+  margin: 0;
+  color: var(--v2-text-muted);
+  font-size: 0.78rem;
+}
+
+.V2Inbox__actions {
+  margin-top: 0.65rem;
+  display: flex;
+  gap: 0.65rem;
+}
+
+.V2Inbox__actions button,
+.V2Inbox__drafts button,
+.V2Inbox__sideColumn button {
+  border: 1px solid var(--v2-border);
+  border-radius: 10px;
+  background: var(--v2-surface-2);
+  color: var(--v2-text);
+  font: inherit;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+}
+
+.V2Inbox__actions button:hover,
+.V2Inbox__drafts button:hover,
+.V2Inbox__sideColumn button:hover {
+  border-color: var(--v2-accent);
+}
+
+.V2Inbox__actions button:disabled,
+.V2Inbox__drafts button:disabled,
+.V2Inbox__sideColumn button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.V2Inbox__drafts {
+  margin-top: 0.8rem;
+}
+
+.V2Inbox__drafts h4 {
+  margin: 0 0 0.45rem;
+  font-size: 0.86rem;
+  color: var(--v2-text-muted);
+}
+
+.V2Inbox__draftRow {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.V2Inbox__draftRow span {
+  font-size: 0.84rem;
+}
+
+.V2Inbox__draftRow em {
+  font-size: 0.75rem;
+  color: var(--v2-text-muted);
+}
+
+.V2Inbox__draftRow.is-active {
+  border-color: var(--v2-accent);
+}
+
+.V2Inbox__cardList {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 0.4rem 0.65rem;
+  margin: 0;
+}
+
+.V2Inbox__cardList dt {
+  margin: 0;
+  color: var(--v2-text-muted);
+  font-size: 0.78rem;
+}
+
+.V2Inbox__cardList dd {
+  margin: 0;
+  font-size: 0.83rem;
+}
+
+.V2Inbox__escalationMeta {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  color: var(--v2-text-muted);
+  font-size: 0.8rem;
+}
+
+@media (max-width: 1360px) {
+  .V2Inbox__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .V2Inbox__conversationList,
+  .V2Inbox__thread {
+    max-height: none;
   }
 }

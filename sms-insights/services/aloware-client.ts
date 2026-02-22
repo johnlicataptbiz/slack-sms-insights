@@ -106,7 +106,11 @@ export const lookupAlowareContactByPhone = async (
   });
 
   try {
-    const payload = await requestAloware(`/api/v1/webhook/contact/phone-number?${query.toString()}`, { method: 'GET' }, logger);
+    const payload = await requestAloware(
+      `/api/v1/webhook/contact/phone-number?${query.toString()}`,
+      { method: 'GET' },
+      logger,
+    );
     if (isObject(payload)) {
       return payload as AlowareContactLookupResult;
     }

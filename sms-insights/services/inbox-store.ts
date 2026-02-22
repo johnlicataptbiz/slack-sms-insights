@@ -1,7 +1,12 @@
 import type { Logger } from '@slack/bolt';
 import type { Pool } from 'pg';
 import { getPool } from './db.js';
-import type { CoachingInterest, EmploymentStatus, InboxContactProfileRow, RevenueMixCategory } from './inbox-contact-profiles.js';
+import type {
+  CoachingInterest,
+  EmploymentStatus,
+  InboxContactProfileRow,
+  RevenueMixCategory,
+} from './inbox-contact-profiles.js';
 
 export type CadenceStatus = 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
 
@@ -94,7 +99,15 @@ export type InboxConversationListRow = {
   profile_employment_status: EmploymentStatus | null;
   profile_coaching_interest: CoachingInterest | null;
   profile_dnc: boolean | null;
+  state_qualification_full_or_part_time: EmploymentStatus | null;
+  state_qualification_niche: string | null;
+  state_qualification_revenue_mix: RevenueMixCategory | null;
+  state_qualification_coaching_interest: CoachingInterest | null;
+  state_qualification_progress_step: number | null;
   state_escalation_level: number | null;
+  state_escalation_reason: string | null;
+  state_escalation_overridden: boolean | null;
+  state_last_podcast_sent_at: string | null;
   state_cadence_status: CadenceStatus | null;
   state_next_followup_due_at: string | null;
   open_needs_reply_count: number;
@@ -385,7 +398,15 @@ export const listInboxConversations = async (
         p.employment_status AS profile_employment_status,
         p.coaching_interest AS profile_coaching_interest,
         p.dnc AS profile_dnc,
+        s.qualification_full_or_part_time AS state_qualification_full_or_part_time,
+        s.qualification_niche AS state_qualification_niche,
+        s.qualification_revenue_mix AS state_qualification_revenue_mix,
+        s.qualification_coaching_interest AS state_qualification_coaching_interest,
+        s.qualification_progress_step AS state_qualification_progress_step,
         s.escalation_level AS state_escalation_level,
+        s.escalation_reason AS state_escalation_reason,
+        s.escalation_overridden AS state_escalation_overridden,
+        s.last_podcast_sent_at AS state_last_podcast_sent_at,
         s.cadence_status AS state_cadence_status,
         s.next_followup_due_at AS state_next_followup_due_at,
         COALESCE(open_items.open_needs_reply_count, 0)::integer AS open_needs_reply_count,
@@ -425,10 +446,6 @@ export const getInboxConversationById = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxConversationListRow | null> => {
-  const rows = await listInboxConversations({ limit: 1, offset: 0, search: undefined }, logger);
-  const direct = rows.find((row) => row.id === conversationId);
-  if (direct) return direct;
-
   const pool = getDbOrThrow();
   const client = await pool.connect();
   try {
@@ -475,7 +492,15 @@ export const getInboxConversationById = async (
         p.employment_status AS profile_employment_status,
         p.coaching_interest AS profile_coaching_interest,
         p.dnc AS profile_dnc,
+        s.qualification_full_or_part_time AS state_qualification_full_or_part_time,
+        s.qualification_niche AS state_qualification_niche,
+        s.qualification_revenue_mix AS state_qualification_revenue_mix,
+        s.qualification_coaching_interest AS state_qualification_coaching_interest,
+        s.qualification_progress_step AS state_qualification_progress_step,
         s.escalation_level AS state_escalation_level,
+        s.escalation_reason AS state_escalation_reason,
+        s.escalation_overridden AS state_escalation_overridden,
+        s.last_podcast_sent_at AS state_last_podcast_sent_at,
         s.cadence_status AS state_cadence_status,
         s.next_followup_due_at AS state_next_followup_due_at,
         COALESCE(open_items.open_needs_reply_count, 0)::integer AS open_needs_reply_count,
@@ -785,6 +810,31 @@ export const listDraftSuggestionsForConversation = async (
     return result.rows;
   } catch (err) {
     logger?.error('listDraftSuggestionsForConversation failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const getDraftSuggestionById = async (
+  draftId: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<DraftSuggestionRow | null> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<DraftSuggestionRow>(
+      `
+      SELECT *
+      FROM draft_suggestions
+      WHERE id = $1
+      LIMIT 1;
+      `,
+      [draftId],
+    );
+    return result.rows[0] ?? null;
+  } catch (err) {
+    logger?.error('getDraftSuggestionById failed', err);
     throw err;
   } finally {
     client.release();

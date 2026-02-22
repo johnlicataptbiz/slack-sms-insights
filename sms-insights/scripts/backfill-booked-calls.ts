@@ -5,6 +5,7 @@ import { upsertBookedCall, upsertBookedCallReaction } from '../services/booked-c
 
 const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 const CHANNEL_ID = process.env.BOOKED_CALLS_CHANNEL_ID;
+const BACKFILL_DAYS = Math.max(1, Number.parseInt(process.env.BACKFILL_DAYS || '90', 10));
 
 const slackTsToDate = (ts: string | undefined): Date => {
   const raw = ts || `${Date.now() / 1000}`;
@@ -25,6 +26,7 @@ async function backfill() {
 
   console.log('🚀 Starting booked calls backfill...');
   console.log(`Channel: ${CHANNEL_ID}`);
+  console.log(`Lookback window: ${BACKFILL_DAYS} days`);
 
   await initDatabase(console);
   await initializeSchema();
@@ -34,6 +36,7 @@ async function backfill() {
   let cursor: string | undefined;
   let totalProcessed = 0;
   let totalIngested = 0;
+  const oldest = Math.floor(Date.now() / 1000 - BACKFILL_DAYS * 24 * 60 * 60).toString();
 
   try {
     do {
@@ -42,6 +45,7 @@ async function backfill() {
         channel: CHANNEL_ID,
         cursor,
         limit: 100,
+        oldest,
       });
 
       if (!result.ok) {

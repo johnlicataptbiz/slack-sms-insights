@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { getPool } from './db.js';
 import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventDirection, SmsEventRow } from './sms-event-store.js';
+import { linkSmsEventToConversation } from './sms-event-store.js';
 
 export type ConversationRow = {
   id: string;
@@ -109,6 +110,7 @@ export const upsertConversationFromEvent = async (
 
     const row = result.rows[0] ?? null;
     if (row) {
+      await linkSmsEventToConversation(event.id, row.id, logger);
       publishRealtimeEvent({ type: 'conversation_updated', id: row.id, ts: new Date().toISOString() }, logger);
     }
     return row;

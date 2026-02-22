@@ -59,9 +59,26 @@ export type SalesMetricsV2 = {
     repliesReceived: number;
     replyRatePct: number;
     canonicalBookedCalls: number;
+    canonicalBookedAfterSmsReply: number;
     canonicalBookedJack: number;
     canonicalBookedBrandon: number;
     canonicalBookedSelf: number;
+    bookedAuditRows: Array<{
+      bookedCallId: string;
+      eventTs: string;
+      bucket: 'jack' | 'brandon' | 'selfBooked';
+      firstConversion: string | null;
+      rep: string | null;
+      line: string | null;
+      contactName: string | null;
+      contactPhone: string | null;
+      slackChannelId: string;
+      slackMessageTs: string;
+      text: string | null;
+      strictSmsReplyLinked: boolean;
+      latestReplyAt: string | null;
+      strictSmsReplyReason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
+    }>;
     diagnosticSmsBookingSignals: number;
     optOuts: number;
     optOutRatePct: number;
@@ -84,6 +101,8 @@ export type SalesMetricsV2 = {
       matchedCalls: number;
       unattributedCalls: number;
       manualCalls: number;
+      strictSmsReplyLinkedCalls?: number;
+      nonSmsOrUnknownCalls?: number;
     };
   };
 };
@@ -187,6 +206,175 @@ export type WeeklyManagerSummaryV2 = {
   actionsNextWeek: string[];
 };
 
+export type QualificationStateV2 = {
+  fullOrPartTime: 'full_time' | 'part_time' | 'unknown';
+  niche: string | null;
+  revenueMix: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
+  coachingInterest: 'high' | 'medium' | 'low' | 'unknown';
+  progressStep: number;
+};
+
+export type EscalationStateV2 = {
+  level: 1 | 2 | 3 | 4;
+  reason: string | null;
+  overridden: boolean;
+  cadenceStatus: 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
+  nextFollowupDueAt: string | null;
+  lastPodcastSentAt: string | null;
+};
+
+export type InboxMessageV2 = {
+  id: string;
+  conversationId: string | null;
+  direction: 'inbound' | 'outbound' | 'unknown';
+  body: string | null;
+  sequence: string | null;
+  line: string | null;
+  alowareUser: string | null;
+  createdAt: string;
+  slackChannelId: string;
+  slackMessageTs: string;
+};
+
+export type InboxContactCardV2 = {
+  contactKey: string;
+  contactId: string | null;
+  alowareContactId: string | null;
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  timezone: string | null;
+  niche: string | null;
+  dnc: boolean;
+};
+
+export type DraftSuggestionV2 = {
+  id: string;
+  conversationId: string;
+  text: string;
+  lint: {
+    passed: boolean;
+    score: number;
+    structuralScore: number;
+    issues: Array<{
+      code: string;
+      message: string;
+      blocking: boolean;
+    }>;
+  };
+  escalation: {
+    level: 1 | 2 | 3 | 4;
+    reason: string;
+  };
+  qualification: {
+    step: number;
+    missing: string[];
+  };
+  attempts: number;
+  createdAt: string;
+};
+
+export type InboxConversationV2 = {
+  id: string;
+  contactKey: string;
+  contactName: string | null;
+  contactPhone: string | null;
+  repId: string | null;
+  status: 'open' | 'closed' | 'dnc';
+  dnc: boolean;
+  lastInboundAt: string | null;
+  lastOutboundAt: string | null;
+  lastTouchAt: string | null;
+  unrepliedInboundCount: number;
+  openNeedsReplyCount: number;
+  needsReplyDueAt: string | null;
+  lastMessage: {
+    direction: 'inbound' | 'outbound' | 'unknown' | null;
+    body: string | null;
+    createdAt: string | null;
+  };
+  qualification: QualificationStateV2;
+  escalation: EscalationStateV2;
+};
+
+export type InboxConversationDetailV2 = {
+  conversation: InboxConversationV2;
+  contactCard: InboxContactCardV2;
+  messages: InboxMessageV2[];
+  drafts: Array<{
+    id: string;
+    text: string;
+    lintScore: number;
+    structuralScore: number;
+    accepted: boolean;
+    edited: boolean;
+    createdAt: string;
+  }>;
+  mondayTrail: Array<{
+    boardId: string;
+    itemId: string;
+    itemName: string | null;
+    stage: string | null;
+    callDate: string | null;
+    disposition: string | null;
+    isBooked: boolean;
+    updatedAt: string;
+  }>;
+};
+
+export type InboxConversationListV2 = {
+  items: InboxConversationV2[];
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
+  filters: {
+    status: 'open' | 'closed' | 'dnc' | null;
+    repId: string | null;
+    needsReplyOnly: boolean;
+    search: string | null;
+  };
+};
+
+export type DraftRequestV2 = {
+  bookedCallLabel?: string;
+};
+
+export type SendMessageRequestV2 = {
+  body: string;
+  idempotencyKey?: string;
+  lineId?: number;
+  fromNumber?: string;
+  senderIdentity?: string;
+};
+
+export type SendMessageResultV2 = {
+  status: 'sent' | 'blocked' | 'failed' | 'duplicate';
+  reason: string;
+  sendAttemptId: string;
+  outboundEventId: string | null;
+  lineSelection: {
+    key: string | null;
+    label: string | null;
+    lineId: number | null;
+    fromNumber: string | null;
+  };
+};
+
+export type SendLineOptionV2 = {
+  key: string;
+  label: string;
+  lineId: number | null;
+  fromNumber: string | null;
+};
+
+export type InboxSendConfigV2 = {
+  lines: SendLineOptionV2[];
+  defaultSelection: SendLineOptionV2 | null;
+  requiresSelection: boolean;
+};
+
 type SalesMetricsV1Compatible = {
   timeRange: { from: string; to: string };
   totals: {
@@ -227,9 +415,26 @@ type SalesMetricsV1Compatible = {
     bookingSignalsSms: number;
     optOuts: number;
     slackBookedCalls?: number;
+    slackBookedAfterSmsReply?: number;
     slackBookedJack?: number;
     slackBookedBrandon?: number;
     slackBookedSelf?: number;
+    slackBookedAuditRows?: Array<{
+      bookedCallId: string;
+      eventTs: string;
+      bucket: 'jack' | 'brandon' | 'selfBooked';
+      firstConversion: string | null;
+      rep: string | null;
+      line: string | null;
+      contactName: string | null;
+      contactPhone: string | null;
+      slackChannelId: string;
+      slackMessageTs: string;
+      text: string | null;
+      strictSmsReplyLinked: boolean;
+      latestReplyAt: string | null;
+      strictSmsReplyReason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
+    }>;
   }>;
   repLeaderboard: Array<{
     repName: string;
@@ -252,6 +457,8 @@ type SalesMetricsV1Compatible = {
       matchedCalls: number;
       unattributedCalls: number;
       manualCalls: number;
+      strictSmsReplyLinkedCalls?: number;
+      nonSmsOrUnknownCalls?: number;
     };
   };
 };
@@ -314,9 +521,11 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
     repliesReceived: row.repliesReceived,
     replyRatePct: row.replyRatePct,
     canonicalBookedCalls: row.slackBookedCalls ?? 0,
+    canonicalBookedAfterSmsReply: row.slackBookedAfterSmsReply ?? 0,
     canonicalBookedJack: row.slackBookedJack ?? 0,
     canonicalBookedBrandon: row.slackBookedBrandon ?? 0,
     canonicalBookedSelf: row.slackBookedSelf ?? 0,
+    bookedAuditRows: row.slackBookedAuditRows ?? [],
     diagnosticSmsBookingSignals: row.bookingSignalsSms,
     optOuts: row.optOuts,
     optOutRatePct: row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,

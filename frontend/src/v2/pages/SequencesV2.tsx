@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
 import { useV2SalesMetrics } from '../../api/v2Queries';
 import { dayKeyInTimeZone, shiftIsoDay } from '../../utils/runDay';
@@ -9,7 +9,7 @@ const BUSINESS_TZ = 'America/Chicago';
 const watchlistStateStorageKey = 'ptbizsms-v2-sequence-watchlist-reviewed';
 
 type Mode = 'day' | '7d' | '30d';
-type Sort = 'messagesSent' | 'replyRatePct' | 'canonicalBookedCalls' | 'optOutRatePct';
+type Sort = 'messagesSent' | 'replyRatePct' | 'canonicalBookedCalls' | 'canonicalBookedAfterSmsReply' | 'optOutRatePct';
 
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtInt = (n: number) => n.toLocaleString();
@@ -32,6 +32,22 @@ const fmtDay = (iso: string | null) => {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return value;
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+const fmtDateTime = (value: string) => {
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return value;
+  return dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+};
+const maskPhone = (value: string | null) => {
+  if (!value) return 'n/a';
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 4) return value;
+  return `***${digits.slice(-4)}`;
+};
+const bucketLabel = (value: 'jack' | 'brandon' | 'selfBooked') => {
+  if (value === 'jack') return 'Jack';
+  if (value === 'brandon') return 'Brandon';
+  return 'Self-booked';
 };
 
 const readWatchlistState = () => {
@@ -69,6 +85,7 @@ export default function SequencesV2() {
   const [sort, setSort] = useState<Sort>('messagesSent');
   const [reviewedMap, setReviewedMap] = useState<Record<string, boolean>>(() => readWatchlistState());
   const [copiedSequence, setCopiedSequence] = useState<string | null>(null);
+  const [expandedAuditRows, setExpandedAuditRows] = useState<Record<string, boolean>>({});
 
   const query = useMemo(() => {
     if (mode === 'day' && selectedDay) return { day: selectedDay, tz: BUSINESS_TZ } as const;
@@ -112,6 +129,8 @@ export default function SequencesV2() {
 
   const totalSent = rows.reduce((sum, row) => sum + row.messagesSent, 0);
   const totalBooked = rows.reduce((sum, row) => sum + row.canonicalBookedCalls, 0);
+  const totalBookedAfterReply = rows.reduce((sum, row) => sum + row.canonicalBookedAfterSmsReply, 0);
+  const totalBookedNonSmsOrUnknown = Math.max(0, totalBooked - totalBookedAfterReply);
   const totalOptOuts = rows.reduce((sum, row) => sum + row.optOuts, 0);
   const attribution = payload.provenance.sequenceBookedAttribution;
   const matchedCalls = attribution?.matchedCalls ?? 0;
@@ -141,6 +160,13 @@ export default function SequencesV2() {
     } catch {
       setCopiedSequence(null);
     }
+  };
+
+  const toggleAuditRow = (label: string) => {
+    setExpandedAuditRows((prev) => ({
+      ...prev,
+      [label]: !prev[label],
+    }));
   };
 
   return (
@@ -176,6 +202,8 @@ export default function SequencesV2() {
         <V2MetricCard label="Sequences" value={String(rows.length)} />
         <V2MetricCard label="Messages Sent" value={fmtInt(totalSent)} />
         <V2MetricCard label={<V2Term term="callsBookedSlack" />} value={fmtInt(totalBooked)} tone="positive" />
+        <V2MetricCard label="Booked after SMS reply" value={fmtInt(totalBookedAfterReply)} tone="accent" />
+        <V2MetricCard label="Booked non SMS or unknown" value={fmtInt(totalBookedNonSmsOrUnknown)} />
         <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(totalOptOuts)} tone={totalOptOuts > 0 ? 'critical' : 'default'} />
       </section>
 
@@ -225,7 +253,7 @@ export default function SequencesV2() {
         title="Sequence Table"
         caption={
           attribution
-            ? `Matched ${matchedCalls}/${totalCalls} booked calls to attribution buckets (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)"). First seen is the earliest outbound timestamp observed in PTBizSMS data (not sequence rename history).`
+            ? `Matched ${matchedCalls}/${totalCalls} booked calls to attribution buckets (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)"). Booked (Slack first conversion) can exceed replies because it is sourced from booked-call records plus first-conversion mapping, not SMS reply counts. First seen is the earliest outbound timestamp observed in PTBizSMS data (not sequence rename history).`
             : 'No booked attribution metadata available. First seen is based on PTBizSMS outbound history.'
         }
       >
@@ -235,7 +263,8 @@ export default function SequencesV2() {
             <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
               <option value="messagesSent">Messages</option>
               <option value="replyRatePct">Reply rate</option>
-              <option value="canonicalBookedCalls">Booked (Slack)</option>
+              <option value="canonicalBookedCalls">Booked (Slack first conversion)</option>
+              <option value="canonicalBookedAfterSmsReply">Booked after SMS reply</option>
               <option value="optOutRatePct">Opt-out rate</option>
             </select>
           </label>
@@ -249,9 +278,8 @@ export default function SequencesV2() {
                 <th className="is-right">Sent</th>
                 <th className="is-right">Replies</th>
                 <th className="is-right">Reply rate</th>
-                <th className="is-right">
-                  <V2Term term="callsBookedSlack" label="Booked (Slack)" />
-                </th>
+                <th className="is-right">Booked (Slack first conversion)</th>
+                <th className="is-right">Booked after SMS reply</th>
                 <th className="is-right">
                   <V2Term term="smsBookingHintsDiagnostic" label="SMS hints (QA)" />
                 </th>
@@ -259,18 +287,66 @@ export default function SequencesV2() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
-                <tr key={row.label}>
-                  <td>{row.label}</td>
-                  {hasFirstSeenData ? <td>{fmtDay(row.firstSeenAt)}</td> : null}
-                  <td className="is-right">{row.messagesSent.toLocaleString()}</td>
-                  <td className="is-right">{row.repliesReceived.toLocaleString()}</td>
-                  <td className="is-right">{fmtPct(row.replyRatePct)}</td>
-                  <td className="is-right">{row.canonicalBookedCalls.toLocaleString()}</td>
-                  <td className="is-right">{row.diagnosticSmsBookingSignals.toLocaleString()}</td>
-                  <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
-                </tr>
-              ))}
+              {rows.map((row) => {
+                const expanded = Boolean(expandedAuditRows[row.label]);
+                const colSpan = hasFirstSeenData ? 9 : 8;
+                return (
+                  <Fragment key={row.label}>
+                    <tr key={`${row.label}-summary`}>
+                      <td>
+                        <div className="V2SequenceCell">
+                          <span>{row.label}</span>
+                          <button type="button" className="V2SequenceCell__auditToggle" onClick={() => toggleAuditRow(row.label)}>
+                            {expanded ? 'Hide' : 'View'} audit ({row.bookedAuditRows.length})
+                          </button>
+                        </div>
+                      </td>
+                      {hasFirstSeenData ? <td>{fmtDay(row.firstSeenAt)}</td> : null}
+                      <td className="is-right">{row.messagesSent.toLocaleString()}</td>
+                      <td className="is-right">{row.repliesReceived.toLocaleString()}</td>
+                      <td className="is-right">{fmtPct(row.replyRatePct)}</td>
+                      <td className="is-right">{row.canonicalBookedCalls.toLocaleString()}</td>
+                      <td className="is-right">{row.canonicalBookedAfterSmsReply.toLocaleString()}</td>
+                      <td className="is-right">{row.diagnosticSmsBookingSignals.toLocaleString()}</td>
+                      <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
+                    </tr>
+                    {expanded ? (
+                      <tr key={`${row.label}-audit`} className="V2Table__auditRow">
+                        <td colSpan={colSpan}>
+                          {row.bookedAuditRows.length === 0 ? (
+                            <V2State kind="empty">No booked-call audit rows for this sequence in this window.</V2State>
+                          ) : (
+                            <div className="V2AuditList">
+                              {row.bookedAuditRows
+                                .slice()
+                                .sort((a, b) => new Date(b.eventTs).getTime() - new Date(a.eventTs).getTime())
+                                .map((audit) => (
+                                  <article key={audit.bookedCallId} className="V2AuditItem">
+                                    <header>
+                                      <strong>{fmtDateTime(audit.eventTs)}</strong>
+                                      <span>{bucketLabel(audit.bucket)}</span>
+                                      <span>
+                                        SMS reply link: {audit.strictSmsReplyLinked ? 'yes' : 'no'} ({audit.strictSmsReplyReason})
+                                      </span>
+                                    </header>
+                                    <p>
+                                      First conversion: {audit.firstConversion || 'n/a'} | Contact: {audit.contactName || 'n/a'} | Phone:{' '}
+                                      {maskPhone(audit.contactPhone)}
+                                    </p>
+                                    <p>
+                                      Slack source: {audit.slackChannelId}:{audit.slackMessageTs}
+                                      {audit.latestReplyAt ? ` | Latest SMS reply: ${fmtDateTime(audit.latestReplyAt)}` : ''}
+                                    </p>
+                                  </article>
+                                ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

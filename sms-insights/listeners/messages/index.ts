@@ -2,6 +2,8 @@ import type { App } from '@slack/bolt';
 import { parseAlowareMessage } from '../../services/aloware-parser.js';
 import { isAlowareChannel } from '../../services/aloware-policy.js';
 import { upsertConversationFromEvent } from '../../services/conversation-projector.js';
+import { enrichContactProfileFromAloware } from '../../services/inbox-contact-enrichment.js';
+import { upsertInboxContactProfile } from '../../services/inbox-contact-profiles.js';
 import { insertSmsEvent } from '../../services/sms-event-store.js';
 import { resolveNeedsReplyOnOutbound, upsertNeedsReplyWorkItem } from '../../services/work-item-engine.js';
 
@@ -64,6 +66,31 @@ const register = (app: App) => {
 
     const conversation = await upsertConversationFromEvent(eventRow, logger);
     if (!conversation) return;
+    await upsertInboxContactProfile(
+      {
+        contactKey: conversation.contact_key,
+        conversationId: conversation.id,
+        contactId: eventRow.contact_id,
+        name: eventRow.contact_name,
+        phone: eventRow.contact_phone,
+      },
+      logger,
+    );
+
+    if (eventRow.contact_phone) {
+      void enrichContactProfileFromAloware(
+        {
+          contactKey: conversation.contact_key,
+          conversationId: conversation.id,
+          phoneNumber: eventRow.contact_phone,
+          fallbackName: eventRow.contact_name,
+          contactId: eventRow.contact_id,
+        },
+        logger,
+      ).catch((error) => {
+        logger.warn('Contact enrichment failed', error);
+      });
+    }
 
     if (eventRow.direction === 'inbound') {
       await upsertNeedsReplyWorkItem(conversation, eventRow, logger);

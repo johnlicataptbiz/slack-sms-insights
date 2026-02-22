@@ -1,5 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { listBookedCallsInRange } from './booked-calls-store.js';
+import { getPool } from './db.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
 
 export type BookedCallsTrendPoint = {
@@ -24,6 +25,7 @@ export type BookedCallsSummary = {
 export type BookedCallAttributionBucket = 'jack' | 'brandon' | 'selfBooked';
 
 export type BookedCallAttributionSource = {
+  bookedCallId: string;
   eventTs: string;
   bucket: BookedCallAttributionBucket;
   firstConversion: string | null;
@@ -34,6 +36,44 @@ export type BookedCallAttributionSource = {
   slackChannelId: string;
   slackMessageTs: string;
   text: string | null;
+};
+
+export type BookedCallSmsReplyLink = {
+  hasPriorReply: boolean;
+  latestReplyAt: string | null;
+  reason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
+};
+
+const ATTRIBUTION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+
+const normalizePhoneKey = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return null;
+  if (digits.length < 10) return null;
+  return digits.slice(-10);
+};
+
+export const bookedCallSourceKey = (source: Pick<BookedCallAttributionSource, 'slackChannelId' | 'slackMessageTs'>): string =>
+  `${source.slackChannelId}::${source.slackMessageTs}`;
+
+const findLatestAtOrBefore = (values: number[], upperBoundMs: number): number | null => {
+  if (values.length === 0) return null;
+  let left = 0;
+  let right = values.length - 1;
+  let answer = -1;
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    const value = values[mid];
+    if (value <= upperBoundMs) {
+      answer = mid;
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  if (answer < 0) return null;
+  return values[answer] ?? null;
 };
 
 const parseGraceSeconds = (): number => {
@@ -183,6 +223,7 @@ export const getBookedCallAttributionSources = async (params: {
     const bucket: BookedCallAttributionBucket = isJack ? 'jack' : isBrandon ? 'brandon' : 'selfBooked';
 
     normalized.push({
+      bookedCallId: c.id,
       eventTs: c.event_ts,
       bucket,
       firstConversion,
@@ -197,4 +238,117 @@ export const getBookedCallAttributionSources = async (params: {
   }
 
   return normalized;
+};
+
+export const getBookedCallSmsReplyLinks = async (
+  calls: BookedCallAttributionSource[],
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<Map<string, BookedCallSmsReplyLink>> => {
+  const results = new Map<string, BookedCallSmsReplyLink>();
+  if (calls.length === 0) return results;
+
+  const pool = getPool();
+  if (!pool) throw new Error('Database not initialized');
+
+  const normalizedCalls = calls.map((call) => {
+    const key = bookedCallSourceKey(call);
+    const phoneKey = normalizePhoneKey(call.contactPhone);
+    const bookingTs = new Date(call.eventTs).getTime();
+    return {
+      key,
+      phoneKey,
+      bookingTs,
+    };
+  });
+
+  const validTimestamps = normalizedCalls.map((row) => row.bookingTs).filter((value) => Number.isFinite(value));
+  if (validTimestamps.length === 0) {
+    for (const row of normalizedCalls) {
+      results.set(row.key, {
+        hasPriorReply: false,
+        latestReplyAt: null,
+        reason: 'invalid_booking_timestamp',
+      });
+    }
+    return results;
+  }
+
+  const minBookingTs = Math.min(...validTimestamps);
+  const maxBookingTs = Math.max(...validTimestamps);
+  const fromIso = new Date(minBookingTs - ATTRIBUTION_WINDOW_MS).toISOString();
+  const toIso = new Date(maxBookingTs).toISOString();
+
+  const phoneKeys = [...new Set(normalizedCalls.map((row) => row.phoneKey).filter((value): value is string => Boolean(value)))];
+  const inboundByPhone = new Map<string, number[]>();
+
+  if (phoneKeys.length > 0) {
+    try {
+      const { rows } = await pool.query<{ phone_key: string; event_ts: string }>(
+        `
+        SELECT
+          RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
+          event_ts
+        FROM sms_events
+        WHERE direction = 'inbound'
+          AND contact_phone IS NOT NULL
+          AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
+          AND event_ts >= $2::timestamptz
+          AND event_ts <= $3::timestamptz
+        ORDER BY event_ts ASC
+        `,
+        [phoneKeys, fromIso, toIso],
+      );
+
+      for (const row of rows) {
+        const key = row.phone_key;
+        const ts = new Date(row.event_ts).getTime();
+        if (!key || !Number.isFinite(ts)) continue;
+        const list = inboundByPhone.get(key) || [];
+        list.push(ts);
+        inboundByPhone.set(key, list);
+      }
+    } catch (error) {
+      logger?.error?.('Failed to compute booked-call SMS reply links', error);
+      throw error;
+    }
+  }
+
+  for (const call of normalizedCalls) {
+    if (!Number.isFinite(call.bookingTs)) {
+      results.set(call.key, {
+        hasPriorReply: false,
+        latestReplyAt: null,
+        reason: 'invalid_booking_timestamp',
+      });
+      continue;
+    }
+
+    if (!call.phoneKey) {
+      results.set(call.key, {
+        hasPriorReply: false,
+        latestReplyAt: null,
+        reason: 'no_contact_phone',
+      });
+      continue;
+    }
+
+    const replyCandidates = inboundByPhone.get(call.phoneKey) || [];
+    const latestReplyTs = findLatestAtOrBefore(replyCandidates, call.bookingTs);
+    if (!latestReplyTs || latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS) {
+      results.set(call.key, {
+        hasPriorReply: false,
+        latestReplyAt: null,
+        reason: 'no_reply_before_booking',
+      });
+      continue;
+    }
+
+    results.set(call.key, {
+      hasPriorReply: true,
+      latestReplyAt: new Date(latestReplyTs).toISOString(),
+      reason: 'matched_reply_before_booking',
+    });
+  }
+
+  return results;
 };

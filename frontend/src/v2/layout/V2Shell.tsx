@@ -13,15 +13,17 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { to: '/v2/insights', label: v2Copy.nav.insights, shortLabel: 'Insights', icon: '◉' },
+  { to: '/v2/inbox', label: v2Copy.nav.inbox, shortLabel: 'Inbox', icon: 'I' },
   { to: '/v2/runs', label: v2Copy.nav.runs, shortLabel: 'Runs', icon: '◌' },
   { to: '/v2/rep/jack', label: v2Copy.nav.setterJack, shortLabel: 'Jack', icon: 'J' },
   { to: '/v2/rep/brandon', label: v2Copy.nav.setterBrandon, shortLabel: 'Brandon', icon: 'B' },
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: 'S' },
-  { to: '/v2/attribution', label: v2Copy.nav.attribution, shortLabel: 'Attribution', icon: 'A' },
 ];
 
 const brandLogoUrl =
   'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/Untitled.png';
+const desktopCollapseStorageKey = 'v2_sidebar_collapsed';
+const mobileMediaQuery = '(max-width: 1080px)';
 
 const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: string) => {
   const doc = document as Document & {
@@ -38,6 +40,12 @@ const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: st
 export default function V2Shell({ children }: { children: ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDefinitionsOpen, setIsDefinitionsOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(mobileMediaQuery).matches : false,
+  );
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
+    () => (typeof window !== 'undefined' ? localStorage.getItem(desktopCollapseStorageKey) === '1' : false),
+  );
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -55,15 +63,48 @@ export default function V2Shell({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isDefinitionsOpen]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mediaQuery = window.matchMedia(mobileMediaQuery);
+    const updateViewport = () => setIsMobileViewport(mediaQuery.matches);
+    updateViewport();
+    mediaQuery.addEventListener('change', updateViewport);
+    return () => mediaQuery.removeEventListener('change', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (isMobileViewport) {
+      setIsSidebarCollapsed(false);
+      return;
+    }
+    const savedCollapsed = localStorage.getItem(desktopCollapseStorageKey) === '1';
+    setIsSidebarCollapsed(savedCollapsed);
+    setIsMenuOpen(false);
+  }, [isMobileViewport]);
+
+  const handleSidebarToggle = () => {
+    if (isMobileViewport) {
+      setIsMenuOpen((value) => !value);
+      return;
+    }
+    setIsSidebarCollapsed((value) => {
+      const next = !value;
+      localStorage.setItem(desktopCollapseStorageKey, next ? '1' : '0');
+      return next;
+    });
+  };
+
+  const isDesktopCollapsed = !isMobileViewport && isSidebarCollapsed;
+
   return (
     <div className="V2Shell">
       <header className="V2Shell__topbar">
         <button
           className="V2Shell__menuButton"
           type="button"
-          aria-label="Toggle navigation"
-          aria-expanded={isMenuOpen}
-          onClick={() => setIsMenuOpen((v) => !v)}
+          aria-label={isMobileViewport ? 'Toggle navigation' : 'Toggle sidebar collapse'}
+          aria-expanded={isMobileViewport ? isMenuOpen : !isDesktopCollapsed}
+          onClick={handleSidebarToggle}
         >
           <span />
           <span />
@@ -96,8 +137,8 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <div className="V2Shell__body">
-        <aside className={`V2Shell__sidebar ${isMenuOpen ? 'is-open' : ''}`}>
+      <div className={`V2Shell__body ${isDesktopCollapsed ? 'is-collapsed' : ''}`}>
+        <aside className={`V2Shell__sidebar ${isMenuOpen ? 'is-open' : ''} ${isDesktopCollapsed ? 'is-collapsed' : ''}`}>
           <nav className="V2Shell__nav" aria-label="V2 primary navigation">
             {navItems.map((item) => (
               <NavLink

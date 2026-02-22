@@ -1,13 +1,30 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { client } from './client';
 import {
+  assertDraftSuggestionEnvelope,
   assertChannelsV2Envelope,
+  assertInboxSendConfigEnvelope,
+  assertInboxConversationDetailEnvelope,
+  assertInboxConversationListEnvelope,
   assertRunsListV2Envelope,
   assertSalesMetricsV2Envelope,
+  assertSendMessageResultEnvelope,
   assertWeeklySummaryV2Envelope,
 } from './v2Guards';
-import type { ApiEnvelope, ChannelsV2, RunsListV2, SalesMetricsV2, WeeklyManagerSummaryV2 } from './v2-types';
+import type {
+  ApiEnvelope,
+  ChannelsV2,
+  DraftSuggestionV2,
+  InboxSendConfigV2,
+  InboxConversationDetailV2,
+  InboxConversationListV2,
+  QualificationStateV2,
+  RunsListV2,
+  SalesMetricsV2,
+  SendMessageResultV2,
+  WeeklyManagerSummaryV2,
+} from './v2-types';
 
 export type SalesMetricsQueryParams =
   | { from: string; to: string; tz?: string }
@@ -187,5 +204,217 @@ export const useV2WeeklySummary = (params: { weekStart?: string; tz?: string }) 
     },
     staleTime: 60_000,
     retry: false,
+  });
+};
+
+type InboxListParams = {
+  limit?: number;
+  offset?: number;
+  status?: 'open' | 'closed' | 'dnc';
+  repId?: string;
+  needsReplyOnly?: boolean;
+  search?: string;
+};
+
+const toInboxListSearchParams = (params: InboxListParams): URLSearchParams => {
+  const search = new URLSearchParams();
+  if (params.limit != null) search.set('limit', String(params.limit));
+  if (params.offset != null) search.set('offset', String(params.offset));
+  if (params.status) search.set('status', params.status);
+  if (params.repId) search.set('repId', params.repId);
+  if (params.needsReplyOnly) search.set('needsReplyOnly', 'true');
+  if (params.search && params.search.trim().length > 0) search.set('search', params.search.trim());
+  return search;
+};
+
+export const useV2InboxConversations = (params: InboxListParams) => {
+  const search = toInboxListSearchParams(params);
+  return useQuery({
+    queryKey: ['v2', 'inbox', 'conversations', params],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/inbox/conversations?${search.toString()}`);
+      assertInboxConversationListEnvelope(response);
+      return response as ApiEnvelope<InboxConversationListV2>;
+    },
+    staleTime: 10_000,
+    retry: false,
+  });
+};
+
+export const useV2InboxConversationDetail = (conversationId: string | null) => {
+  return useQuery({
+    queryKey: ['v2', 'inbox', 'conversation', conversationId],
+    enabled: Boolean(conversationId),
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/inbox/conversations/${conversationId}`);
+      assertInboxConversationDetailEnvelope(response);
+      return response as ApiEnvelope<InboxConversationDetailV2>;
+    },
+    staleTime: 5_000,
+    retry: false,
+  });
+};
+
+export const useV2GenerateDraft = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; bookedCallLabel?: string }) => {
+      const response = await client.post<unknown>(`/api/v2/inbox/conversations/${params.conversationId}/draft`, {
+        bookedCallLabel: params.bookedCallLabel,
+      });
+      assertDraftSuggestionEnvelope(response);
+      return response as ApiEnvelope<DraftSuggestionV2>;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+export const useV2SendInboxMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      conversationId: string;
+      body: string;
+      idempotencyKey?: string;
+      lineId?: number;
+      fromNumber?: string;
+      senderIdentity?: string;
+      draftId?: string;
+    }) => {
+      const response = await client.post<unknown>(`/api/v2/inbox/conversations/${params.conversationId}/send`, {
+        body: params.body,
+        idempotencyKey: params.idempotencyKey,
+        lineId: params.lineId,
+        fromNumber: params.fromNumber,
+        senderIdentity: params.senderIdentity,
+        draftId: params.draftId,
+      });
+      assertSendMessageResultEnvelope(response);
+      return response as ApiEnvelope<SendMessageResultV2>;
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+export const useV2UpdateQualification = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      conversationId: string;
+      fullOrPartTime?: QualificationStateV2['fullOrPartTime'];
+      niche?: string | null;
+      revenueMix?: QualificationStateV2['revenueMix'];
+      coachingInterest?: QualificationStateV2['coachingInterest'];
+    }) => {
+      return client.post<ApiEnvelope<QualificationStateV2>>(`/api/v2/inbox/conversations/${params.conversationId}/qualification`, {
+        fullOrPartTime: params.fullOrPartTime,
+        niche: params.niche,
+        revenueMix: params.revenueMix,
+        coachingInterest: params.coachingInterest,
+      });
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+export const useV2OverrideEscalation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      conversationId: string;
+      level: 1 | 2 | 3 | 4;
+      reason?: string;
+      cadenceStatus?: 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
+      nextFollowupDueAt?: string;
+      lastPodcastSentAt?: string;
+    }) => {
+      return client.post<ApiEnvelope<unknown>>(`/api/v2/inbox/conversations/${params.conversationId}/escalation-override`, {
+        level: params.level,
+        reason: params.reason,
+        cadenceStatus: params.cadenceStatus,
+        nextFollowupDueAt: params.nextFollowupDueAt,
+        lastPodcastSentAt: params.lastPodcastSentAt,
+      });
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+export const useV2DraftFeedback = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      draftId: string;
+      conversationId: string;
+      accepted?: boolean;
+      edited?: boolean;
+      sendLinkedEventId?: string;
+      sourceOutboundEventId?: string;
+      bookedCallLabel?: string;
+      closedWonLabel?: string;
+      escalationLevel?: 1 | 2 | 3 | 4;
+      structureSignature?: string;
+      qualifierSnapshot?: unknown;
+    }) => {
+      return client.post<ApiEnvelope<{ success: boolean }>>(`/api/v2/inbox/drafts/${params.draftId}/feedback`, {
+        accepted: params.accepted,
+        edited: params.edited,
+        sendLinkedEventId: params.sendLinkedEventId,
+        sourceOutboundEventId: params.sourceOutboundEventId,
+        bookedCallLabel: params.bookedCallLabel,
+        closedWonLabel: params.closedWonLabel,
+        escalationLevel: params.escalationLevel,
+        structureSignature: params.structureSignature,
+        qualifierSnapshot: params.qualifierSnapshot,
+      });
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+export const useV2InboxSendConfig = () => {
+  return useQuery({
+    queryKey: ['v2', 'inbox', 'send-config'],
+    queryFn: async () => {
+      const response = await client.get<unknown>('/api/v2/inbox/send-config');
+      assertInboxSendConfigEnvelope(response);
+      return response as ApiEnvelope<InboxSendConfigV2>;
+    },
+    staleTime: 30_000,
+    retry: false,
+  });
+};
+
+export const useV2SetDefaultSendLine = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { lineId?: number | null; fromNumber?: string | null; clear?: boolean }) => {
+      return client.post<ApiEnvelope<{ success: boolean; defaultSelection: InboxSendConfigV2['defaultSelection'] }>>(
+        '/api/v2/inbox/send-config/default',
+        {
+          lineId: params.lineId,
+          fromNumber: params.fromNumber,
+          clear: params.clear,
+        },
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'send-config'] });
+    },
   });
 };

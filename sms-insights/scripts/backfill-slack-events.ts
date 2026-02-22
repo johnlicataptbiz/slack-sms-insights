@@ -3,11 +3,13 @@ import { WebClient } from '@slack/web-api';
 import { parseAlowareMessage } from '../services/aloware-parser.js';
 import { upsertConversationFromEvent } from '../services/conversation-projector.js';
 import { closeDatabase, initDatabase } from '../services/db.js';
+import { upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
 import { insertSmsEvent } from '../services/sms-event-store.js';
 import { resolveNeedsReplyOnOutbound, upsertNeedsReplyWorkItem } from '../services/work-item-engine.js';
 
 const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 const CHANNEL_ID = process.env.ALOWARE_CHANNEL_ID || 'C09ULGH1BEC';
+const BACKFILL_DAYS = Math.max(1, Number.parseInt(process.env.BACKFILL_DAYS || '90', 10));
 
 const slackTsToDate = (ts: string | undefined): Date => {
   const raw = ts || `${Date.now() / 1000}`;
@@ -24,6 +26,7 @@ async function backfill() {
 
   console.log('🚀 Starting Slack backfill...');
   console.log(`Channel: ${CHANNEL_ID}`);
+  console.log(`Lookback window: ${BACKFILL_DAYS} days`);
 
   await initDatabase(console);
   const client = new WebClient(SLACK_TOKEN);
@@ -32,6 +35,8 @@ async function backfill() {
   let totalProcessed = 0;
   let totalIngested = 0;
 
+  const oldest = Math.floor(Date.now() / 1000 - BACKFILL_DAYS * 24 * 60 * 60).toString();
+
   try {
     do {
       console.log(`Fetching messages... ${cursor ? `(cursor: ${cursor})` : ''}`);
@@ -39,6 +44,7 @@ async function backfill() {
         channel: CHANNEL_ID,
         cursor,
         limit: 100,
+        oldest,
       });
 
       if (!result.ok) {
@@ -83,6 +89,13 @@ async function backfill() {
           totalIngested++;
           const conversation = await upsertConversationFromEvent(eventRow);
           if (conversation) {
+            await upsertInboxContactProfile({
+              contactKey: conversation.contact_key,
+              conversationId: conversation.id,
+              contactId: eventRow.contact_id,
+              name: eventRow.contact_name,
+              phone: eventRow.contact_phone,
+            });
             if (eventRow.direction === 'inbound') {
               await upsertNeedsReplyWorkItem(conversation, eventRow);
             } else if (eventRow.direction === 'outbound') {

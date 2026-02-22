@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 
 import V2Shell from './layout/V2Shell';
-import AttributionV2 from './pages/AttributionV2';
+import InboxV2 from './pages/InboxV2';
 import InsightsV2 from './pages/InsightsV2';
 import RepV2 from './pages/RepV2';
 import RunsV2 from './pages/RunsV2';
@@ -19,11 +19,12 @@ export default function V2App() {
     <V2Shell>
       <Routes>
         <Route path="insights" element={<InsightsV2 />} />
+        <Route path="inbox" element={<InboxV2 />} />
         <Route path="runs" element={<RunsV2 />} />
         <Route path="rep/jack" element={<RepV2 rep="jack" />} />
         <Route path="rep/brandon" element={<RepV2 rep="brandon" />} />
         <Route path="sequences" element={<SequencesV2 />} />
-        <Route path="attribution" element={<AttributionV2 />} />
+        <Route path="attribution" element={<Navigate to="/v2/sequences" replace />} />
         <Route path="" element={<Navigate to="insights" replace />} />
         <Route path="*" element={<V2NotFound />} />
       </Routes>

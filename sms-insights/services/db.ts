@@ -354,6 +354,17 @@ export const initializeSchema = async (): Promise<void> => {
       WHERE idempotency_key IS NOT NULL;
     `);
 
+    // Per-user outbound line defaults for deterministic sending across multiple Aloware lines.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_send_preferences (
+        user_id TEXT PRIMARY KEY,
+        default_line_id INTEGER,
+        default_from_number TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Generated draft history + compliance diagnostics.
     await client.query(`
       CREATE TABLE IF NOT EXISTS draft_suggestions (
@@ -498,6 +509,11 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_send_attempts_conversation_created
       ON send_attempts (conversation_id, created_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_user_send_preferences_updated
+      ON user_send_preferences (updated_at DESC);
     `);
 
     await client.query(`

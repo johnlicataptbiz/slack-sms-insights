@@ -1,13 +1,33 @@
-import type { BookedCallAttributionBucket, BookedCallAttributionSource } from './booked-calls.js';
+import { bookedCallSourceKey } from './booked-calls.js';
+import type { BookedCallAttributionBucket, BookedCallAttributionSource, BookedCallSmsReplyLink } from './booked-calls.js';
 import type { TopSequenceRow } from './sales-metrics.js';
 
 export const MANUAL_SEQUENCE_LABEL = 'No sequence (manual/direct)';
+
+export type SequenceBookedAuditRow = {
+  bookedCallId: string;
+  eventTs: string;
+  bucket: BookedCallAttributionBucket;
+  firstConversion: string | null;
+  rep: string | null;
+  line: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  slackChannelId: string;
+  slackMessageTs: string;
+  text: string | null;
+  strictSmsReplyLinked: boolean;
+  latestReplyAt: string | null;
+  strictSmsReplyReason: BookedCallSmsReplyLink['reason'];
+};
 
 export type SequenceBookedBreakdown = {
   booked: number;
   jack: number;
   brandon: number;
   selfBooked: number;
+  bookedAfterSmsReply: number;
+  auditRows: SequenceBookedAuditRow[];
 };
 
 export type SequenceBookedAttributionResult = {
@@ -17,7 +37,12 @@ export type SequenceBookedAttributionResult = {
     matchedCalls: number;
     unattributedCalls: number;
     manualCalls: number;
-  } & SequenceBookedBreakdown;
+    booked: number;
+    jack: number;
+    brandon: number;
+    selfBooked: number;
+    bookedAfterSmsReply: number;
+  };
 };
 
 type CandidateSequence = {
@@ -104,7 +129,10 @@ const normalizeFirstConversionCandidates = (firstConversion: string): string[] =
   return [...variants].map((item) => item.trim()).filter(Boolean);
 };
 
-const bump = (target: SequenceBookedBreakdown, bucket: BookedCallAttributionBucket): void => {
+const bump = (
+  target: { booked: number; jack: number; brandon: number; selfBooked: number },
+  bucket: BookedCallAttributionBucket,
+): void => {
   target.booked += 1;
   if (bucket === 'jack') target.jack += 1;
   else if (bucket === 'brandon') target.brandon += 1;
@@ -116,6 +144,8 @@ const emptyBreakdown = (): SequenceBookedBreakdown => ({
   jack: 0,
   brandon: 0,
   selfBooked: 0,
+  bookedAfterSmsReply: 0,
+  auditRows: [],
 });
 
 const resolveSequenceLabel = (
@@ -163,6 +193,7 @@ const resolveSequenceLabel = (
 export const attributeSlackBookedCallsToSequences = (
   sequenceRows: TopSequenceRow[],
   calls: BookedCallAttributionSource[],
+  smsReplyLinks: Map<string, BookedCallSmsReplyLink> = new Map(),
 ): SequenceBookedAttributionResult => {
   const candidates: CandidateSequence[] = sequenceRows.map((row) => ({
     label: row.label,
@@ -186,7 +217,11 @@ export const attributeSlackBookedCallsToSequences = (
     matchedCalls: 0,
     unattributedCalls: 0,
     manualCalls: 0,
-    ...emptyBreakdown(),
+    booked: 0,
+    jack: 0,
+    brandon: 0,
+    selfBooked: 0,
+    bookedAfterSmsReply: 0,
   };
 
   for (const call of calls) {
@@ -199,11 +234,33 @@ export const attributeSlackBookedCallsToSequences = (
       continue;
     }
 
+    const sourceKey = bookedCallSourceKey(call);
+    const smsLink = smsReplyLinks.get(sourceKey);
+    const strictLinked = smsLink?.hasPriorReply === true;
+
     const row = byLabel.get(resolved.label) || emptyBreakdown();
     bump(row, call.bucket);
+    if (strictLinked) row.bookedAfterSmsReply += 1;
+    row.auditRows.push({
+      bookedCallId: call.bookedCallId,
+      eventTs: call.eventTs,
+      bucket: call.bucket,
+      firstConversion: call.firstConversion,
+      rep: call.rep,
+      line: call.line,
+      contactName: call.contactName,
+      contactPhone: call.contactPhone,
+      slackChannelId: call.slackChannelId,
+      slackMessageTs: call.slackMessageTs,
+      text: call.text,
+      strictSmsReplyLinked: strictLinked,
+      latestReplyAt: smsLink?.latestReplyAt || null,
+      strictSmsReplyReason: smsLink?.reason || 'no_reply_before_booking',
+    });
     byLabel.set(resolved.label, row);
     totals.matchedCalls += 1;
     if (resolved.manual) totals.manualCalls += 1;
+    if (strictLinked) totals.bookedAfterSmsReply += 1;
   }
 
   return { byLabel, totals };

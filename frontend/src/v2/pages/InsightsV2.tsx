@@ -128,6 +128,12 @@ export default function InsightsV2() {
     return <V2State kind="error">Failed to load team insights: {String((error as Error)?.message || error)}</V2State>;
   }
 
+  const bookedAttribution = payload.provenance.sequenceBookedAttribution;
+  const bookedTotalAllChannels = payload.totals.canonicalBookedCalls;
+  const bookedSmsLinkedStrict = bookedAttribution?.strictSmsReplyLinkedCalls ?? 0;
+  const bookedNonSmsOrUnknown =
+    bookedAttribution?.nonSmsOrUnknownCalls ?? Math.max(0, bookedTotalAllChannels - bookedSmsLinkedStrict);
+
   const weeklySummary = weeklySummaryQuery.data?.data || null;
   const sourceStatus = weeklySummary?.sources.monday.status || 'disabled';
   const sourceBadge = sourceText(sourceStatus);
@@ -164,10 +170,12 @@ export default function InsightsV2() {
         />
         <V2MetricCard
           label={<V2Term term="callsBookedSlack" />}
-          value={fmtInt(payload.totals.canonicalBookedCalls)}
+          value={fmtInt(bookedTotalAllChannels)}
           meta={runRate ? `${runRate.bookedDelta >= 0 ? '+' : ''}${runRate.bookedDelta} vs prior day` : 'Canonical booked-call KPI'}
           tone="positive"
         />
+        <V2MetricCard label="Booked SMS linked (strict)" value={fmtInt(bookedSmsLinkedStrict)} tone="accent" />
+        <V2MetricCard label="Booked non SMS or unknown" value={fmtInt(bookedNonSmsOrUnknown)} />
         <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} tone="critical" />
         <V2MetricCard
           label={<V2Term term="smsBookingHintsDiagnostic" />}
@@ -331,6 +339,10 @@ export default function InsightsV2() {
           <ul className="V2BulletList">
             <li>Calls Booked source: {payload.provenance.canonicalBookedSource} (canonical KPI).</li>
             <li>SMS Booking Hints source: {payload.provenance.diagnosticBookingSignalsSource} (QA only).</li>
+            <li>
+              Channel split:
+              {` total ${fmtInt(bookedTotalAllChannels)}, SMS linked strict ${fmtInt(bookedSmsLinkedStrict)}, non SMS or unknown ${fmtInt(bookedNonSmsOrUnknown)}.`}
+            </li>
             <li>
               Sequence label coverage:{' '}
               {payload.provenance.sequenceBookedAttribution

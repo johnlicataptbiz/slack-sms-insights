@@ -239,7 +239,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           <ul className="V2BulletList">
             <li>Calls Booked KPI is sourced from Slack booked-call records.</li>
             <li>SMS Booking Hints are diagnostic-only and never added to booked-call totals.</li>
-            <li>Use Sequence Performance + Attribution Deep Dive to diagnose root cause.</li>
+            <li>Use Sequence Performance and Insights attribution panels to diagnose root cause.</li>
           </ul>
         </V2Panel>
       </div>

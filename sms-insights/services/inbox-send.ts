@@ -37,6 +37,13 @@ const evaluateAllowlist = (senderUserId?: string | null, senderEmail?: string | 
   const allowedIds = getAllowedSenderIds();
   const allowedEmails = getAllowedSenderEmails();
 
+  if (allowedIds.size === 0 && allowedEmails.size === 0) {
+    return {
+      allowed: true,
+      reason: 'allowlist disabled',
+    };
+  }
+
   const id = (senderUserId || '').trim();
   const email = (senderEmail || '').trim().toLowerCase();
 

@@ -1088,6 +1088,25 @@ const resolveSlackUserId = (user: VerifiedSlackUser): string | null => {
   return id.length > 0 ? id : null;
 };
 
+const resolveDashboardClientId = (req: IncomingMessage): string | null => {
+  const rawHeader = req.headers['x-dashboard-client-id'];
+  const value = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
+  const normalized = (value || '').trim();
+  if (!normalized) return null;
+  if (!/^[a-zA-Z0-9_-]{8,120}$/.test(normalized)) return null;
+  return normalized;
+};
+
+const resolveInboxActorId = (req: IncomingMessage & { user?: unknown }): string | null => {
+  const slackUserId = resolveSlackUserId(getVerifiedSlackUser(req));
+  if (slackUserId) return slackUserId;
+
+  const dashboardClientId = resolveDashboardClientId(req);
+  if (dashboardClientId) return `dashboard:${dashboardClientId}`;
+
+  return null;
+};
+
 const resolveSendLineSelection = async (
   params: {
     userId: string | null;
@@ -1201,10 +1220,9 @@ const handleGetInboxSendConfigV2: RequestHandler = async (req, res, logger, orig
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
   }
 
-  const user = getVerifiedSlackUser(req);
-  const userId = resolveSlackUserId(user);
+  const actorId = resolveInboxActorId(req);
   const options = listSendLineOptions();
-  const preference = userId ? await getUserSendPreferences(userId, logger) : null;
+  const preference = actorId ? await getUserSendPreferences(actorId, logger) : null;
   const preferredOption =
     preference && (preference.default_line_id != null || preference.default_from_number)
       ? findSendLineOption({
@@ -1251,10 +1269,9 @@ const handlePostInboxSendDefaultV2: RequestHandler = async (req, res, logger, or
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
   }
 
-  const user = getVerifiedSlackUser(req);
-  const userId = resolveSlackUserId(user);
-  if (!userId) {
-    return sendJson(res, 400, { error: 'Authenticated Slack user id is required to save defaults' }, origin);
+  const actorId = resolveInboxActorId(req);
+  if (!actorId) {
+    return sendJson(res, 400, { error: 'Client identity header missing' }, origin);
   }
 
   let body: {
@@ -1271,7 +1288,7 @@ const handlePostInboxSendDefaultV2: RequestHandler = async (req, res, logger, or
   if (body.clear === true) {
     const updated = await upsertUserSendPreferences(
       {
-        userId,
+        userId: actorId,
         defaultLineId: null,
         defaultFromNumber: null,
       },
@@ -1310,7 +1327,7 @@ const handlePostInboxSendDefaultV2: RequestHandler = async (req, res, logger, or
 
     const updated = await upsertUserSendPreferences(
       {
-        userId,
+        userId: actorId,
         defaultLineId: selectedOption.lineId,
         defaultFromNumber: selectedOption.fromNumber,
       },
@@ -1338,7 +1355,7 @@ const handlePostInboxSendDefaultV2: RequestHandler = async (req, res, logger, or
 
   const updated = await upsertUserSendPreferences(
     {
-      userId,
+      userId: actorId,
       defaultLineId: lineId,
       defaultFromNumber: fromNumber,
     },
@@ -2003,38 +2020,38 @@ const apiRoutes: ApiRoute[] = [
   // Authenticated endpoints (mutations / sensitive data)
   { method: 'GET', path: '/api/auth/verify', requiresAuth: true, handler: handleAuthVerify },
   { method: 'POST', path: '/api/runs', requiresAuth: false, handler: handlePostRun },
-  { method: 'GET', path: '/api/v2/inbox/send-config', requiresAuth: true, handler: handleGetInboxSendConfigV2 },
-  { method: 'POST', path: '/api/v2/inbox/send-config/default', requiresAuth: true, handler: handlePostInboxSendDefaultV2 },
-  { method: 'GET', path: '/api/v2/inbox/conversations', requiresAuth: true, handler: handleGetInboxConversationsV2 },
+  { method: 'GET', path: '/api/v2/inbox/send-config', requiresAuth: false, handler: handleGetInboxSendConfigV2 },
+  { method: 'POST', path: '/api/v2/inbox/send-config/default', requiresAuth: false, handler: handlePostInboxSendDefaultV2 },
+  { method: 'GET', path: '/api/v2/inbox/conversations', requiresAuth: false, handler: handleGetInboxConversationsV2 },
   {
     method: 'GET',
     path: '/api/v2/inbox/conversations/:id',
-    requiresAuth: true,
+    requiresAuth: false,
     handler: handleGetInboxConversationDetailV2,
   },
   {
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/draft',
-    requiresAuth: true,
+    requiresAuth: false,
     handler: handlePostInboxDraftV2,
   },
-  { method: 'POST', path: '/api/v2/inbox/conversations/:id/send', requiresAuth: true, handler: handlePostInboxSendV2 },
+  { method: 'POST', path: '/api/v2/inbox/conversations/:id/send', requiresAuth: false, handler: handlePostInboxSendV2 },
   {
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/qualification',
-    requiresAuth: true,
+    requiresAuth: false,
     handler: handlePostInboxQualificationV2,
   },
   {
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/escalation-override',
-    requiresAuth: true,
+    requiresAuth: false,
     handler: handlePostInboxEscalationOverrideV2,
   },
   {
     method: 'POST',
     path: '/api/v2/inbox/drafts/:id/feedback',
-    requiresAuth: true,
+    requiresAuth: false,
     handler: handlePostInboxDraftFeedbackV2,
   },
 

@@ -91,17 +91,17 @@
   align-items: center;
   width: 270px;
   height: 66px;
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
 }
 
 .V2Shell__brandLogo {
   display: block;
   width: auto;
-  height: 90px;
+  height: 66px;
   max-width: none;
-  object-fit: cover;
-  transform: translateX(-9px) translateY(-8px);
+  object-fit: contain;
+  transform: none;
 }
 
 .V2Shell__modeButton {

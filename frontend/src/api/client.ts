@@ -16,6 +16,26 @@ export class ApiError extends Error {
   }
 }
 
+const dashboardClientIdStorageKey = 'ptbizsms_dashboard_client_id_v1';
+
+const getDashboardClientId = (): string | null => {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const existing = localStorage.getItem(dashboardClientIdStorageKey);
+    if (existing) return existing;
+
+    const generated =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `cid-${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36)}`;
+    localStorage.setItem(dashboardClientIdStorageKey, generated);
+    return generated;
+  } catch {
+    return null;
+  }
+};
+
 const getAuthToken = (explicit?: string): string | null => {
   if (explicit) return explicit;
   try {
@@ -44,6 +64,10 @@ export const apiFetch = async <T>(
   headers.set('Accept', 'application/json');
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
+  const dashboardClientId = getDashboardClientId();
+  if (dashboardClientId && !headers.has('X-Dashboard-Client-Id')) {
+    headers.set('X-Dashboard-Client-Id', dashboardClientId);
+  }
 
   // Timeout + abort support
   const controller = new AbortController();

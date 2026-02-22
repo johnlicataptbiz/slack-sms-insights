@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
+import { hasPasswordGateAccess, PasswordGate } from './components/PasswordGate';
 import LegacyApp from './legacy/LegacyApp';
 import { parseUiMode, type UiMode, uiModeStorageKey } from './uiMode';
 import V2App from './v2/V2App';
@@ -64,6 +65,12 @@ const DefaultRoute = () => {
 };
 
 export default function App() {
+  const [hasGateAccess, setHasGateAccess] = useState(() => hasPasswordGateAccess());
+
+  if (!hasGateAccess) {
+    return <PasswordGate onUnlock={() => setHasGateAccess(true)} />;
+  }
+
   return (
     <BrowserRouter>
       <ModeSync />

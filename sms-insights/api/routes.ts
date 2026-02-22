@@ -1093,7 +1093,12 @@ const getConversationIdFromPath = (req: IncomingMessage): string | null => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   const parts = url.pathname.split('/').filter(Boolean);
   // /api/v2/inbox/conversations/:id
-  return parts[4] || null;
+  const id = (parts[4] || '').trim();
+  if (!id) return null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    return null;
+  }
+  return id;
 };
 
 const parseLineIdInput = (value: unknown): number | null => {

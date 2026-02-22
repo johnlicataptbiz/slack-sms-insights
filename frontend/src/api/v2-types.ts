@@ -104,6 +104,13 @@ export type SalesMetricsV2 = {
   };
 };
 
+export type SalesMetricsBatchV2 = {
+  items: Array<{
+    day: string;
+    metrics: SalesMetricsV2;
+  }>;
+};
+
 export type RunV2 = {
   id: string;
   createdAt: string;

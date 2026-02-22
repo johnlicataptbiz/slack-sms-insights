@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   assertRunsListV2Envelope,
+  assertSalesMetricsBatchV2Envelope,
   assertSalesMetricsV2Envelope,
   assertWeeklySummaryV2Envelope,
 } from '../../../frontend/src/api/v2Guards.js';
@@ -99,4 +100,33 @@ test('v2 guards accept weekly summary envelope', () => {
   };
 
   assert.doesNotThrow(() => assertWeeklySummaryV2Envelope(response));
+});
+
+test('v2 guards accept sales metrics batch envelope', () => {
+  const response = {
+    meta: {
+      schemaVersion: '2026.1',
+      generatedAt: new Date().toISOString(),
+      timeZone: 'America/Chicago',
+      requestedMode: 'day',
+    },
+    data: {
+      items: [
+        {
+          day: '2026-02-20',
+          metrics: {
+            timeRange: { from: '2026-02-20T00:00:00Z', to: '2026-02-20T23:59:59Z' },
+            totals: { messagesSent: 1, canonicalBookedCalls: 1 },
+            bookedCredit: { total: 1, jack: 1, brandon: 0, selfBooked: 0 },
+            trendByDay: [],
+            sequences: [],
+            reps: [],
+            provenance: { canonicalBookedSource: 'slack', diagnosticBookingSignalsSource: 'sms_heuristics' },
+          },
+        },
+      ],
+    },
+  };
+
+  assert.doesNotThrow(() => assertSalesMetricsBatchV2Envelope(response));
 });

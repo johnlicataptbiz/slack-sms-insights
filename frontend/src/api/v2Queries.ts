@@ -7,7 +7,9 @@ import {
   assertInboxSendConfigEnvelope,
   assertInboxConversationDetailEnvelope,
   assertInboxConversationListEnvelope,
+  assertRunV2Envelope,
   assertRunsListV2Envelope,
+  assertSalesMetricsBatchV2Envelope,
   assertSalesMetricsV2Envelope,
   assertSendMessageResultEnvelope,
   assertWeeklySummaryV2Envelope,
@@ -20,7 +22,9 @@ import type {
   InboxConversationDetailV2,
   InboxConversationListV2,
   QualificationStateV2,
+  RunV2,
   RunsListV2,
+  SalesMetricsBatchV2,
   SalesMetricsV2,
   SendMessageResultV2,
   WeeklyManagerSummaryV2,
@@ -80,6 +84,7 @@ const toRunsSearchParams = (params: {
   offset?: number;
   includeLegacy?: boolean;
   legacyOnly?: boolean;
+  includeFullReport?: boolean;
 }): URLSearchParams => {
   const searchParams = new URLSearchParams();
   searchParams.set('daysBack', String(params.daysBack));
@@ -88,6 +93,7 @@ const toRunsSearchParams = (params: {
   if (params.channelId) searchParams.set('channelId', params.channelId);
   if (params.includeLegacy) searchParams.set('includeLegacy', 'true');
   if (params.legacyOnly) searchParams.set('legacyOnly', 'true');
+  if (params.includeFullReport) searchParams.set('includeFullReport', 'true');
   return searchParams;
 };
 
@@ -96,6 +102,15 @@ export const fetchV2SalesMetrics = async (params: SalesMetricsQueryParams) => {
   const response = await client.get<unknown>(`/api/v2/sales-metrics?${searchParams.toString()}`);
   assertSalesMetricsV2Envelope(response);
   return response as ApiEnvelope<SalesMetricsV2>;
+};
+
+const fetchV2SalesMetricsBatch = async (params: { days: string[]; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('days', params.days.join(','));
+  if (params.tz) searchParams.set('tz', params.tz);
+  const response = await client.get<unknown>(`/api/v2/sales-metrics/batch?${searchParams.toString()}`);
+  assertSalesMetricsBatchV2Envelope(response);
+  return response as ApiEnvelope<SalesMetricsBatchV2>;
 };
 
 export const useV2SalesMetrics = (params: SalesMetricsQueryParams, options?: { enabled?: boolean }) => {
@@ -114,31 +129,32 @@ export const useV2SetterTrend = (days: string[], tz: string) => {
     enabled: days.length > 0,
     queryFn: async () => {
       const uniqueDays = [...new Set(days)].sort((a, b) => a.localeCompare(b));
-      const envelopes = await Promise.all(uniqueDays.map((day) => fetchV2SalesMetrics({ day, tz })));
+      const batchEnvelope = await fetchV2SalesMetricsBatch({ days: uniqueDays, tz });
 
-      return envelopes.map<SetterTrendPoint>((envelope, index) => {
-        const jack = findRepRow(envelope.data.reps, 'jack');
-        const brandon = findRepRow(envelope.data.reps, 'brandon');
+      return batchEnvelope.data.items.map<SetterTrendPoint>((item, index) => {
+        const metrics = item.metrics;
+        const jack = findRepRow(metrics.reps, 'jack');
+        const brandon = findRepRow(metrics.reps, 'brandon');
 
         return {
-          day: envelope.data.trendByDay[0]?.day || uniqueDays[index] || '',
+          day: item.day || metrics.trendByDay[0]?.day || uniqueDays[index] || '',
           team: {
-            messagesSent: envelope.data.totals.messagesSent,
-            replyRatePct: envelope.data.totals.replyRatePct,
-            bookedCalls: envelope.data.totals.canonicalBookedCalls,
-            optOuts: envelope.data.totals.optOuts,
+            messagesSent: metrics.totals.messagesSent,
+            replyRatePct: metrics.totals.replyRatePct,
+            bookedCalls: metrics.totals.canonicalBookedCalls,
+            optOuts: metrics.totals.optOuts,
           },
           setters: {
             jack: {
               outboundConversations: jack?.outboundConversations ?? 0,
               replyRatePct: jack?.replyRatePct ?? 0,
-              bookedCalls: envelope.data.bookedCredit.jack,
+              bookedCalls: metrics.bookedCredit.jack,
               optOuts: jack?.optOuts ?? 0,
             },
             brandon: {
               outboundConversations: brandon?.outboundConversations ?? 0,
               replyRatePct: brandon?.replyRatePct ?? 0,
-              bookedCalls: envelope.data.bookedCredit.brandon,
+              bookedCalls: metrics.bookedCredit.brandon,
               optOuts: brandon?.optOuts ?? 0,
             },
           },
@@ -157,6 +173,7 @@ export const useV2Runs = (params: {
   offset?: number;
   includeLegacy?: boolean;
   legacyOnly?: boolean;
+  includeFullReport?: boolean;
 }) => {
   const searchParams = toRunsSearchParams(params);
   return useQuery({
@@ -165,6 +182,20 @@ export const useV2Runs = (params: {
       const response = await client.get<unknown>(`/api/v2/runs?${searchParams.toString()}`);
       assertRunsListV2Envelope(response);
       return response as ApiEnvelope<RunsListV2>;
+    },
+    staleTime: 15_000,
+    retry: false,
+  });
+};
+
+export const useV2Run = (runId: string | null) => {
+  return useQuery({
+    queryKey: ['v2', 'run', runId],
+    enabled: Boolean(runId),
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/runs/${runId}`);
+      assertRunV2Envelope(response);
+      return response as ApiEnvelope<RunV2>;
     },
     staleTime: 15_000,
     retry: false,

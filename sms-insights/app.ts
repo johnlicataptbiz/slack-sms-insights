@@ -12,6 +12,14 @@ import { startMondaySyncJobs } from './services/monday-sync.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
+const isProduction = (): boolean => (process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+
+const assertStartupSecurityConfig = (): void => {
+  const allowDummyAuthToken = (process.env.ALLOW_DUMMY_AUTH_TOKEN || '').trim().toLowerCase() === 'true';
+  if (allowDummyAuthToken && isProduction()) {
+    throw new Error('ALLOW_DUMMY_AUTH_TOKEN cannot be enabled in production.');
+  }
+};
 
 const getLogLevel = (): LogLevel => {
   const configured = process.env.APP_LOG_LEVEL?.trim().toUpperCase();
@@ -25,6 +33,13 @@ const getLogLevel = (): LogLevel => {
     return LogLevel.ERROR;
   }
   return DEFAULT_APP_LOG_LEVEL;
+};
+
+const responseSecurityHeaders: Record<string, string> = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
 };
 
 /** Initialization */
@@ -46,6 +61,8 @@ app.error(async (error) => {
 /** Start Bolt App */
 (async () => {
   try {
+    assertStartupSecurityConfig();
+
     // Initialize database
     await initDatabase(app.logger);
     await initializeSchema();
@@ -77,13 +94,21 @@ app.error(async (error) => {
 
       // Serve frontend
       if (frontendIndex && !pathname.startsWith('/api/')) {
-        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.writeHead(200, {
+          ...responseSecurityHeaders,
+          'Content-Type': 'text/html',
+          'Content-Security-Policy':
+            "default-src 'self'; img-src 'self' https: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://slack.com https://*.slack.com;",
+        });
         res.end(frontendIndex);
         return;
       }
 
       // Fallback health check
-      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.writeHead(200, {
+        ...responseSecurityHeaders,
+        'Content-Type': 'text/plain',
+      });
       res.end('Health check: OK');
     });
 

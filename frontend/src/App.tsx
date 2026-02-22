@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
-import { hasPasswordGateAccess, PasswordGate } from './components/PasswordGate';
+import { ApiError, client } from './api/client';
+import Login from './components/Login';
 import LegacyApp from './legacy/LegacyApp';
 import { parseUiMode, type UiMode, uiModeStorageKey } from './uiMode';
 import V2App from './v2/V2App';
@@ -65,10 +66,39 @@ const DefaultRoute = () => {
 };
 
 export default function App() {
-  const [hasGateAccess, setHasGateAccess] = useState(() => hasPasswordGateAccess());
+  const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
 
-  if (!hasGateAccess) {
-    return <PasswordGate onUnlock={() => setHasGateAccess(true)} />;
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        await client.get('/api/auth/verify');
+        if (active) setAuthState('authenticated');
+      } catch (error) {
+        if (!active) return;
+        if (error instanceof ApiError && error.status === 401) {
+          setAuthState('unauthenticated');
+          return;
+        }
+        setAuthState('unauthenticated');
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (authState === 'checking') {
+    return (
+      <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: 'system-ui' }}>
+        Checking secure session...
+      </main>
+    );
+  }
+
+  if (authState === 'unauthenticated') {
+    return <Login />;
   }
 
   return (

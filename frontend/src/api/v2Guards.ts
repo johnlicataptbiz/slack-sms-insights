@@ -5,7 +5,9 @@ import type {
   InboxSendConfigV2,
   InboxConversationDetailV2,
   InboxConversationListV2,
+  RunV2,
   RunsListV2,
+  SalesMetricsBatchV2,
   SalesMetricsV2,
   SendMessageResultV2,
   WeeklyManagerSummaryV2,
@@ -37,21 +39,37 @@ function assertRun(value: unknown): void {
   if (!isBoolean(value.isLegacy)) throw new Error('Invalid v2 run.isLegacy');
 }
 
+const assertSalesMetricsPayload = (data: Record<string, unknown>, context: string): void => {
+  if (!isObject(data.totals)) throw new Error(`Invalid ${context}: totals missing`);
+  if (!isNumber(data.totals.messagesSent)) throw new Error(`Invalid ${context}: totals.messagesSent`);
+  if (!isNumber(data.totals.canonicalBookedCalls)) {
+    throw new Error(`Invalid ${context}: totals.canonicalBookedCalls`);
+  }
+  if (!isObject(data.bookedCredit)) throw new Error(`Invalid ${context}: bookedCredit missing`);
+  if (!Array.isArray(data.trendByDay)) throw new Error(`Invalid ${context}: trendByDay missing`);
+  if (!Array.isArray(data.sequences)) throw new Error(`Invalid ${context}: sequences missing`);
+  if (!Array.isArray(data.reps)) throw new Error(`Invalid ${context}: reps missing`);
+};
+
 export function assertSalesMetricsV2Envelope(value: unknown): asserts value is ApiEnvelope<SalesMetricsV2> {
   if (!isObject(value)) throw new Error('Invalid v2 sales-metrics response: not an object');
   assertEnvelopeMeta(value.meta);
   if (!isObject(value.data)) throw new Error('Invalid v2 sales-metrics response: data must be object');
 
-  const data = value.data;
-  if (!isObject(data.totals)) throw new Error('Invalid v2 sales-metrics response: totals missing');
-  if (!isNumber(data.totals.messagesSent)) throw new Error('Invalid v2 sales-metrics response: totals.messagesSent');
-  if (!isNumber(data.totals.canonicalBookedCalls)) {
-    throw new Error('Invalid v2 sales-metrics response: totals.canonicalBookedCalls');
+  assertSalesMetricsPayload(value.data, 'v2 sales-metrics response');
+}
+
+export function assertSalesMetricsBatchV2Envelope(value: unknown): asserts value is ApiEnvelope<SalesMetricsBatchV2> {
+  if (!isObject(value)) throw new Error('Invalid v2 sales-metrics batch response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid v2 sales-metrics batch response: data must be object');
+  if (!Array.isArray(value.data.items)) throw new Error('Invalid v2 sales-metrics batch response: items missing');
+  for (const item of value.data.items) {
+    if (!isObject(item)) throw new Error('Invalid v2 sales-metrics batch row: not an object');
+    if (!isString(item.day)) throw new Error('Invalid v2 sales-metrics batch row.day');
+    if (!isObject(item.metrics)) throw new Error('Invalid v2 sales-metrics batch row.metrics');
+    assertSalesMetricsPayload(item.metrics, 'v2 sales-metrics batch row.metrics');
   }
-  if (!isObject(data.bookedCredit)) throw new Error('Invalid v2 sales-metrics response: bookedCredit missing');
-  if (!Array.isArray(data.trendByDay)) throw new Error('Invalid v2 sales-metrics response: trendByDay missing');
-  if (!Array.isArray(data.sequences)) throw new Error('Invalid v2 sales-metrics response: sequences missing');
-  if (!Array.isArray(data.reps)) throw new Error('Invalid v2 sales-metrics response: reps missing');
 }
 
 export function assertRunsListV2Envelope(value: unknown): asserts value is ApiEnvelope<RunsListV2> {
@@ -65,6 +83,12 @@ export function assertRunsListV2Envelope(value: unknown): asserts value is ApiEn
   if (!isObject(data.pagination)) throw new Error('Invalid v2 runs response: pagination missing');
   if (!isNumber(data.pagination.count)) throw new Error('Invalid v2 runs response: pagination.count invalid');
   if (!isObject(data.filters)) throw new Error('Invalid v2 runs response: filters missing');
+}
+
+export function assertRunV2Envelope(value: unknown): asserts value is ApiEnvelope<RunV2> {
+  if (!isObject(value)) throw new Error('Invalid v2 run response: not an object');
+  assertEnvelopeMeta(value.meta);
+  assertRun(value.data);
 }
 
 export function assertChannelsV2Envelope(value: unknown): asserts value is ApiEnvelope<ChannelsV2> {

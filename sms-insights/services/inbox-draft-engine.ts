@@ -118,7 +118,7 @@ const findLatestMessageByDirection = (
   return null;
 };
 const timelineSpeakerLabel = (message: InboxMessageRow): string =>
-  message.direction === 'inbound' ? 'Lead' : (message.aloware_user || 'Setter');
+  message.direction === 'inbound' ? 'Lead' : message.aloware_user || 'Setter';
 
 const hasPattern = (text: string, patterns: RegExp[]): boolean => patterns.some((pattern) => pattern.test(text));
 

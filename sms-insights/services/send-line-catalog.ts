@@ -29,7 +29,7 @@ const parseRawEntry = (entry: unknown, index: number): SendLineOption | null => 
       ? Math.trunc(rawLineId)
       : typeof rawLineId === 'string' && rawLineId.trim().length > 0
         ? Number.parseInt(rawLineId.trim(), 10)
-        : NaN;
+        : Number.NaN;
 
   const normalizedLineId = Number.isFinite(lineId) ? lineId : null;
 
@@ -85,7 +85,10 @@ export const listSendLineOptions = (): SendLineOption[] => {
   }
 };
 
-export const findSendLineOption = (params: { lineId?: number | null; fromNumber?: string | null }): SendLineOption | null => {
+export const findSendLineOption = (params: {
+  lineId?: number | null;
+  fromNumber?: string | null;
+}): SendLineOption | null => {
   const options = listSendLineOptions();
   if (options.length === 0) return null;
 

@@ -54,8 +54,9 @@ const normalizePhoneKey = (value: string | null | undefined): string | null => {
   return digits.slice(-10);
 };
 
-export const bookedCallSourceKey = (source: Pick<BookedCallAttributionSource, 'slackChannelId' | 'slackMessageTs'>): string =>
-  `${source.slackChannelId}::${source.slackMessageTs}`;
+export const bookedCallSourceKey = (
+  source: Pick<BookedCallAttributionSource, 'slackChannelId' | 'slackMessageTs'>,
+): string => `${source.slackChannelId}::${source.slackMessageTs}`;
 
 const findLatestAtOrBefore = (values: number[], upperBoundMs: number): number | null => {
   if (values.length === 0) return null;
@@ -278,7 +279,9 @@ export const getBookedCallSmsReplyLinks = async (
   const fromIso = new Date(minBookingTs - ATTRIBUTION_WINDOW_MS).toISOString();
   const toIso = new Date(maxBookingTs).toISOString();
 
-  const phoneKeys = [...new Set(normalizedCalls.map((row) => row.phoneKey).filter((value): value is string => Boolean(value)))];
+  const phoneKeys = [
+    ...new Set(normalizedCalls.map((row) => row.phoneKey).filter((value): value is string => Boolean(value))),
+  ];
   const inboundByPhone = new Map<string, number[]>();
 
   if (phoneKeys.length > 0) {

@@ -17,6 +17,7 @@ export class ApiError extends Error {
 }
 
 const dashboardClientIdStorageKey = 'ptbizsms_dashboard_client_id_v1';
+const csrfCookieName = 'ptbizsms_csrf';
 
 const getDashboardClientId = (): string | null => {
   if (typeof window === 'undefined') return null;
@@ -36,16 +37,15 @@ const getDashboardClientId = (): string | null => {
   }
 };
 
-const getAuthToken = (explicit?: string): string | null => {
-  if (explicit) return explicit;
+const getCsrfToken = (): string | null => {
+  if (typeof document === 'undefined') return null;
   try {
-    const t = localStorage.getItem('slackToken');
-    // Back-compat: older code may have stored the token with quotes.
-    if (t && (t.startsWith('"') || t.startsWith("'"))) {
-      return t.replace(/^['"]|['"]$/g, '');
-    }
-    if (t) return t;
-    return null;
+    const cookie = document.cookie
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(`${csrfCookieName}=`));
+    if (!cookie) return null;
+    return decodeURIComponent(cookie.slice(csrfCookieName.length + 1));
   } catch {
     return null;
   }
@@ -57,13 +57,19 @@ export const apiFetch = async <T>(
   options: ApiClientOptions = {},
 ): Promise<T> => {
   const baseUrl = options.baseUrl ?? '';
-  const token = getAuthToken(init.token ?? options.token ?? undefined);
+  const token = init.token ?? options.token ?? undefined;
   const timeoutMs = options.timeoutMs ?? 30_000;
 
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
+  if ((init.method || 'GET').toUpperCase() !== 'GET' && (init.method || 'GET').toUpperCase() !== 'HEAD') {
+    const csrfToken = getCsrfToken();
+    if (csrfToken && !headers.has('X-CSRF-Token')) {
+      headers.set('X-CSRF-Token', csrfToken);
+    }
+  }
   const dashboardClientId = getDashboardClientId();
   if (dashboardClientId && !headers.has('X-Dashboard-Client-Id')) {
     headers.set('X-Dashboard-Client-Id', dashboardClientId);
@@ -81,7 +87,12 @@ export const apiFetch = async <T>(
 
   let res: Response;
   try {
-    res = await fetch(`${baseUrl}${path}`, { ...init, headers, signal: controller.signal });
+    res = await fetch(`${baseUrl}${path}`, {
+      credentials: init.credentials ?? 'include',
+      ...init,
+      headers,
+      signal: controller.signal,
+    });
   } catch (e) {
     if (controller.signal.aborted) {
       throw new ApiError(`Request timed out after ${timeoutMs}ms`, 408, { timeoutMs, path });

@@ -126,7 +126,9 @@ const splitSlackText = (text: string, maxLen = SLACK_TEXT_CHUNK_LIMIT): string[]
 };
 
 const resolveAlowareChannelName = (): string => {
-  return process.env.DAILY_REPORT_CHANNEL_NAME?.trim() || process.env.ALOWARE_CHANNEL_NAME?.trim() || 'alowaresmsupdates';
+  return (
+    process.env.DAILY_REPORT_CHANNEL_NAME?.trim() || process.env.ALOWARE_CHANNEL_NAME?.trim() || 'alowaresmsupdates'
+  );
 };
 
 const appMentionCallback = async ({
@@ -247,7 +249,9 @@ const appMentionCallback = async ({
     // Log the successful report run
     if (isAloware) {
       try {
-        const summaryText = isDailySnapshot ? buildDailyReportSummary(reportText) : reportText.split('\n').slice(0, 5).join('\n');
+        const summaryText = isDailySnapshot
+          ? buildDailyReportSummary(reportText)
+          : reportText.split('\n').slice(0, 5).join('\n');
         await logDailyRun(
           {
             channelId: event.channel,

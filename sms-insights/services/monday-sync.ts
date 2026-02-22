@@ -85,9 +85,7 @@ export const syncMondayBoard = async (
     const inferred = inferBoardMapping(columns);
     const persisted = coerceBoardMapping(persistedRaw);
     const envOverride = readBoardMappingFromEnv();
-    const mapping =
-      mergeBoardMappings(mergeBoardMappings(inferred, persisted), envOverride) ||
-      inferred;
+    const mapping = mergeBoardMappings(mergeBoardMappings(inferred, persisted), envOverride) || inferred;
     if (envOverride) {
       logger?.info?.('Using MONDAY_ACQ_COLUMN_MAP_JSON override for monday sync mapping', { boardId });
     }

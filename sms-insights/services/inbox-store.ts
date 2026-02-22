@@ -777,6 +777,58 @@ export const getSendAttemptByIdempotency = async (
   }
 };
 
+export type SendAttemptVolumeCounts = {
+  sentLastHour: number;
+  sentLastDay: number;
+  conversationSentLastHour: number;
+};
+
+export const getSendAttemptVolumeCounts = async (
+  conversationId: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<SendAttemptVolumeCounts> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<{
+      sent_last_hour: string;
+      sent_last_day: string;
+      conversation_sent_last_hour: string;
+    }>(
+      `
+      SELECT
+        COUNT(*) FILTER (
+          WHERE status = 'sent'
+            AND created_at >= NOW() - INTERVAL '1 hour'
+        )::text AS sent_last_hour,
+        COUNT(*) FILTER (
+          WHERE status = 'sent'
+            AND created_at >= NOW() - INTERVAL '1 day'
+        )::text AS sent_last_day,
+        COUNT(*) FILTER (
+          WHERE status = 'sent'
+            AND conversation_id = $1::uuid
+            AND created_at >= NOW() - INTERVAL '1 hour'
+        )::text AS conversation_sent_last_hour
+      FROM send_attempts;
+      `,
+      [conversationId],
+    );
+
+    const row = result.rows[0];
+    return {
+      sentLastHour: Number.parseInt(row?.sent_last_hour || '0', 10) || 0,
+      sentLastDay: Number.parseInt(row?.sent_last_day || '0', 10) || 0,
+      conversationSentLastHour: Number.parseInt(row?.conversation_sent_last_hour || '0', 10) || 0,
+    };
+  } catch (err) {
+    logger?.error('getSendAttemptVolumeCounts failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export type InsertDraftSuggestionInput = {
   conversationId: string;
   promptSnapshotHash: string;

@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 
+import { client } from '../../api/client';
 import { uiModeStorageKey } from '../../uiMode';
 import { V2_TERM_DEFINITIONS, V2_TERM_GROUPS, v2Copy } from '../copy';
 
@@ -96,6 +97,16 @@ export default function V2Shell({ children }: { children: ReactNode }) {
 
   const isDesktopCollapsed = !isMobileViewport && isSidebarCollapsed;
 
+  const handleLogout = async () => {
+    try {
+      await client.post('/api/auth/logout', {});
+    } catch {
+      // noop
+    } finally {
+      window.location.assign('/');
+    }
+  };
+
   return (
     <div className="V2Shell">
       <header className="V2Shell__topbar">
@@ -135,6 +146,9 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             }}
           >
             {v2Copy.actions.legacyUi}
+          </button>
+          <button className="V2Shell__modeButton" type="button" onClick={() => void handleLogout()}>
+            Sign out
           </button>
         </div>
       </header>

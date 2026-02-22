@@ -77,7 +77,11 @@ export type SalesMetricsV2 = {
       text: string | null;
       strictSmsReplyLinked: boolean;
       latestReplyAt: string | null;
-      strictSmsReplyReason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
+      strictSmsReplyReason:
+        | 'matched_reply_before_booking'
+        | 'no_contact_phone'
+        | 'no_reply_before_booking'
+        | 'invalid_booking_timestamp';
     }>;
     diagnosticSmsBookingSignals: number;
     optOuts: number;
@@ -435,7 +439,11 @@ type SalesMetricsV1Compatible = {
       text: string | null;
       strictSmsReplyLinked: boolean;
       latestReplyAt: string | null;
-      strictSmsReplyReason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
+      strictSmsReplyReason:
+        | 'matched_reply_before_booking'
+        | 'no_contact_phone'
+        | 'no_reply_before_booking'
+        | 'invalid_booking_timestamp';
     }>;
   }>;
   repLeaderboard: Array<{
@@ -547,7 +555,7 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
   },
 });
 
-export const toRunV2 = (run: DailyRunRow): RunV2 => ({
+export const toRunV2 = (run: DailyRunRow, options?: { includeFullReport?: boolean }): RunV2 => ({
   id: run.id,
   createdAt: run.created_at,
   timestamp: run.timestamp,
@@ -558,7 +566,7 @@ export const toRunV2 = (run: DailyRunRow): RunV2 => ({
   status: run.status,
   errorMessage: run.error_message,
   summaryText: run.summary_text,
-  fullReport: run.full_report,
+  fullReport: options?.includeFullReport ? run.full_report : null,
   durationMs: run.duration_ms,
   isLegacy: run.is_legacy === true,
 });
@@ -570,8 +578,9 @@ export const toRunsListV2 = (params: {
   daysBack: number;
   channelId?: string;
   legacyMode: 'exclude' | 'only' | 'include';
+  includeFullReport?: boolean;
 }): RunsListV2 => ({
-  items: params.rows.map(toRunV2),
+  items: params.rows.map((row) => toRunV2(row, { includeFullReport: params.includeFullReport === true })),
   pagination: {
     limit: params.limit,
     offset: params.offset,

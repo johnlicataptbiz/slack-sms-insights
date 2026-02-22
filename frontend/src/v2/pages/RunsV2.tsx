@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { useV2Channels, useV2Runs, useV2SalesMetrics } from '../../api/v2Queries';
+import { useV2Channels, useV2Run, useV2Runs, useV2SalesMetrics } from '../../api/v2Queries';
 import type { RunV2 } from '../../api/v2-types';
 import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser';
 import { v2Copy } from '../copy';
@@ -290,8 +290,15 @@ export default function RunsV2() {
   const selectedId = searchParams.get('run');
   const [isRunDetailFocused, setIsRunDetailFocused] = useState(() => Boolean(selectedId));
 
-  const { data: runsData, isLoading, isError, error } = useV2Runs({ daysBack, channelId, limit: 100, offset: 0 });
+  const { data: runsData, isLoading, isError, error } = useV2Runs({
+    daysBack,
+    channelId,
+    limit: 100,
+    offset: 0,
+    includeFullReport: false,
+  });
   const { data: channelsData } = useV2Channels();
+  const selectedRunQuery = useV2Run(selectedId);
 
   const channels = useMemo(() => {
     const rows = channelsData?.data.items || [];
@@ -319,7 +326,11 @@ export default function RunsV2() {
     return map;
   }, [channels]);
 
-  const selected = useMemo(() => runsData?.data.items.find((item) => item.id === selectedId) || null, [runsData?.data.items, selectedId]);
+  const selectedSummary = useMemo(
+    () => runsData?.data.items.find((item) => item.id === selectedId) || null,
+    [runsData?.data.items, selectedId],
+  );
+  const selected = selectedRunQuery.data?.data || selectedSummary || null;
   const selectedReportDay = useMemo(() => {
     if (!selected) return null;
     return toIsoDay(extractReportDayLabel(selected));
@@ -751,7 +762,7 @@ export default function RunsV2() {
 
               <details className="V2RunDetail__raw">
                 <summary>Show stored raw report text</summary>
-                <pre>{selected.fullReport || 'No stored report text'}</pre>
+                <pre>{selectedRunQuery.isLoading ? 'Loading raw report text…' : selected.fullReport || 'No stored report text'}</pre>
               </details>
             </div>
           ) : (

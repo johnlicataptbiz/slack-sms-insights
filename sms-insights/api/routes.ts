@@ -2,7 +2,11 @@ import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
-import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallsSummary } from '../services/booked-calls.js';
+import {
+  getBookedCallAttributionSources,
+  getBookedCallSmsReplyLinks,
+  getBookedCallsSummary,
+} from '../services/booked-calls.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
@@ -11,11 +15,11 @@ import { generateDraftSuggestion } from '../services/inbox-draft-engine.js';
 import { sendInboxMessage } from '../services/inbox-send.js';
 import {
   ensureConversationState,
-  type ConversationStateRow,
   getDraftSuggestionById,
   getInboxConversationById,
+  getSendAttemptVolumeCounts,
   insertDraftSuggestion,
-  type InboxMessageRow,
+  insertSendAttempt,
   listDraftSuggestionsForConversation,
   listInboxConversations,
   listMessagesForConversation,
@@ -24,38 +28,108 @@ import {
   updateDraftSuggestionFeedback,
   upsertConversionExample,
 } from '../services/inbox-store.js';
-import { inferQualificationStateFromMessages } from '../services/qualification-inference.js';
 import {
   getMetricsOverview,
   getSlaMetrics,
   getVolumeByDayMetrics,
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
+import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
+import {
+  createDashboardSession,
+  type DashboardSession,
+  type DashboardSessionUser,
+  destroyDashboardSession,
+  getDashboardSession,
+  getDashboardSessionTtlSeconds,
+} from '../services/session-store.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
-import { toChannelsV2, toEnvelope, toRunsListV2, toSalesMetricsV2, toWeeklyManagerSummaryV2 } from './v2-contract.js';
+import {
+  toChannelsV2,
+  toEnvelope,
+  toRunsListV2,
+  toRunV2,
+  toSalesMetricsV2,
+  toWeeklyManagerSummaryV2,
+} from './v2-contract.js';
+
+type ApiRequest = IncomingMessage & {
+  body?: unknown;
+  user?: unknown;
+  authMode?: 'session' | 'bearer';
+  session?: DashboardSession;
+};
 
 type RequestHandler = (
-  req: IncomingMessage & { body?: unknown; user?: unknown },
+  req: ApiRequest,
   res: ServerResponse,
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
   origin?: string,
 ) => Promise<void>;
 
 const OAUTH_STATE_COOKIE_NAME = 'dashboard_oauth_state';
+const SESSION_COOKIE_NAME = 'ptbizsms_session';
+const CSRF_COOKIE_NAME = 'ptbizsms_csrf';
+const DEFAULT_JSON_BODY_MAX_BYTES = 256 * 1024;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://ptbizsms.com',
   'https://www.ptbizsms.com',
   'http://localhost:5173',
   'http://localhost:3000',
 ];
+
+type RateLimitBucket = {
+  limit: number;
+  windowMs: number;
+};
+
+type RateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  retryAfterSeconds: number;
+};
+
+const rateLimitState = new Map<string, number[]>();
+
+const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
+  if (!value) return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'true') return true;
+  if (normalized === 'false') return false;
+  return fallback;
+};
+
+const parsePositiveInteger = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt(value || '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const getMutationRateLimit = (): RateLimitBucket => ({
+  limit: parsePositiveInteger(process.env.API_MUTATION_RATE_LIMIT_MAX, 60),
+  windowMs: parsePositiveInteger(process.env.API_MUTATION_RATE_LIMIT_WINDOW_MS, 60_000),
+});
+
+const getSendRateLimit = (): RateLimitBucket => ({
+  limit: parsePositiveInteger(process.env.API_SEND_RATE_LIMIT_MAX, 10),
+  windowMs: parsePositiveInteger(process.env.API_SEND_RATE_LIMIT_WINDOW_MS, 60_000),
+});
+
+const getSendCapPerHour = (): number => parsePositiveInteger(process.env.SMS_SEND_CAP_PER_HOUR, 250);
+const getSendCapPerDay = (): number => parsePositiveInteger(process.env.SMS_SEND_CAP_PER_DAY, 2500);
+const getSendCapPerConversationHour = (): number =>
+  parsePositiveInteger(process.env.SMS_SEND_CAP_PER_CONVERSATION_HOUR, 20);
+
+const shouldUseSecureCookies = (): boolean =>
+  parseBooleanFlag(process.env.COOKIE_SECURE, (process.env.NODE_ENV || '').trim() === 'production');
 
 const getAllowedOrigins = (): Set<string> => {
   const configured = (process.env.ALLOWED_ORIGINS || process.env.CORS_ALLOWED_ORIGINS || '').trim();
@@ -92,79 +166,233 @@ const parseCookies = (rawCookies: string | undefined): Record<string, string> =>
   return cookies;
 };
 
-const buildCookie = (name: string, value: string, maxAgeSeconds: number): string => {
-  return [
+const buildCookie = (
+  name: string,
+  value: string,
+  options: { maxAgeSeconds: number; httpOnly?: boolean; sameSite?: 'Lax' | 'Strict' | 'None' },
+): string => {
+  const parts = [
     `${name}=${encodeURIComponent(value)}`,
     'Path=/',
-    'HttpOnly',
-    'Secure',
-    'SameSite=Lax',
-    `Max-Age=${maxAgeSeconds}`,
-  ].join('; ');
+    `SameSite=${options.sameSite || 'Lax'}`,
+    `Max-Age=${Math.max(0, options.maxAgeSeconds)}`,
+  ];
+  if (options.httpOnly !== false) {
+    parts.push('HttpOnly');
+  }
+  if (shouldUseSecureCookies()) {
+    parts.push('Secure');
+  }
+  return parts.join('; ');
+};
+
+const getMaxJsonBodyBytes = (): number => {
+  return parsePositiveInteger(process.env.API_JSON_BODY_MAX_BYTES, DEFAULT_JSON_BODY_MAX_BYTES);
+};
+
+class HttpRequestError extends Error {
+  statusCode: number;
+
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.name = 'HttpRequestError';
+    this.statusCode = statusCode;
+  }
+}
+
+const isUuid = (value: string): boolean => UUID_PATTERN.test(value);
+
+const ensureRateLimit = (bucketKey: string, identifier: string, bucket: RateLimitBucket): RateLimitResult => {
+  const now = Date.now();
+  const key = `${bucketKey}:${identifier}`;
+  const cutoff = now - bucket.windowMs;
+  const existing = rateLimitState.get(key) || [];
+  const active = existing.filter((value) => value > cutoff);
+  const allowed = active.length < bucket.limit;
+  if (allowed) {
+    active.push(now);
+  }
+  rateLimitState.set(key, active);
+  const oldest = active[0] || now;
+  const retryAfterMs = Math.max(0, bucket.windowMs - (now - oldest));
+
+  return {
+    allowed,
+    remaining: Math.max(0, bucket.limit - active.length),
+    retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+  };
+};
+
+const resolveRateLimitActor = (req: ApiRequest): string => {
+  const verified = getVerifiedSlackUser(req);
+  const userId = (verified.user_id || verified.user || '').trim();
+  if (userId) {
+    return `user:${userId}`;
+  }
+  const dashboardClientId = resolveDashboardClientId(req);
+  if (dashboardClientId) {
+    return `dashboard:${dashboardClientId}`;
+  }
+  const forwarded = req.headers['x-forwarded-for'];
+  const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const ip = (forwardedIp || req.socket.remoteAddress || 'unknown').split(',')[0]?.trim();
+  return `ip:${ip || 'unknown'}`;
+};
+
+const handleRateLimitExceeded = (
+  res: ServerResponse,
+  origin: string | undefined,
+  result: RateLimitResult,
+  message = 'Rate limit exceeded',
+) => {
+  sendJson(res, 429, { error: message, retryAfterSeconds: result.retryAfterSeconds }, origin, {
+    'Retry-After': String(result.retryAfterSeconds),
+  });
+};
+
+const getSessionFromRequest = (req: IncomingMessage): DashboardSession | null => {
+  const cookies = parseCookies(req.headers.cookie);
+  const sessionId = (cookies[SESSION_COOKIE_NAME] || '').trim();
+  return getDashboardSession(sessionId);
+};
+
+const isDummyTokenAllowed = (): boolean => {
+  const requested = parseBooleanFlag(process.env.ALLOW_DUMMY_AUTH_TOKEN, false);
+  const environment = (process.env.NODE_ENV || '').trim().toLowerCase();
+  return requested && environment !== 'production';
+};
+
+const extractBearerToken = (req: IncomingMessage): string | null => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice(7).trim();
+  }
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  if (url.pathname === '/api/stream') {
+    return (url.searchParams.get('token') || '').trim() || null;
+  }
+  return null;
+};
+
+const validateCsrf = (req: ApiRequest): boolean => {
+  if (req.authMode !== 'session') {
+    return true;
+  }
+  const session = req.session;
+  if (!session) {
+    return false;
+  }
+  const rawHeader = req.headers['x-csrf-token'];
+  const header = (Array.isArray(rawHeader) ? rawHeader[0] : rawHeader || '').trim();
+  if (!header) {
+    return false;
+  }
+  return header === session.csrfToken;
 };
 
 // Parse JSON body
 const parseJsonBody = async (req: IncomingMessage): Promise<unknown> => {
   return new Promise((resolve, reject) => {
+    const maxBytes = getMaxJsonBodyBytes();
     let body = '';
-    req.on('data', (chunk) => {
-      body += chunk.toString();
+    let received = 0;
+    let finished = false;
+
+    const fail = (error: Error) => {
+      if (finished) return;
+      finished = true;
+      reject(error);
+    };
+
+    req.on('data', (chunk: Buffer | string) => {
+      if (finished) return;
+      const text = Buffer.isBuffer(chunk) ? chunk.toString('utf8') : chunk;
+      received += Buffer.byteLength(text, 'utf8');
+      if (received > maxBytes) {
+        req.destroy();
+        fail(new HttpRequestError(413, 'Payload too large'));
+        return;
+      }
+      body += text;
     });
     req.on('end', () => {
+      if (finished) return;
       try {
+        finished = true;
         resolve(body ? JSON.parse(body) : {});
       } catch {
-        reject(new Error('Invalid JSON'));
+        fail(new HttpRequestError(400, 'Invalid JSON'));
       }
     });
-    req.on('error', reject);
+    req.on('error', (error) => fail(error instanceof Error ? error : new Error('Request stream failed')));
   });
 };
 
-// Verify token from Authorization header
-const verifyToken = async (req: IncomingMessage & { user?: unknown }): Promise<boolean> => {
-  const authHeader = req.headers.authorization;
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
+const sendBodyParseError = (res: ServerResponse, origin: string | undefined, error: unknown): void => {
+  if (error instanceof HttpRequestError) {
+    sendJson(res, error.statusCode, { error: error.message }, origin);
+    return;
+  }
+  sendJson(res, 400, { error: 'Invalid request body' }, origin);
+};
 
-  let token: string | null = null;
-
-  if (authHeader?.startsWith('Bearer ')) {
-    token = authHeader.slice(7);
-  } else {
-    // SSE/EventSource can't set Authorization headers; allow token via query param for /api/stream only.
-    if (url.pathname === '/api/stream') {
-      token = url.searchParams.get('token');
-    }
+// Verify session cookie or bearer token.
+const verifyToken = async (req: ApiRequest): Promise<boolean> => {
+  const session = getSessionFromRequest(req);
+  if (session) {
+    req.user = session.user;
+    req.authMode = 'session';
+    req.session = session;
+    return true;
   }
 
+  const token = extractBearerToken(req);
   if (!token) return false;
 
-  const allowDummyToken = (process.env.ALLOW_DUMMY_AUTH_TOKEN || '').trim().toLowerCase() === 'true';
-  if (allowDummyToken && token === 'dummy-token-bypass-auth') {
-    (req as { user?: unknown }).user = { user_id: 'dummy-user', team_id: 'dummy-team' };
+  if (isDummyTokenAllowed() && token === 'dummy-token-bypass-auth') {
+    req.user = { user_id: 'dummy-user', team_id: 'dummy-team', email: null };
+    req.authMode = 'bearer';
     return true;
   }
 
   try {
     const slack = new WebClient(token);
     const auth = await slack.auth.test();
-    (req as { user?: unknown }).user = auth;
+    req.user = auth;
+    req.authMode = 'bearer';
     return true;
   } catch {
     return false;
   }
 };
 
-const sendJson = (res: ServerResponse, statusCode: number, data: unknown, origin?: string) => {
-  const headers: Record<string, string> = {
+const sendJson = (
+  res: ServerResponse,
+  statusCode: number,
+  data: unknown,
+  origin?: string,
+  extraHeaders?: Record<string, string | string[]>,
+) => {
+  const securityHeaders: Record<string, string> = {
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  };
+
+  const headers: Record<string, string | string[]> = {
     'Content-Type': 'application/json',
     Vary: 'Origin',
+    ...securityHeaders,
   };
   if (origin) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-CSRF-Token, X-Dashboard-Client-Id';
     headers['Access-Control-Allow-Credentials'] = 'true';
+  }
+  if (extraHeaders) {
+    Object.assign(headers, extraHeaders);
   }
   res.writeHead(statusCode, headers);
   res.end(JSON.stringify(data));
@@ -195,21 +423,52 @@ const inferOwnerLabelFromHint = (value: string | null | undefined): string | nul
   return null;
 };
 
-const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
-  if (!value) return fallback;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'true') return true;
-  if (normalized === 'false') return false;
-  return fallback;
-};
-
 const isV2InboxEnabled = (): boolean => parseBooleanFlag(process.env.V2_INBOX_ENABLED, true);
 const isAlowareSendEnabled = (): boolean => parseBooleanFlag(process.env.ALOWARE_SEND_ENABLED, true);
 const isDraftEngineEnabled = (): boolean => parseBooleanFlag(process.env.AI_DRAFT_ENGINE_ENABLED, true);
 const isStrictLintEnabled = (): boolean => parseBooleanFlag(process.env.AI_DRAFT_STRICT_LINT_ENABLED, true);
 
 const handleAuthVerify: RequestHandler = async (req, res, _logger, origin) => {
-  sendJson(res, 200, { ok: true, user: (req as { user?: unknown }).user }, origin);
+  sendJson(
+    res,
+    200,
+    {
+      ok: true,
+      user: req.user || null,
+      authMode: req.authMode || null,
+      csrfToken: req.authMode === 'session' ? req.session?.csrfToken || null : null,
+    },
+    origin,
+  );
+};
+
+const handleAuthLogout: RequestHandler = async (req, res, _logger, origin) => {
+  const cookies = parseCookies(req.headers.cookie);
+  const existingSession = (cookies[SESSION_COOKIE_NAME] || '').trim();
+  if (existingSession) {
+    destroyDashboardSession(existingSession);
+  }
+  sendJson(res, 200, { ok: true }, origin, {
+    'Cache-Control': 'no-store',
+    'Set-Cookie': [
+      buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0, httpOnly: true }),
+      buildCookie(CSRF_COOKIE_NAME, '', { maxAgeSeconds: 0, httpOnly: false }),
+      buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
+    ],
+  });
+};
+
+const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
+  sendJson(
+    res,
+    200,
+    {
+      ok: true,
+      service: 'sms-insights-api',
+      time: new Date().toISOString(),
+    },
+    origin,
+  );
 };
 
 const handleOauthStart: RequestHandler = async (_req, res, logger) => {
@@ -233,7 +492,7 @@ const handleOauthStart: RequestHandler = async (_req, res, logger) => {
 
   const headers: Record<string, string> = {
     Location: authorizeUrl.toString(),
-    'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, state, 600),
+    'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, state, { maxAgeSeconds: 600 }),
   };
   res.writeHead(302, headers);
   res.end();
@@ -287,29 +546,30 @@ const handleOauthCallback: RequestHandler = async (req, res, logger) => {
       return;
     }
 
-    const successUrl = (process.env.DASHBOARD_AUTH_SUCCESS_URL || 'https://ptbizsms.com').trim();
-    const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Signing in…</title>
-  </head>
-  <body>
-    <script>
-      localStorage.setItem('slackToken', ${JSON.stringify(token)});
-      window.location.replace(${JSON.stringify(successUrl)});
-    </script>
-    <p>Signed in. <a href="${successUrl}">Continue</a></p>
-  </body>
-</html>`;
+    const auth = await slack.auth.test({ token });
+    const sessionUser: DashboardSessionUser = {
+      user_id: auth.user_id || response.authed_user?.id || undefined,
+      user: auth.user || response.authed_user?.id || undefined,
+      team_id: auth.team_id || undefined,
+    };
+    const existingSession = (cookies[SESSION_COOKIE_NAME] || '').trim();
+    if (existingSession) {
+      destroyDashboardSession(existingSession);
+    }
+    const session = createDashboardSession(sessionUser);
+    const sessionTtlSeconds = getDashboardSessionTtlSeconds();
+    const successUrl = (process.env.DASHBOARD_AUTH_SUCCESS_URL || 'https://ptbizsms.com/v2/insights?ui=v2').trim();
 
-    res.writeHead(200, {
-      'Content-Type': 'text/html; charset=utf-8',
-      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', 0),
+    res.writeHead(302, {
+      Location: successUrl,
+      'Set-Cookie': [
+        buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
+        buildCookie(SESSION_COOKIE_NAME, session.id, { maxAgeSeconds: sessionTtlSeconds, httpOnly: true }),
+        buildCookie(CSRF_COOKIE_NAME, session.csrfToken, { maxAgeSeconds: sessionTtlSeconds, httpOnly: false }),
+      ],
       'Cache-Control': 'no-store',
     });
-    res.end(html);
+    res.end();
     logger?.info('Completed dashboard OAuth callback');
   } catch (error) {
     logger?.error('OAuth callback failed', error);
@@ -348,6 +608,9 @@ const handleGetRunById: RequestHandler = async (req, res, logger, origin) => {
   if (!id) {
     return sendJson(res, 400, { error: 'Missing run ID' }, origin);
   }
+  if (!isUuid(id)) {
+    return sendJson(res, 400, { error: 'Invalid run ID' }, origin);
+  }
 
   const run = await getDailyRunById(id, logger);
   if (!run) {
@@ -363,27 +626,33 @@ const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
     return sendJson(res, 401, { error: 'Invalid bot token' }, origin);
   }
 
+  type LegacyRunPayload = {
+    channelId: string;
+    channelName?: string;
+    reportType: 'daily' | 'manual' | 'test';
+    status: 'success' | 'error' | 'pending';
+    errorMessage?: string;
+    summaryText?: string;
+    fullReport?: string;
+    durationMs?: number;
+  };
+
+  let body: Partial<LegacyRunPayload>;
   try {
-    type LegacyRunPayload = {
-      channelId: string;
-      channelName?: string;
-      reportType: 'daily' | 'manual' | 'test';
-      status: 'success' | 'error' | 'pending';
-      errorMessage?: string;
-      summaryText?: string;
-      fullReport?: string;
-      durationMs?: number;
-    };
+    body = (await parseJsonBody(req)) as Partial<LegacyRunPayload>;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
 
-    const body = (await parseJsonBody(req)) as Partial<LegacyRunPayload>;
+  if (!body.channelId || !body.reportType || !body.status) {
+    return sendJson(res, 400, { error: 'Missing required fields: channelId, reportType, status' }, origin);
+  }
 
-    if (!body.channelId || !body.reportType || !body.status) {
-      return sendJson(res, 400, { error: 'Missing required fields: channelId, reportType, status' }, origin);
-    }
+  const { channelId, channelName, reportType, status, errorMessage, summaryText, fullReport, durationMs } =
+    body as LegacyRunPayload;
 
-    const { channelId, channelName, reportType, status, errorMessage, summaryText, fullReport, durationMs } =
-      body as LegacyRunPayload;
-
+  try {
     const runId = await logDailyRun(
       {
         channelId,
@@ -405,7 +674,7 @@ const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
     sendJson(res, 200, { runId }, origin);
   } catch (error) {
     logger?.error('Failed to post run:', error);
-    sendJson(res, 400, { error: 'Invalid request' }, origin);
+    sendJson(res, 500, { error: 'Failed to log run' }, origin);
   }
 };
 
@@ -420,6 +689,7 @@ const handleGetRunsV2: RequestHandler = async (req, res, logger, origin) => {
   const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 100);
   const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
   const daysBack = Number.parseInt(url.searchParams.get('daysBack') || '7', 10) || 7;
+  const includeFullReport = url.searchParams.get('includeFullReport') === 'true';
   const legacyOnly = url.searchParams.get('legacyOnly') === 'true';
   const includeLegacy = url.searchParams.get('includeLegacy') === 'true';
   const legacyMode = legacyOnly ? 'only' : includeLegacy ? 'include' : 'exclude';
@@ -440,7 +710,34 @@ const handleGetRunsV2: RequestHandler = async (req, res, logger, origin) => {
     res,
     200,
     toEnvelope({
-      data: toRunsListV2({ rows, limit, offset, daysBack, channelId, legacyMode }),
+      data: toRunsListV2({ rows, limit, offset, daysBack, channelId, legacyMode, includeFullReport }),
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+const handleGetRunByIdV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const parts = url.pathname.split('/').filter(Boolean);
+  const runId = (parts[3] || '').trim(); // /api/v2/runs/:id
+  if (!runId) {
+    return sendJson(res, 400, { error: 'Missing run ID' }, origin);
+  }
+  if (!isUuid(runId)) {
+    return sendJson(res, 400, { error: 'Invalid run ID' }, origin);
+  }
+
+  const run = await getDailyRunById(runId, logger);
+  if (!run) {
+    return sendJson(res, 404, { error: 'Run not found' }, origin);
+  }
+
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: toRunV2(run, { includeFullReport: true }),
       timeZone: DEFAULT_BUSINESS_TIMEZONE,
     }),
     origin,
@@ -506,6 +803,9 @@ const handleGetConversationById: RequestHandler = async (req, res, logger, origi
   if (!id) {
     return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
   }
+  if (!isUuid(id)) {
+    return sendJson(res, 400, { error: 'Invalid conversation ID' }, origin);
+  }
 
   const conversation = await getConversationById(id, logger);
   if (!conversation) {
@@ -549,6 +849,9 @@ const handleGetConversationEvents: RequestHandler = async (req, res, logger, ori
   const id = parts[2]; // /api/conversations/:id/events
   if (!id) {
     return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  if (!isUuid(id)) {
+    return sendJson(res, 400, { error: 'Invalid conversation ID' }, origin);
   }
 
   const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200);
@@ -817,6 +1120,81 @@ const handleGetSalesMetricsV2: RequestHandler = async (req, res, logger, origin)
   }
 };
 
+const handleGetSalesMetricsBatchV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const rawDays = [
+    ...(url.searchParams.get('days') || '')
+      .split(',')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
+    ...url.searchParams
+      .getAll('day')
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
+  ];
+
+  const uniqueDays = [...new Set(rawDays)].sort((a, b) => a.localeCompare(b));
+  if (uniqueDays.length === 0) {
+    return sendJson(res, 400, { error: 'Provide at least one day (YYYY-MM-DD) via days or day params' }, origin);
+  }
+  if (uniqueDays.length > 31) {
+    return sendJson(res, 400, { error: 'Batch day limit exceeded (max 31)' }, origin);
+  }
+  for (const day of uniqueDays) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      return sendJson(res, 400, { error: `Invalid day format: ${day}` }, origin);
+    }
+  }
+
+  const tz = (url.searchParams.get('tz') || '').trim();
+  try {
+    const items = await Promise.all(
+      uniqueDays.map(async (day) => {
+        const resolved = resolveMetricsRange({
+          day,
+          tz,
+          from: null,
+          to: null,
+          range: null,
+        });
+        const payload = await buildSalesMetricsPayload({
+          from: resolved.from,
+          to: resolved.to,
+          timeZone: resolved.timeZone,
+          requestedMode: 'day',
+          logger,
+        });
+        return {
+          day,
+          metrics: toSalesMetricsV2(payload),
+        };
+      }),
+    );
+
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: { items },
+        timeZone: tz || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: 'day',
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch v2 sales metrics batch:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to fetch v2 sales metrics batch',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
 const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
   // SSE endpoint for realtime invalidation.
   // Note: we intentionally do not use sendJson here.
@@ -824,11 +1202,15 @@ const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   };
   if (origin) {
     headers['Access-Control-Allow-Origin'] = origin;
     headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-CSRF-Token, X-Dashboard-Client-Id';
     headers['Access-Control-Allow-Credentials'] = 'true';
   }
 
@@ -887,11 +1269,13 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
 
   const cursorParam = url.searchParams.get('cursor') || undefined;
   const cursor = cursorParam ? decodeWorkItemCursor(cursorParam) : undefined;
+  const authUser = getVerifiedSlackUser(req);
+  const meRepId = (authUser.user_id || authUser.user || '').trim() || undefined;
 
   const { items, nextCursor: _nextCursor } = await listOpenWorkItems(
     {
       type: type === 'ALL' ? undefined : type,
-      repId: repId === 'all' ? undefined : repId === 'me' ? 'dummy-user' : repId, // Handle 'me' and 'all'
+      repId: repId === 'all' ? undefined : repId === 'me' ? meRepId : repId, // Handle 'me' and 'all'
       severity,
       overdueOnly,
       dueBefore,
@@ -955,8 +1339,8 @@ const handleAssignWorkItem: RequestHandler = async (req, res, logger, origin) =>
     }
 
     sendJson(res, 200, { success: true }, origin);
-  } catch (_error) {
-    sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
   }
 };
 
@@ -967,7 +1351,7 @@ type VerifiedSlackUser = {
   email?: string;
 };
 
-const getVerifiedSlackUser = (req: IncomingMessage & { user?: unknown }): VerifiedSlackUser => {
+const getVerifiedSlackUser = (req: ApiRequest): VerifiedSlackUser => {
   const user = req.user;
   if (!user || typeof user !== 'object') return {};
   return user as VerifiedSlackUser;
@@ -1001,44 +1385,6 @@ const resolveQualificationProgressStep = (params: {
   if (params.revenueMix !== 'unknown') score += 1;
   if (params.coachingInterest !== 'unknown') score += 1;
   return score;
-};
-
-const applyAutoQualificationFromMessages = async (
-  params: {
-    conversationId: string;
-    contactKey: string;
-    contactId: string | null;
-    currentState: ConversationStateRow;
-    messages: InboxMessageRow[];
-  },
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
-): Promise<ConversationStateRow> => {
-  const inference = inferQualificationStateFromMessages(params.currentState, params.messages, logger);
-  if (!inference.changed) {
-    return params.currentState;
-  }
-
-  const nextState = await updateConversationState(params.conversationId, inference.updates, logger);
-
-  await upsertInboxContactProfile(
-    {
-      contactKey: params.contactKey,
-      conversationId: params.conversationId,
-      contactId: params.contactId,
-      niche: nextState.qualification_niche,
-      employmentStatus: nextState.qualification_full_or_part_time,
-      revenueMixCategory: nextState.qualification_revenue_mix,
-      coachingInterest: nextState.qualification_coaching_interest,
-    },
-    logger,
-  );
-
-  logger?.info?.('Auto qualification state updated from conversation text', {
-    conversationId: params.conversationId,
-    updates: inference.updates,
-  });
-
-  return nextState;
 };
 
 const toInboxConversationV2 = (row: {
@@ -1076,10 +1422,7 @@ const toInboxConversationV2 = (row: {
   const ownerFromRep = repDisplayName(row.current_rep_id);
   const ownerFromUser = inferOwnerLabelFromHint(row.latest_outbound_user);
   const ownerFromLine = inferOwnerLabelFromHint(row.latest_outbound_line);
-  const ownerLabel =
-    ownerFromRep !== 'Unassigned'
-      ? ownerFromRep
-      : ownerFromUser || ownerFromLine || null;
+  const ownerLabel = ownerFromRep !== 'Unassigned' ? ownerFromRep : ownerFromUser || ownerFromLine || null;
   const ownerSource =
     ownerFromRep !== 'Unassigned'
       ? 'rep'
@@ -1090,43 +1433,43 @@ const toInboxConversationV2 = (row: {
           : 'unknown';
 
   return {
-  id: row.id,
-  contactKey: row.contact_key,
-  contactName: row.profile_name,
-  contactPhone: row.profile_phone || row.contact_phone,
-  repId: row.current_rep_id,
-  ownerLabel,
-  ownerSource,
-  status: row.status,
-  dnc: row.status === 'dnc' || row.profile_dnc === true,
-  lastInboundAt: row.last_inbound_at,
-  lastOutboundAt: row.last_outbound_at,
-  lastTouchAt: row.last_touch_at,
-  unrepliedInboundCount: row.unreplied_inbound_count,
-  openNeedsReplyCount: row.open_needs_reply_count,
-  needsReplyDueAt: row.needs_reply_due_at,
-  lastMessage: {
-    direction: row.last_message_direction,
-    body: row.last_message_body,
-    createdAt: row.last_message_at,
-  },
-  qualification: {
-    fullOrPartTime: row.state_qualification_full_or_part_time || 'unknown',
-    niche: row.state_qualification_niche || null,
-    revenueMix: row.state_qualification_revenue_mix || 'unknown',
-    coachingInterest: row.state_qualification_coaching_interest || 'unknown',
-    progressStep: row.state_qualification_progress_step || 0,
-  },
-  escalation: {
-    level: (row.state_escalation_level && row.state_escalation_level >= 1 && row.state_escalation_level <= 4
-      ? row.state_escalation_level
-      : 1) as 1 | 2 | 3 | 4,
-    reason: row.state_escalation_reason || null,
-    overridden: row.state_escalation_overridden === true,
-    cadenceStatus: row.state_cadence_status || 'idle',
-    nextFollowupDueAt: row.state_next_followup_due_at || null,
-    lastPodcastSentAt: row.state_last_podcast_sent_at || null,
-  },
+    id: row.id,
+    contactKey: row.contact_key,
+    contactName: row.profile_name,
+    contactPhone: row.profile_phone || row.contact_phone,
+    repId: row.current_rep_id,
+    ownerLabel,
+    ownerSource,
+    status: row.status,
+    dnc: row.status === 'dnc' || row.profile_dnc === true,
+    lastInboundAt: row.last_inbound_at,
+    lastOutboundAt: row.last_outbound_at,
+    lastTouchAt: row.last_touch_at,
+    unrepliedInboundCount: row.unreplied_inbound_count,
+    openNeedsReplyCount: row.open_needs_reply_count,
+    needsReplyDueAt: row.needs_reply_due_at,
+    lastMessage: {
+      direction: row.last_message_direction,
+      body: row.last_message_body,
+      createdAt: row.last_message_at,
+    },
+    qualification: {
+      fullOrPartTime: row.state_qualification_full_or_part_time || 'unknown',
+      niche: row.state_qualification_niche || null,
+      revenueMix: row.state_qualification_revenue_mix || 'unknown',
+      coachingInterest: row.state_qualification_coaching_interest || 'unknown',
+      progressStep: row.state_qualification_progress_step || 0,
+    },
+    escalation: {
+      level: (row.state_escalation_level && row.state_escalation_level >= 1 && row.state_escalation_level <= 4
+        ? row.state_escalation_level
+        : 1) as 1 | 2 | 3 | 4,
+      reason: row.state_escalation_reason || null,
+      overridden: row.state_escalation_overridden === true,
+      cadenceStatus: row.state_cadence_status || 'idle',
+      nextFollowupDueAt: row.state_next_followup_due_at || null,
+      lastPodcastSentAt: row.state_last_podcast_sent_at || null,
+    },
   };
 };
 
@@ -1136,7 +1479,7 @@ const getConversationIdFromPath = (req: IncomingMessage): string | null => {
   // /api/v2/inbox/conversations/:id
   const id = (parts[4] || '').trim();
   if (!id) return null;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+  if (!isUuid(id)) {
     return null;
   }
   return id;
@@ -1174,7 +1517,7 @@ const resolveDashboardClientId = (req: IncomingMessage): string | null => {
   return normalized;
 };
 
-const resolveInboxActorId = (req: IncomingMessage & { user?: unknown }): string | null => {
+const resolveInboxActorId = (req: ApiRequest): string | null => {
   const slackUserId = resolveSlackUserId(getVerifiedSlackUser(req));
   if (slackUserId) return slackUserId;
 
@@ -1292,6 +1635,82 @@ const resolveSendLineSelection = async (
   };
 };
 
+type SendCapDecision = {
+  allowed: boolean;
+  reason: string | null;
+  retryAfterSeconds: number;
+  totals: {
+    sentLastHour: number;
+    sentLastDay: number;
+    conversationSentLastHour: number;
+  };
+  limits: {
+    perHour: number;
+    perDay: number;
+    perConversationHour: number;
+  };
+};
+
+const evaluateSendCaps = async (
+  conversationId: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<SendCapDecision> => {
+  const limits = {
+    perHour: getSendCapPerHour(),
+    perDay: getSendCapPerDay(),
+    perConversationHour: getSendCapPerConversationHour(),
+  };
+
+  try {
+    const totals = await getSendAttemptVolumeCounts(conversationId, logger);
+
+    if (totals.sentLastHour >= limits.perHour) {
+      return {
+        allowed: false,
+        reason: 'Global hourly SMS send cap reached',
+        retryAfterSeconds: 60,
+        totals,
+        limits,
+      };
+    }
+    if (totals.sentLastDay >= limits.perDay) {
+      return {
+        allowed: false,
+        reason: 'Global daily SMS send cap reached',
+        retryAfterSeconds: 300,
+        totals,
+        limits,
+      };
+    }
+    if (totals.conversationSentLastHour >= limits.perConversationHour) {
+      return {
+        allowed: false,
+        reason: 'Conversation hourly SMS send cap reached',
+        retryAfterSeconds: 60,
+        totals,
+        limits,
+      };
+    }
+
+    return {
+      allowed: true,
+      reason: null,
+      retryAfterSeconds: 1,
+      totals,
+      limits,
+    };
+  } catch (error) {
+    logger?.error?.('Failed to evaluate send cap guardrails; allowing request', error);
+    return {
+      allowed: true,
+      reason: null,
+      retryAfterSeconds: 1,
+      totals: { sentLastHour: 0, sentLastDay: 0, conversationSentLastHour: 0 },
+      limits,
+    };
+  }
+};
+
 const handleGetInboxSendConfigV2: RequestHandler = async (req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
@@ -1358,8 +1777,9 @@ const handlePostInboxSendDefaultV2: RequestHandler = async (req, res, logger, or
   } = {};
   try {
     body = (await parseJsonBody(req)) as typeof body;
-  } catch {
-    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
   }
 
   if (body.clear === true) {
@@ -1566,16 +1986,18 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       return a.id.localeCompare(b.id);
     });
   }
-  ensuredState = await applyAutoQualificationFromMessages(
+  const inferredStateResult = await syncQualificationFromConversationText(
     {
       conversationId,
       contactKey: conversation.contact_key,
       contactId: conversation.contact_id,
+      triggerDirection: 'inbound',
       currentState: ensuredState,
       messages,
     },
     logger,
   );
+  ensuredState = inferredStateResult.state || ensuredState;
   const drafts = await listDraftSuggestionsForConversation(conversationId, 20, logger);
   const mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
 
@@ -1655,8 +2077,9 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
   let body: { bookedCallLabel?: string } = {};
   try {
     body = (await parseJsonBody(req)) as { bookedCallLabel?: string };
-  } catch {
-    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
   }
 
   let state = await ensureConversationState(conversationId, logger);
@@ -1689,16 +2112,18 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
       return a.id.localeCompare(b.id);
     });
   }
-  state = await applyAutoQualificationFromMessages(
+  const draftInferenceStateResult = await syncQualificationFromConversationText(
     {
       conversationId,
       contactKey: conversation.contact_key,
       contactId: conversation.contact_id,
+      triggerDirection: 'inbound',
       currentState: state,
       messages,
     },
     logger,
   );
+  state = draftInferenceStateResult.state || state;
 
   const draft = await generateDraftSuggestion(
     {
@@ -1791,8 +2216,9 @@ const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) =
   } = {};
   try {
     body = (await parseJsonBody(req)) as typeof body;
-  } catch {
-    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
   }
 
   const messageBody = (body.body || '').trim();
@@ -1826,6 +2252,52 @@ const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) =
 
   if (sendLineSelection.error) {
     return sendJson(res, 400, { error: sendLineSelection.error }, origin);
+  }
+
+  const sendCaps = await evaluateSendCaps(conversationId, logger);
+  if (!sendCaps.allowed) {
+    const blockedAttempt = await insertSendAttempt(
+      {
+        conversationId,
+        messageBody,
+        senderIdentity: body.senderIdentity || authUser.user_id || authUser.user || null,
+        lineId: sendLineSelection.lineId != null ? String(sendLineSelection.lineId) : null,
+        fromNumber: sendLineSelection.fromNumber ?? null,
+        allowlistDecision: true,
+        dncDecision: conversation.status === 'dnc' || profile?.dnc === true,
+        idempotencyKey: body.idempotencyKey || null,
+        status: 'blocked',
+        requestPayload: {
+          sendCaps: sendCaps.limits,
+          currentVolume: sendCaps.totals,
+        },
+        responsePayload: null,
+        errorMessage: sendCaps.reason || 'SMS send cap reached',
+      },
+      logger,
+    );
+
+    return sendJson(
+      res,
+      429,
+      toEnvelope({
+        data: {
+          status: 'blocked',
+          reason: sendCaps.reason || 'SMS send cap reached',
+          sendAttemptId: blockedAttempt.id,
+          outboundEventId: null,
+          lineSelection: {
+            key: sendLineSelection.key,
+            label: sendLineSelection.label,
+            lineId: sendLineSelection.lineId,
+            fromNumber: sendLineSelection.fromNumber,
+          },
+        },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+      { 'Retry-After': String(sendCaps.retryAfterSeconds) },
+    );
   }
 
   const result = await sendInboxMessage(
@@ -1893,8 +2365,9 @@ const handlePostInboxQualificationV2: RequestHandler = async (req, res, logger, 
   } = {};
   try {
     body = (await parseJsonBody(req)) as typeof body;
-  } catch {
-    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
   }
 
   const currentState = await ensureConversationState(conversationId, logger);
@@ -1976,8 +2449,9 @@ const handlePostInboxEscalationOverrideV2: RequestHandler = async (req, res, log
   } = {};
   try {
     body = (await parseJsonBody(req)) as typeof body;
-  } catch {
-    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
   }
 
   if (!body.level || body.level < 1 || body.level > 4) {
@@ -2036,8 +2510,9 @@ const handlePostInboxDraftFeedbackV2: RequestHandler = async (req, res, logger, 
   } = {};
   try {
     body = (await parseJsonBody(req)) as typeof body;
-  } catch {
-    return sendJson(res, 400, { error: 'Invalid request body' }, origin);
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
   }
 
   const updatedDraft = await updateDraftSuggestionFeedback(
@@ -2100,7 +2575,9 @@ const handlePostInboxDraftFeedbackV2: RequestHandler = async (req, res, logger, 
 type ApiRoute = {
   method: 'GET' | 'POST';
   path: string;
-  requiresAuth: boolean;
+  public?: boolean;
+  csrf?: boolean;
+  rateLimitBucket?: 'mutation' | 'send' | 'none';
   handler: RequestHandler;
 };
 
@@ -2110,70 +2587,70 @@ const routeMatches = (pathname: string, pattern: string): boolean => {
 };
 
 const apiRoutes: ApiRoute[] = [
-  { method: 'GET', path: '/api/oauth/start', requiresAuth: false, handler: handleOauthStart },
-  { method: 'GET', path: '/api/oauth/callback', requiresAuth: false, handler: handleOauthCallback },
+  { method: 'GET', path: '/api/health', public: true, handler: handleApiHealth },
+  { method: 'GET', path: '/api/oauth/start', public: true, handler: handleOauthStart },
+  { method: 'GET', path: '/api/oauth/callback', public: true, handler: handleOauthCallback },
+  { method: 'POST', path: '/api/runs', public: true, csrf: false, rateLimitBucket: 'none', handler: handlePostRun },
 
-  // Public read-only endpoints (dashboard is public)
-  { method: 'GET', path: '/api/metrics', requiresAuth: false, handler: handleGetMetrics },
-  { method: 'GET', path: '/api/sales-metrics', requiresAuth: false, handler: handleGetSalesMetrics },
-  { method: 'GET', path: '/api/runs', requiresAuth: false, handler: handleGetRuns },
-  { method: 'GET', path: '/api/runs/:id', requiresAuth: false, handler: handleGetRunById },
-  { method: 'GET', path: '/api/channels', requiresAuth: false, handler: handleGetChannels },
-  { method: 'GET', path: '/api/v2/sales-metrics', requiresAuth: false, handler: handleGetSalesMetricsV2 },
-  { method: 'GET', path: '/api/v2/runs', requiresAuth: false, handler: handleGetRunsV2 },
-  { method: 'GET', path: '/api/v2/channels', requiresAuth: false, handler: handleGetChannelsV2 },
-  { method: 'GET', path: '/api/v2/weekly-summary', requiresAuth: false, handler: handleGetWeeklySummaryV2 },
+  { method: 'GET', path: '/api/auth/verify', handler: handleAuthVerify },
+  { method: 'POST', path: '/api/auth/logout', handler: handleAuthLogout },
 
-  // Authenticated endpoints (mutations / sensitive data)
-  { method: 'GET', path: '/api/auth/verify', requiresAuth: true, handler: handleAuthVerify },
-  { method: 'POST', path: '/api/runs', requiresAuth: false, handler: handlePostRun },
-  { method: 'GET', path: '/api/v2/inbox/send-config', requiresAuth: false, handler: handleGetInboxSendConfigV2 },
-  { method: 'POST', path: '/api/v2/inbox/send-config/default', requiresAuth: false, handler: handlePostInboxSendDefaultV2 },
-  { method: 'GET', path: '/api/v2/inbox/conversations', requiresAuth: false, handler: handleGetInboxConversationsV2 },
+  { method: 'GET', path: '/api/metrics', handler: handleGetMetrics },
+  { method: 'GET', path: '/api/sales-metrics', handler: handleGetSalesMetrics },
+  { method: 'GET', path: '/api/runs', handler: handleGetRuns },
+  { method: 'GET', path: '/api/runs/:id', handler: handleGetRunById },
+  { method: 'GET', path: '/api/channels', handler: handleGetChannels },
+  { method: 'GET', path: '/api/v2/sales-metrics', handler: handleGetSalesMetricsV2 },
+  { method: 'GET', path: '/api/v2/sales-metrics/batch', handler: handleGetSalesMetricsBatchV2 },
+  { method: 'GET', path: '/api/v2/runs', handler: handleGetRunsV2 },
+  { method: 'GET', path: '/api/v2/runs/:id', handler: handleGetRunByIdV2 },
+  { method: 'GET', path: '/api/v2/channels', handler: handleGetChannelsV2 },
+  { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
+  { method: 'GET', path: '/api/v2/inbox/send-config', handler: handleGetInboxSendConfigV2 },
+  { method: 'POST', path: '/api/v2/inbox/send-config/default', handler: handlePostInboxSendDefaultV2 },
+  { method: 'GET', path: '/api/v2/inbox/conversations', handler: handleGetInboxConversationsV2 },
   {
     method: 'GET',
     path: '/api/v2/inbox/conversations/:id',
-    requiresAuth: false,
     handler: handleGetInboxConversationDetailV2,
   },
   {
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/draft',
-    requiresAuth: false,
     handler: handlePostInboxDraftV2,
   },
-  { method: 'POST', path: '/api/v2/inbox/conversations/:id/send', requiresAuth: false, handler: handlePostInboxSendV2 },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/send',
+    rateLimitBucket: 'send',
+    handler: handlePostInboxSendV2,
+  },
   {
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/qualification',
-    requiresAuth: false,
     handler: handlePostInboxQualificationV2,
   },
   {
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/escalation-override',
-    requiresAuth: false,
     handler: handlePostInboxEscalationOverrideV2,
   },
   {
     method: 'POST',
     path: '/api/v2/inbox/drafts/:id/feedback',
-    requiresAuth: false,
     handler: handlePostInboxDraftFeedbackV2,
   },
 
-  { method: 'GET', path: '/api/conversations/:id', requiresAuth: true, handler: handleGetConversationById },
-  { method: 'GET', path: '/api/conversations/:id/events', requiresAuth: true, handler: handleGetConversationEvents },
-
-  { method: 'GET', path: '/api/stream', requiresAuth: true, handler: handleGetStream },
-
-  { method: 'GET', path: '/api/work-items', requiresAuth: true, handler: handleGetWorkItems },
-  { method: 'POST', path: '/api/work-items/:id/resolve', requiresAuth: true, handler: handleResolveWorkItem },
-  { method: 'POST', path: '/api/work-items/:id/assign', requiresAuth: true, handler: handleAssignWorkItem },
+  { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
+  { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },
+  { method: 'GET', path: '/api/stream', handler: handleGetStream },
+  { method: 'GET', path: '/api/work-items', handler: handleGetWorkItems },
+  { method: 'POST', path: '/api/work-items/:id/resolve', handler: handleResolveWorkItem },
+  { method: 'POST', path: '/api/work-items/:id/assign', handler: handleAssignWorkItem },
 ];
 
 export const handleApiRoute = async (
-  req: IncomingMessage & { body?: unknown; user?: unknown },
+  req: ApiRequest,
   res: ServerResponse,
   pathname: string,
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
@@ -2194,23 +2671,47 @@ export const handleApiRoute = async (
   }
 
   for (const route of apiRoutes) {
-    if (route.method === method && routeMatches(pathname, route.path)) {
-      if (route.requiresAuth) {
-        const isValid = await verifyToken(req);
-        if (!isValid) {
-          sendJson(res, 401, { error: 'Unauthorized' }, origin);
+    if (route.method !== method || !routeMatches(pathname, route.path)) {
+      continue;
+    }
+
+    const requiresAuth = route.public !== true;
+    if (requiresAuth) {
+      const isValid = await verifyToken(req);
+      if (!isValid) {
+        sendJson(res, 401, { error: 'Unauthorized' }, origin);
+        return true;
+      }
+    }
+
+    if (method === 'POST' && requiresAuth) {
+      const requiresCsrf = route.csrf !== false;
+      if (requiresCsrf && !validateCsrf(req)) {
+        sendJson(res, 403, { error: 'CSRF token missing or invalid' }, origin);
+        return true;
+      }
+
+      const bucket = route.rateLimitBucket || 'mutation';
+      if (bucket !== 'none') {
+        const result = ensureRateLimit(
+          bucket,
+          resolveRateLimitActor(req),
+          bucket === 'send' ? getSendRateLimit() : getMutationRateLimit(),
+        );
+        if (!result.allowed) {
+          handleRateLimitExceeded(res, origin, result);
           return true;
         }
       }
-
-      try {
-        await route.handler(req, res, logger, origin);
-      } catch (error) {
-        logger?.error('API route error:', error);
-        sendJson(res, 500, { error: 'Internal server error' }, origin);
-      }
-      return true;
     }
+
+    try {
+      await route.handler(req, res, logger, origin);
+    } catch (error) {
+      logger?.error('API route error:', error);
+      sendJson(res, 500, { error: 'Internal server error' }, origin);
+    }
+    return true;
   }
 
   return false;

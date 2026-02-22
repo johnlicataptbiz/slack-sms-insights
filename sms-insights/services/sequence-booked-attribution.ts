@@ -1,5 +1,9 @@
+import type {
+  BookedCallAttributionBucket,
+  BookedCallAttributionSource,
+  BookedCallSmsReplyLink,
+} from './booked-calls.js';
 import { bookedCallSourceKey } from './booked-calls.js';
-import type { BookedCallAttributionBucket, BookedCallAttributionSource, BookedCallSmsReplyLink } from './booked-calls.js';
 import type { TopSequenceRow } from './sales-metrics.js';
 
 export const MANUAL_SEQUENCE_LABEL = 'No sequence (manual/direct)';

@@ -1,10 +1,10 @@
 import type { Logger } from '@slack/bolt';
 import { upsertInboxContactProfile } from './inbox-contact-profiles.js';
 import {
-  ensureConversationState,
-  listMessagesForConversation,
   type ConversationStateRow,
+  ensureConversationState,
   type InboxMessageRow,
+  listMessagesForConversation,
   updateConversationState,
 } from './inbox-store.js';
 import { inferQualificationStateFromMessages, type QualificationInferenceResult } from './qualification-inference.js';

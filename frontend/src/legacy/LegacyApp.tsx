@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { client } from '../api/client';
 import Dashboard from '../pages/Dashboard';
 import { Insights } from '../pages/Insights';
 import RepScorecard from '../pages/RepScorecard';
@@ -10,18 +11,19 @@ import '../styles/App.css';
 type View = 'dashboard' | 'insights' | 'rep-jack' | 'rep-brandon' | 'rep-attribution' | 'sequences';
 
 export default function LegacyApp() {
-  const [token, setToken] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('slackToken');
-  });
   const [view, setView] = useState<View>('insights');
 
   // Initialize real-time event stream
-  useEventStream(token);
+  useEventStream();
 
-  const handleLogout = () => {
-    localStorage.removeItem('slackToken');
-    setToken(null);
+  const handleLogout = async () => {
+    try {
+      await client.post('/api/auth/logout', {});
+    } catch {
+      // noop
+    } finally {
+      window.location.assign('/');
+    }
   };
 
   return (
@@ -62,12 +64,9 @@ export default function LegacyApp() {
           </button>
         </div>
 
-
-        {token ? (
-          <button className="AppShell__logout" onClick={handleLogout}>
-            Logout
-          </button>
-        ) : null}
+        <button className="AppShell__logout" onClick={() => void handleLogout()}>
+          Logout
+        </button>
 
         <button
           className="AppShell__logout AppShell__switch"

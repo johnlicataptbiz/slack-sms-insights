@@ -99,12 +99,7 @@ const MOSTLY_INSURANCE_PATTERNS = [
   /\binsurance contracts?\b/i,
 ];
 
-const BALANCED_MIX_PATTERNS = [
-  /\bbalanced\b/i,
-  /\bmix(?:ed)?\b/i,
-  /\bboth cash and insurance\b/i,
-  /\b50\s*\/\s*50\b/i,
-];
+const BALANCED_MIX_PATTERNS = [/\bbalanced\b/i, /\bmix(?:ed)?\b/i, /\bboth cash and insurance\b/i, /\b50\s*\/\s*50\b/i];
 
 const inferRevenueMix = (bodies: string[]): RevenueMixCategory | null => {
   for (const body of bodies) {
@@ -215,8 +210,7 @@ export const inferQualificationStateFromMessages = (
       state.qualification_full_or_part_time === 'unknown' && inferred.fullOrPartTime
         ? inferred.fullOrPartTime
         : state.qualification_full_or_part_time,
-    niche:
-      isNicheMissing(state.qualification_niche) && inferred.niche ? inferred.niche : state.qualification_niche,
+    niche: isNicheMissing(state.qualification_niche) && inferred.niche ? inferred.niche : state.qualification_niche,
     revenueMix:
       state.qualification_revenue_mix === 'unknown' && inferred.revenueMix
         ? inferred.revenueMix

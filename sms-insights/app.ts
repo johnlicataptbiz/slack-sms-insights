@@ -11,6 +11,7 @@ import { reportError } from './services/error-reporter.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
+const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
 
 const getLogLevel = (): LogLevel => {
   const configured = process.env.APP_LOG_LEVEL?.trim().toUpperCase();
@@ -93,6 +94,12 @@ app.error(async (error) => {
     // Start Bolt App
     await app.start();
     app.logger.info('⚡️ Bolt app is running via Socket Mode!');
+    app.logger.info('Token config diagnostics', {
+      alowareApiTokenLength: safeEnvLen(process.env.ALOWARE_API_TOKEN),
+      alowareWebhookTokenLength: safeEnvLen(process.env.ALOWARE_WEBHOOK_API_TOKEN),
+      alowareFormTokenLength: safeEnvLen(process.env.ALOWARE_FORM_API_TOKEN),
+      mondayTokenLength: safeEnvLen(process.env.MONDAY_API_TOKEN),
+    });
 
     // 🕒 Schedule 6:00 AM Daily Report
     const { scheduleDailyReport } = await import('./services/scheduler.js');

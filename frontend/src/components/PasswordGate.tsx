@@ -1,47 +1,44 @@
 import { FormEvent, useState } from 'react';
 
+import { ApiError, client } from '../api/client';
+
 import './PasswordGate.css';
 
-const gatePassword = 'bigbizin26';
-const accessSessionKey = 'ptbizsms_password_gate_session_v1';
-const accessCookieName = 'ptbizsms_password_gate';
 const brandLogoUrl =
   'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/Untitled.png';
-
-const hasAccessCookie = (): boolean => {
-  if (typeof document === 'undefined') return false;
-  return document.cookie.split(';').some((part) => part.trim() === `${accessCookieName}=ok`);
-};
-
-export const hasPasswordGateAccess = (): boolean => {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
-  if (hasAccessCookie()) return true;
-  return sessionStorage.getItem(accessSessionKey) === 'ok';
-};
 
 export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   const [password, setPassword] = useState('');
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (password !== gatePassword) {
-      setError('Incorrect password');
+    if (isSubmitting) return;
+
+    if (!password.trim()) {
+      setError('Password is required');
       return;
     }
 
-    if (stayLoggedIn) {
-      const maxAgeSeconds = 60 * 60 * 24 * 30;
-      document.cookie = `${accessCookieName}=ok; Path=/; Max-Age=${maxAgeSeconds}; SameSite=Lax; Secure`;
-      sessionStorage.removeItem(accessSessionKey);
-    } else {
-      sessionStorage.setItem(accessSessionKey, 'ok');
-      document.cookie = `${accessCookieName}=; Path=/; Max-Age=0; SameSite=Lax; Secure`;
-    }
-
+    setIsSubmitting(true);
     setError('');
-    onUnlock();
+    try {
+      await client.post('/api/auth/password', {
+        password: password.trim(),
+        stayLoggedIn,
+      });
+      onUnlock();
+    } catch (requestError) {
+      if (requestError instanceof ApiError && requestError.status === 401) {
+        setError('Incorrect password');
+      } else {
+        setError('Unable to unlock right now. Try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -58,13 +55,17 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
             placeholder="Password"
             autoComplete="current-password"
             autoFocus
+            disabled={isSubmitting}
           />
-          <button type="submit">Enter</button>
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Entering...' : 'Enter'}
+          </button>
           <label className="PasswordGate__checkbox">
             <input
               type="checkbox"
               checked={stayLoggedIn}
               onChange={(event) => setStayLoggedIn(event.target.checked)}
+              disabled={isSubmitting}
             />
             <span>Stay logged in on this device</span>
           </label>

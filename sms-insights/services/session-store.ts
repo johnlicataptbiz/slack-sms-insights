@@ -40,13 +40,22 @@ const pruneExpiredSessions = (): void => {
   }
 };
 
-export const createDashboardSession = (user: DashboardSessionUser): DashboardSession => {
+export const createDashboardSession = (
+  user: DashboardSessionUser,
+  options?: {
+    ttlSeconds?: number;
+  },
+): DashboardSession => {
   pruneExpiredSessions();
 
   const id = randomBytes(24).toString('hex');
   const csrfToken = randomBytes(24).toString('hex');
   const createdAt = nowMs();
-  const ttlMs = resolveSessionTtlSeconds() * 1000;
+  const ttlSeconds =
+    options?.ttlSeconds && Number.isFinite(options.ttlSeconds) && options.ttlSeconds > 0
+      ? Math.floor(options.ttlSeconds)
+      : resolveSessionTtlSeconds();
+  const ttlMs = ttlSeconds * 1000;
   const session: DashboardSession = {
     id,
     csrfToken,

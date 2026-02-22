@@ -128,6 +128,13 @@ const getSendCapPerDay = (): number => parsePositiveInteger(process.env.SMS_SEND
 const getSendCapPerConversationHour = (): number =>
   parsePositiveInteger(process.env.SMS_SEND_CAP_PER_CONVERSATION_HOUR, 20);
 
+const getDashboardPassword = (): string => {
+  return (process.env.DASHBOARD_PASSWORD || 'bigbizin26').trim();
+};
+
+const getPersistentSessionTtlSeconds = (): number =>
+  parsePositiveInteger(process.env.DASHBOARD_PERSIST_SESSION_TTL_SECONDS, 60 * 60 * 24 * 30);
+
 const shouldUseSecureCookies = (): boolean =>
   parseBooleanFlag(process.env.COOKIE_SECURE, (process.env.NODE_ENV || '').trim() === 'production');
 
@@ -439,6 +446,84 @@ const handleAuthVerify: RequestHandler = async (req, res, _logger, origin) => {
       csrfToken: req.authMode === 'session' ? req.session?.csrfToken || null : null,
     },
     origin,
+  );
+};
+
+const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => {
+  let body: { password?: string; stayLoggedIn?: boolean } = {};
+  try {
+    body = (await parseJsonBody(req)) as { password?: string; stayLoggedIn?: boolean };
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+
+  const password = (body.password || '').trim();
+  if (!password) {
+    sendJson(res, 400, { error: 'Password is required' }, origin);
+    return;
+  }
+
+  const actorIp = (() => {
+    const forwarded = req.headers['x-forwarded-for'];
+    const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    return (forwardedIp || req.socket.remoteAddress || 'unknown').split(',')[0]?.trim() || 'unknown';
+  })();
+  const rateLimitResult = ensureRateLimit('password_auth', actorIp, {
+    limit: parsePositiveInteger(process.env.PASSWORD_AUTH_RATE_LIMIT_MAX, 10),
+    windowMs: parsePositiveInteger(process.env.PASSWORD_AUTH_RATE_LIMIT_WINDOW_MS, 60_000),
+  });
+  if (!rateLimitResult.allowed) {
+    handleRateLimitExceeded(res, origin, rateLimitResult, 'Too many password attempts');
+    return;
+  }
+
+  const expected = getDashboardPassword();
+  if (!expected || password !== expected) {
+    sendJson(res, 401, { error: 'Invalid password' }, origin);
+    return;
+  }
+
+  const stayLoggedIn = body.stayLoggedIn !== false;
+  const sessionTtlSeconds = stayLoggedIn ? getPersistentSessionTtlSeconds() : getDashboardSessionTtlSeconds();
+  const sessionUser: DashboardSessionUser = {
+    user_id: 'dashboard-password-user',
+    user: 'Dashboard User',
+    team_id: 'ptbizsms',
+  };
+
+  const cookies = parseCookies(req.headers.cookie);
+  const existingSession = (cookies[SESSION_COOKIE_NAME] || '').trim();
+  if (existingSession) {
+    destroyDashboardSession(existingSession);
+  }
+
+  const session = createDashboardSession(sessionUser, { ttlSeconds: sessionTtlSeconds });
+
+  sendJson(
+    res,
+    200,
+    {
+      ok: true,
+      authMode: 'session',
+      user: session.user,
+      csrfToken: session.csrfToken,
+    },
+    origin,
+    {
+      'Cache-Control': 'no-store',
+      'Set-Cookie': [
+        buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
+        buildCookie(SESSION_COOKIE_NAME, session.id, {
+          maxAgeSeconds: sessionTtlSeconds,
+          httpOnly: true,
+        }),
+        buildCookie(CSRF_COOKIE_NAME, session.csrfToken, {
+          maxAgeSeconds: sessionTtlSeconds,
+          httpOnly: false,
+        }),
+      ],
+    },
   );
 };
 
@@ -2604,6 +2689,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/oauth/callback', public: true, handler: handleOauthCallback },
   { method: 'POST', path: '/api/runs', public: true, csrf: false, rateLimitBucket: 'none', handler: handlePostRun },
 
+  { method: 'POST', path: '/api/auth/password', public: true, csrf: false, handler: handleAuthPassword },
   { method: 'GET', path: '/api/auth/verify', handler: handleAuthVerify },
   { method: 'POST', path: '/api/auth/logout', handler: handleAuthLogout },
 

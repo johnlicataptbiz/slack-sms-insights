@@ -71,6 +71,38 @@ const displaySetterName = (value: string | null | undefined): string | null => {
   return trimmed;
 };
 
+type StateTone = 'red' | 'orange' | 'yellow' | 'green';
+
+const computeQualificationProgress = (state: QualificationStateV2): number => {
+  let score = 0;
+  if (state.fullOrPartTime !== 'unknown') score += 1;
+  if ((state.niche || '').trim().length > 0) score += 1;
+  if (state.revenueMix !== 'unknown') score += 1;
+  if (state.coachingInterest !== 'unknown') score += 1;
+  return score;
+};
+
+const qualificationToneForProgress = (progress: number): StateTone => {
+  if (progress <= 0) return 'red';
+  if (progress === 1) return 'orange';
+  if (progress === 2) return 'yellow';
+  return 'green';
+};
+
+const escalationToneForLevel = (level: 1 | 2 | 3 | 4): StateTone => {
+  if (level <= 1) return 'red';
+  if (level === 2) return 'orange';
+  if (level === 3) return 'yellow';
+  return 'green';
+};
+
+const escalationLevelSubtitle = (level: 1 | 2 | 3 | 4): string => {
+  if (level === 1) return 'Awareness';
+  if (level === 2) return 'Objection bridge';
+  if (level === 3) return 'Call first';
+  return 'Scaling hybrid';
+};
+
 export default function InboxV2() {
   const [statusFilter, setStatusFilter] = useState<'open' | 'closed' | 'dnc' | ''>('open');
   const [needsReplyOnly, setNeedsReplyOnly] = useState(true);
@@ -93,6 +125,18 @@ export default function InboxV2() {
   });
   const [escalationLevel, setEscalationLevel] = useState<1 | 2 | 3 | 4>(1);
   const [escalationReason, setEscalationReason] = useState('');
+
+  const qualificationProgressLive = computeQualificationProgress(qualificationState);
+  const qualificationTone = qualificationToneForProgress(qualificationProgressLive);
+  const qualificationProgressPct = Math.round((qualificationProgressLive / 4) * 100);
+  const escalationTone = escalationToneForLevel(escalationLevel);
+  const escalationProgressPct = Math.round((escalationLevel / 4) * 100);
+  const qualificationFields = [
+    { key: 'full', label: 'Full or part time', complete: qualificationState.fullOrPartTime !== 'unknown' },
+    { key: 'niche', label: 'Niche', complete: (qualificationState.niche || '').trim().length > 0 },
+    { key: 'mix', label: 'Revenue mix', complete: qualificationState.revenueMix !== 'unknown' },
+    { key: 'coach', label: 'Coaching interest', complete: qualificationState.coachingInterest !== 'unknown' },
+  ];
 
   const listQuery = useV2InboxConversations({
     ...(statusFilter ? { status: statusFilter } : {}),
@@ -453,7 +497,20 @@ export default function InboxV2() {
             <V2State kind="empty">Conversation context will appear here.</V2State>
           ) : (
             <>
-              <V2Panel title="Contact Card" caption="Enriched from Aloware and PT Biz conversation state.">
+              <V2Panel
+                title="Contact Card"
+                caption="Enriched from Aloware and PT Biz conversation state."
+                className="V2Inbox__sidePanel V2Inbox__sidePanel--contact"
+              >
+                <div className="V2Inbox__contactHead">
+                  <span className="V2Inbox__contactAvatar">
+                    {(detail.contactCard.name || detail.contactCard.phone || '?').slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <p>{detail.contactCard.name || detail.contactCard.phone || 'Unknown contact'}</p>
+                    <small>{detail.contactCard.email || 'No email on file'}</small>
+                  </div>
+                </div>
                 <dl className="V2Inbox__cardList">
                   <dt>Name</dt>
                   <dd>{detail.contactCard.name || 'Unknown'}</dd>
@@ -470,7 +527,28 @@ export default function InboxV2() {
                 </dl>
               </V2Panel>
 
-              <V2Panel title="Qualification State" caption={`Progress ${qualificationState.progressStep}/4`}>
+              <V2Panel
+                title="Qualification State"
+                caption={`Progress ${qualificationProgressLive}/4`}
+                className={`V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${qualificationTone}`}
+              >
+                <div className="V2Inbox__stateTop">
+                  <span className="V2Inbox__stateBadge">{qualificationProgressLive} of 4 captured</span>
+                  <span className="V2Inbox__stateHint">
+                    {qualificationProgressLive >= 4 ? 'Ready for handoff' : `${4 - qualificationProgressLive} remaining`}
+                  </span>
+                </div>
+                <div className="V2Inbox__stateMeter" aria-hidden="true">
+                  <span style={{ width: `${qualificationProgressPct}%` }} />
+                </div>
+                <div className="V2Inbox__pillRow">
+                  {qualificationFields.map((field) => (
+                    <span key={field.key} className={`V2Inbox__pill ${field.complete ? 'is-complete' : ''}`}>
+                      {field.label}
+                    </span>
+                  ))}
+                </div>
+
                 <label className="V2Control">
                   <span>Full or part time</span>
                   <select
@@ -533,12 +611,41 @@ export default function InboxV2() {
                   </select>
                 </label>
 
-                <button type="button" onClick={onSaveQualification} disabled={qualificationMutation.isPending}>
+                <button
+                  type="button"
+                  className="V2Inbox__stateAction V2Inbox__stateAction--primary"
+                  onClick={onSaveQualification}
+                  disabled={qualificationMutation.isPending}
+                >
                   {qualificationMutation.isPending ? 'Saving...' : 'Save Qualification'}
                 </button>
               </V2Panel>
 
-              <V2Panel title="Escalation Override" caption={`Current level ${detail.conversation.escalation.level}`}>
+              <V2Panel
+                title="Escalation Override"
+                caption={`Current level ${detail.conversation.escalation.level}`}
+                className={`V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${escalationTone}`}
+              >
+                <div className="V2Inbox__stateTop">
+                  <span className="V2Inbox__stateBadge">Level {escalationLevel}</span>
+                  <span className="V2Inbox__stateHint">{escalationLevelSubtitle(escalationLevel)}</span>
+                </div>
+                <div className="V2Inbox__stateMeter" aria-hidden="true">
+                  <span style={{ width: `${escalationProgressPct}%` }} />
+                </div>
+                <div className="V2Inbox__levelRail" role="group" aria-label="Escalation level quick pick">
+                  {[1, 2, 3, 4].map((level) => (
+                    <button
+                      type="button"
+                      key={level}
+                      className={`V2Inbox__levelChip ${escalationLevel === level ? 'is-active' : ''}`}
+                      onClick={() => setEscalationLevel(level as 1 | 2 | 3 | 4)}
+                    >
+                      L{level}
+                    </button>
+                  ))}
+                </div>
+
                 <label className="V2Control">
                   <span>Level</span>
                   <select
@@ -554,10 +661,19 @@ export default function InboxV2() {
 
                 <label className="V2Control">
                   <span>Reason</span>
-                  <input value={escalationReason} onChange={(event) => setEscalationReason(event.target.value)} placeholder="Why this override applies" />
+                  <input
+                    value={escalationReason}
+                    onChange={(event) => setEscalationReason(event.target.value)}
+                    placeholder="Why this override applies"
+                  />
                 </label>
 
-                <button type="button" onClick={onOverrideEscalation} disabled={escalationMutation.isPending}>
+                <button
+                  type="button"
+                  className="V2Inbox__stateAction V2Inbox__stateAction--secondary"
+                  onClick={onOverrideEscalation}
+                  disabled={escalationMutation.isPending}
+                >
                   {escalationMutation.isPending ? 'Saving...' : 'Save Escalation'}
                 </button>
 

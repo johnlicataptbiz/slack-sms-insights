@@ -401,9 +401,24 @@ export const generateDraftSuggestion = async (
     });
     lastPromptHash = promptHash(prompt);
 
-    let output = (await generateAiResponse(prompt)).trim();
+    let output = '';
+    let usedFallback = false;
+
+    try {
+      output = (await generateAiResponse(prompt)).trim();
+    } catch (error) {
+      logger?.warn?.('AI draft generation failed; using fallback draft', {
+        conversationId: params.conversationId,
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      output = fallbackDraft(missingFields);
+      usedFallback = true;
+    }
+
     if (!output || output === OPENAI_MISSING_KEY_MESSAGE) {
       output = fallbackDraft(missingFields);
+      usedFallback = true;
     }
 
     const lint = lintDraft(output);
@@ -412,7 +427,7 @@ export const generateDraftSuggestion = async (
       bestLint = lint;
     }
 
-    if (lint.passed) {
+    if (lint.passed || usedFallback) {
       break;
     }
 

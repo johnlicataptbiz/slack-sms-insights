@@ -1488,6 +1488,12 @@
   gap: 1rem;
 }
 
+.V2Inbox__draftPanel {
+  position: sticky;
+  top: calc(var(--v2-topbar-height) + 0.8rem);
+  z-index: 2;
+}
+
 .V2Inbox__conversationList {
   display: flex;
   flex-direction: column;
@@ -1706,6 +1712,11 @@
 @media (max-width: 1360px) {
   .V2Inbox__layout {
     grid-template-columns: 1fr;
+  }
+
+  .V2Inbox__draftPanel {
+    position: static;
+    top: auto;
   }
 
   .V2Inbox__conversationList,

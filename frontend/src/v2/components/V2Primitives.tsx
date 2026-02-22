@@ -23,9 +23,19 @@ export function V2PageHeader({
   );
 }
 
-export function V2Panel({ title, caption, children }: { title?: ReactNode; caption?: ReactNode; children: ReactNode }) {
+export function V2Panel({
+  title,
+  caption,
+  children,
+  className,
+}: {
+  title?: ReactNode;
+  caption?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="V2Panel">
+    <section className={`V2Panel ${className || ''}`.trim()}>
       {title ? <h2 className="V2Panel__title">{title}</h2> : null}
       {caption ? <p className="V2Panel__caption">{caption}</p> : null}
       {children}

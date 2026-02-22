@@ -62,12 +62,13 @@ const formatSendLineLabel = (params: {
   return parts.join(' · ');
 };
 
-const normalizeFromNumberInput = (value: string): string | null => {
-  const digits = value.replace(/\D/g, '');
-  if (!digits) return null;
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
-  return `+${digits}`;
+const displaySetterName = (value: string | null | undefined): string | null => {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLowerCase();
+  if (lower.includes('jack')) return 'Jack';
+  if (lower.includes('brandon')) return 'Brandon';
+  return trimmed;
 };
 
 export default function InboxV2() {
@@ -80,7 +81,6 @@ export default function InboxV2() {
   const [composerText, setComposerText] = useState('');
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [selectedLineKey, setSelectedLineKey] = useState('');
-  const [manualFromNumber, setManualFromNumber] = useState('');
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -136,8 +136,7 @@ export default function InboxV2() {
   const sendConfig = sendConfigQuery.data?.data || null;
   const lineOptions = sendConfig?.lines || [];
   const selectedLineOption = lineOptions.find((option) => option.key === selectedLineKey) || null;
-  const normalizedManualFrom = normalizeFromNumberInput(manualFromNumber);
-  const lineSelectionRequired = Boolean(sendConfig?.requiresSelection) && !selectedLineOption && !normalizedManualFrom;
+  const lineSelectionRequired = Boolean(sendConfig?.requiresSelection) && !selectedLineOption;
   const savedDefaultSummary = sendConfig?.defaultSelection
     ? formatSendLineLabel(sendConfig.defaultSelection)
     : 'No saved default line';
@@ -228,8 +227,7 @@ export default function InboxV2() {
 
     setFlashMessage(null);
     try {
-      const sendFromNumber =
-        selectedLineOption?.lineId == null ? selectedLineOption?.fromNumber || normalizedManualFrom || null : null;
+      const sendFromNumber = selectedLineOption?.lineId == null ? selectedLineOption?.fromNumber || null : null;
       const result = await sendMutation.mutateAsync({
         conversationId: selectedConversationId,
         body: composerText.trim(),
@@ -252,23 +250,19 @@ export default function InboxV2() {
   };
 
   const onSaveDefaultLine = async () => {
-    if (!selectedLineOption && !normalizedManualFrom) {
-      setFlashMessage('Choose a line or enter a from number before saving default.');
+    if (!selectedLineOption) {
+      setFlashMessage('Choose a line before saving default.');
       return;
     }
 
     setFlashMessage(null);
     try {
-      const defaultFromNumber = selectedLineOption?.fromNumber || normalizedManualFrom || null;
+      const defaultFromNumber = selectedLineOption.fromNumber || null;
       await setDefaultLineMutation.mutateAsync({
         ...(selectedLineOption?.lineId != null ? { lineId: selectedLineOption.lineId } : {}),
         ...(defaultFromNumber ? { fromNumber: defaultFromNumber } : {}),
       });
-      setFlashMessage(
-        `Default send line saved: ${
-          selectedLineOption ? formatSendLineLabel(selectedLineOption) : normalizedManualFrom || 'custom from number'
-        }`,
-      );
+      setFlashMessage(`Default send line saved: ${formatSendLineLabel(selectedLineOption)}`);
     } catch (error) {
       setFlashMessage(`Failed to save default line: ${String((error as Error)?.message || error)}`);
     }
@@ -428,15 +422,21 @@ export default function InboxV2() {
                   </button>
                 </div>
                 <div className="V2Inbox__thread">
-                  {detail.messages.map((message) => (
-                    <article key={message.id} className={`V2Inbox__message V2Inbox__message--${message.direction}`}>
-                      <header>
-                        <span>{message.direction === 'inbound' ? 'Inbound' : 'Outbound'}</span>
-                        <time>{fmtDateTime(message.createdAt)}</time>
-                      </header>
-                      <p>{message.body || '(empty message)'}</p>
-                    </article>
-                  ))}
+                  {detail.messages.map((message) => {
+                    const leadLabel = detail.contactCard.name || detail.contactCard.phone || 'Lead';
+                    const defaultSetter = displaySetterName(detail.conversation.ownerLabel) || 'Setter';
+                    const speaker =
+                      message.direction === 'inbound' ? leadLabel : displaySetterName(message.alowareUser) || defaultSetter;
+                    return (
+                      <article key={message.id} className={`V2Inbox__message V2Inbox__message--${message.direction}`}>
+                        <header>
+                          <span>{speaker}</span>
+                          <time>{fmtDateTime(message.createdAt)}</time>
+                        </header>
+                        <p>{message.body || '(empty message)'}</p>
+                      </article>
+                    );
+                  })}
                 </div>
               </V2Panel>
             </>
@@ -621,11 +621,10 @@ export default function InboxV2() {
                           <label className="V2Control">
                             <span>Send line</span>
                             <select value={selectedLineKey} onChange={(event) => setSelectedLineKey(event.target.value)}>
-                              {sendConfig?.defaultSelection ? (
-                                <option value="">Use saved default ({formatSendLineLabel(sendConfig.defaultSelection)})</option>
-                              ) : (
-                                <option value="">Select a line</option>
-                              )}
+                              <option value="">
+                                Select line
+                                {sendConfig?.defaultSelection ? ` (saved default: ${formatSendLineLabel(sendConfig.defaultSelection)})` : ''}
+                              </option>
                               {lineOptions.map((option) => (
                                 <option key={option.key} value={option.key}>
                                   {formatSendLineLabel(option)}
@@ -634,25 +633,14 @@ export default function InboxV2() {
                             </select>
                           </label>
                         ) : (
-                          <p className="V2Inbox__sendMeta">
-                            No line catalog detected. You can still send by entering a from number below.
-                          </p>
+                          <p className="V2Inbox__sendMeta">No line catalog detected. Configure send lines to enable line selection.</p>
                         )}
-
-                        <label className="V2Control">
-                          <span>From number override</span>
-                          <input
-                            value={manualFromNumber}
-                            onChange={(event) => setManualFromNumber(event.target.value)}
-                            placeholder="+18175809950"
-                          />
-                        </label>
 
                         <div className="V2Inbox__actions">
                           <button
                             type="button"
                             onClick={onSaveDefaultLine}
-                            disabled={setDefaultLineMutation.isPending || (!selectedLineOption && !normalizedManualFrom)}
+                            disabled={setDefaultLineMutation.isPending || !selectedLineOption}
                           >
                             {setDefaultLineMutation.isPending ? 'Saving default...' : 'Save as Default'}
                           </button>

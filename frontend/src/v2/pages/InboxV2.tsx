@@ -208,6 +208,11 @@ export default function InboxV2() {
       });
       setComposerText(result.data.text);
       setSelectedDraftId(result.data.id);
+      if (result.data.generationMode === 'contextual_fallback') {
+        const firstWarning = result.data.generationWarnings[0] || 'AI generation unavailable';
+        setFlashMessage(`Draft generated in contextual fallback mode. ${firstWarning}`);
+        return;
+      }
       if (result.data.lint.passed) {
         setFlashMessage('Draft generated and passed strict lint.');
       } else {

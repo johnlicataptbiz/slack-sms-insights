@@ -2124,6 +2124,7 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
     logger,
   );
   state = draftInferenceStateResult.state || state;
+  const ownerLabel = toInboxConversationV2(conversation).ownerLabel || null;
 
   const draft = await generateDraftSuggestion(
     {
@@ -2131,6 +2132,13 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
       messages,
       state,
       bookedCallLabel: body.bookedCallLabel,
+      contact: {
+        name: conversation.profile_name,
+        phone: conversation.profile_phone || conversation.contact_phone,
+        timezone: conversation.profile_timezone,
+        ownerLabel,
+        profileNiche: conversation.profile_niche,
+      },
     },
     logger,
   );
@@ -2147,6 +2155,8 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
       raw: {
         attempts: draft.attempts,
         escalationReason: draft.escalationReason,
+        generationMode: draft.generationMode,
+        generationWarnings: draft.generationWarnings,
       },
     },
     logger,
@@ -2182,6 +2192,8 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
       missing: draft.qualificationMissing,
     },
     attempts: draft.attempts,
+    generationMode: draft.generationMode,
+    generationWarnings: draft.generationWarnings,
     createdAt: storedDraft.created_at,
   };
 

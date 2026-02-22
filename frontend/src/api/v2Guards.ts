@@ -190,6 +190,10 @@ export function assertDraftSuggestionEnvelope(value: unknown): asserts value is 
   if (!isString(value.data.text)) throw new Error('Invalid draft suggestion response: text missing');
   if (!isObject(value.data.lint)) throw new Error('Invalid draft suggestion response: lint missing');
   if (!isObject(value.data.escalation)) throw new Error('Invalid draft suggestion response: escalation missing');
+  if (!isString(value.data.generationMode)) throw new Error('Invalid draft suggestion response: generationMode missing');
+  if (!Array.isArray(value.data.generationWarnings)) {
+    throw new Error('Invalid draft suggestion response: generationWarnings missing');
+  }
 }
 
 export function assertSendMessageResultEnvelope(value: unknown): asserts value is ApiEnvelope<SendMessageResultV2> {

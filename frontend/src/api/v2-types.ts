@@ -336,6 +336,8 @@ export type DraftSuggestionV2 = {
     missing: string[];
   };
   attempts: number;
+  generationMode: 'ai' | 'contextual_fallback';
+  generationWarnings: string[];
   createdAt: string;
 };
 

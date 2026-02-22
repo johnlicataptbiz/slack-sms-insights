@@ -55,6 +55,16 @@ export type DraftGenerationResult = {
   promptSnapshotHash: string;
   lint: DraftLintResult;
   attempts: number;
+  generationMode: 'ai' | 'contextual_fallback';
+  generationWarnings: string[];
+};
+
+export type DraftContactContext = {
+  name?: string | null;
+  phone?: string | null;
+  timezone?: string | null;
+  ownerLabel?: string | null;
+  profileNiche?: string | null;
 };
 
 const safeReadText = (path: string): string => {
@@ -105,6 +115,11 @@ const formatTimestamp = (value: string): string => {
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toISOString();
 };
+const sanitizeInline = (value: string): string =>
+  value
+    .replace(/[\u2012\u2013\u2014\u2015-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 const findLatestMessageByDirection = (
   messages: InboxMessageRow[],
   direction: InboxMessageRow['direction'],
@@ -304,17 +319,102 @@ export const lintDraft = (text: string): DraftLintResult => {
   };
 };
 
-const fallbackDraft = (missingFields: string[]): string => {
-  const nextQuestion =
-    missingFields[0] === 'full_or_part_time'
-      ? 'Are you full time right now or still part time in clinic?'
-      : missingFields[0] === 'niche'
-        ? 'What patient niche are you mainly focused on right now?'
-        : missingFields[0] === 'revenue_mix'
-          ? 'Would you say your revenue is mostly cash, mostly insurance, or balanced right now?'
-          : 'How open are you to business coaching if it looks like a fit for your goals?';
+const renderRevenueMixLabel = (value: ConversationStateRow['qualification_revenue_mix']): string => {
+  if (value === 'mostly_cash') return 'mostly cash';
+  if (value === 'mostly_insurance') return 'mostly insurance';
+  if (value === 'balanced') return 'balanced';
+  return 'unknown';
+};
 
-  return `Appreciate you sharing that. Quick one so we can map the next step properly. ${nextQuestion}`;
+const renderEmploymentLabel = (value: ConversationStateRow['qualification_full_or_part_time']): string => {
+  if (value === 'full_time') return 'full time';
+  if (value === 'part_time') return 'part time';
+  return 'unknown';
+};
+
+const renderCoachingInterestLabel = (value: ConversationStateRow['qualification_coaching_interest']): string => {
+  if (value === 'high') return 'high';
+  if (value === 'medium') return 'medium';
+  if (value === 'low') return 'low';
+  return 'unknown';
+};
+
+const nextQualificationQuestion = (missingFields: string[]): string => {
+  if (missingFields[0] === 'full_or_part_time') {
+    return 'Are you full time right now or still part time?';
+  }
+  if (missingFields[0] === 'niche') {
+    return 'Who is your core niche right now?';
+  }
+  if (missingFields[0] === 'revenue_mix') {
+    return 'Would you say your revenue mix is mostly cash, mostly insurance, or balanced right now?';
+  }
+  if (missingFields[0] === 'coaching_interest') {
+    return 'If we map a clear plan, how open are you to business coaching right now?';
+  }
+  return 'Would you be open to a quick call this week so we can map the next step together?';
+};
+
+const chooseAcknowledgement = (latestInboundBody: string): string => {
+  const normalized = normalize(latestInboundBody);
+  if (!normalized) return 'Appreciate the update.';
+  if (/thank|thanks|appreciate|grateful/.test(normalized)) return 'Love that and thanks for sharing.';
+  if (/not receive|did not receive|didnt receive|have not received|hasnt received/.test(normalized)) {
+    return 'Thanks for the heads up.';
+  }
+  if (/book|scheduled|schedule|availability|available|call/.test(normalized)) {
+    return 'Perfect, timing sounds good.';
+  }
+  if (/\?/.test(latestInboundBody)) return 'Great question.';
+  return 'Appreciate the context.';
+};
+
+const buildContextualFallbackDraft = (params: {
+  messages: InboxMessageRow[];
+  state: ConversationStateRow | null;
+  escalationLevel: EscalationLevel;
+  missingFields: string[];
+  contact?: DraftContactContext;
+}): string => {
+  const orderedMessages = orderMessagesChronologically(params.messages);
+  const latestInbound = findLatestMessageByDirection(orderedMessages, 'inbound');
+  const knownNiche = sanitizeInline(params.state?.qualification_niche || params.contact?.profileNiche || '');
+  const knownName = sanitizeInline(params.contact?.name || '');
+  const acknowledgement = chooseAcknowledgement(sanitizeInline(latestInbound?.body || ''));
+
+  const lineOne = knownName ? `${knownName}, ${acknowledgement}` : acknowledgement;
+
+  const contextBits: string[] = [];
+  if (knownNiche) {
+    contextBits.push(`I have your niche noted as ${knownNiche}.`);
+  }
+  if (params.state && params.state.qualification_revenue_mix !== 'unknown') {
+    contextBits.push(
+      `I have your revenue mix noted as ${renderRevenueMixLabel(params.state.qualification_revenue_mix)}.`,
+    );
+  }
+  if (params.state && params.state.qualification_full_or_part_time !== 'unknown') {
+    contextBits.push(
+      `I have your status marked as ${renderEmploymentLabel(params.state.qualification_full_or_part_time)}.`,
+    );
+  }
+  if (params.state && params.state.qualification_coaching_interest !== 'unknown') {
+    contextBits.push(
+      `I have your coaching interest marked as ${renderCoachingInterestLabel(params.state.qualification_coaching_interest)}.`,
+    );
+  }
+
+  const nextQuestion = nextQualificationQuestion(params.missingFields);
+  const escalationBridge =
+    params.missingFields.length === 0
+      ? params.escalationLevel >= 3
+        ? 'You seem close to call readiness.'
+        : params.escalationLevel === 2
+          ? 'I want to keep this practical and low pressure.'
+          : 'I want to keep this simple and useful.'
+      : 'Quick check so I can keep qualification accurate.';
+
+  return [lineOne, ...contextBits, escalationBridge, nextQuestion].join(' ').replace(/\s+/g, ' ').trim();
 };
 
 const buildPrompt = (params: {
@@ -326,6 +426,7 @@ const buildPrompt = (params: {
   examples: Array<ConversionExampleRow & { outbound_body: string | null }>;
   canonical: CanonicalSources;
   previousIssues?: DraftLintIssue[];
+  contact?: DraftContactContext;
 }): string => {
   const orderedMessages = orderMessagesChronologically(params.messages);
   const latestInbound = findLatestMessageByDirection(orderedMessages, 'inbound');
@@ -346,6 +447,16 @@ const buildPrompt = (params: {
     ? `[${formatTimestamp(latestOutbound.event_ts)}] ${timelineSpeakerLabel(latestOutbound)}: ${truncate(latestOutbound.body || '', 900)}`
     : 'none';
   const latestOutboundLine = (latestOutbound?.line || '').trim() || 'unknown';
+  const qualificationSnapshot = params.state
+    ? `full_or_part_time=${params.state.qualification_full_or_part_time}; niche=${params.state.qualification_niche || 'unknown'}; revenue_mix=${params.state.qualification_revenue_mix}; coaching_interest=${params.state.qualification_coaching_interest}`
+    : 'unknown';
+  const contactSnapshot = [
+    `name=${params.contact?.name || 'unknown'}`,
+    `phone=${params.contact?.phone || 'unknown'}`,
+    `timezone=${params.contact?.timezone || 'unknown'}`,
+    `owner=${params.contact?.ownerLabel || 'unknown'}`,
+    `profile_niche=${params.contact?.profileNiche || 'unknown'}`,
+  ].join('; ');
 
   const canonicalExamples = parseNumberedExamples(params.canonical.conversionMessages)
     .slice(0, 4)
@@ -374,11 +485,14 @@ const buildPrompt = (params: {
     '4) Qualification first, coaching advice only if source structure includes it.',
     '5) Required qualification variables: full/part time, niche, cash vs insurance mix, coaching interest.',
     '6) Follow escalation model and cadence logic before drafting.',
+    '7) First sentence must directly acknowledge the lead most recent inbound context.',
     '',
     `Escalation level: ${params.escalationLevel}`,
     `Escalation reason: ${params.escalationReason}`,
     `Missing qualification fields: ${params.missingFields.join(', ') || 'none'}`,
     `Qualification progress step: ${qualificationStep(params.state)}`,
+    `Qualification snapshot: ${qualificationSnapshot}`,
+    `Contact snapshot: ${contactSnapshot}`,
     previousIssues,
     '',
     'Escalation model reference:',
@@ -413,6 +527,7 @@ export const generateDraftSuggestion = async (
     messages: InboxMessageRow[];
     state: ConversationStateRow | null;
     bookedCallLabel?: string;
+    contact?: DraftContactContext;
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<DraftGenerationResult> => {
@@ -440,6 +555,8 @@ export const generateDraftSuggestion = async (
   let lastIssues: DraftLintIssue[] = [];
   let lastPromptHash = '';
   let attempts = 0;
+  let generationMode: DraftGenerationResult['generationMode'] = 'ai';
+  const generationWarnings: string[] = [];
 
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
     attempts = attempt;
@@ -452,6 +569,7 @@ export const generateDraftSuggestion = async (
       examples,
       canonical,
       previousIssues: lastIssues,
+      contact: params.contact,
     });
     lastPromptHash = promptHash(prompt);
 
@@ -466,13 +584,35 @@ export const generateDraftSuggestion = async (
         attempt,
         error: error instanceof Error ? error.message : String(error),
       });
-      output = fallbackDraft(missingFields);
+      const reason = sanitizeInline(error instanceof Error ? error.message : String(error));
+      output = buildContextualFallbackDraft({
+        messages: orderedMessages,
+        state: params.state,
+        escalationLevel: escalation.level,
+        missingFields,
+        contact: params.contact,
+      });
       usedFallback = true;
+      generationMode = 'contextual_fallback';
+      if (reason) {
+        generationWarnings.push(`AI unavailable: ${reason}`);
+      }
     }
 
-    if (!output || output === OPENAI_MISSING_KEY_MESSAGE) {
-      output = fallbackDraft(missingFields);
+    const isMissingKey = output === OPENAI_MISSING_KEY_MESSAGE;
+    if (!output || isMissingKey) {
+      output = buildContextualFallbackDraft({
+        messages: orderedMessages,
+        state: params.state,
+        escalationLevel: escalation.level,
+        missingFields,
+        contact: params.contact,
+      });
       usedFallback = true;
+      generationMode = 'contextual_fallback';
+      generationWarnings.push(
+        isMissingKey ? 'AI unavailable: missing OpenAI API key.' : 'AI unavailable: empty response.',
+      );
     }
 
     const lint = lintDraft(output);
@@ -498,5 +638,7 @@ export const generateDraftSuggestion = async (
     promptSnapshotHash: lastPromptHash,
     lint: bestLint,
     attempts,
+    generationMode,
+    generationWarnings,
   };
 };

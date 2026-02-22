@@ -40,11 +40,12 @@ describe('daily report summary', () => {
 
   it('should build message/reply-first summary output', () => {
     const summary = buildDailyReportSummary(DAILY_REPORT_TEXT);
-    assert(summary.includes('- Messages sent: 26'));
-    assert(summary.includes('- Replies received: 2 (7.7%)'));
-    assert(summary.includes('- Calls booked: 1'));
-    assert(summary.includes('- Opt-outs: 1'));
-    assert(summary.includes('- Outbound conversations: 26'));
-    assert(summary.includes('Alpha Sequence: 16 sent, 2 replies (12.5%), 1 booked, 1 opt-outs'));
+    assert(summary.includes('Daily Setter Snapshot | Feb 14, 2026 | Last 24 Hours'));
+    assert(summary.includes('Messages sent: 26'));
+    assert(summary.includes('Replies received: 2 (7.7%)'));
+    assert(summary.includes('Calls booked (Slack): 1'));
+    assert(summary.includes('Opt-outs: 1'));
+    assert(summary.includes('Outbound conversations: 26'));
+    assert(summary.includes('1. Alpha Sequence: 16 sent, 2 replies (12.5%), 1 booked, 1 opt-outs'));
   });
 });

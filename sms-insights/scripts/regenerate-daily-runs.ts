@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { WebClient } from '@slack/web-api';
 import { buildAlowareAnalyticsReportBundle } from '../services/aloware-analytics.js';
+import { buildDailyReportSummary, isDailySnapshotReport } from '../services/daily-report-summary.js';
 import { logDailyRun } from '../services/daily-run-logger.js';
 import { closeDatabase, getPool, initDatabase, initializeSchema } from '../services/db.js';
 
@@ -65,7 +66,10 @@ const isPlaceholderText = (text: string | null | undefined): boolean => {
 };
 
 const summarize = (report: string): string => {
-  return report.split('\n').slice(0, 10).join('\n');
+  if (isDailySnapshotReport(report)) {
+    return buildDailyReportSummary(report);
+  }
+  return report.split('\n').slice(0, 5).join('\n');
 };
 
 const resolveDefaultWindow = async (channelId: string): Promise<{ start: string; end: string } | null> => {

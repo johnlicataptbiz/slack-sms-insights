@@ -78,6 +78,10 @@ cp .env.sample .env
 # - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
 # - ALLOW_DUMMY_AUTH_TOKEN=false
 # - VITE_API_URL=http://localhost:3000
+# - VITE_UI_VERSION=legacy
+# Optional monday mapping overrides (JSON):
+# - MONDAY_ACQ_COLUMN_MAP_JSON={"callDateColumnId":"date4","setterColumnId":"people","stageColumnId":"status","outcomeColumnId":"text_mkrrha4q","phoneColumnId":"phone","contactIdColumnId":"text_mkrqz1wd"}
+# - MONDAY_PERSONAL_COLUMN_MAP_JSON={"callDateColumnId":"date4","contactNameColumnId":"name","phoneColumnId":"phone","setterColumnId":"person","stageColumnId":"status","firstConversionColumnId":"text_first_conversion","lineColumnId":"text_line","sourceColumnId":"text_source","slackLinkColumnId":"link","notesColumnId":"long_text"}
 ```
 
 ### 3. Start backend + API server

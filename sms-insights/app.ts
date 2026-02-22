@@ -8,6 +8,7 @@ import { handleApiRoute } from './api/routes.js';
 import registerListeners from './listeners/index.js';
 import { initDatabase, initializeSchema } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
+import { startMondaySyncJobs } from './services/monday-sync.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 
@@ -96,6 +97,9 @@ app.error(async (error) => {
     // 🕒 Schedule 6:00 AM Daily Report
     const { scheduleDailyReport } = await import('./services/scheduler.js');
     await scheduleDailyReport(app);
+
+    // monday read-sync/writeback maintenance jobs (feature-flag gated).
+    startMondaySyncJobs(app.logger);
   } catch (error) {
     await reportError(app, error, 'Startup Failure');
   }

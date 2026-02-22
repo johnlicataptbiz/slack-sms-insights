@@ -6,9 +6,12 @@ coverage/
 .env.local
 .env.*
 !.env.sample
+!frontend/.env.production
 *.log
 .railway/
 .vscode/
 frontend/node_modules/
 .vercel
 .env*.local
+.playwright-cli/
+output/

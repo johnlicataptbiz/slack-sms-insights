@@ -1,6 +1,7 @@
 import type { App } from '@slack/bolt';
 import type { WebClient } from '@slack/web-api';
 import { upsertBookedCall, upsertBookedCallReaction } from '../../services/booked-calls-store.js';
+import { syncBookedCallToPersonalBoardFromSlackMessage } from '../../services/monday-personal-writeback.js';
 
 const BOOKED_CALLS_CHANNEL_ID = process.env.BOOKED_CALLS_CHANNEL_ID;
 
@@ -83,6 +84,13 @@ export const registerReactionListeners = (app: App) => {
       // If we don't have the booked_call row yet, refresh will create it.
       // If we do have it, refresh will update reaction counts/users.
       await refreshReactionsForMessage(client, channelId, messageTs);
+
+      try {
+        const result = await syncBookedCallToPersonalBoardFromSlackMessage({ channelId, messageTs });
+        logger?.debug?.('personal monday booked-call sync from reaction', { channelId, messageTs, result });
+      } catch (syncError) {
+        logger?.error?.('Failed personal monday sync from reaction', syncError);
+      }
 
       logger?.debug?.('booked call reactions refreshed', { channelId, messageTs });
     } catch (err) {

@@ -121,6 +121,10 @@ const splitSlackText = (text: string, maxLen = SLACK_TEXT_CHUNK_LIMIT): string[]
   return chunks.map((chunk, index) => `*Report chunk ${index + 1}/${chunks.length}*\n${chunk}`);
 };
 
+const resolveAlowareChannelName = (): string => {
+  return process.env.DAILY_REPORT_CHANNEL_NAME?.trim() || process.env.ALOWARE_CHANNEL_NAME?.trim() || 'alowaresmsupdates';
+};
+
 const appMentionCallback = async ({
   client,
   event,
@@ -222,7 +226,9 @@ const appMentionCallback = async ({
       },
     })) as { ts?: string };
 
-    if (isAloware && isDailySnapshotReport(reportText)) {
+    const isDailySnapshot = isAloware && isDailySnapshotReport(reportText);
+
+    if (isDailySnapshot) {
       const summaryText = buildDailyReportSummary(reportText);
       const replyThread = threadTs || postResult.ts || event.ts;
       await requestDailyAnalysisHandoff({
@@ -237,10 +243,11 @@ const appMentionCallback = async ({
     // Log the successful report run
     if (isAloware) {
       try {
-        const summaryText = reportText.split('\n').slice(0, 5).join('\n');
+        const summaryText = isDailySnapshot ? buildDailyReportSummary(reportText) : reportText.split('\n').slice(0, 5).join('\n');
         await logDailyRun(
           {
             channelId: event.channel,
+            channelName: resolveAlowareChannelName(),
             reportType: event.thread_ts ? 'manual' : 'daily',
             status: 'success',
             summaryText,
@@ -260,6 +267,7 @@ const appMentionCallback = async ({
       await logDailyRun(
         {
           channelId: event.channel,
+          channelName: isAlowareChannel(event.channel) ? resolveAlowareChannelName() : undefined,
           reportType: 'manual',
           status: 'error',
           errorMessage: error instanceof Error ? error.message : String(error),

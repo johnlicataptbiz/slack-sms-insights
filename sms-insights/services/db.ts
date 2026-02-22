@@ -166,6 +166,43 @@ export const initializeSchema = async (): Promise<void> => {
       );
     `);
 
+    // Link events to projected conversations for exact conversation history retrieval.
+    await client.query(`
+      ALTER TABLE sms_events
+      ADD COLUMN IF NOT EXISTS conversation_id UUID;
+    `);
+
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM pg_constraint
+          WHERE conname = 'fk_sms_events_conversation'
+        ) THEN
+          ALTER TABLE sms_events
+          ADD CONSTRAINT fk_sms_events_conversation
+          FOREIGN KEY (conversation_id)
+          REFERENCES conversations(id)
+          ON DELETE SET NULL;
+        END IF;
+      END
+      $$;
+    `);
+
+    // Backfill missing conversation_id links for previously ingested events.
+    await client.query(`
+      UPDATE sms_events e
+      SET conversation_id = c.id
+      FROM conversations c
+      WHERE e.conversation_id IS NULL
+        AND c.contact_key = CASE
+          WHEN e.contact_id IS NOT NULL THEN 'contact:' || e.contact_id
+          WHEN e.contact_phone IS NOT NULL THEN 'phone:' || regexp_replace(e.contact_phone, '\\D', '', 'g')
+          ELSE NULL
+        END;
+    `);
+
     // Action queue.
     await client.query(`
       CREATE TABLE IF NOT EXISTS work_items (
@@ -179,6 +216,176 @@ export const initializeSchema = async (): Promise<void> => {
         resolved_at TIMESTAMPTZ,
         resolution TEXT,
         source_event_id UUID REFERENCES sms_events(id) ON DELETE SET NULL
+      );
+    `);
+
+    // Monday integration state (phase 1: additive schema only).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_sync_state (
+        board_id TEXT PRIMARY KEY,
+        cursor TEXT,
+        last_sync_at TIMESTAMPTZ,
+        status TEXT CHECK (status IN ('idle', 'running', 'success', 'error')),
+        error TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Persisted column mapping per board to avoid code edits when monday column IDs drift.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_column_mappings (
+        board_id TEXT PRIMARY KEY,
+        mapping_json JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Normalized monday snapshots used for weekly aggregation + parity checks.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_call_snapshots (
+        board_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        item_name TEXT,
+        updated_at TIMESTAMPTZ NOT NULL,
+        call_date DATE,
+        setter TEXT,
+        stage TEXT,
+        disposition TEXT CHECK (disposition IN ('booked', 'no_show', 'cancelled', 'other')),
+        is_booked BOOLEAN NOT NULL DEFAULT FALSE,
+        contact_key TEXT,
+        raw JSONB,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, item_id)
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_weekly_reports (
+        week_start DATE PRIMARY KEY,
+        source_board_id TEXT,
+        summary_json JSONB NOT NULL,
+        monday_item_id TEXT,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_booked_call_pushes (
+        board_id TEXT NOT NULL,
+        slack_channel_id TEXT NOT NULL,
+        slack_message_ts TEXT NOT NULL,
+        setter_bucket TEXT NOT NULL,
+        monday_item_id TEXT,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'synced', 'error', 'skipped')),
+        error TEXT,
+        payload_json JSONB,
+        pushed_at TIMESTAMPTZ,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, slack_channel_id, slack_message_ts)
+      );
+    `);
+
+    // Contact profile cache for inbox card rendering and qualification context.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS inbox_contact_profiles (
+        contact_key TEXT PRIMARY KEY,
+        conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+        contact_id TEXT,
+        aloware_contact_id TEXT,
+        name TEXT,
+        phone TEXT,
+        email TEXT,
+        timezone TEXT,
+        niche TEXT,
+        revenue_mix_category TEXT NOT NULL DEFAULT 'unknown' CHECK (revenue_mix_category IN ('mostly_cash', 'mostly_insurance', 'balanced', 'unknown')),
+        employment_status TEXT NOT NULL DEFAULT 'unknown' CHECK (employment_status IN ('full_time', 'part_time', 'unknown')),
+        coaching_interest TEXT NOT NULL DEFAULT 'unknown' CHECK (coaching_interest IN ('high', 'medium', 'low', 'unknown')),
+        dnc BOOLEAN NOT NULL DEFAULT FALSE,
+        raw JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Per-conversation qualification + escalation state machine.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS conversation_state (
+        conversation_id UUID PRIMARY KEY REFERENCES conversations(id) ON DELETE CASCADE,
+        qualification_full_or_part_time TEXT NOT NULL DEFAULT 'unknown' CHECK (qualification_full_or_part_time IN ('full_time', 'part_time', 'unknown')),
+        qualification_niche TEXT,
+        qualification_revenue_mix TEXT NOT NULL DEFAULT 'unknown' CHECK (qualification_revenue_mix IN ('mostly_cash', 'mostly_insurance', 'balanced', 'unknown')),
+        qualification_coaching_interest TEXT NOT NULL DEFAULT 'unknown' CHECK (qualification_coaching_interest IN ('high', 'medium', 'low', 'unknown')),
+        qualification_progress_step INTEGER NOT NULL DEFAULT 0,
+        escalation_level INTEGER NOT NULL DEFAULT 1 CHECK (escalation_level BETWEEN 1 AND 4),
+        escalation_reason TEXT,
+        escalation_overridden BOOLEAN NOT NULL DEFAULT FALSE,
+        last_podcast_sent_at TIMESTAMPTZ,
+        next_followup_due_at TIMESTAMPTZ,
+        cadence_status TEXT NOT NULL DEFAULT 'idle' CHECK (cadence_status IN ('idle', 'podcast_sent', 'call_offered', 'nurture_pool')),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Outbound send audit trail with policy decisions and provider payloads.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS send_attempts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        message_body TEXT NOT NULL,
+        sender_identity TEXT,
+        line_id TEXT,
+        from_number TEXT,
+        allowlist_decision BOOLEAN NOT NULL DEFAULT FALSE,
+        dnc_decision BOOLEAN NOT NULL DEFAULT FALSE,
+        idempotency_key TEXT,
+        status TEXT NOT NULL CHECK (status IN ('blocked', 'queued', 'sent', 'failed')),
+        retry_count INTEGER NOT NULL DEFAULT 0,
+        request_payload JSONB,
+        response_payload JSONB,
+        error_message TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uniq_send_attempts_conversation_idempotency
+      ON send_attempts (conversation_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL;
+    `);
+
+    // Generated draft history + compliance diagnostics.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS draft_suggestions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+        prompt_snapshot_hash TEXT NOT NULL,
+        retrieved_exemplar_ids JSONB,
+        generated_text TEXT NOT NULL,
+        lint_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+        structural_score DOUBLE PRECISION NOT NULL DEFAULT 0,
+        lint_issues JSONB,
+        accepted BOOLEAN NOT NULL DEFAULT FALSE,
+        edited BOOLEAN NOT NULL DEFAULT FALSE,
+        send_linked_event_id UUID REFERENCES sms_events(id) ON DELETE SET NULL,
+        raw JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Labeled successful outbound examples used for retrieval during drafting.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS conversion_examples (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        source_outbound_event_id UUID NOT NULL UNIQUE REFERENCES sms_events(id) ON DELETE CASCADE,
+        booked_call_label TEXT,
+        closed_won_label TEXT,
+        escalation_level INTEGER NOT NULL DEFAULT 1 CHECK (escalation_level BETWEEN 1 AND 4),
+        structure_signature TEXT,
+        qualifier_snapshot JSONB,
+        channel_marker TEXT NOT NULL DEFAULT 'sms',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -229,6 +436,11 @@ export const initializeSchema = async (): Promise<void> => {
     `);
 
     await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sms_events_conversation_event_ts
+      ON sms_events (conversation_id, event_ts DESC);
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_conversations_rep_last_touch
       ON conversations (current_rep_id, last_touch_at DESC);
     `);
@@ -246,6 +458,56 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_work_items_type_resolved_due
       ON work_items (type, resolved_at, due_at);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_sync_state_updated_at
+      ON monday_sync_state (updated_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_call_snapshots_board_updated
+      ON monday_call_snapshots (board_id, updated_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_call_snapshots_call_date
+      ON monday_call_snapshots (call_date);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_weekly_reports_week_start
+      ON monday_weekly_reports (week_start DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_booked_call_pushes_status_updated
+      ON monday_booked_call_pushes (status, updated_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_inbox_contact_profiles_contact_key
+      ON inbox_contact_profiles (contact_key);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversation_state_conversation_id
+      ON conversation_state (conversation_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_send_attempts_conversation_created
+      ON send_attempts (conversation_id, created_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_draft_suggestions_conversation_created
+      ON draft_suggestions (conversation_id, created_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversion_examples_booked_escalation
+      ON conversion_examples (booked_call_label, escalation_level);
     `);
 
     // Enforce "one open needs_reply per conversation" at the DB level.

@@ -16,7 +16,9 @@ import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
+import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
+import { toChannelsV2, toEnvelope, toRunsListV2, toSalesMetricsV2, toWeeklyManagerSummaryV2 } from './v2-contract.js';
 
 type RequestHandler = (
   req: IncomingMessage & { body?: unknown; user?: unknown },
@@ -368,6 +370,93 @@ const handleGetChannels: RequestHandler = async (_req, res, logger, origin) => {
   sendJson(res, 200, { channels }, origin);
 };
 
+const handleGetRunsV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const channelId = url.searchParams.get('channelId') || undefined;
+  const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 100);
+  const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
+  const daysBack = Number.parseInt(url.searchParams.get('daysBack') || '7', 10) || 7;
+  const legacyOnly = url.searchParams.get('legacyOnly') === 'true';
+  const includeLegacy = url.searchParams.get('includeLegacy') === 'true';
+  const legacyMode = legacyOnly ? 'only' : includeLegacy ? 'include' : 'exclude';
+
+  const rows = await getDailyRuns(
+    {
+      channelId: channelId as string | undefined,
+      limit,
+      offset,
+      daysBack,
+      raw: false,
+      legacyMode,
+    },
+    logger,
+  );
+
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: toRunsListV2({ rows, limit, offset, daysBack, channelId, legacyMode }),
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+const handleGetChannelsV2: RequestHandler = async (_req, res, logger, origin) => {
+  const channels = await getChannelsWithRuns(logger);
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: toChannelsV2(channels),
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+const handleGetWeeklySummaryV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const weekStartRaw = (url.searchParams.get('weekStart') || '').trim();
+  const timeZoneRaw = (url.searchParams.get('tz') || '').trim();
+
+  if (weekStartRaw && !/^\d{4}-\d{2}-\d{2}$/.test(weekStartRaw)) {
+    sendJson(res, 400, { error: 'Invalid weekStart format. Expected YYYY-MM-DD' }, origin);
+    return;
+  }
+
+  try {
+    const summary = await getWeeklyManagerSummary(
+      {
+        weekStart: weekStartRaw || undefined,
+        timeZone: timeZoneRaw || undefined,
+      },
+      logger,
+    );
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: toWeeklyManagerSummaryV2(summary),
+        timeZone: summary.window.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isValidationError = /Invalid timezone|Invalid day format|Invalid weekStart|expected YYYY-MM-DD/i.test(
+      message,
+    );
+    if (isValidationError) {
+      sendJson(res, 400, { error: message }, origin);
+      return;
+    }
+    logger?.error('Failed to fetch v2 weekly summary:', error);
+    sendJson(res, 500, { error: 'Failed to fetch v2 weekly summary', details: message }, origin);
+  }
+};
+
 const handleGetConversationById: RequestHandler = async (req, res, logger, origin) => {
   const id = req.url?.split('/').pop();
   if (!id) {
@@ -381,7 +470,7 @@ const handleGetConversationById: RequestHandler = async (req, res, logger, origi
 
   // Fetch recent events to satisfy the frontend Conversation detail view
   const events = await listSmsEventsForConversation(
-    { contact_id: conversation.contact_id, contact_phone: conversation.contact_phone },
+    { id: conversation.id, contact_id: conversation.contact_id, contact_phone: conversation.contact_phone },
     50,
     logger,
   );
@@ -426,7 +515,7 @@ const handleGetConversationEvents: RequestHandler = async (req, res, logger, ori
   }
 
   const events = await listSmsEventsForConversation(
-    { contact_id: conversation.contact_id, contact_phone: conversation.contact_phone },
+    { id: conversation.id, contact_id: conversation.contact_id, contact_phone: conversation.contact_phone },
     limit,
     logger,
   );
@@ -517,6 +606,84 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
   sendJson(res, 200, summary, origin);
 };
 
+const buildSalesMetricsPayload = async (params: {
+  from: Date;
+  to: Date;
+  timeZone: string;
+  requestedMode: 'day' | 'range' | 'from-to';
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>;
+}) => {
+  const [summary, bookedCalls, bookedAttributionSources] = await Promise.all([
+    getSalesMetricsSummary({ from: params.from, to: params.to, timeZone: params.timeZone }, params.logger),
+    getBookedCallsSummary(
+      { from: params.from, to: params.to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID, timeZone: params.timeZone },
+      params.logger,
+    ),
+    getBookedCallAttributionSources({
+      from: params.from,
+      to: params.to,
+      channelId: process.env.BOOKED_CALLS_CHANNEL_ID,
+    }),
+  ]);
+
+  const canonical = buildCanonicalSalesMetricsSlice(summary, bookedCalls);
+  const sequenceBookedAttribution = attributeSlackBookedCallsToSequences(
+    canonical.topSequences,
+    bookedAttributionSources,
+  );
+  const topSequences = canonical.topSequences.map((row) => {
+    const booked = sequenceBookedAttribution.byLabel.get(row.label);
+    return {
+      ...row,
+      slackBookedCalls: booked?.booked ?? 0,
+      slackBookedJack: booked?.jack ?? 0,
+      slackBookedBrandon: booked?.brandon ?? 0,
+      slackBookedSelf: booked?.selfBooked ?? 0,
+    };
+  });
+  if (!canonical.consistency.totalsBookedMatches) {
+    params.logger?.warn('Booked consistency mismatch', {
+      bookedCallsTotal: bookedCalls.totals.booked,
+      totalsBooked: canonical.totals.booked,
+    });
+  }
+  if (!canonical.consistency.trendBookedMatches) {
+    params.logger?.warn('Booked consistency mismatch', {
+      bookedCallsTotal: bookedCalls.totals.booked,
+      trendBookedSum: canonical.consistency.trendBookedSum,
+    });
+  }
+
+  return {
+    ...summary,
+    timeRange: { from: params.from.toISOString(), to: params.to.toISOString() },
+    totals: canonical.totals,
+    trendByDay: canonical.trendByDay,
+    topSequences,
+    repLeaderboard: canonical.repLeaderboard,
+    bookedCalls: canonical.bookedCalls,
+    meta: {
+      bookedSource: 'slack' as const,
+      timeZone: params.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+      legacySignalsAvailable: true,
+      sequenceLabelPolicy: 'preserve-exact' as const,
+      sequenceBookedAttribution: {
+        source: 'slack_booked_calls' as const,
+        model: 'hubspot_first_conversion_fuzzy_v1',
+        totalCalls: sequenceBookedAttribution.totals.totalCalls,
+        matchedCalls: sequenceBookedAttribution.totals.matchedCalls,
+        unattributedCalls: sequenceBookedAttribution.totals.unattributedCalls,
+        manualCalls: sequenceBookedAttribution.totals.manualCalls,
+      },
+      deprecations: {
+        topSequencesBookedAlias: true,
+        repLeaderboardBookedAlias: true,
+      },
+      requestedMode: params.requestedMode,
+    },
+  };
+};
+
 const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   let resolved: ReturnType<typeof resolveMetricsRange>;
@@ -532,83 +699,66 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
     return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
   }
 
-  const from = resolved.from;
-  const to = resolved.to;
-
   try {
-    const [summary, bookedCalls, bookedAttributionSources] = await Promise.all([
-      getSalesMetricsSummary({ from, to, timeZone: resolved.timeZone }, logger),
-      getBookedCallsSummary(
-        { from, to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID, timeZone: resolved.timeZone },
-        logger,
-      ),
-      getBookedCallAttributionSources({ from, to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID }),
-    ]);
-
-    const canonical = buildCanonicalSalesMetricsSlice(summary, bookedCalls);
-    const sequenceBookedAttribution = attributeSlackBookedCallsToSequences(
-      canonical.topSequences,
-      bookedAttributionSources,
-    );
-    const topSequences = canonical.topSequences.map((row) => {
-      const booked = sequenceBookedAttribution.byLabel.get(row.label);
-      return {
-        ...row,
-        slackBookedCalls: booked?.booked ?? 0,
-        slackBookedJack: booked?.jack ?? 0,
-        slackBookedBrandon: booked?.brandon ?? 0,
-        slackBookedSelf: booked?.selfBooked ?? 0,
-      };
+    const payload = await buildSalesMetricsPayload({
+      from: resolved.from,
+      to: resolved.to,
+      timeZone: resolved.timeZone,
+      requestedMode: resolved.mode,
+      logger,
     });
-    if (!canonical.consistency.totalsBookedMatches) {
-      logger?.warn('Booked consistency mismatch', {
-        bookedCallsTotal: bookedCalls.totals.booked,
-        totalsBooked: canonical.totals.booked,
-      });
-    }
-    if (!canonical.consistency.trendBookedMatches) {
-      logger?.warn('Booked consistency mismatch', {
-        bookedCallsTotal: bookedCalls.totals.booked,
-        trendBookedSum: canonical.consistency.trendBookedSum,
-      });
-    }
-
-    const patched = {
-      ...summary,
-      timeRange: { from: from.toISOString(), to: to.toISOString() },
-      totals: canonical.totals,
-      trendByDay: canonical.trendByDay,
-      topSequences,
-      repLeaderboard: canonical.repLeaderboard,
-      bookedCalls: canonical.bookedCalls,
-      meta: {
-        bookedSource: 'slack',
-        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
-        legacySignalsAvailable: true,
-        sequenceLabelPolicy: 'preserve-exact',
-        sequenceBookedAttribution: {
-          source: 'slack_booked_calls',
-          model: 'hubspot_first_conversion_fuzzy_v1',
-          totalCalls: sequenceBookedAttribution.totals.totalCalls,
-          matchedCalls: sequenceBookedAttribution.totals.matchedCalls,
-          unattributedCalls: sequenceBookedAttribution.totals.unattributedCalls,
-          manualCalls: sequenceBookedAttribution.totals.manualCalls,
-        },
-        deprecations: {
-          topSequencesBookedAlias: true,
-          repLeaderboardBookedAlias: true,
-        },
-        requestedMode: resolved.mode,
-      },
-    };
-
-    sendJson(res, 200, patched, origin);
+    sendJson(res, 200, payload, origin);
   } catch (err) {
     logger?.error('Failed to fetch sales metrics:', err);
     sendJson(
       res,
       500,
       { error: 'Failed to fetch sales metrics', details: err instanceof Error ? err.message : String(err) },
+      origin,
+    );
+  }
+};
+
+const handleGetSalesMetricsV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range'),
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  try {
+    const payload = await buildSalesMetricsPayload({
+      from: resolved.from,
+      to: resolved.to,
+      timeZone: resolved.timeZone,
+      requestedMode: resolved.mode,
+      logger,
+    });
+    const v2Payload = toSalesMetricsV2(payload);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: v2Payload,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (err) {
+    logger?.error('Failed to fetch v2 sales metrics:', err);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch v2 sales metrics', details: err instanceof Error ? err.message : String(err) },
       origin,
     );
   }
@@ -779,6 +929,10 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/runs', requiresAuth: false, handler: handleGetRuns },
   { method: 'GET', path: '/api/runs/:id', requiresAuth: false, handler: handleGetRunById },
   { method: 'GET', path: '/api/channels', requiresAuth: false, handler: handleGetChannels },
+  { method: 'GET', path: '/api/v2/sales-metrics', requiresAuth: false, handler: handleGetSalesMetricsV2 },
+  { method: 'GET', path: '/api/v2/runs', requiresAuth: false, handler: handleGetRunsV2 },
+  { method: 'GET', path: '/api/v2/channels', requiresAuth: false, handler: handleGetChannelsV2 },
+  { method: 'GET', path: '/api/v2/weekly-summary', requiresAuth: false, handler: handleGetWeeklySummaryV2 },
 
   // Authenticated endpoints (mutations / sensitive data)
   { method: 'GET', path: '/api/auth/verify', requiresAuth: true, handler: handleAuthVerify },

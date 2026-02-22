@@ -32,6 +32,7 @@ export type TopSequenceRow = {
   bookingSignalsSms: number;
   booked: number; // deprecated alias, kept for one compatibility release
   optOuts: number;
+  firstSeenAt?: string | null;
 };
 
 export type RepLeaderboardRow = {
@@ -98,6 +99,7 @@ const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybi
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
 const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
+const MANUAL_SEQUENCE_LABEL = 'No sequence (manual/direct)';
 
 export const isHighConfidenceBookingSignal = (direction: string, body: string): boolean => {
   if (!body) return false;
@@ -513,7 +515,7 @@ export const getSalesMetricsSummary = async (
       }
 
       const attributedTouch = latestSequencedOutbound || latestOutbound;
-      const sequenceLabel = (attributedTouch?.sequence || '').trim() || 'No sequence (manual/direct)';
+      const sequenceLabel = (attributedTouch?.sequence || '').trim() || MANUAL_SEQUENCE_LABEL;
 
       // credit booking to booking day
       const bookingDay = e._day;
@@ -530,6 +532,7 @@ export const getSalesMetricsSummary = async (
         bookingSignalsSms: 0,
         booked: 0, // deprecated alias
         optOuts: 0,
+        firstSeenAt: null,
       };
       seqRow.bookingSignalsSms += 1;
       seqRow.booked = seqRow.bookingSignalsSms;
@@ -558,7 +561,7 @@ export const getSalesMetricsSummary = async (
   // excluded manual outbounds are not part of any sequence label anyway.
   for (const e of events) {
     if (e.direction !== 'outbound') continue;
-    const label = (e.sequence || '').trim() || 'No sequence (manual/direct)';
+    const label = (e.sequence || '').trim() || MANUAL_SEQUENCE_LABEL;
     const row = seqMap.get(label) || {
       label,
       messagesSent: 0,
@@ -567,8 +570,13 @@ export const getSalesMetricsSummary = async (
       bookingSignalsSms: 0,
       booked: 0, // deprecated alias
       optOuts: 0,
+      firstSeenAt: null,
     };
     row.messagesSent += 1;
+    const eventDay = dayKeyInTimeZone(e.event_ts, timeZone);
+    if (eventDay && (!row.firstSeenAt || eventDay < row.firstSeenAt)) {
+      row.firstSeenAt = eventDay;
+    }
     seqMap.set(label, row);
   }
 
@@ -601,7 +609,7 @@ export const getSalesMetricsSummary = async (
       const attributedTouch = latestSequencedOutbound || latestOutbound;
       if (!attributedTouch) continue;
 
-      const label = (attributedTouch.sequence || '').trim() || 'No sequence (manual/direct)';
+      const label = (attributedTouch.sequence || '').trim() || MANUAL_SEQUENCE_LABEL;
       const set = repliedBySequence.get(label) || new Set<string>();
       set.add(contactKey);
       repliedBySequence.set(label, set);
@@ -644,7 +652,7 @@ export const getSalesMetricsSummary = async (
       }
 
       const attributedTouch = latestSequencedOutbound || latestOutbound;
-      const label = (attributedTouch?.sequence || '').trim() || 'No sequence (manual/direct)';
+      const label = (attributedTouch?.sequence || '').trim() || MANUAL_SEQUENCE_LABEL;
       const set = optOutBySequence.get(label) || new Set<string>();
       set.add(contactKey);
       optOutBySequence.set(label, set);
@@ -673,9 +681,38 @@ export const getSalesMetricsSummary = async (
       bookingSignalsSms: 0,
       booked: 0, // deprecated alias
       optOuts: 0,
+      firstSeenAt: null,
     };
     row.optOuts = contacts.size;
     seqMap.set(label, row);
+  }
+
+  // Best-effort sequence provenance: first outbound timestamp observed in PTBizSMS history for each label.
+  if (seqMap.size > 0) {
+    const labels = [...seqMap.keys()];
+    const { rows: firstSeenRows } = await pool.query<{ label: string; first_seen_at: string | null }>(
+      `
+      SELECT
+        COALESCE(NULLIF(TRIM(sequence), ''), $2::text) AS label,
+        TO_CHAR(MIN((event_ts AT TIME ZONE $3)::date), 'YYYY-MM-DD') AS first_seen_at
+      FROM sms_events
+      WHERE direction = 'outbound'
+        AND COALESCE(NULLIF(TRIM(sequence), ''), $2::text) = ANY($1::text[])
+      GROUP BY 1
+      `,
+      [labels, MANUAL_SEQUENCE_LABEL, timeZone],
+    );
+
+    const firstSeenByLabel = new Map(
+      firstSeenRows
+        .map((row) => [row.label, row.first_seen_at?.trim() || null] as const)
+        .filter((row): row is readonly [string, string] => Boolean(row[1])),
+    );
+    for (const [label, row] of seqMap.entries()) {
+      const firstSeenAt = firstSeenByLabel.get(label);
+      if (firstSeenAt) row.firstSeenAt = firstSeenAt;
+      seqMap.set(label, row);
+    }
   }
 
   // finalize trend reply rates

@@ -20,10 +20,14 @@ export function useEventStream(token: string | null) {
         qc.invalidateQueries({ queryKey: ['runs'] });
         qc.invalidateQueries({ queryKey: ['run'] });
         qc.invalidateQueries({ queryKey: ['channels'] });
+        qc.invalidateQueries({ queryKey: ['v2', 'runs'] });
+        qc.invalidateQueries({ queryKey: ['v2', 'channels'] });
       });
 
       es.addEventListener('metrics-updated', () => {
         qc.invalidateQueries({ queryKey: ['metrics'] });
+        qc.invalidateQueries({ queryKey: ['salesMetrics'] });
+        qc.invalidateQueries({ queryKey: ['v2', 'salesMetrics'] });
       });
 
       es.onerror = (err) => {

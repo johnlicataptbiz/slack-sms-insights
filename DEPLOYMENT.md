@@ -55,6 +55,26 @@ railway variables set ALLOW_DUMMY_AUTH_TOKEN=false
 railway variables set DASHBOARD_AUTH_REDIRECT_URI=https://your-railway-app.up.railway.app/api/oauth/callback
 railway variables set DASHBOARD_AUTH_SUCCESS_URL=https://your-project.vercel.app
 railway variables set DASHBOARD_OAUTH_USER_SCOPES=users:read
+
+# monday integration (phase rollout)
+railway variables set MONDAY_API_TOKEN=...
+railway variables set MONDAY_SYNC_ENABLED=true
+railway variables set MONDAY_WRITEBACK_ENABLED=true
+railway variables set MONDAY_PERSONAL_SYNC_ENABLED=true
+railway variables set MONDAY_ACQ_BOARD_ID=5077164868
+railway variables set MONDAY_MY_CALLS_BOARD_ID=10029059942
+railway variables set MONDAY_PERSONAL_BOARD_ID=10029059942
+railway variables set MONDAY_PERSONAL_SETTER_BUCKET=jack
+railway variables set MONDAY_PERSONAL_SETTER_MONDAY_USER_ID=YOUR_MONDAY_USER_ID
+railway variables set MONDAY_PERSONAL_PUSH_LOOKBACK_DAYS=14
+railway variables set MONDAY_SYNC_BACKFILL_DAYS=90
+railway variables set MONDAY_API_TIMEOUT_MS=12000
+railway variables set MONDAY_API_MAX_RETRIES=2
+railway variables set MONDAY_API_RETRY_BASE_MS=500
+
+# Hard-map column IDs (recommended in production for exact board parity)
+railway variables set MONDAY_ACQ_COLUMN_MAP_JSON='{"callDateColumnId":"date4","setterColumnId":"people","stageColumnId":"status","outcomeColumnId":"text_mkrrha4q","phoneColumnId":"phone","contactIdColumnId":"text_mkrqz1wd"}'
+railway variables set MONDAY_PERSONAL_COLUMN_MAP_JSON='{"callDateColumnId":"date4","contactNameColumnId":"name","phoneColumnId":"phone","setterColumnId":"person","stageColumnId":"status","firstConversionColumnId":"text_first_conversion","lineColumnId":"text_line","sourceColumnId":"text_source","slackLinkColumnId":"link","notesColumnId":"long_text"}'
 ```
 
 ### 1.4 Deploy
@@ -86,9 +106,12 @@ In Vercel project settings → Environment Variables, add:
 
 ```
 VITE_API_URL=https://your-railway-app.up.railway.app
+VITE_UI_VERSION=legacy
 ```
 
 (Replace with your actual Railway URL from Step 1.4)
+
+`VITE_UI_VERSION=legacy` keeps legacy as default while we cohort-test V2.
 
 ### 2.3 Configure build settings
 
@@ -106,6 +129,32 @@ Click "Deploy". Vercel will:
 3. Deploy static files to CDN
 
 Your frontend will be live at: `https://your-project.vercel.app`
+
+## UI rollout: legacy default + V2 cohorts
+
+### Keep legacy default (initial rollout)
+
+- Set `VITE_UI_VERSION=legacy` in Vercel production env vars.
+- Deploy.
+- Default route opens legacy unless user explicitly opts into V2.
+
+### Cohort-enable V2
+
+Per-user V2 enable options:
+
+1. Query param (one-time, sticky):
+   - `https://your-project.vercel.app/v2/insights?ui=v2`
+   - This stores `ptbizsms-ui-mode=v2` in localStorage.
+2. LocalStorage manual toggle (browser console):
+   - `localStorage.setItem('ptbizsms-ui-mode', 'v2'); location.href='/v2/insights';`
+3. Revert a user to legacy:
+   - `localStorage.setItem('ptbizsms-ui-mode', 'legacy'); location.href='/legacy';`
+
+### Flip default to V2 (after cohort signoff)
+
+1. Change Vercel env var to `VITE_UI_VERSION=v2`.
+2. Deploy.
+3. Keep query/localStorage overrides enabled for fast rollback.
 
 ## Step 3: Verify Integration
 

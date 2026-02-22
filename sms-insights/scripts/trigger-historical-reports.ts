@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { WebClient } from '@slack/web-api';
 import { buildAlowareAnalyticsReportBundle } from '../services/aloware-analytics.js';
+import { buildDailyReportSummary, isDailySnapshotReport } from '../services/daily-report-summary.js';
 import { logDailyRun } from '../services/daily-run-logger.js';
 import { closeDatabase, getPool, initDatabase } from '../services/db.js';
 
@@ -75,8 +76,10 @@ async function run() {
         logger: console,
       });
 
-      const summarySnippet = bundle.reportText.split('\n').slice(0, 10).join('\n'); // Store a snippet
-      const looksPlaceholder = isPlaceholderText(summarySnippet) || isPlaceholderText(bundle.reportText);
+      const summaryText = isDailySnapshotReport(bundle.reportText)
+        ? buildDailyReportSummary(bundle.reportText)
+        : bundle.reportText.split('\n').slice(0, 5).join('\n');
+      const looksPlaceholder = isPlaceholderText(summaryText) || isPlaceholderText(bundle.reportText);
 
       // If the generated output is a placeholder and a real run exists, skip logging.
       // (This is defensive; the pre-check above should already catch the common case.)
@@ -100,7 +103,7 @@ async function run() {
           reportDate: date,
           reportType: 'daily',
           status: 'success',
-          summaryText: summarySnippet,
+          summaryText,
           fullReport: bundle.reportText,
           durationMs: 0, // We don't have the timing here easily
         });

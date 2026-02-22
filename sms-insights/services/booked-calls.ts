@@ -27,8 +27,22 @@ export type BookedCallAttributionSource = {
   eventTs: string;
   bucket: BookedCallAttributionBucket;
   firstConversion: string | null;
+  rep: string | null;
+  line: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  slackChannelId: string;
+  slackMessageTs: string;
   text: string | null;
 };
+
+const parseGraceSeconds = (): number => {
+  const raw = Number.parseInt(process.env.BOOKED_CALL_ATTRIBUTION_GRACE_SECONDS || '300', 10);
+  if (!Number.isFinite(raw) || raw < 0) return 300;
+  return raw;
+};
+
+const BOOKED_CALL_ATTRIBUTION_GRACE_SECONDS = parseGraceSeconds();
 
 const hasReaction = (
   reactions: Array<{ reaction_name: string; users: unknown }>,
@@ -112,8 +126,14 @@ export const getBookedCallAttributionSources = async (params: {
   from: Date;
   to: Date;
   channelId?: string;
+  slackMessageTs?: string;
 }): Promise<BookedCallAttributionSource[]> => {
-  const calls = await listBookedCallsInRange({ from: params.from, to: params.to, channelId: params.channelId });
+  const calls = await listBookedCallsInRange({
+    from: params.from,
+    to: params.to,
+    channelId: params.channelId,
+    slackMessageTs: params.slackMessageTs,
+  });
   const jackId = process.env.ALOWARE_WATCHER_JACK_USER_ID;
   const brandonId = process.env.ALOWARE_WATCHER_BRANDON_USER_ID;
 
@@ -144,12 +164,34 @@ export const getBookedCallAttributionSources = async (params: {
 
     const fallback = fallbackFromRaw(c.raw);
     const firstConversion = parseFallbackField(fallback, 'First Conversion');
+    const rep = parseFallbackField(fallback, 'Rep');
+    const line = parseFallbackField(fallback, 'Line');
+    const contactName = parseFallbackField(fallback, 'Name');
+    const contactPhone = parseFallbackField(fallback, 'Phone');
+
+    if (!hasAttribution) {
+      const eventMs = new Date(c.event_ts).getTime();
+      if (Number.isFinite(eventMs)) {
+        const ageSeconds = Math.max(0, (Date.now() - eventMs) / 1000);
+        if (ageSeconds < BOOKED_CALL_ATTRIBUTION_GRACE_SECONDS) {
+          // Grace period: wait for setter reaction before defaulting this to self-booked.
+          continue;
+        }
+      }
+    }
+
     const bucket: BookedCallAttributionBucket = isJack ? 'jack' : isBrandon ? 'brandon' : 'selfBooked';
 
     normalized.push({
       eventTs: c.event_ts,
       bucket,
       firstConversion,
+      rep,
+      line,
+      contactName,
+      contactPhone,
+      slackChannelId: c.slack_channel_id,
+      slackMessageTs: c.slack_message_ts,
       text: c.text,
     });
   }

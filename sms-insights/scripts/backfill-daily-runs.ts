@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { closeDatabase, initDatabase } from '../services/db.js';
 import { getPool } from '../services/db.js';
-import { isDailySnapshotReport } from '../services/daily-report-summary.js';
+import { buildDailyReportSummary, isDailySnapshotReport } from '../services/daily-report-summary.js';
 
 type Args = {
   dryRun: boolean;
@@ -31,12 +31,6 @@ const parseArgs = (): Args => {
     offset: Number.isFinite(offset as number) ? offset : undefined,
     daysBack: Number.isFinite(daysBack as number) ? daysBack : undefined,
   };
-};
-
-const normalizeSummary = (fullReport: string, maxLen = 220): string => {
-  const oneLine = fullReport.replace(/\s+/g, ' ').trim();
-  if (oneLine.length <= maxLen) return oneLine;
-  return `${oneLine.slice(0, maxLen - 3)}...`;
 };
 
 const extractReportDate = (fullReport: string): string | null => {
@@ -114,7 +108,7 @@ async function main() {
     if (!isDailySnapshotReport(full)) continue;
 
     const nextReportDate = extractReportDate(full);
-    const nextSummary = normalizeSummary(full);
+    const nextSummary = buildDailyReportSummary(full);
 
     const needsReportDate = nextReportDate && nextReportDate !== row.report_date;
     const needsSummary = nextSummary !== (row.summary_text ?? '');

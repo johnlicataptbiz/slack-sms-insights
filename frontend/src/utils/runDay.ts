@@ -46,7 +46,10 @@ const getTimeZoneParts = (input: Date | string, timeZone: string): TimeZoneParts
 
 export const shiftIsoDay = (day: string, deltaDays: number): string => {
   const [year, month, date] = day.split('-').map((value) => Number.parseInt(value, 10));
-  const shifted = new Date(Date.UTC(year, month - 1, date + deltaDays, 0, 0, 0, 0));
+  const safeYear = typeof year === 'number' && Number.isFinite(year) ? year : 1970;
+  const safeMonth = typeof month === 'number' && Number.isFinite(month) ? month : 1;
+  const safeDate = typeof date === 'number' && Number.isFinite(date) ? date : 1;
+  const shifted = new Date(Date.UTC(safeYear, safeMonth - 1, safeDate + deltaDays, 0, 0, 0, 0));
   const yyyy = shifted.getUTCFullYear();
   const mm = String(shifted.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(shifted.getUTCDate()).padStart(2, '0');

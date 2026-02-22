@@ -17,6 +17,7 @@ export type NewSmsEvent = {
   body?: string | null;
   line?: string | null;
   sequence?: string | null;
+  conversationId?: string | null;
   raw?: unknown | null;
 };
 
@@ -34,6 +35,7 @@ export type SmsEventRow = {
   body: string | null;
   line: string | null;
   sequence: string | null;
+  conversation_id: string | null;
   raw: unknown | null;
   created_at: string;
 };
@@ -69,9 +71,10 @@ export const insertSmsEvent = async (
         body,
         line,
         sequence,
+        conversation_id,
         raw
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       ON CONFLICT (slack_channel_id, slack_message_ts)
       DO UPDATE SET
         -- keep the first write as source of truth, but allow filling missing fields
@@ -82,6 +85,7 @@ export const insertSmsEvent = async (
         body = COALESCE(sms_events.body, EXCLUDED.body),
         line = COALESCE(sms_events.line, EXCLUDED.line),
         sequence = COALESCE(sms_events.sequence, EXCLUDED.sequence),
+        conversation_id = COALESCE(sms_events.conversation_id, EXCLUDED.conversation_id),
         raw = COALESCE(sms_events.raw, EXCLUDED.raw)
       RETURNING *;
     `,
@@ -98,6 +102,7 @@ export const insertSmsEvent = async (
         event.body ?? null,
         event.line ?? null,
         event.sequence ?? null,
+        event.conversationId ?? null,
         event.raw ?? null,
       ],
     );
@@ -105,6 +110,31 @@ export const insertSmsEvent = async (
     return result.rows[0] ?? null;
   } catch (err) {
     logger?.error('insertSmsEvent failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const linkSmsEventToConversation = async (
+  eventId: string,
+  conversationId: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<void> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `
+      UPDATE sms_events
+      SET conversation_id = $2
+      WHERE id = $1
+        AND (conversation_id IS NULL OR conversation_id = $2);
+      `,
+      [eventId, conversationId],
+    );
+  } catch (err) {
+    logger?.error('linkSmsEventToConversation failed', err);
     throw err;
   } finally {
     client.release();

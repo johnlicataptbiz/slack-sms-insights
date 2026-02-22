@@ -111,7 +111,7 @@ export const upsertBookedCallReaction = async (
 };
 
 export const listBookedCallsInRange = async (
-  params: { from: Date; to: Date; channelId?: string },
+  params: { from: Date; to: Date; channelId?: string; slackMessageTs?: string },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<
   Array<
@@ -146,9 +146,10 @@ export const listBookedCallsInRange = async (
       WHERE bc.event_ts >= $1::timestamptz
         AND bc.event_ts <= $2::timestamptz
         AND ($3::text IS NULL OR bc.slack_channel_id = $3::text)
+        AND ($4::text IS NULL OR bc.slack_message_ts = $4::text)
       ORDER BY bc.event_ts ASC
       `,
-      [fromIso, toIso, params.channelId ?? null],
+      [fromIso, toIso, params.channelId ?? null, params.slackMessageTs ?? null],
     );
 
     const byId = new Map<

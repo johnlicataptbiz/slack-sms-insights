@@ -37,23 +37,28 @@ const OPT_OUTS_PATTERN = /- Opt[-\s]?Outs?:\s*(\d+)/i;
 const DATE_PATTERN = /^Date:\s*(.+)$/im;
 
 export function parseReport(reportText: string): ParsedReport {
-  const lines = reportText.split('\n').map(l => l.trim());
+  const lines = reportText.split('\n').map((line) => line.trim());
   const reps: RepMetrics[] = [];
   let currentRep: RepMetrics | null = null;
 
-  const dateMatch = reportText.match(DATE_PATTERN);
-  const date = dateMatch ? dateMatch[1] : undefined;
+  const date = reportText.match(DATE_PATTERN)?.[1]?.trim();
 
   for (const line of lines) {
     // Check for Rep header
     const repMatch = line.match(REP_PATTERN);
     if (repMatch) {
+      const repName = repMatch[1]?.trim();
+      if (!repName) {
+        currentRep = null;
+        continue;
+      }
+
       currentRep = {
-        name: repMatch[1],
+        name: repName,
         outboundConversations: 0,
         bookings: 0,
         optOuts: 0,
-        sequences: []
+        sequences: [],
       };
       reps.push(currentRep);
       continue;
@@ -62,19 +67,19 @@ export function parseReport(reportText: string): ParsedReport {
     if (currentRep) {
       const outboundMatch = line.match(OUTBOUND_CONV_PATTERN);
       if (outboundMatch) {
-        currentRep.outboundConversations = parseInt(outboundMatch[1], 10);
+        currentRep.outboundConversations = Number.parseInt(outboundMatch[1] || '0', 10);
         continue;
       }
 
       const bookingsMatch = line.match(BOOKINGS_PATTERN);
       if (bookingsMatch) {
-        currentRep.bookings = parseInt(bookingsMatch[1], 10);
+        currentRep.bookings = Number.parseInt(bookingsMatch[1] || '0', 10);
         continue;
       }
 
       const optOutsMatch = line.match(OPT_OUTS_PATTERN);
       if (optOutsMatch) {
-        currentRep.optOuts = parseInt(optOutsMatch[1], 10);
+        currentRep.optOuts = Number.parseInt(optOutsMatch[1] || '0', 10);
         continue;
       }
     }
@@ -82,13 +87,18 @@ export function parseReport(reportText: string): ParsedReport {
     // Check for Sequence line
     const seqMatch = line.match(SEQUENCE_LINE_PATTERN);
     if (seqMatch) {
+      const label = seqMatch[1]?.trim();
+      if (!label) {
+        continue;
+      }
+
       const row: SequenceRow = {
-        label: seqMatch[1].trim(),
-        messagesSent: parseInt(seqMatch[2], 10),
-        repliesReceived: parseInt(seqMatch[3], 10),
-        replyRate: parseFloat(seqMatch[4]),
-        booked: parseInt(seqMatch[5], 10),
-        optOuts: parseInt(seqMatch[6], 10)
+        label,
+        messagesSent: Number.parseInt(seqMatch[2] || '0', 10),
+        repliesReceived: Number.parseInt(seqMatch[3] || '0', 10),
+        replyRate: Number.parseFloat(seqMatch[4] || '0'),
+        booked: Number.parseInt(seqMatch[5] || '0', 10),
+        optOuts: Number.parseInt(seqMatch[6] || '0', 10),
       };
 
       if (currentRep) {
@@ -107,8 +117,8 @@ export function parseReport(reportText: string): ParsedReport {
         existing.repliesReceived += seq.repliesReceived;
         existing.booked += seq.booked;
         existing.optOuts += seq.optOuts;
-        existing.replyRate = existing.messagesSent > 0 
-          ? (existing.repliesReceived / existing.messagesSent) * 100 
+        existing.replyRate = existing.messagesSent > 0
+          ? (existing.repliesReceived / existing.messagesSent) * 100
           : 0;
       } else {
         sequenceMap.set(seq.label, { ...seq });
@@ -128,15 +138,20 @@ export function parseReport(reportText: string): ParsedReport {
   const totalBooked = allSequences.reduce((sum, s) => sum + s.booked, 0);
   const totalOptOuts = allSequences.reduce((sum, s) => sum + s.optOuts, 0);
 
-  return {
-    title: "Daily SMS Snapshot",
-    date,
+  const parsed: ParsedReport = {
+    title: 'Daily SMS Snapshot',
     totalMessagesSent,
     totalRepliesReceived,
     totalBooked,
     totalOptOuts,
     overallReplyRate: totalMessagesSent > 0 ? (totalRepliesReceived / totalMessagesSent) * 100 : 0,
     reps,
-    allSequences
+    allSequences,
   };
+
+  if (date) {
+    parsed.date = date;
+  }
+
+  return parsed;
 }

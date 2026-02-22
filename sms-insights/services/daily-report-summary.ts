@@ -5,6 +5,8 @@ const OUTBOUND_CONVERSATIONS_PATTERNS = [
 ];
 const BOOKINGS_PATTERNS = [/Calls\s+booked\s*\(24h\):\s*(\d+)/gi, /- Bookings:\s*(\d+)/gi];
 const OPTOUTS_PATTERNS = [/Total opt-out conversations\s*\(24h\):\s*(\d+)/gi, /- Opt[-\s]?Outs?:\s*(\d+)/gi];
+const DATE_PATTERN = /^Date:\s*(.+)$/im;
+const TIME_RANGE_PATTERN = /^Time Range:\s*(.+)$/im;
 const SEQUENCE_LINE_PATTERN =
   /^-\s*(.+?):\s*sent\s+(\d+).*?(?:replies(?:\s+received)?|replied)\s+(\d+)\s*\(([0-9.]+)%[^)]*\).*?book(?:ings?|ed)\s+(\d+).*?opt-outs\s+(\d+)/i;
 
@@ -92,33 +94,43 @@ export const buildDailyReportSummary = (report: string): string => {
   const optOuts = sumFromPatterns(report, OPTOUTS_PATTERNS);
   const outboundConversations = sumFromPatterns(report, OUTBOUND_CONVERSATIONS_PATTERNS);
   const sequences = aggregateSequenceRows(report);
+  const dateLabel = report.match(DATE_PATTERN)?.[1]?.trim();
+  const timeRange = report.match(TIME_RANGE_PATTERN)?.[1]?.trim();
   const messagesSent = sequences.reduce((sum, row) => sum + row.messagesSent, 0);
   const repliesReceived = sequences.reduce((sum, row) => sum + row.repliesReceived, 0);
   const replyRatePct = messagesSent > 0 ? (repliesReceived / messagesSent) * 100 : 0;
   const topSequences = sequences.slice(0, 3);
 
+  const headlineParts = ['Daily Setter Snapshot'];
+  if (dateLabel) {
+    headlineParts.push(dateLabel);
+  }
+  if (timeRange) {
+    headlineParts.push(timeRange);
+  }
+
   const lines = [
-    '*Daily Summary (Canvas Only)*',
-    `- Messages sent: ${messagesSent}`,
-    `- Replies received: ${repliesReceived} (${replyRatePct.toFixed(1)}%)`,
-    `- Calls booked: ${booked}`,
-    `- Opt-outs: ${optOuts}`,
+    headlineParts.join(' | '),
+    `Messages sent: ${messagesSent}`,
+    `Replies received: ${repliesReceived} (${replyRatePct.toFixed(1)}%)`,
+    `Calls booked (Slack): ${booked}`,
+    `Opt-outs: ${optOuts}`,
   ];
 
   if (outboundConversations > 0) {
-    lines.push(`- Outbound conversations: ${outboundConversations}`);
+    lines.push(`Outbound conversations: ${outboundConversations}`);
   }
 
   if (topSequences.length > 0) {
-    lines.push('- Top sequences by volume:');
-    for (const row of topSequences) {
+    lines.push('Top sequences by volume:');
+    topSequences.forEach((row, index) => {
       const sequenceRate = row.messagesSent > 0 ? (row.repliesReceived / row.messagesSent) * 100 : 0;
       lines.push(
-        `  - ${row.label}: ${row.messagesSent} sent, ${row.repliesReceived} replies (${sequenceRate.toFixed(
+        `${index + 1}. ${row.label}: ${row.messagesSent} sent, ${row.repliesReceived} replies (${sequenceRate.toFixed(
           1,
         )}%), ${row.booked} booked, ${row.optOuts} opt-outs`,
       );
-    }
+    });
   }
 
   return lines.join('\n');

@@ -38,7 +38,7 @@ export const getConversationById = async (
 };
 
 export const listSmsEventsForConversation = async (
-  conversation: Pick<ConversationRow, 'contact_id' | 'contact_phone'>,
+  conversation: Pick<ConversationRow, 'id' | 'contact_id' | 'contact_phone'>,
   limit: number,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<
@@ -47,8 +47,7 @@ export const listSmsEventsForConversation = async (
   const pool = getDbOrThrow();
   const client = await pool.connect();
   try {
-    // We don't have conversation_id on sms_events yet.
-    // Prefer contact_id match when available; otherwise fall back to contact_phone.
+    // Prefer exact conversation_id. Keep contact fallback for historical rows not yet linked.
     const result = await client.query<
       Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>
     >(
@@ -56,12 +55,16 @@ export const listSmsEventsForConversation = async (
       SELECT id, direction, body, event_ts, slack_channel_id, slack_message_ts
       FROM sms_events
       WHERE
-        ($1::text IS NOT NULL AND contact_id = $1::text)
-        OR ($1::text IS NULL AND $2::text IS NOT NULL AND contact_phone = $2::text)
+        conversation_id = $1::uuid
+        OR (
+          conversation_id IS NULL
+          AND (($2::text IS NOT NULL AND contact_id = $2::text)
+            OR ($2::text IS NULL AND $3::text IS NOT NULL AND contact_phone = $3::text))
+        )
       ORDER BY event_ts DESC
-      LIMIT $3;
+      LIMIT $4;
       `,
-      [conversation.contact_id ?? null, conversation.contact_phone ?? null, limit],
+      [conversation.id, conversation.contact_id ?? null, conversation.contact_phone ?? null, limit],
     );
 
     return result.rows;

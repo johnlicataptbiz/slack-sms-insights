@@ -8,11 +8,7 @@ type StreamTokenPayload = {
 
 const base64UrlEncode = (input: Buffer | string): string => {
   const buf = Buffer.isBuffer(input) ? input : Buffer.from(input, 'utf8');
-  return buf
-    .toString('base64')
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replaceAll('=', '');
+  return buf.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 };
 
 const base64UrlDecodeToBuffer = (input: string): Buffer => {
@@ -64,7 +60,10 @@ export const mintStreamToken = (params: {
   return `${payloadB64}.${sig}`;
 };
 
-export const verifyStreamToken = (token: string, now = new Date()): { ok: true; payload: StreamTokenPayload } | { ok: false } => {
+export const verifyStreamToken = (
+  token: string,
+  now = new Date(),
+): { ok: true; payload: StreamTokenPayload } | { ok: false } => {
   const trimmed = (token || '').trim();
   const parts = trimmed.split('.');
   if (parts.length !== 2) return { ok: false };
@@ -82,7 +81,12 @@ export const verifyStreamToken = (token: string, now = new Date()): { ok: true; 
     return { ok: false };
   }
 
-  if (!payload || typeof payload.sub !== 'string' || typeof payload.exp !== 'number' || typeof payload.nonce !== 'string') {
+  if (
+    !payload ||
+    typeof payload.sub !== 'string' ||
+    typeof payload.exp !== 'number' ||
+    typeof payload.nonce !== 'string'
+  ) {
     return { ok: false };
   }
 

@@ -147,8 +147,7 @@ const getStreamTokenTtlSeconds = (): number => {
   return 60;
 };
 
-const isDashboardSlackOauthEnabled = (): boolean =>
-  parseBooleanFlag(process.env.DASHBOARD_SLACK_OAUTH_ENABLED, false);
+const isDashboardSlackOauthEnabled = (): boolean => parseBooleanFlag(process.env.DASHBOARD_SLACK_OAUTH_ENABLED, false);
 
 const shouldUseSecureCookies = (): boolean =>
   parseBooleanFlag(process.env.COOKIE_SECURE, (process.env.NODE_ENV || '').trim() === 'production');

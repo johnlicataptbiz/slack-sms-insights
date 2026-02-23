@@ -121,10 +121,7 @@ describe('v2 contract mappers', () => {
     assert.equal(envelope.meta.timeZone, 'America/Chicago');
     assert.equal(envelope.data.pagination.count, 1);
     assert.equal(envelope.data.items[0]?.processing.model, 'snapshot_report');
-    assert.equal(
-      envelope.data.items[0]?.processing.derivedFrom,
-      'continuous_sms_events_and_booked_calls',
-    );
+    assert.equal(envelope.data.items[0]?.processing.derivedFrom, 'continuous_sms_events_and_booked_calls');
     assert.equal(envelope.data.items[0]?.isLegacy, false);
   });
 

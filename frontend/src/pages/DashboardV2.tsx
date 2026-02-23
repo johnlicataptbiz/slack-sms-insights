@@ -7,23 +7,27 @@ import { useEventStream } from "@/api/useEventStream";
 export default function DashboardV2() {
   useEventStream();
 
-  const salesMetricsQuery = useV2SalesMetrics({ range: "7d" }, { enabled: false });
+  const salesMetricsQuery = useV2SalesMetrics({ range: "7d" });
   const runsQuery = useV2Runs({ daysBack: 7, limit: 10 });
 
-  if (salesMetricsQuery.isLoading || runsQuery.isLoading) {
+  const salesMetricsErrorMessage = salesMetricsQuery.isError ? String(salesMetricsQuery.error) : null;
+  const salesMetricsUnavailable =
+    salesMetricsQuery.isError &&
+    (salesMetricsErrorMessage?.toLowerCase().includes("database not initialized") ||
+      salesMetricsErrorMessage?.toLowerCase().includes("db not initialized"));
+
+  if (runsQuery.isLoading) {
     return <div className="text-muted-foreground">Loading dashboard...</div>;
   }
 
-  if (salesMetricsQuery.isError || runsQuery.isError) {
+  if (runsQuery.isError) {
     return (
       <div className="text-destructive">
         Failed to load dashboard data.
         <pre className="mt-4 whitespace-pre-wrap text-xs text-muted-foreground">
           {JSON.stringify(
             {
-              salesMetricsError: salesMetricsQuery.error,
               runsError: runsQuery.error,
-              salesMetricsErrorString: String(salesMetricsQuery.error),
               runsErrorString: String(runsQuery.error),
             },
             null,
@@ -34,17 +38,42 @@ export default function DashboardV2() {
     );
   }
 
-  const salesMetrics = salesMetricsQuery.data?.data;
+  const salesMetrics = salesMetricsUnavailable ? null : salesMetricsQuery.data?.data;
   const runs = runsQuery.data?.data;
 
-  if (!salesMetrics || !runs) {
+  if (!runs) {
     return <div className="text-muted-foreground">No data available.</div>;
   }
 
   return (
     <div className="flex flex-col gap-6">
-      <KPIGrid data={salesMetrics} />
-      <ChartsGrid data={salesMetrics} />
+      {salesMetrics ? (
+        <>
+          <KPIGrid data={salesMetrics} />
+          <ChartsGrid data={salesMetrics} />
+        </>
+      ) : salesMetricsQuery.isLoading ? (
+        <div className="text-muted-foreground">Loading metrics...</div>
+      ) : salesMetricsUnavailable ? (
+        <div className="text-muted-foreground">
+          Metrics are temporarily unavailable (database not initialized). Showing recent runs only.
+        </div>
+      ) : salesMetricsQuery.isError ? (
+        <div className="text-muted-foreground">
+          Metrics failed to load. Showing recent runs only.
+          <pre className="mt-4 whitespace-pre-wrap text-xs text-muted-foreground">
+            {JSON.stringify(
+              {
+                salesMetricsError: salesMetricsQuery.error,
+                salesMetricsErrorString: String(salesMetricsQuery.error),
+              },
+              null,
+              2
+            )}
+          </pre>
+        </div>
+      ) : null}
+
       <CampaignsTable data={runs} />
     </div>
   );

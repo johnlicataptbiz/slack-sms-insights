@@ -8,7 +8,6 @@ import { handleApiRoute } from './api/routes.js';
 import registerListeners from './listeners/index.js';
 import { initDatabase, initializeSchema } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
-import { startMondaySyncJobs } from './services/monday-sync.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
@@ -76,16 +75,22 @@ app.error(async (error) => {
     await initDatabase(app.logger);
     await initializeSchema();
 
+    // Frontend is deployed on Vercel in production. Only attempt to serve a local
+    // `frontend/dist` bundle when explicitly enabled (useful for single-container dev).
+    const serveFrontendFromDisk = (process.env.SERVE_FRONTEND_FROM_DISK || '').trim().toLowerCase() === 'true';
+
     // Get frontend dist path
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = join(__filename, '..');
     const frontendDistPath = join(__dirname, '../frontend/dist');
     let frontendIndex: string | null = null;
 
-    try {
-      frontendIndex = readFileSync(join(frontendDistPath, 'index.html'), 'utf-8');
-    } catch {
-      app.logger.warn('Frontend dist not found; dashboard will be unavailable');
+    if (serveFrontendFromDisk) {
+      try {
+        frontendIndex = readFileSync(join(frontendDistPath, 'index.html'), 'utf-8');
+      } catch {
+        app.logger.warn('Frontend dist not found; dashboard will be unavailable');
+      }
     }
 
     // Start HTTP server with API + static file serving

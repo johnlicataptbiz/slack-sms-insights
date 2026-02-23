@@ -12,6 +12,7 @@
     "build:frontend": "sh -c 'if [ -d ../frontend ]; then cd ../frontend && npm run build; else echo \"frontend directory not present in build context; skipping frontend build\"; fi'",
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
     "backfill:slack": "node --import tsx ./scripts/backfill-slack-events.ts",
+    "backfill:booked-calls": "node --import tsx ./scripts/backfill-booked-calls.ts",
     "sync:monday": "node --import tsx ./scripts/sync-monday.ts",
     "regenerate:runs": "node --import tsx ./scripts/regenerate-daily-runs.ts",
     "dev": "node --import tsx app.ts",

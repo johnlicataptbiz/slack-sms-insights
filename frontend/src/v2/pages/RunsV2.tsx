@@ -476,7 +476,7 @@ export default function RunsV2() {
     <div className="V2Page">
       <V2PageHeader
         title={v2Copy.nav.runs}
-        subtitle="Archive of daily/manual run logs. Start with the structured summary, then open raw text only when needed."
+        subtitle="A look back at each day's activity."
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">
@@ -551,7 +551,7 @@ export default function RunsV2() {
           </V2Panel>
         ) : null}
 
-        <V2Panel title="Selected Run" caption="Structured summary first. Expand raw report text only when needed." className="V2RunsLayout__detail">
+        <V2Panel title="Run Details" caption="The summary and raw output." className="V2RunsLayout__detail">
           {selected && selectedView ? (
             <div className="V2RunDetail">
               {isRunDetailFocused ? (

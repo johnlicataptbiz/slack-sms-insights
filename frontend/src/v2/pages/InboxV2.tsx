@@ -383,7 +383,7 @@ export default function InboxV2() {
     <div className="V2Page V2Inbox">
       <V2PageHeader
         title={v2Copy.nav.inbox}
-        subtitle="Two-way SMS inbox with clear conversation context, drafting tools, and send controls."
+        subtitle="Your conversations in one place."
         right={
           <div className="V2Inbox__controls">
             <label className="V2Control">
@@ -423,7 +423,7 @@ export default function InboxV2() {
       {flashMessage ? <div className="V2Inbox__flash">{flashMessage}</div> : null}
 
       <section className="V2Inbox__layout">
-        <V2Panel title="Conversations" caption="Unread and needs reply threads are prioritized first.">
+        <V2Panel title="Conversations" caption="Your message threads.">
           {listQuery.isLoading ? (
             <V2State kind="loading">Loading inbox conversations...</V2State>
           ) : listQuery.isError ? (

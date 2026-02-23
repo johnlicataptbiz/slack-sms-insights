@@ -241,7 +241,7 @@ export default function SequencesV2() {
     <div className="V2Page">
       <V2PageHeader
         title={v2Copy.nav.sequences}
-        subtitle="Sequence performance by sends, replies, booked calls, and opt-outs. Sequence names are shown exactly as stored."
+        subtitle="See how each sequence is performing."
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">
@@ -277,9 +277,9 @@ export default function SequencesV2() {
         <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(totalOptOuts)} tone={totalOptOuts > 0 ? 'critical' : 'default'} />
       </section>
 
-      <V2Panel title="High Opt-Out Watchlist" caption="Priority action queue for sequences above watch thresholds.">
+      <V2Panel title="At-Risk Sequences" caption="Sequences that need attention.">
         {watchlistRows.length === 0 ? (
-          <V2State kind="empty">No sequences are currently above watch thresholds (sent 20+ and opt-out rate 3%+).</V2State>
+          <V2State kind="empty">All clear! No sequences need attention.</V2State>
         ) : (
           <div className="V2Watchlist">
             {watchlistRows.map((row) => {

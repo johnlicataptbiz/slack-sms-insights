@@ -1,12 +1,12 @@
 export const v2Copy = {
   nav: {
-    insights: 'Team Insights',
-    inbox: 'SMS Inbox',
-    runs: 'Daily Runs',
-    setterJack: 'Jack Scorecard',
-    setterBrandon: 'Brandon Scorecard',
-    sequences: 'Sequence Performance',
-    attribution: 'Attribution Deep Dive',
+    insights: 'Performance',
+    inbox: 'Messages',
+    runs: 'Daily Activity',
+    setterJack: "Jack's Stats",
+    setterBrandon: "Brandon's Stats",
+    sequences: 'Sequences',
+    attribution: 'Attribution',
   },
   actions: {
     legacyUi: 'Legacy UI',
@@ -36,58 +36,58 @@ type V2TermDefinition = {
 
 export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
   callsBookedSlack: {
-    label: 'Calls Booked (Slack)',
-    definition: 'Canonical booked-call KPI from Slack booked-call records and reaction routing.',
+    label: 'Calls Booked',
+    definition: 'Total confirmed calls scheduled from our outreach efforts.',
   },
   callsBookedCreditSlack: {
-    label: 'Booked Call Credit (Slack)',
-    definition: 'Booked-call credit assigned to each setter from Slack records.',
+    label: 'Setter Credit',
+    definition: 'How many calls each team member booked.',
   },
   smsBookingHintsDiagnostic: {
-    label: 'SMS Booking Hints (Diagnostic)',
-    definition: 'SMS heuristics used for QA and coaching. These never roll into Calls Booked KPI totals.',
+    label: 'Booking Hints',
+    definition: 'Tips our system spots for booking more calls.',
   },
   peopleContacted: {
-    label: 'People Contacted',
-    definition: 'Unique leads messaged in the selected window.',
+    label: 'Leads Reached',
+    definition: 'Unique people we messaged this week.',
   },
   replyRatePeople: {
-    label: 'Reply Rate (People)',
-    definition: 'Unique leads who replied divided by unique leads contacted.',
+    label: 'Reply Rate',
+    definition: 'What percent of people wrote back.',
   },
   outboundConversations: {
-    label: 'Outbound Convos',
-    definition: 'Conversation volume driven by setter outbound activity.',
+    label: 'Outbound Messages',
+    definition: 'Texts we sent to potential clients.',
   },
   optOuts: {
-    label: 'Opt-Outs',
-    definition: 'Count of leads who opted out in the selected window.',
+    label: 'Unsubscribes',
+    definition: 'People who asked to stop receiving messages.',
   },
   optOutRate: {
-    label: 'Opt-Out Rate',
-    definition: 'Opt-out leads divided by outbound conversation volume.',
+    label: 'Unsubscribe Rate',
+    definition: 'Percent of people who opted out after hearing from us.',
   },
   manualReplyRate: {
-    label: 'Manual Reply Rate',
-    definition: 'Reply rate from manual outbound messages only.',
+    label: 'Direct Reply Rate',
+    definition: 'Reply rate from messages we sent directly.',
   },
   sequenceReplyRate: {
     label: 'Sequence Reply Rate',
-    definition: 'Reply rate from sequence-driven outreach only.',
+    definition: 'Reply rate from automated follow-ups.',
   },
   selfBooked: {
-    label: 'Self-Booked Calls',
-    definition: 'Calls booked and credited as self-booked rather than assigned to a setter.',
+    label: 'Self-Booked',
+    definition: 'Calls booked without setter help.',
   },
   sequenceMatchCoverage: {
-    label: 'Sequence Match Coverage',
-    definition: 'Calls booked that matched a known sequence label over total calls booked.',
+    label: 'Sequence Coverage',
+    definition: 'How many booked calls came from our outreach sequences.',
   },
 };
 
 export const V2_TERM_GROUPS: Array<{ title: string; keys: V2TermKey[] }> = [
   {
-    title: 'Core Scorecard Metrics',
+    title: 'Main Metrics',
     keys: [
       'callsBookedSlack',
       'callsBookedCreditSlack',
@@ -100,7 +100,7 @@ export const V2_TERM_GROUPS: Array<{ title: string; keys: V2TermKey[] }> = [
     ],
   },
   {
-    title: 'Attribution Rules + Coverage',
+    title: 'Where Calls Come From',
     keys: ['manualReplyRate', 'sequenceReplyRate', 'selfBooked', 'sequenceMatchCoverage'],
   },
 ];

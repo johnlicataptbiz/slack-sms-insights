@@ -23,8 +23,8 @@ export default function AttributionV2() {
   return (
     <div className="V2Page">
       <V2PageHeader
-        title="Attribution Deep Dive"
-        subtitle="How booked calls and reply signals are counted, including manual vs sequence attribution."
+        title={v2Copy.nav.attribution}
+        subtitle="See where your booked calls are coming from."
       />
 
       <section className="V2MetricsGrid">

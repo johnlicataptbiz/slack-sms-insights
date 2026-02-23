@@ -178,20 +178,20 @@ export default function InsightsV2() {
   const isWeeklyRange = range === '7d';
   const jackRangeRep = payload.reps.find((row) => row.repName.toLowerCase().includes('jack')) || null;
   const brandonRangeRep = payload.reps.find((row) => row.repName.toLowerCase().includes('brandon')) || null;
-  const selectedWindowMeta = `Selected window: ${selectedRangeLabel}`;
-  const sentMeta = range === 'today' && runRate ? `${runRate.sentDelta >= 0 ? '+' : ''}${runRate.sentDelta} vs prior day` : selectedWindowMeta;
+  const rangeMeta = selectedRangeLabel;
+  const sentMeta = range === 'today' && runRate ? `${runRate.sentDelta >= 0 ? '+' : ''}${runRate.sentDelta} vs yesterday` : rangeMeta;
   const replyMeta =
-    range === 'today' && runRate ? `${runRate.replyDelta >= 0 ? '+' : ''}${runRate.replyDelta.toFixed(1)}pp vs prior day` : selectedWindowMeta;
+    range === 'today' && runRate ? `${runRate.replyDelta >= 0 ? '+' : ''}${runRate.replyDelta.toFixed(1)}pp vs yesterday` : rangeMeta;
   const bookedMeta =
     range === 'today' && runRate
-      ? `${runRate.bookedDelta >= 0 ? '+' : ''}${runRate.bookedDelta} vs prior day`
-      : `Canonical booked-call KPI (${selectedRangeLabel})`;
+      ? `${runRate.bookedDelta >= 0 ? '+' : ''}${runRate.bookedDelta} vs yesterday`
+      : rangeMeta;
 
   return (
     <div className="V2Page V2Insights">
       <V2PageHeader
         title={v2Copy.nav.insights}
-        subtitle="Live team performance in rolling windows. Calls booked come from Slack booked-call records with self-booked shown separately."
+        subtitle="How your team is performing this week."
         right={
           <label className="V2Control">
             <span>Range</span>
@@ -205,43 +205,24 @@ export default function InsightsV2() {
       />
 
       <section className="V2MetricsGrid">
-        <V2MetricCard label="Messages Sent" value={fmtInt(payload.totals.messagesSent)} meta={sentMeta} />
-        <V2MetricCard label={<V2Term term="peopleContacted" />} value={fmtInt(payload.totals.peopleContacted)} />
         <V2MetricCard
-          label={<V2Term term="replyRatePeople" />}
-          value={fmtPct(payload.totals.replyRatePct)}
-          meta={replyMeta}
-          tone="accent"
-        />
-        <V2MetricCard
-          label={<V2Term term="callsBookedSlack" />}
+          label={<V2Term term="callsBookedSlack" label="Calls Booked" />}
           value={fmtInt(bookedTotalAllChannels)}
           meta={bookedMeta}
           tone="positive"
         />
-        <V2MetricCard label="Booked SMS linked (strict)" value={fmtInt(bookedSmsLinkedStrict)} tone="accent" />
+        <V2MetricCard label="Messages Sent" value={fmtInt(payload.totals.messagesSent)} meta={sentMeta} />
+        <V2MetricCard label={<V2Term term="peopleContacted" />} value={fmtInt(payload.totals.peopleContacted)} meta={selectedWindowMeta} />
         <V2MetricCard
-          label="Self-booked calls"
-          value={fmtInt(bookedSelf)}
-          meta="No setter reaction on booked-call message"
+          label={<V2Term term="replyRatePeople" label="Reply Rate" />}
+          value={fmtPct(payload.totals.replyRatePct)}
+          meta={replyMeta}
           tone="accent"
         />
-        <V2MetricCard
-          label="Booked calls (non-SMS/unknown, excluding self-booked)"
-          value={fmtInt(bookedNonSmsOrUnknownExcludingSelf)}
-          meta={`Raw non-SMS/unknown bucket is ${fmtInt(bookedNonSmsOrUnknown)} including self-booked`}
-        />
-        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} tone="critical" />
+        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} meta={selectedWindowMeta} tone="critical" />
       </section>
 
-      <V2Panel
-        title={isWeeklyRange ? 'Weekly Summary' : 'Range Summary'}
-        caption={
-          isWeeklyRange
-            ? 'Past 7 days with team totals and per-setter trend.'
-            : `${selectedRangeLabel} totals and per-setter summary.`
-        }
-      >
+      <V2Panel title={isWeeklyRange ? 'This Week' : selectedRangeLabel} caption={isWeeklyRange ? 'How the week went.' : `${selectedRangeLabel} totals.`}>
         {isWeeklyRange ? (
           weeklyEnvelopeQuery.isLoading || weeklyTrendQuery.isLoading || weeklySummaryQuery.isLoading ? (
             <V2State kind="loading">Loading weekly summary…</V2State>
@@ -420,7 +401,7 @@ export default function InsightsV2() {
       </V2Panel>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Booked Call Credit (Slack)" caption="Source-of-truth from Slack reactions and first-conversion attribution model.">
+        <V2Panel title="Booked Calls" caption="Who booked what.">
           <div className="V2SplitStat">
             <div>
               <span>Setter Jack</span>
@@ -437,7 +418,7 @@ export default function InsightsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Attribution Rules" caption="Explicit split so self-booked does not hide inside unknown buckets.">
+        <V2Panel title="Call Sources" caption="Where your booked calls came from.">
           <ul className="V2BulletList">
             <li>Calls Booked source: {payload.provenance.canonicalBookedSource} (canonical KPI).</li>
             <li>
@@ -455,7 +436,7 @@ export default function InsightsV2() {
       </div>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Sequence Risk Watch" caption="Protect list health before scaling volume.">
+        <V2Panel title="List Health" caption="Watch for opt-out spikes.">
           <div className="V2TableWrap">
             <table className="V2Table">
               <thead>
@@ -482,7 +463,7 @@ export default function InsightsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Live Trend" caption={`Rolling by-day trend in ${data.meta.timeZone}.`}>
+        <V2Panel title="Daily Stats" caption={`Your numbers by day.`}>
           <div className="V2TrendList">
             {payload.trendByDay.map((day) => (
               <article key={day.day} className="V2TrendList__row">

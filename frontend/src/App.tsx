@@ -15,7 +15,7 @@ import V2App from './v2/V2App';
 
 const resolveUiMode = (): UiMode => {
   const envMode = parseUiMode(import.meta.env.VITE_UI_VERSION);
-  if (typeof window === 'undefined') return envMode || 'legacy';
+  if (typeof window === 'undefined') return envMode || 'v2';
 
   const queryMode = parseUiMode(new URLSearchParams(window.location.search).get('ui'));
   if (queryMode) return queryMode;
@@ -23,7 +23,7 @@ const resolveUiMode = (): UiMode => {
   const stored = parseUiMode(localStorage.getItem(uiModeStorageKey));
   if (stored) return stored;
 
-  return envMode || 'legacy';
+  return envMode || 'v2';
 };
 
 const ModeSync = () => {

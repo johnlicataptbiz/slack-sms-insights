@@ -176,7 +176,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
       </section>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Day-over-Day Deltas" caption={`Compared with ${prevDay || 'prior day'}.`}>
+        <V2Panel title="Day by Day" caption={`How today compared to yesterday.`}>
           {deltas ? (
             <div className="V2DeltaList">
               <div>
@@ -201,7 +201,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           )}
         </V2Panel>
 
-        <V2Panel title="At-Risk Flags" caption="Simple checks for execution drift.">
+        <V2Panel title="Watch List" caption="Things to keep an eye on.">
           {riskFlags.length ? (
             <div className="V2RiskFlags">
               {riskFlags.map((flag) => (
@@ -218,7 +218,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
       </div>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Team Booked Call Credit (Slack)" caption="Canonical split from Slack reactions.">
+        <V2Panel title="Team Performance" caption="How the team performed.">
           <div className="V2SplitStat">
             <div>
               <span>Setter Jack</span>

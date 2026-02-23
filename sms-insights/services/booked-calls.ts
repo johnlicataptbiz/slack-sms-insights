@@ -44,6 +44,13 @@ export type BookedCallSmsReplyLink = {
   reason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
 };
 
+type NormalizedBookedCallLookup = {
+  key: string;
+  phoneKey: string | null;
+  contactNameKey: string | null;
+  bookingTs: number;
+};
+
 const ATTRIBUTION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 
 const normalizePhoneKey = (value: string | null | undefined): string | null => {
@@ -52,6 +59,12 @@ const normalizePhoneKey = (value: string | null | undefined): string | null => {
   if (!digits) return null;
   if (digits.length < 10) return null;
   return digits.slice(-10);
+};
+
+export const normalizeContactNameKey = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase().replace(/\s+/g, ' ');
+  return normalized.length > 0 ? normalized : null;
 };
 
 export const bookedCallSourceKey = (
@@ -102,7 +115,10 @@ const parseFallbackField = (fallback: string, label: string): string | null => {
   if (!fallback) return null;
   const pattern = new RegExp(`\\*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\*:\\s*(.*)$`, 'im');
   const match = fallback.match(pattern);
-  const value = (match?.[1] || '').trim();
+  const value = (match?.[1] || '')
+    .trim()
+    .replace(/<mailto:[^|>]+\|([^>]+)>/gi, '$1')
+    .replace(/<[^|>]+\|([^>]+)>/g, '$1');
   return value.length > 0 ? value : null;
 };
 
@@ -112,6 +128,76 @@ const fallbackFromRaw = (raw: unknown): string => {
   const first = Array.isArray(typed.attachments) ? typed.attachments[0] : null;
   if (!first) return '';
   return String(first.fallback || '');
+};
+
+const parseContactNameFromFallback = (fallback: string): string | null => {
+  const explicit = parseFallbackField(fallback, 'Name') || parseFallbackField(fallback, 'Contact Name');
+  if (explicit) return explicit;
+
+  const first = parseFallbackField(fallback, 'First Name');
+  const last = parseFallbackField(fallback, 'Last Name');
+  const combined = [first, last]
+    .filter((part): part is string => Boolean(part))
+    .join(' ')
+    .trim();
+  return combined.length > 0 ? combined : null;
+};
+
+const parseContactPhoneFromFallback = (fallback: string): string | null => {
+  return (
+    parseFallbackField(fallback, 'Phone') ||
+    parseFallbackField(fallback, 'Phone Number') ||
+    parseFallbackField(fallback, 'Mobile Phone')
+  );
+};
+
+export const resolveBookedCallSmsReplyLink = (
+  call: NormalizedBookedCallLookup,
+  lookups: { inboundByPhone: Map<string, number[]>; inboundByName: Map<string, number[]> },
+): BookedCallSmsReplyLink => {
+  if (!Number.isFinite(call.bookingTs)) {
+    return {
+      hasPriorReply: false,
+      latestReplyAt: null,
+      reason: 'invalid_booking_timestamp',
+    };
+  }
+
+  let latestReplyTs: number | null = null;
+
+  if (call.phoneKey) {
+    const phoneCandidates = lookups.inboundByPhone.get(call.phoneKey) || [];
+    latestReplyTs = findLatestAtOrBefore(phoneCandidates, call.bookingTs);
+  }
+
+  if ((!latestReplyTs || latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS) && call.contactNameKey) {
+    const nameCandidates = lookups.inboundByName.get(call.contactNameKey) || [];
+    const nameMatch = findLatestAtOrBefore(nameCandidates, call.bookingTs);
+    if (nameMatch && nameMatch >= call.bookingTs - ATTRIBUTION_WINDOW_MS) {
+      latestReplyTs = nameMatch;
+    }
+  }
+
+  if (!latestReplyTs || latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS) {
+    if (!call.phoneKey && !call.contactNameKey) {
+      return {
+        hasPriorReply: false,
+        latestReplyAt: null,
+        reason: 'no_contact_phone',
+      };
+    }
+    return {
+      hasPriorReply: false,
+      latestReplyAt: null,
+      reason: 'no_reply_before_booking',
+    };
+  }
+
+  return {
+    hasPriorReply: true,
+    latestReplyAt: new Date(latestReplyTs).toISOString(),
+    reason: 'matched_reply_before_booking',
+  };
 };
 
 export const getBookedCallsSummary = async (
@@ -205,10 +291,10 @@ export const getBookedCallAttributionSources = async (params: {
 
     const fallback = fallbackFromRaw(c.raw);
     const firstConversion = parseFallbackField(fallback, 'First Conversion');
-    const rep = parseFallbackField(fallback, 'Rep');
+    const rep = parseFallbackField(fallback, 'Rep') || parseFallbackField(fallback, 'Contact owner');
     const line = parseFallbackField(fallback, 'Line');
-    const contactName = parseFallbackField(fallback, 'Name');
-    const contactPhone = parseFallbackField(fallback, 'Phone');
+    const contactName = parseContactNameFromFallback(fallback);
+    const contactPhone = parseContactPhoneFromFallback(fallback);
 
     if (!hasAttribution) {
       const eventMs = new Date(c.event_ts).getTime();
@@ -254,10 +340,12 @@ export const getBookedCallSmsReplyLinks = async (
   const normalizedCalls = calls.map((call) => {
     const key = bookedCallSourceKey(call);
     const phoneKey = normalizePhoneKey(call.contactPhone);
+    const contactNameKey = normalizeContactNameKey(call.contactName);
     const bookingTs = new Date(call.eventTs).getTime();
     return {
       key,
       phoneKey,
+      contactNameKey,
       bookingTs,
     };
   });
@@ -282,10 +370,14 @@ export const getBookedCallSmsReplyLinks = async (
   const phoneKeys = [
     ...new Set(normalizedCalls.map((row) => row.phoneKey).filter((value): value is string => Boolean(value))),
   ];
+  const contactNameKeys = [
+    ...new Set(normalizedCalls.map((row) => row.contactNameKey).filter((value): value is string => Boolean(value))),
+  ];
   const inboundByPhone = new Map<string, number[]>();
+  const inboundByName = new Map<string, number[]>();
 
-  if (phoneKeys.length > 0) {
-    try {
+  try {
+    if (phoneKeys.length > 0) {
       const { rows } = await pool.query<{ phone_key: string; event_ts: string }>(
         `
         SELECT
@@ -310,47 +402,41 @@ export const getBookedCallSmsReplyLinks = async (
         list.push(ts);
         inboundByPhone.set(key, list);
       }
-    } catch (error) {
-      logger?.error?.('Failed to compute booked-call SMS reply links', error);
-      throw error;
     }
+
+    if (contactNameKeys.length > 0) {
+      const { rows } = await pool.query<{ contact_name_key: string; event_ts: string }>(
+        `
+        SELECT
+          LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) AS contact_name_key,
+          event_ts
+        FROM sms_events
+        WHERE direction = 'inbound'
+          AND contact_name IS NOT NULL
+          AND LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) = ANY($1::text[])
+          AND event_ts >= $2::timestamptz
+          AND event_ts <= $3::timestamptz
+        ORDER BY event_ts ASC
+        `,
+        [contactNameKeys, fromIso, toIso],
+      );
+
+      for (const row of rows) {
+        const key = row.contact_name_key;
+        const ts = new Date(row.event_ts).getTime();
+        if (!key || !Number.isFinite(ts)) continue;
+        const list = inboundByName.get(key) || [];
+        list.push(ts);
+        inboundByName.set(key, list);
+      }
+    }
+  } catch (error) {
+    logger?.error?.('Failed to compute booked-call SMS reply links', error);
+    throw error;
   }
 
   for (const call of normalizedCalls) {
-    if (!Number.isFinite(call.bookingTs)) {
-      results.set(call.key, {
-        hasPriorReply: false,
-        latestReplyAt: null,
-        reason: 'invalid_booking_timestamp',
-      });
-      continue;
-    }
-
-    if (!call.phoneKey) {
-      results.set(call.key, {
-        hasPriorReply: false,
-        latestReplyAt: null,
-        reason: 'no_contact_phone',
-      });
-      continue;
-    }
-
-    const replyCandidates = inboundByPhone.get(call.phoneKey) || [];
-    const latestReplyTs = findLatestAtOrBefore(replyCandidates, call.bookingTs);
-    if (!latestReplyTs || latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS) {
-      results.set(call.key, {
-        hasPriorReply: false,
-        latestReplyAt: null,
-        reason: 'no_reply_before_booking',
-      });
-      continue;
-    }
-
-    results.set(call.key, {
-      hasPriorReply: true,
-      latestReplyAt: new Date(latestReplyTs).toISOString(),
-      reason: 'matched_reply_before_booking',
-    });
+    results.set(call.key, resolveBookedCallSmsReplyLink(call, { inboundByPhone, inboundByName }));
   }
 
   return results;

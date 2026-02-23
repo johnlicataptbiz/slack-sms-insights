@@ -8,6 +8,7 @@ import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../compone
 
 const BUSINESS_TZ = 'America/Chicago';
 const watchlistStateStorageKey = 'ptbizsms-v2-sequence-watchlist-reviewed';
+const unattributedSequenceLabel = 'Unattributed / other channels / unknown';
 
 type Mode = 'day' | '7d' | '30d';
 type Sort = 'messagesSent' | 'replyRatePct' | 'canonicalBookedCalls' | 'canonicalBookedAfterSmsReply' | 'optOutRatePct';
@@ -134,8 +135,36 @@ export default function SequencesV2() {
   const rows = useMemo(() => {
     if (!payload) return [];
     const queryText = search.trim().toLowerCase();
-    return [...payload.sequences]
-      .filter((row) => (queryText ? row.label.toLowerCase().includes(queryText) : true))
+    const unattributedCalls =
+      payload.provenance.sequenceBookedAttribution?.unattributedCalls ??
+      Math.max(0, payload.bookedCredit.total - (payload.provenance.sequenceBookedAttribution?.matchedCalls ?? 0));
+
+    const baseRows = [...payload.sequences]
+      .filter((row) => (queryText ? row.label.toLowerCase().includes(queryText) : true));
+
+    if (unattributedCalls > 0) {
+      const matchesSearch = !queryText || unattributedSequenceLabel.toLowerCase().includes(queryText);
+      if (matchesSearch) {
+        baseRows.push({
+          label: unattributedSequenceLabel,
+          firstSeenAt: null,
+          messagesSent: 0,
+          repliesReceived: 0,
+          replyRatePct: 0,
+          canonicalBookedCalls: unattributedCalls,
+          canonicalBookedAfterSmsReply: 0,
+          canonicalBookedJack: 0,
+          canonicalBookedBrandon: 0,
+          canonicalBookedSelf: 0,
+          bookedAuditRows: [],
+          diagnosticSmsBookingSignals: 0,
+          optOuts: 0,
+          optOutRatePct: 0,
+        });
+      }
+    }
+
+    return baseRows
       .sort((a, b) => {
         const diff = b[sort] - a[sort];
         if (diff !== 0) return diff;
@@ -175,7 +204,7 @@ export default function SequencesV2() {
     namedSequenceCalls,
     totalCalls,
     totalBookedNonSmsOrUnknown,
-  } = computeSequenceHeaderMetrics(payload, rows);
+  } = computeSequenceHeaderMetrics(payload, payload.sequences);
 
   const toggleReviewed = (sequenceLabel: string) => {
     setReviewedMap((prev) => ({
@@ -294,7 +323,7 @@ export default function SequencesV2() {
         title="Sequence Table"
         caption={
           attribution
-            ? `Matched ${matchedCalls}/${totalCalls} booked calls to sequence attribution (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)", ${unattributedCalls} unattributed). Unattributed bookings often come from IG/LinkedIn/Circle/other non-SMS sources or unmatched First Conversion labels. "First seen" is the first outbound timestamp found in PTBizSMS history.`
+            ? `Matched ${matchedCalls}/${totalCalls} booked calls to sequence attribution (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)", ${unattributedCalls} unattributed). Unattributed bookings often come from IG/LinkedIn/Circle/other non-SMS sources or unmatched First Conversion labels. Table includes an explicit "${unattributedSequenceLabel}" row when applicable. "First seen" is the first outbound timestamp found in PTBizSMS history.`
             : 'No booked-call attribution metadata found. "First seen" is based on PTBizSMS outbound history.'
         }
       >

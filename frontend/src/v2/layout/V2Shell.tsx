@@ -23,7 +23,6 @@ const navItems: NavItem[] = [
 
 const brandLogoUrl =
   'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/Untitled.png';
-const desktopCollapseStorageKey = 'v2_sidebar_collapsed';
 const mobileMediaQuery = '(max-width: 1080px)';
 
 const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: string) => {
@@ -43,9 +42,6 @@ export default function V2Shell({ children }: { children: ReactNode }) {
   const [isDefinitionsOpen, setIsDefinitionsOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(mobileMediaQuery).matches : false,
-  );
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(
-    () => (typeof window !== 'undefined' ? localStorage.getItem(desktopCollapseStorageKey) === '1' : false),
   );
   const location = useLocation();
   const navigate = useNavigate();
@@ -74,28 +70,16 @@ export default function V2Shell({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (isMobileViewport) {
-      setIsSidebarCollapsed(false);
-      return;
+    if (!isMobileViewport) {
+      setIsMenuOpen(false);
     }
-    const savedCollapsed = localStorage.getItem(desktopCollapseStorageKey) === '1';
-    setIsSidebarCollapsed(savedCollapsed);
-    setIsMenuOpen(false);
   }, [isMobileViewport]);
 
   const handleSidebarToggle = () => {
-    if (isMobileViewport) {
-      setIsMenuOpen((value) => !value);
-      return;
-    }
-    setIsSidebarCollapsed((value) => {
-      const next = !value;
-      localStorage.setItem(desktopCollapseStorageKey, next ? '1' : '0');
-      return next;
-    });
+    setIsMenuOpen((value) => !value);
   };
 
-  const isDesktopCollapsed = !isMobileViewport && isSidebarCollapsed;
+  const isDesktopCollapsed = false;
 
   const handleLogout = async () => {
     try {
@@ -111,16 +95,18 @@ export default function V2Shell({ children }: { children: ReactNode }) {
     <div className="V2Shell">
       <header className="V2Shell__topbar">
         <div className="V2Shell__topStart">
-          <button
-            className="V2Shell__menuButton"
-            type="button"
-            aria-label={isMobileViewport ? 'Toggle navigation' : 'Toggle sidebar collapse'}
-            aria-expanded={isMobileViewport ? isMenuOpen : !isDesktopCollapsed}
-            onClick={handleSidebarToggle}
-          >
-            <span />
-            <span />
-          </button>
+          {isMobileViewport ? (
+            <button
+              className="V2Shell__menuButton"
+              type="button"
+              aria-label="Toggle navigation"
+              aria-expanded={isMenuOpen}
+              onClick={handleSidebarToggle}
+            >
+              <span />
+              <span />
+            </button>
+          ) : null}
 
           <div className="V2Shell__brand" onClick={() => navigateWithTransition(navigate, '/v2/insights')}>
             <img className="V2Shell__brandLogo" src={brandLogoUrl} alt="PT Biz logo" />

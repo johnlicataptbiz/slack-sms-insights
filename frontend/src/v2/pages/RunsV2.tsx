@@ -513,52 +513,6 @@ export default function RunsV2() {
         }
       />
 
-      <V2Panel title="Saved Views" caption="Save and share range, channel, and selected run via URL.">
-        <div className="V2SavedViews">
-          <div className="V2SavedViews__composer">
-            <input
-              type="text"
-              value={newViewName}
-              onChange={(e) => setNewViewName(e.target.value)}
-              placeholder="View name (example: Jack weekly + main line)"
-            />
-            <button type="button" onClick={saveCurrentView}>
-              Save current view
-            </button>
-            <button type="button" onClick={() => void copyShareLink('current', shareableUrl)}>
-              {copied === 'current' ? 'Copied link' : 'Copy current link'}
-            </button>
-          </div>
-          {savedViews.length ? (
-            <div className="V2SavedViews__list">
-              {savedViews.map((view) => (
-                <article className="V2SavedViews__item" key={view.id}>
-                  <div>
-                    <h3>{view.name}</h3>
-                    <p>
-                      Range {view.range}d | Channel {view.channelId || 'All'} | Run {view.runId ? view.runId.slice(0, 8) : 'none'}
-                    </p>
-                  </div>
-                  <div className="V2SavedViews__actions">
-                    <button type="button" onClick={() => applySavedView(view)}>
-                      Open
-                    </button>
-                    <button type="button" onClick={() => void copyShareLink(view.id, buildSavedViewUrl(view))}>
-                      {copied === view.id ? 'Copied' : 'Copy URL'}
-                    </button>
-                    <button type="button" onClick={() => deleteSavedView(view.id)}>
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <V2State kind="empty">No saved views yet. Save one for manager handoff.</V2State>
-          )}
-        </div>
-      </V2Panel>
-
       <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
         {!isRunDetailFocused ? (
           <V2Panel title="Run Timeline" caption={`Showing ${runsData.data.items.length} runs`} className="V2RunsLayout__timeline">
@@ -782,6 +736,55 @@ export default function RunsV2() {
           )}
         </V2Panel>
       </div>
+
+      <V2Panel title="Saved Views (Optional)" caption="Collapsed by default so run timeline/details stay first.">
+        <details className="V2RunDetail__raw">
+          <summary>Open saved views</summary>
+          <div className="V2SavedViews">
+            <div className="V2SavedViews__composer">
+              <input
+                type="text"
+                value={newViewName}
+                onChange={(e) => setNewViewName(e.target.value)}
+                placeholder="View name (example: Jack weekly + main line)"
+              />
+              <button type="button" onClick={saveCurrentView}>
+                Save current view
+              </button>
+              <button type="button" onClick={() => void copyShareLink('current', shareableUrl)}>
+                {copied === 'current' ? 'Copied link' : 'Copy current link'}
+              </button>
+            </div>
+            {savedViews.length ? (
+              <div className="V2SavedViews__list">
+                {savedViews.map((view) => (
+                  <article className="V2SavedViews__item" key={view.id}>
+                    <div>
+                      <h3>{view.name}</h3>
+                      <p>
+                        Range {view.range}d | Channel {view.channelId || 'All'} | Run {view.runId ? view.runId.slice(0, 8) : 'none'}
+                      </p>
+                    </div>
+                    <div className="V2SavedViews__actions">
+                      <button type="button" onClick={() => applySavedView(view)}>
+                        Open
+                      </button>
+                      <button type="button" onClick={() => void copyShareLink(view.id, buildSavedViewUrl(view))}>
+                        {copied === view.id ? 'Copied' : 'Copy URL'}
+                      </button>
+                      <button type="button" onClick={() => deleteSavedView(view.id)}>
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <V2State kind="empty">No saved views yet.</V2State>
+            )}
+          </div>
+        </details>
+      </V2Panel>
     </div>
   );
 }

@@ -250,21 +250,21 @@ export default function InsightsV2() {
               <div className="V2WeeklySummary__stats">
                 <article>
                   <span>Team Messages (7d)</span>
-                  <strong>{fmtInt(weeklySummary.teamTotals.messagesSent)}</strong>
+                  <strong>{fmtInt(weeklyTrendSummary.totals.messagesSent)}</strong>
                 </article>
                 <article>
                   <span>Team Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklySummary.teamTotals.canonicalBookedCalls)}</strong>
+                  <strong>{fmtInt(weeklyTrendSummary.totals.bookedCalls)}</strong>
                   <em>{fmtDelta(weeklyTrendSummary.latestDelta.teamBooked)} vs prior day</em>
                 </article>
                 <article>
                   <span>Jack Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklySummary.setters.jack.canonicalBookedCalls)}</strong>
+                  <strong>{fmtInt(weeklyTrendSummary.totals.jackBooked)}</strong>
                   <em>{fmtDelta(weeklyTrendSummary.latestDelta.jackBooked)} vs prior day</em>
                 </article>
                 <article>
                   <span>Brandon Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklySummary.setters.brandon.canonicalBookedCalls)}</strong>
+                  <strong>{fmtInt(weeklyTrendSummary.totals.brandonBooked)}</strong>
                   <em>{fmtDelta(weeklyTrendSummary.latestDelta.brandonBooked)} vs prior day</em>
                 </article>
               </div>
@@ -273,15 +273,15 @@ export default function InsightsV2() {
                 <article>
                   <h3>Setter Jack</h3>
                   <p>
-                    Outbound {fmtInt(weeklySummary.setters.jack.outboundConversations)} | Opt-outs {fmtInt(weeklySummary.setters.jack.optOuts)} |
-                    Avg reply {fmtPct(weeklySummary.setters.jack.replyRatePct)}
+                    Outbound {fmtInt(weeklyTrendSummary.totals.jackOutbound)} | Opt-outs {fmtInt(weeklyTrendSummary.totals.jackOptOuts)} |
+                    Avg reply {fmtPct(weeklyTrendSummary.avgReplyRate.jack)}
                   </p>
                 </article>
                 <article>
                   <h3>Setter Brandon</h3>
                   <p>
-                    Outbound {fmtInt(weeklySummary.setters.brandon.outboundConversations)} | Opt-outs{' '}
-                    {fmtInt(weeklySummary.setters.brandon.optOuts)} | Avg reply {fmtPct(weeklySummary.setters.brandon.replyRatePct)}
+                    Outbound {fmtInt(weeklyTrendSummary.totals.brandonOutbound)} | Opt-outs{' '}
+                    {fmtInt(weeklyTrendSummary.totals.brandonOptOuts)} | Avg reply {fmtPct(weeklyTrendSummary.avgReplyRate.brandon)}
                   </p>
                 </article>
               </div>

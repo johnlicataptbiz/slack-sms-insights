@@ -267,13 +267,13 @@ export default function SequencesV2() {
       />
 
       <section className="V2MetricsGrid">
-        <V2MetricCard label="Sequences" value={String(rows.length)} />
+        <V2MetricCard label="Sequences" value={String(rows.length)} meta="active in window" />
         <V2MetricCard label="Messages Sent" value={fmtInt(totalSent)} />
-        <V2MetricCard label="Booked calls (all channels, Slack source)" value={fmtInt(totalBookedAllChannels)} tone="positive" />
-        <V2MetricCard label="Booked attributed to sequence labels" value={fmtInt(totalBookedAttributedToRows)} tone="accent" />
-        <V2MetricCard label="Booked unattributed (IG/LinkedIn/Circle/unknown)" value={fmtInt(unattributedCalls)} />
-        <V2MetricCard label="Booked after SMS reply" value={fmtInt(totalBookedAfterReply)} tone="accent" />
-        <V2MetricCard label="Booked calls (non-SMS or unknown source)" value={fmtInt(totalBookedNonSmsOrUnknown)} />
+        <V2MetricCard label="Total Sets" value={fmtInt(totalBookedAllChannels)} tone="positive" meta="all channels" />
+        <V2MetricCard label="Sets via Sequence" value={fmtInt(totalBookedAttributedToRows)} tone="accent" meta="attributed to labels" />
+        <V2MetricCard label="Unattributed Sets" value={fmtInt(unattributedCalls)} meta="IG/LinkedIn/Circle/unknown" />
+        <V2MetricCard label="Sets After SMS Reply" value={fmtInt(totalBookedAfterReply)} tone="accent" />
+        <V2MetricCard label="Non-SMS Sets" value={fmtInt(totalBookedNonSmsOrUnknown)} meta="non-SMS or unknown source" />
         <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(totalOptOuts)} tone={totalOptOuts > 0 ? 'critical' : 'default'} />
       </section>
 
@@ -284,16 +284,25 @@ export default function SequencesV2() {
           <div className="V2Watchlist">
             {watchlistRows.map((row) => {
               const reviewed = Boolean(reviewedMap[row.label]);
+              const tone = riskTone(row.optOutRatePct);
               return (
                 <article className={`V2Watchlist__item ${reviewed ? 'is-reviewed' : ''}`} key={row.label}>
                   <div className="V2Watchlist__head">
                     <div>
                       <h3>{row.label}</h3>
-                      <p>
-                        Sent {fmtInt(row.messagesSent)} | Replies {fmtInt(row.repliesReceived)} | Opt-outs {fmtInt(row.optOuts)} ({fmtPct(row.optOutRatePct)})
-                      </p>
+                      <div className="V2Watchlist__stats">
+                        <span className="V2Watchlist__stat">
+                          📤 {fmtInt(row.messagesSent)} sent
+                        </span>
+                        <span className="V2Watchlist__stat">
+                          💬 {fmtInt(row.repliesReceived)} replies
+                        </span>
+                        <span className={`V2Watchlist__stat V2Watchlist__stat--${tone === 'critical' ? 'critical' : 'warning'}`}>
+                          🚫 {fmtInt(row.optOuts)} opt-outs ({fmtPct(row.optOutRatePct)})
+                        </span>
+                      </div>
                     </div>
-                    <span className={`V2RiskTag V2RiskTag--${riskTone(row.optOutRatePct)}`}>{riskLabel(row.optOutRatePct)}</span>
+                    <span className={`V2RiskTag V2RiskTag--${tone}`}>{riskLabel(row.optOutRatePct)}</span>
                   </div>
                   <div className="V2Watchlist__actions">
                     <button
@@ -362,7 +371,7 @@ export default function SequencesV2() {
                 const colSpan = hasFirstSeenData ? 9 : 8;
                 return (
                   <Fragment key={row.label}>
-                    <tr key={`${row.label}-summary`}>
+                    <tr key={`${row.label}-summary`} className={row.optOutRatePct >= 6 ? 'is-risk-critical' : row.optOutRatePct >= 3 ? 'is-risk-watch' : ''}>
                       <td>
                         <div className="V2SequenceCell">
                           <span>{row.label}</span>

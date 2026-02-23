@@ -48,10 +48,14 @@ import {
   getDashboardSession,
   getDashboardSessionTtlSeconds,
 } from '../services/session-store.js';
+import { mintStreamToken, verifyStreamToken } from '../services/stream-token.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
+
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
+
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
+
 import {
   toChannelsV2,
   toEnvelope,
@@ -84,6 +88,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   'https://ptbizsms.com',
   'https://www.ptbizsms.com',
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
   'http://localhost:3000',
 ];
 
@@ -134,6 +139,13 @@ const getDashboardPassword = (): string => {
 
 const getPersistentSessionTtlSeconds = (): number =>
   parsePositiveInteger(process.env.DASHBOARD_PERSIST_SESSION_TTL_SECONDS, 60 * 60 * 24 * 30);
+
+const getStreamTokenTtlSeconds = (): number => {
+  const raw = (process.env.STREAM_TOKEN_TTL_SECONDS || '').trim();
+  const parsed = Number.parseInt(raw || '', 10);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return 60;
+};
 
 const isDashboardSlackOauthEnabled = (): boolean =>
   parseBooleanFlag(process.env.DASHBOARD_SLACK_OAUTH_ENABLED, false);
@@ -279,7 +291,17 @@ const extractBearerToken = (req: IncomingMessage): string | null => {
   }
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   if (url.pathname === '/api/stream') {
-    return (url.searchParams.get('token') || '').trim() || null;
+    const token = (url.searchParams.get('token') || '').trim();
+    if (!token) return null;
+
+    // Prefer short-lived signed stream tokens for SSE (works through proxies without cookies).
+    const verified = verifyStreamToken(token);
+    if (verified.ok) {
+      return 'stream-token-ok';
+    }
+
+    // Back-compat: allow Slack bearer token via ?token=... for /api/stream.
+    return token;
   }
   return null;
 };
@@ -358,6 +380,13 @@ const verifyToken = async (req: ApiRequest): Promise<boolean> => {
 
   const token = extractBearerToken(req);
   if (!token) return false;
+
+  // Signed stream token (SSE) path.
+  if (token === 'stream-token-ok') {
+    req.user = { user_id: 'stream-token', team_id: 'ptbizsms', email: null };
+    req.authMode = 'bearer';
+    return true;
+  }
 
   if (isDummyTokenAllowed() && token === 'dummy-token-bypass-auth') {
     req.user = { user_id: 'dummy-user', team_id: 'dummy-team', email: null };
@@ -1303,6 +1332,15 @@ const handleGetSalesMetricsBatchV2: RequestHandler = async (req, res, logger, or
       origin,
     );
   }
+};
+
+const handleGetStreamToken: RequestHandler = async (req, res, _logger, origin) => {
+  const user = getVerifiedSlackUser(req);
+  const userId = user.user_id || user.user || 'unknown';
+  const ttl = getStreamTokenTtlSeconds();
+  const token = mintStreamToken({ subject: userId, ttlSeconds: ttl });
+
+  sendJson(res, 200, { token, ttlSeconds: ttl }, origin);
 };
 
 const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
@@ -2766,6 +2804,7 @@ const apiRoutes: ApiRoute[] = [
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },
+  { method: 'GET', path: '/api/stream-token', handler: handleGetStreamToken },
   { method: 'GET', path: '/api/stream', handler: handleGetStream },
   { method: 'GET', path: '/api/work-items', handler: handleGetWorkItems },
   { method: 'POST', path: '/api/work-items/:id/resolve', handler: handleResolveWorkItem },

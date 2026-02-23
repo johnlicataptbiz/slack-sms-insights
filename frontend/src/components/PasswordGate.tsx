@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 import { ApiError, client } from '../api/client';
 
@@ -8,6 +8,7 @@ const brandLogoUrl =
   'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/Untitled.png';
 
 export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
+  const [username] = useState('dashboard');
   const [password, setPassword] = useState('');
   const [stayLoggedIn, setStayLoggedIn] = useState(true);
   const [error, setError] = useState('');
@@ -54,7 +55,25 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
         ) : null}
         <form onSubmit={handleSubmit}>
           <input
+            type="text"
+            name="username"
+            value={username}
+            readOnly
+            tabIndex={-1}
+            autoComplete="username"
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '-10000px',
+              top: 'auto',
+              width: '1px',
+              height: '1px',
+              overflow: 'hidden',
+            }}
+          />
+          <input
             type="password"
+            name="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             placeholder="Password"

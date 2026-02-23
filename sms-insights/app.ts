@@ -43,10 +43,19 @@ const responseSecurityHeaders: Record<string, string> = {
 };
 
 /** Initialization */
+const isDummyToken = process.env.SLACK_BOT_TOKEN === 'xoxb-dummy';
 const app = new App({
-  token: process.env.SLACK_BOT_TOKEN,
-  socketMode: true,
-  appToken: process.env.SLACK_APP_TOKEN,
+  token: isDummyToken ? undefined : process.env.SLACK_BOT_TOKEN,
+  authorize: isDummyToken
+    ? async () => ({
+        botToken: 'xoxb-dummy',
+        botId: 'B_DUMMY',
+        teamId: 'T_DUMMY',
+      })
+    : undefined,
+  socketMode: !isDummyToken,
+  appToken: isDummyToken ? undefined : process.env.SLACK_APP_TOKEN,
+  signingSecret: process.env.SLACK_SIGNING_SECRET || 'dummy-secret',
   logLevel: getLogLevel(),
 });
 
@@ -117,8 +126,12 @@ app.error(async (error) => {
     });
 
     // Start Bolt App
-    await app.start();
-    app.logger.info('⚡️ Bolt app is running via Socket Mode!');
+    if (process.env.SLACK_BOT_TOKEN !== 'xoxb-dummy') {
+      await app.start();
+      app.logger.info('⚡️ Bolt app is running via Socket Mode!');
+    } else {
+      app.logger.info('⚡️ Bolt app skipped (dummy token detected)');
+    }
     app.logger.info('Token config diagnostics', {
       alowareApiTokenLength: safeEnvLen(process.env.ALOWARE_API_TOKEN),
       alowareWebhookTokenLength: safeEnvLen(process.env.ALOWARE_WEBHOOK_API_TOKEN),
@@ -127,11 +140,11 @@ app.error(async (error) => {
     });
 
     // 🕒 Schedule 6:00 AM Daily Report
-    const { scheduleDailyReport } = await import('./services/scheduler.js');
-    await scheduleDailyReport(app);
+    // const { scheduleDailyReport } = await import('./services/scheduler.js');
+    // await scheduleDailyReport(app);
 
     // monday read-sync/writeback maintenance jobs (feature-flag gated).
-    startMondaySyncJobs(app.logger);
+    // startMondaySyncJobs(app.logger);
   } catch (error) {
     await reportError(app, error, 'Startup Failure');
   }

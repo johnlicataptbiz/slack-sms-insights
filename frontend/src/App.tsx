@@ -5,6 +5,12 @@ import { ApiError, client } from './api/client';
 import { PasswordGate } from './components/PasswordGate';
 import LegacyApp from './legacy/LegacyApp';
 import { parseUiMode, type UiMode, uiModeStorageKey } from './uiMode';
+
+const postAuthRedirectKey = 'ptbizsms-post-auth-redirect';
+const getCurrentUrl = () => {
+  if (typeof window === 'undefined') return '/';
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+};
 import V2App from './v2/V2App';
 
 const resolveUiMode = (): UiMode => {
@@ -63,6 +69,30 @@ const ModeSync = () => {
 const DefaultRoute = () => {
   const mode = useMemo(resolveUiMode, []);
   return <Navigate to={mode === 'v2' ? '/v2/insights' : '/legacy'} replace />;
+};
+
+const PostAuthRedirect = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const stored = sessionStorage.getItem(postAuthRedirectKey);
+    if (!stored) return;
+
+    // Avoid loops: only redirect if we're not already on the intended URL.
+    const current = `${location.pathname}${location.search}${location.hash}`;
+    if (stored === current) {
+      sessionStorage.removeItem(postAuthRedirectKey);
+      return;
+    }
+
+    sessionStorage.removeItem(postAuthRedirectKey);
+    navigate(stored, { replace: true });
+  }, [location.hash, location.pathname, location.search, navigate]);
+
+  return null;
 };
 
 const CheckingSessionView = () => {
@@ -129,6 +159,15 @@ export default function App() {
   }
 
   if (authState === 'unauthenticated') {
+    // Preserve deep links (e.g. /v2/insights?ui=v2) through the password gate.
+    // Without this, after unlock the app can fall through to DefaultRoute and bounce to legacy.
+    if (typeof window !== 'undefined') {
+      const current = getCurrentUrl();
+      if (current !== '/' && current !== '/legacy' && current !== '/v2') {
+        sessionStorage.setItem(postAuthRedirectKey, current);
+      }
+    }
+
     return (
       <PasswordGate
         onUnlock={() => {
@@ -141,6 +180,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <ModeSync />
+      <PostAuthRedirect />
       <Routes>
         <Route path="/legacy" element={<LegacyApp />} />
         <Route path="/legacy/*" element={<LegacyApp />} />

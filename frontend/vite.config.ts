@@ -1,15 +1,22 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
+import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     proxy: process.env.VITE_DISABLE_PROXY
       ? undefined
       : {
           // Local dev: avoid CORS by proxying API calls to the backend.
           '/api': {
-            target: process.env.VITE_API_TARGET ?? 'http://localhost:3000',
+            target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
             changeOrigin: true,
             ws: true,
           },

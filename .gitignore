@@ -15,3 +15,4 @@ frontend/node_modules/
 .env*.local
 .playwright-cli/
 output/
+.cocoindex_code/

@@ -181,3 +181,139 @@ export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) 
     </span>
   );
 }
+
+// Visual Components for Dashboard
+
+export function V2StatBar({
+  segments,
+  total,
+}: {
+  segments: { label: string; value: number; color: string }[];
+  total: number;
+}) {
+  return (
+    <div className="V2StatBar">
+      <div className="V2StatBar__track">
+        {segments.map((seg, i) => (
+          <div
+            key={i}
+            className="V2StatBar__segment"
+            style={{
+              width: `${total > 0 ? (seg.value / total) * 100 : 0}%`,
+              background: seg.color,
+            }}
+            title={`${seg.label}: ${seg.value}`}
+          />
+        ))}
+      </div>
+      <div className="V2StatBar__legend">
+        {segments.map((seg, i) => (
+          <div key={i} className="V2StatBar__legendItem">
+            <span className="V2StatBar__dot" style={{ background: seg.color }} />
+            <span className="V2StatBar__label">{seg.label}</span>
+            <span className="V2StatBar__value">{seg.value}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function V2PipelineVisual({
+  stages,
+}: {
+  stages: { label: string; value: number; color?: string }[];
+}) {
+  const max = Math.max(...stages.map((s) => s.value), 1);
+  
+  return (
+    <div className="V2PipelineVisual">
+      {stages.map((stage, i) => (
+        <div key={i} className="V2PipelineVisual__stage">
+          <div className="V2PipelineVisual__barWrap">
+            <div
+              className="V2PipelineVisual__bar"
+              style={{
+                width: `${(stage.value / max) * 100}%`,
+                background: stage.color || 'var(--v2-accent)',
+              }}
+            />
+            <span className="V2PipelineVisual__number">{stage.value}</span>
+          </div>
+          <span className="V2PipelineVisual__label">{stage.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function V2ActionList({ actions }: { actions: string[] }) {
+  return (
+    <ul className="V2ActionList">
+      {actions.map((action, i) => (
+        <li key={i} className="V2ActionList__item">
+          <span className="V2ActionList__icon">→</span>
+          <span className="V2ActionList__text">{action}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function V2HealthIndicator({
+  value,
+  threshold,
+  label,
+}: {
+  value: number;
+  threshold: number;
+  label: string;
+}) {
+  const status = value >= threshold ? 'critical' : value >= threshold / 2 ? 'warning' : 'healthy';
+  
+  return (
+    <div className={`V2HealthIndicator V2HealthIndicator--${status}`}>
+      <div className="V2HealthIndicator__dot" />
+      <span className="V2HealthIndicator__label">{label}</span>
+      <span className="V2HealthIndicator__value">{value.toFixed(1)}%</span>
+    </div>
+  );
+}
+
+export function V2MiniTrend({
+  day,
+  sent,
+  replyRate,
+  booked,
+  optOuts,
+}: {
+  day: string;
+  sent: number;
+  replyRate: number;
+  booked: number;
+  optOuts: number;
+}) {
+  return (
+    <article className="V2MiniTrend">
+      <h3 className="V2MiniTrend__day">{day}</h3>
+      <div className="V2MiniTrend__grid">
+        <div className="V2MiniTrend__stat">
+          <span className="V2MiniTrend__label">Sent</span>
+          <span className="V2MiniTrend__value">{sent.toLocaleString()}</span>
+        </div>
+        <div className="V2MiniTrend__stat">
+          <span className="V2MiniTrend__label">Reply</span>
+          <span className="V2MiniTrend__value V2MiniTrend__value--accent">{replyRate.toFixed(1)}%</span>
+        </div>
+        <div className="V2MiniTrend__stat">
+          <span className="V2MiniTrend__label">Sets</span>
+          <span className="V2MiniTrend__value V2MiniTrend__value--positive">{booked}</span>
+        </div>
+        <div className="V2MiniTrend__stat">
+          <span className="V2MiniTrend__label">Opt-outs</span>
+          <span className="V2MiniTrend__value V2MiniTrend__value--critical">{optOuts}</span>
+        </div>
+      </div>
+    </article>
+  );
+}

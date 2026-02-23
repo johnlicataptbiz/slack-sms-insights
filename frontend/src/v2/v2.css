@@ -1,4 +1,4 @@
-@import https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
   --v2-font-display: 'Space Grotesk', 'Avenir Next', sans-serif;
@@ -100,8 +100,8 @@
 .V2Shell__brand {
   display: inline-flex;
   align-items: center;
-  width: 270px;
-  height: 66px;
+  width: 180px;
+  height: 50px;
   overflow: visible;
   cursor: pointer;
 }
@@ -109,7 +109,7 @@
 .V2Shell__brandLogo {
   display: block;
   width: auto;
-  height: 66px;
+  height: 50px;
   max-width: none;
   object-fit: contain;
   transform: none;
@@ -159,14 +159,14 @@
 
 .V2Shell__body {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 200px 1fr;
   min-height: calc(100vh - var(--v2-topbar-height));
   overflow-x: clip;
   transition: grid-template-columns 220ms ease;
 }
 
 .V2Shell__body.is-collapsed {
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 72px 1fr;
 }
 
 .V2Shell__sidebar {
@@ -189,15 +189,16 @@
 
 .V2Shell__navItem {
   display: grid;
-  grid-template-columns: 1.9rem 1fr;
+  grid-template-columns: 1.6rem 1fr;
   align-items: center;
-  gap: var(--v2-space-3);
+  gap: var(--v2-space-2);
   text-decoration: none;
   color: rgba(235, 244, 255, 0.8);
   border-radius: var(--v2-radius-sm);
-  padding: 0.78rem 0.85rem;
+  padding: 0.6rem 0.7rem;
   border: 1px solid transparent;
   transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+  font-size: 0.9rem;
 }
 
 .V2Shell__navItem:hover {
@@ -213,12 +214,12 @@
 }
 
 .V2Shell__navIcon {
-  width: 1.9rem;
-  height: 1.9rem;
+  width: 1.6rem;
+  height: 1.6rem;
   border-radius: 50%;
   display: grid;
   place-content: center;
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   border: 1px solid rgba(255, 255, 255, 0.25);
   font-family: var(--v2-font-display);
 }
@@ -231,8 +232,8 @@
   grid-template-columns: 1fr;
   justify-items: center;
   text-align: center;
-  gap: var(--v2-space-2);
-  padding: 0.66rem 0.35rem;
+  gap: var(--v2-space-1);
+  padding: 0.5rem 0.25rem;
 }
 
 .V2Shell__sidebar.is-collapsed .V2Shell__navLabel {
@@ -1489,7 +1490,7 @@
   .V2Shell__sidebar {
     position: fixed;
     inset: var(--v2-topbar-height) auto 0 0;
-    width: min(82vw, 320px);
+    width: min(82vw, 260px);
     transform: translateX(-106%);
     z-index: 28;
   }
@@ -1499,11 +1500,11 @@
   }
 
   .V2Shell__sidebar.is-collapsed .V2Shell__navItem {
-    grid-template-columns: 1.9rem 1fr;
+    grid-template-columns: 1.6rem 1fr;
     justify-items: stretch;
     text-align: left;
-    gap: var(--v2-space-3);
-    padding: 0.78rem 0.85rem;
+    gap: var(--v2-space-2);
+    padding: 0.6rem 0.7rem;
   }
 
   .V2Shell__sidebar.is-collapsed .V2Shell__navLabel {
@@ -1565,13 +1566,13 @@
   }
 
   .V2Shell__brandLogo {
-    height: 50px;
+    height: 40px;
     transform: translateX(-5px) translateY(-4px);
   }
 
   .V2Shell__brand {
-    width: 145px;
-    height: 36px;
+    width: 120px;
+    height: 32px;
   }
 
   .V2Shell__navLabelShort {
@@ -1627,6 +1628,233 @@
   .V2WeeklySummary__extras {
     grid-template-columns: 1fr;
   }
+}
+
+/* Visual Components - Stat Bar */
+.V2StatBar {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.V2StatBar__track {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(7, 19, 36, 0.08);
+}
+
+.V2StatBar__segment {
+  transition: width 300ms ease;
+}
+
+.V2StatBar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.V2StatBar__legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.V2StatBar__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.V2StatBar__label {
+  color: var(--v2-muted);
+}
+
+.V2StatBar__value {
+  font-weight: 700;
+  color: var(--v2-text);
+}
+
+/* Visual Components - Pipeline */
+.V2PipelineVisual {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.V2PipelineVisual__stage {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.V2PipelineVisual__barWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 28px;
+}
+
+.V2PipelineVisual__bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 400ms ease;
+  min-width: 4px;
+}
+
+.V2PipelineVisual__number {
+  font-family: var(--v2-font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  min-width: 2ch;
+}
+
+.V2PipelineVisual__label {
+  font-size: 0.75rem;
+  color: var(--v2-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Visual Components - Action List */
+.V2ActionList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.V2ActionList__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.7rem;
+  border-radius: var(--v2-radius-sm);
+  background: rgba(245, 250, 255, 0.7);
+  border: 1px solid rgba(7, 19, 36, 0.08);
+  transition: transform 150ms ease, border-color 150ms ease;
+}
+
+.V2ActionList__item:hover {
+  transform: translateX(2px);
+  border-color: rgba(17, 184, 214, 0.3);
+}
+
+.V2ActionList__icon {
+  color: var(--v2-accent);
+  font-weight: 700;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.V2ActionList__text {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--v2-text);
+}
+
+/* Visual Components - Health Indicator */
+.V2HealthIndicator {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--v2-radius-sm);
+  background: rgba(245, 250, 255, 0.7);
+  border: 1px solid rgba(7, 19, 36, 0.08);
+}
+
+.V2HealthIndicator__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--v2-positive);
+}
+
+.V2HealthIndicator--warning .V2HealthIndicator__dot {
+  background: var(--v2-warning);
+}
+
+.V2HealthIndicator--critical .V2HealthIndicator__dot {
+  background: var(--v2-critical);
+}
+
+.V2HealthIndicator__label {
+  font-size: 0.8rem;
+  color: var(--v2-muted);
+  flex: 1;
+}
+
+.V2HealthIndicator__value {
+  font-family: var(--v2-font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.V2HealthIndicator--critical .V2HealthIndicator__value {
+  color: var(--v2-critical);
+}
+
+.V2HealthIndicator--warning .V2HealthIndicator__value {
+  color: var(--v2-warning);
+}
+
+/* Visual Components - Mini Trend */
+.V2MiniTrend {
+  border: 1px solid rgba(7, 19, 36, 0.1);
+  border-radius: var(--v2-radius-sm);
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.78);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.V2MiniTrend:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--v2-shadow-1);
+}
+
+.V2MiniTrend__day {
+  margin: 0 0 0.5rem;
+  font-family: var(--v2-font-mono);
+  font-size: 0.82rem;
+  color: var(--v2-muted);
+}
+
+.V2MiniTrend__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+}
+
+.V2MiniTrend__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.V2MiniTrend__label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--v2-muted);
+}
+
+.V2MiniTrend__value {
+  font-family: var(--v2-font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.V2MiniTrend__value--accent {
+  color: var(--v2-accent);
+}
+
+.V2MiniTrend__value--positive {
+  color: var(--v2-positive);
+}
+
+.V2MiniTrend__value--critical {
+  color: var(--v2-critical);
 }
 
 @media (prefers-reduced-motion: reduce) {

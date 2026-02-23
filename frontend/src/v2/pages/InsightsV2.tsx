@@ -1,6 +1,8 @@
+import { useMemo, useState } from 'react';
+
+import type { SalesMetricsV2, WeeklyManagerSummaryV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2SetterTrend, useV2WeeklySummary } from '../../api/v2Queries';
-import { v2Copy } from '../copy';
-import { V2MetricCard, V2PageHeader, V2Panel, V2RiskAlert, V2State, V2Term } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend } from '../components/V2Primitives';
 
 const BUSINESS_TZ = 'America/Chicago';
 type InsightsRange = 'today' | '7d' | '30d';
@@ -8,7 +10,6 @@ type InsightsRange = 'today' | '7d' | '30d';
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtPctMaybe = (n: number | null | undefined) => (typeof n === 'number' ? fmtPct(n) : 'n/a');
-const fmtDelta = (n: number) => `${n >= 0 ? '+' : ''}${n.toLocaleString()}`;
 const fmtDateTime = (value: string | null) => {
   if (!value) return 'n/a';
   const date = new Date(value);
@@ -22,29 +23,21 @@ const riskTone = (optOutRate: number): 'critical' | 'accent' | 'default' => {
   return 'default';
 };
 
-const sourceTone = (status: 'ready' | 'stale' | 'missing' | 'disabled'): 'positive' | 'accent' | 'critical' => {
-  if (status === 'ready') return 'positive';
-  if (status === 'stale') return 'accent';
-  return 'critical';
-};
-
-const sourceText = (status: 'ready' | 'stale' | 'missing' | 'disabled'): string => {
-  if (status === 'ready') return 'Monday synced';
-  if (status === 'stale') return 'Monday stale';
-  if (status === 'missing') return 'Monday missing';
-  return 'PTBizSMS only';
-};
-
 const rangeLabel = (range: InsightsRange): string => {
   if (range === 'today') return 'Today';
   if (range === '30d') return 'Last 30 days';
   return 'Last 7 days';
 };
 
-const rangeShortLabel = (range: InsightsRange): string => {
-  if (range === 'today') return '1d';
-  if (range === '30d') return '30d';
-  return '7d';
+// Calculate trend direction from sparkline data
+const calculateTrend = (data: number[]): 'up' | 'down' | 'flat' => {
+  if (data.length < 2) return 'flat';
+  const first = data[0];
+  const last = data[data.length - 1];
+  const change = last - first;
+  if (change > 0.01) return 'up';
+  if (change < -0.01) return 'down';
+  return 'flat';
 };
 
 export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2) => {
@@ -56,191 +49,106 @@ export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2) => {
     bookedAttribution?.nonSmsOrUnknownCalls ?? Math.max(0, bookedTotalAllChannels - bookedSmsLinkedStrict);
   const bookedNonSmsOrUnknownExcludingSelf = Math.max(0, bookedNonSmsOrUnknown - bookedSelf);
   return {
-    bookedAttribution,
     bookedTotalAllChannels,
     bookedSmsLinkedStrict,
     bookedSelf,
-    bookedNonSmsOrUnknown,
     bookedNonSmsOrUnknownExcludingSelf,
+    bookedAttribution,
   };
 };
 
-export default function InsightsV2() {
+export function InsightsV2() {
   const [range, setRange] = useState<InsightsRange>('7d');
-  const { data, isLoading, isError, error } = useV2SalesMetrics({ range, tz: BUSINESS_TZ });
-  const weeklyEnvelopeQuery = useV2SalesMetrics({ range: '7d', tz: BUSINESS_TZ });
-  const weeklySummaryQuery = useV2WeeklySummary({ tz: BUSINESS_TZ });
+  const { data: payloadEnvelope, isLoading, error } = useV2SalesMetrics({ range });
+  const { data: weeklyEnvelope } = useV2WeeklySummary({});
+  const { data: setterTrend } = useV2SetterTrend([], BUSINESS_TZ);
 
-  const payload = data?.data;
-  const weeklyDays = useMemo(() => {
-    const rows = weeklyEnvelopeQuery.data?.data.trendByDay || [];
-    return [...rows].map((row) => row.day).sort((a, b) => a.localeCompare(b));
-  }, [weeklyEnvelopeQuery.data?.data.trendByDay]);
-  const weeklyTrendQuery = useV2SetterTrend(weeklyDays, BUSINESS_TZ);
+  const payload = payloadEnvelope?.data;
+  const weekly = weeklyEnvelope?.data;
 
-  const runRate = useMemo(() => {
-    if (!payload || payload.trendByDay.length < 2) return null;
-    const sorted = [...payload.trendByDay].sort((a, b) => a.day.localeCompare(b.day));
-    const latest = sorted[sorted.length - 1];
-    const prev = sorted[sorted.length - 2];
-    if (!latest || !prev) return null;
+  const rangeMeta = useMemo(() => {
+    if (!payload) return null;
     return {
-      bookedDelta: latest.canonicalBookedCalls - prev.canonicalBookedCalls,
-      replyDelta: latest.replyRatePct - prev.replyRatePct,
-      sentDelta: latest.messagesSent - prev.messagesSent,
+      start: payload.timeRange.from,
+      end: payload.timeRange.to,
+      label: rangeLabel(range),
     };
-  }, [payload]);
+  }, [payload, range]);
 
+  // Get high-risk sequences from sequences array
   const highRisk = useMemo(() => {
     if (!payload) return [];
-    return [...payload.sequences]
-      .filter((row) => row.messagesSent > 0)
-      .sort((a, b) => b.optOutRatePct - a.optOutRatePct)
+    return payload.sequences
+      .filter((s) => s.optOutRatePct >= 3)
+      .map((s) => ({
+        label: s.label,
+        messagesSent: s.messagesSent,
+        repliesReceived: s.repliesReceived,
+        optOutRatePct: s.optOutRatePct,
+      }))
       .slice(0, 6);
   }, [payload]);
 
   const criticalRiskCount = useMemo(() => {
-    return highRisk.filter((row) => row.optOutRatePct >= 6).length;
+    return highRisk.filter((s) => s.optOutRatePct >= 6).length;
   }, [highRisk]);
 
-  // Sparkline data preparation from trendByDay
-  const sparklineData = useMemo(() => {
+  // Extract sparkline data from trendByDay
+  const sparklines = useMemo(() => {
     if (!payload?.trendByDay?.length) return null;
-    const sorted = [...payload.trendByDay].sort((a, b) => a.day.localeCompare(b.day));
+    const days = payload.trendByDay;
     return {
-      booked: sorted.map((d) => d.canonicalBookedCalls),
-      sent: sorted.map((d) => d.messagesSent),
-      contacted: sorted.map((d) => d.peopleContacted),
-      replyRate: sorted.map((d) => d.replyRatePct),
-      optOuts: sorted.map((d) => d.optOuts),
+      replyRate: days.map((d) => d.replyRatePct),
+      bookedCalls: days.map((d) => d.canonicalBookedCalls),
+      messagesSent: days.map((d) => d.messagesSent),
+      optOuts: days.map((d) => d.optOuts),
     };
   }, [payload]);
 
-  // Calculate trends (comparing last day to previous day)
-  const trends = useMemo<{
-    booked: 'up' | 'down' | 'flat';
-    sent: 'up' | 'down' | 'flat';
-    contacted: 'up' | 'down' | 'flat';
-    replyRate: 'up' | 'down' | 'flat';
-    optOuts: 'up' | 'down' | 'flat';
-  } | null>(() => {
-    if (!payload?.trendByDay?.length || payload.trendByDay.length < 2) return null;
-    const sorted = [...payload.trendByDay].sort((a, b) => a.day.localeCompare(b.day));
-    const latest = sorted[sorted.length - 1];
-    const prev = sorted[sorted.length - 2];
-    return {
-      booked: latest.canonicalBookedCalls > prev.canonicalBookedCalls ? 'up' : latest.canonicalBookedCalls < prev.canonicalBookedCalls ? 'down' : 'flat',
-      sent: latest.messagesSent > prev.messagesSent ? 'up' : latest.messagesSent < prev.messagesSent ? 'down' : 'flat',
-      contacted: latest.peopleContacted > prev.peopleContacted ? 'up' : latest.peopleContacted < prev.peopleContacted ? 'down' : 'flat',
-      replyRate: latest.replyRatePct > prev.replyRatePct ? 'up' : latest.replyRatePct < prev.replyRatePct ? 'down' : 'flat',
-      optOuts: latest.optOuts > prev.optOuts ? 'up' : latest.optOuts < prev.optOuts ? 'down' : 'flat',
-    };
-  }, [payload]);
-
-  const weeklyTrend = useMemo(() => {
-    return [...(weeklyTrendQuery.data || [])].sort((a, b) => a.day.localeCompare(b.day));
-  }, [weeklyTrendQuery.data]);
-
-  const weeklyTrendSummary = useMemo(() => {
-    if (!weeklyTrend.length) return null;
-    const latest = weeklyTrend[weeklyTrend.length - 1];
-    if (!latest) return null;
-    const prev = weeklyTrend.length > 1 ? weeklyTrend[weeklyTrend.length - 2] : null;
-
-    const totals = weeklyTrend.reduce(
-      (acc, point) => {
-        acc.messagesSent += point.team.messagesSent;
-        acc.bookedCalls += point.team.bookedCalls;
-        acc.optOuts += point.team.optOuts;
-        acc.jackBooked += point.setters.jack.bookedCalls;
-        acc.jackOutbound += point.setters.jack.outboundConversations;
-        acc.jackOptOuts += point.setters.jack.optOuts;
-        acc.brandonBooked += point.setters.brandon.bookedCalls;
-        acc.brandonOutbound += point.setters.brandon.outboundConversations;
-        acc.brandonOptOuts += point.setters.brandon.optOuts;
-        acc.jackReplyRateTotal += point.setters.jack.replyRatePct;
-        acc.brandonReplyRateTotal += point.setters.brandon.replyRatePct;
-        return acc;
-      },
-      {
-        messagesSent: 0,
-        bookedCalls: 0,
-        optOuts: 0,
-        jackBooked: 0,
-        jackOutbound: 0,
-        jackOptOuts: 0,
-        brandonBooked: 0,
-        brandonOutbound: 0,
-        brandonOptOuts: 0,
-        jackReplyRateTotal: 0,
-        brandonReplyRateTotal: 0,
-      },
+  if (isLoading) {
+    return (
+      <div className="V2Page">
+        <V2PageHeader title="Performance" subtitle="Track your team's messaging performance and outcomes." />
+        <V2State kind="loading">Loading performance metrics…</V2State>
+      </div>
     );
-
-    return {
-      totals,
-      latestDelta: {
-        teamBooked: prev ? latest.team.bookedCalls - prev.team.bookedCalls : 0,
-        jackBooked: prev ? latest.setters.jack.bookedCalls - prev.setters.jack.bookedCalls : 0,
-        brandonBooked: prev ? latest.setters.brandon.bookedCalls - prev.setters.brandon.bookedCalls : 0,
-      },
-      avgReplyRate: {
-        jack: totals.jackReplyRateTotal / weeklyTrend.length,
-        brandon: totals.brandonReplyRateTotal / weeklyTrend.length,
-      },
-    };
-  }, [weeklyTrend]);
-
-  if (isLoading) return <V2State kind="loading">Loading team insights…</V2State>;
-  if (isError || !payload) {
-    return <V2State kind="error">Failed to load team insights: {String((error as Error)?.message || error)}</V2State>;
   }
 
-  const {
-    bookedAttribution,
-    bookedTotalAllChannels,
-    bookedSmsLinkedStrict,
-    bookedSelf,
-    bookedNonSmsOrUnknown,
-    bookedNonSmsOrUnknownExcludingSelf,
-  } = computeInsightsBookedBreakdown(payload);
+  if (error || !payload) {
+    return (
+      <div className="V2Page">
+        <V2PageHeader title="Performance" subtitle="Track your team's messaging performance and outcomes." />
+        <V2State kind="error">Unable to load metrics. Please try again later.</V2State>
+      </div>
+    );
+  }
 
-  const weeklySummary = weeklySummaryQuery.data?.data || null;
-  const sourceStatus = weeklySummary?.sources.monday.status || 'disabled';
-  const sourceBadge = sourceText(sourceStatus);
-  const selectedRangeLabel = rangeLabel(range);
-  const selectedRangeShortLabel = rangeShortLabel(range);
-  const isWeeklyRange = range === '7d';
-  const jackRangeRep = payload.reps.find((row) => row.repName.toLowerCase().includes('jack')) || null;
-  const brandonRangeRep = payload.reps.find((row) => row.repName.toLowerCase().includes('brandon')) || null;
-  const rangeMeta = selectedRangeLabel;
-  const sentMeta = range === 'today' && runRate ? `${runRate.sentDelta >= 0 ? '+' : ''}${runRate.sentDelta} vs yesterday` : rangeMeta;
-  const replyMeta =
-    range === 'today' && runRate ? `${runRate.replyDelta >= 0 ? '+' : ''}${runRate.replyDelta.toFixed(1)}pp vs yesterday` : rangeMeta;
-  const bookedMeta =
-    range === 'today' && runRate
-      ? `${runRate.bookedDelta >= 0 ? '+' : ''}${runRate.bookedDelta} vs yesterday`
-      : rangeMeta;
-
-  const selectedWindowMeta = rangeMeta;
+  const breakdown = computeInsightsBookedBreakdown(payload);
+  
+  // Get setter data from trend
+  const setterJack = setterTrend?.find((d) => d.setters.jack);
+  const setterBrandon = setterTrend?.find((d) => d.setters.brandon);
 
   return (
-    <div className="V2Page V2Insights">
+    <div className="V2Page">
       <V2PageHeader
-        title={v2Copy.nav.insights}
-        subtitle="How your team is performing this week."
+        title="Performance"
+        subtitle="Track your team's messaging performance and outcomes."
         right={
-          <label className="V2Control">
-            <span>Range</span>
-            <select value={range} onChange={(e) => setRange(e.target.value as InsightsRange)}>
-              <option value="today">Today</option>
-              <option value="7d">Last 7 days</option>
-              <option value="30d">Last 30 days</option>
-            </select>
-          </label>
+          <div className="V2ControlsRow">
+            <label className="V2Control">
+              <span>Range</span>
+              <select value={range} onChange={(e) => setRange(e.target.value as InsightsRange)}>
+                <option value="today">Today</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+              </select>
+            </label>
+          </div>
         }
       />
 
+      {/* Risk Alert Banner */}
       <V2RiskAlert
         title="High Opt-Out Risk Detected"
         count={criticalRiskCount}
@@ -250,258 +158,160 @@ export default function InsightsV2() {
         }}
       />
 
-      <section className="V2MetricsGrid">
+      {/* Metrics with Sparklines */}
+      <div className="V2MetricsGrid">
         <V2MetricCard
-          label={<V2Term term="callsBookedSlack" label="Calls Booked" />}
-          value={fmtInt(bookedTotalAllChannels)}
-          meta={bookedMeta}
+          label="Total Sets"
+          value={fmtInt(payload.totals.canonicalBookedCalls)}
+          meta={`${fmtInt(payload.totals.repliesReceived)} replies`}
           tone="positive"
-          sparkline={sparklineData?.booked}
-          trend={trends?.booked}
+          sparkline={sparklines?.bookedCalls}
+          trend={sparklines ? calculateTrend(sparklines.bookedCalls) : undefined}
         />
         <V2MetricCard
           label="Messages Sent"
           value={fmtInt(payload.totals.messagesSent)}
-          meta={sentMeta}
-          sparkline={sparklineData?.sent}
-          trend={trends?.sent}
+          meta={`${fmtInt(payload.totals.peopleContacted)} people contacted`}
+          sparkline={sparklines?.messagesSent}
+          trend={sparklines ? calculateTrend(sparklines.messagesSent) : undefined}
         />
         <V2MetricCard
-          label={<V2Term term="peopleContacted" />}
-          value={fmtInt(payload.totals.peopleContacted)}
-          meta={selectedWindowMeta}
-          sparkline={sparklineData?.contacted}
-          trend={trends?.contacted}
+          label="Reply Rate"
+          value={fmtPctMaybe(payload.totals.replyRatePct)}
+          meta={`${fmtInt(payload.totals.repliesReceived)} replies / ${fmtInt(payload.totals.messagesSent)} sent`}
+          tone={typeof payload.totals.replyRatePct === 'number' && payload.totals.replyRatePct >= 15 ? 'positive' : 'default'}
+          sparkline={sparklines?.replyRate}
+          trend={sparklines ? calculateTrend(sparklines.replyRate) : undefined}
         />
         <V2MetricCard
-          label={<V2Term term="replyRatePeople" label="Reply Rate" />}
-          value={fmtPct(payload.totals.replyRatePct)}
-          meta={replyMeta}
-          tone="accent"
-          sparkline={sparklineData?.replyRate}
-          trend={trends?.replyRate}
-        />
-        <V2MetricCard
-          label={<V2Term term="optOuts" />}
+          label="Opt-outs"
           value={fmtInt(payload.totals.optOuts)}
-          meta={rangeMeta}
-          tone="critical"
-          sparkline={sparklineData?.optOuts}
-          trend={trends?.optOuts === 'up' ? 'down' : trends?.optOuts === 'down' ? 'up' : 'flat'}
+          meta={`of ${fmtInt(payload.totals.messagesSent)} messages`}
+          tone={payload.totals.optOuts >= 10 ? 'critical' : 'default'}
+          sparkline={sparklines?.optOuts}
+          trend={sparklines ? calculateTrend(sparklines.optOuts) : undefined}
         />
-      </section>
+        <V2MetricCard
+          label="Self Bookings"
+          value={fmtInt(payload.bookedCredit.selfBooked)}
+          meta="From website & ads"
+          tone="accent"
+        />
+      </div>
 
-      <V2Panel title={isWeeklyRange ? 'This Week' : selectedRangeLabel} caption={isWeeklyRange ? 'How the week went.' : `${selectedRangeLabel} totals.`}>
-        {isWeeklyRange ? (
-          weeklyEnvelopeQuery.isLoading || weeklyTrendQuery.isLoading || weeklySummaryQuery.isLoading ? (
-            <V2State kind="loading">Loading weekly summary…</V2State>
-          ) : weeklySummary && weeklyTrendSummary ? (
-            <div className="V2WeeklySummary">
-              <div className="V2WeeklySummary__stats">
-                <article>
-                  <span>Team Messages (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.messagesSent)}</strong>
-                </article>
-                <article>
-                  <span>Team Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.bookedCalls)}</strong>
-                  <em>{fmtDelta(weeklyTrendSummary.latestDelta.teamBooked)} vs prior day</em>
-                </article>
-                <article>
-                  <span>Jack Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.jackBooked)}</strong>
-                  <em>{fmtDelta(weeklyTrendSummary.latestDelta.jackBooked)} vs prior day</em>
-                </article>
-                <article>
-                  <span>Brandon Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.brandonBooked)}</strong>
-                  <em>{fmtDelta(weeklyTrendSummary.latestDelta.brandonBooked)} vs prior day</em>
-                </article>
-              </div>
-
-              <div className="V2WeeklySummary__setters">
-                <article>
-                  <h3>Setter Jack</h3>
-                  <p>
-                    Outbound {fmtInt(weeklyTrendSummary.totals.jackOutbound)} | Opt-outs {fmtInt(weeklyTrendSummary.totals.jackOptOuts)} |
-                    Avg reply {fmtPct(weeklyTrendSummary.avgReplyRate.jack)}
-                  </p>
-                </article>
-                <article>
-                  <h3>Setter Brandon</h3>
-                  <p>
-                    Outbound {fmtInt(weeklyTrendSummary.totals.brandonOutbound)} | Opt-outs{' '}
-                    {fmtInt(weeklyTrendSummary.totals.brandonOptOuts)} | Avg reply {fmtPct(weeklyTrendSummary.avgReplyRate.brandon)}
-                  </p>
-                </article>
-              </div>
-
-              <div className="V2WeeklySummary__meta">
-                <span className={`V2Tag V2Tag--${sourceTone(sourceStatus)}`}>Source: {sourceBadge}</span>
-                <span>Last monday sync: {fmtDateTime(weeklySummary.sources.monday.lastSyncAt)}</span>
-                <span>Generated: {fmtDateTime(weeklySummary.sources.generatedAt)}</span>
-              </div>
-
-              <div className="V2TableWrap">
-                <table className="V2Table">
-                  <thead>
-                    <tr>
-                      <th>Day</th>
-                      <th className="is-right">Team calls booked</th>
-                      <th className="is-right">Team opt-outs</th>
-                      <th className="is-right">Jack calls booked</th>
-                      <th className="is-right">Jack outbound</th>
-                      <th className="is-right">Brandon calls booked</th>
-                      <th className="is-right">Brandon outbound</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {weeklyTrend.map((point) => (
-                      <tr key={point.day}>
-                        <td>{point.day}</td>
-                        <td className="is-right">{fmtInt(point.team.bookedCalls)}</td>
-                        <td className="is-right">{fmtInt(point.team.optOuts)}</td>
-                        <td className="is-right">{fmtInt(point.setters.jack.bookedCalls)}</td>
-                        <td className="is-right">{fmtInt(point.setters.jack.outboundConversations)}</td>
-                        <td className="is-right">{fmtInt(point.setters.brandon.bookedCalls)}</td>
-                        <td className="is-right">{fmtInt(point.setters.brandon.outboundConversations)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="V2WeeklySummary__extras">
-                <article>
-                  <h3>monday Pipeline Snapshot</h3>
-                  <p>
-                    Total {fmtInt(weeklySummary.mondayPipeline.totalCalls)} | Booked {fmtInt(weeklySummary.mondayPipeline.booked)} | No-show{' '}
-                    {fmtInt(weeklySummary.mondayPipeline.noShow)} | Cancelled {fmtInt(weeklySummary.mondayPipeline.cancelled)}
-                  </p>
-                </article>
-                <article>
-                  <h3>Actions Next Week</h3>
-                  <ul className="V2BulletList">
-                    {weeklySummary.actionsNextWeek.map((action) => (
-                      <li key={action}>{action}</li>
-                    ))}
-                  </ul>
-                </article>
-              </div>
-            </div>
-          ) : weeklyTrendSummary ? (
-            <div className="V2WeeklySummary">
-              <div className="V2WeeklySummary__meta">
-                <span className="V2Tag V2Tag--critical">Source: PTBizSMS only</span>
-                <span>monday summary unavailable; showing fallback trend from sales-metrics.</span>
-              </div>
-              <div className="V2WeeklySummary__stats">
-                <article>
-                  <span>Team Messages (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.messagesSent)}</strong>
-                </article>
-                <article>
-                  <span>Team Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.bookedCalls)}</strong>
-                  <em>{fmtDelta(weeklyTrendSummary.latestDelta.teamBooked)} vs prior day</em>
-                </article>
-                <article>
-                  <span>Jack Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.jackBooked)}</strong>
-                  <em>{fmtDelta(weeklyTrendSummary.latestDelta.jackBooked)} vs prior day</em>
-                </article>
-                <article>
-                  <span>Brandon Calls Booked (7d)</span>
-                  <strong>{fmtInt(weeklyTrendSummary.totals.brandonBooked)}</strong>
-                  <em>{fmtDelta(weeklyTrendSummary.latestDelta.brandonBooked)} vs prior day</em>
-                </article>
-              </div>
-              <V2State kind="empty">
-                Weekly manager summary endpoint unavailable: {String((weeklySummaryQuery.error as Error | undefined)?.message || 'unknown error')}
-              </V2State>
-            </div>
-          ) : (
-            <V2State kind="empty">No weekly summary available for this range.</V2State>
-          )
-        ) : (
+      <div className="V2Grid V2Grid--2-1">
+        <V2Panel
+          title="This Week"
+          caption={
+            rangeMeta
+              ? `${rangeMeta.label} · ${fmtDateTime(rangeMeta.start)} – ${fmtDateTime(rangeMeta.end)}`
+              : undefined
+          }
+        >
           <div className="V2WeeklySummary">
             <div className="V2WeeklySummary__stats">
               <article>
-                <span>Team Messages ({selectedRangeShortLabel})</span>
-                <strong>{fmtInt(payload.totals.messagesSent)}</strong>
+                <span>Jack's Sets</span>
+                <strong>{fmtInt(weekly?.setters?.jack?.canonicalBookedCalls ?? 0)}</strong>
+                <em>{fmtInt(weekly?.setters?.jack?.outboundConversations ?? 0)} conversations</em>
               </article>
               <article>
-                <span>Team Calls Booked ({selectedRangeShortLabel})</span>
-                <strong>{fmtInt(payload.totals.canonicalBookedCalls)}</strong>
+                <span>Brandon's Sets</span>
+                <strong>{fmtInt(weekly?.setters?.brandon?.canonicalBookedCalls ?? 0)}</strong>
+                <em>{fmtInt(weekly?.setters?.brandon?.outboundConversations ?? 0)} conversations</em>
               </article>
               <article>
-                <span>Jack Calls Booked ({selectedRangeShortLabel})</span>
-                <strong>{fmtInt(payload.bookedCredit.jack)}</strong>
+                <span>Self Bookings</span>
+                <strong>{fmtInt(payload.bookedCredit.selfBooked)}</strong>
+                <em>From website & ads</em>
               </article>
               <article>
-                <span>Brandon Calls Booked ({selectedRangeShortLabel})</span>
-                <strong>{fmtInt(payload.bookedCredit.brandon)}</strong>
+                <span>Total Outreach</span>
+                <strong>{fmtInt(weekly?.teamTotals?.messagesSent ?? 0)}</strong>
+                <em>{fmtInt(weekly?.teamTotals?.peopleContacted ?? 0)} people contacted</em>
               </article>
             </div>
 
             <div className="V2WeeklySummary__setters">
               <article>
-                <h3>Setter Jack</h3>
+                <h3>Jack's Performance</h3>
                 <p>
-                  Outbound {fmtInt(jackRangeRep?.outboundConversations ?? 0)} | Opt-outs {fmtInt(jackRangeRep?.optOuts ?? 0)} | Avg reply{' '}
-                  {fmtPctMaybe(jackRangeRep?.replyRatePct)}
+                  {fmtInt(setterJack?.setters.jack.outboundConversations ?? 0)} conversations ·{' '}
+                  {fmtPctMaybe(setterJack?.setters.jack.replyRatePct)} reply rate ·{' '}
+                  {fmtInt(setterJack?.setters.jack.bookedCalls ?? 0)} sets
                 </p>
               </article>
               <article>
-                <h3>Setter Brandon</h3>
+                <h3>Brandon's Performance</h3>
                 <p>
-                  Outbound {fmtInt(brandonRangeRep?.outboundConversations ?? 0)} | Opt-outs {fmtInt(brandonRangeRep?.optOuts ?? 0)} | Avg reply{' '}
-                  {fmtPctMaybe(brandonRangeRep?.replyRatePct)}
+                  {fmtInt(setterBrandon?.setters.brandon.outboundConversations ?? 0)} conversations ·{' '}
+                  {fmtPctMaybe(setterBrandon?.setters.brandon.replyRatePct)} reply rate ·{' '}
+                  {fmtInt(setterBrandon?.setters.brandon.bookedCalls ?? 0)} sets
                 </p>
               </article>
             </div>
 
             <div className="V2WeeklySummary__meta">
-              <span className="V2Tag V2Tag--accent">Source: selected range ({selectedRangeLabel})</span>
-              <span>monday weekly endpoint is not used outside the 7d view.</span>
+              <span>Source: {payload.provenance.canonicalBookedSource}</span>
+              <span>Synced: {fmtDateTime(weekly?.sources?.monday?.lastSyncAt ?? null)}</span>
+              <span>Window: {payload.timeRange.from} → {payload.timeRange.to}</span>
             </div>
-          </div>
-        )}
-      </V2Panel>
 
-      <div className="V2Grid V2Grid--2">
-        <V2Panel title="Booked Calls" caption="Who booked what.">
-          <div className="V2SplitStat">
-            <div>
-              <span>Setter Jack</span>
-              <strong>{fmtInt(payload.bookedCredit.jack)}</strong>
-            </div>
-            <div>
-              <span>Setter Brandon</span>
-              <strong>{fmtInt(payload.bookedCredit.brandon)}</strong>
-            </div>
-            <div>
-              <span>Self-Booked</span>
-              <strong>{fmtInt(payload.bookedCredit.selfBooked)}</strong>
+            <div className="V2WeeklySummary__extras">
+              <V2Panel title="Monday Pipeline" caption="Current pipeline status">
+                <V2PipelineVisual
+                  stages={[
+                    { label: 'Total Calls', value: weekly?.mondayPipeline?.totalCalls ?? 0, color: 'var(--v2-accent)' },
+                    { label: 'Booked', value: weekly?.mondayPipeline?.booked ?? 0, color: 'var(--v2-positive)' },
+                    { label: 'No-Show', value: weekly?.mondayPipeline?.noShow ?? 0, color: 'var(--v2-warning)' },
+                    { label: 'Cancelled', value: (weekly?.mondayPipeline as any)?.cancelled ?? 0, color: 'var(--v2-critical)' },
+                  ]}
+                />
+              </V2Panel>
+              <V2Panel title="Actions Next Week" caption="Recommended follow-ups">
+                <V2ActionList 
+                  actions={weekly?.actionsNextWeek?.length ? weekly.actionsNextWeek : ['No actions suggested. Review performance metrics.']} 
+                />
+              </V2Panel>
             </div>
           </div>
         </V2Panel>
 
-        <V2Panel title="Call Sources" caption="Where your booked calls came from.">
-          <ul className="V2BulletList">
-            <li>Calls Booked source: {payload.provenance.canonicalBookedSource} (canonical KPI).</li>
-            <li>
-              Channel split:
-              {` total ${fmtInt(bookedTotalAllChannels)}, SMS linked strict ${fmtInt(bookedSmsLinkedStrict)}, self-booked ${fmtInt(bookedSelf)}, non-SMS/unknown excluding self ${fmtInt(bookedNonSmsOrUnknownExcludingSelf)}.`}
-            </li>
-            <li>
-              Sequence label coverage:{' '}
-              {bookedAttribution
-                ? `${bookedAttribution.matchedCalls}/${bookedAttribution.totalCalls} (named: ${Math.max(0, bookedAttribution.matchedCalls - bookedAttribution.manualCalls)}, manual/direct: ${bookedAttribution.manualCalls})`
+        <div className="V2Grid">
+          <V2Panel title="Sets Breakdown" caption="Jack's sets vs Brandon's sets vs self bookings.">
+            <div className="V2SplitStat">
+              <div>
+                <span>Jack's Sets</span>
+                <strong>{fmtInt(payload.bookedCredit.jack)}</strong>
+              </div>
+              <div>
+                <span>Brandon's Sets</span>
+                <strong>{fmtInt(payload.bookedCredit.brandon)}</strong>
+              </div>
+              <div>
+                <span>Self Bookings</span>
+                <strong>{fmtInt(payload.bookedCredit.selfBooked)}</strong>
+              </div>
+            </div>
+          </V2Panel>
+
+          <V2Panel title="Call Sources" caption="Where your booked calls came from.">
+            <V2StatBar
+              segments={[
+                { label: 'SMS Linked', value: breakdown.bookedSmsLinkedStrict, color: 'var(--v2-accent)' },
+                { label: 'Self Booked', value: breakdown.bookedSelf, color: 'var(--v2-positive)' },
+                { label: 'Other', value: breakdown.bookedNonSmsOrUnknownExcludingSelf, color: 'var(--v2-muted)' },
+              ]}
+              total={breakdown.bookedTotalAllChannels}
+            />
+            <div style={{ marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--v2-muted)' }}>
+              Source: {payload.provenance.canonicalBookedSource} • 
+              Coverage: {breakdown.bookedAttribution
+                ? `${breakdown.bookedAttribution.matchedCalls}/${breakdown.bookedAttribution.totalCalls} calls`
                 : 'n/a'}
-            </li>
-          </ul>
-        </V2Panel>
+            </div>
+          </V2Panel>
+        </div>
       </div>
 
       <div className="V2Grid V2Grid--2">
@@ -533,17 +343,16 @@ export default function InsightsV2() {
         </V2Panel>
 
         <V2Panel title="Daily Stats" caption={`Your numbers by day.`}>
-          <div className="V2TrendList">
+          <div style={{ display: 'grid', gap: '0.5rem' }}>
             {payload.trendByDay.map((day) => (
-              <article key={day.day} className="V2TrendList__row">
-                <h3>{day.day}</h3>
-                <div className="V2TrendList__metrics">
-                  <span>Sent {fmtInt(day.messagesSent)}</span>
-                  <span>Reply {fmtPct(day.replyRatePct)}</span>
-                  <span>Booked Calls {fmtInt(day.canonicalBookedCalls)}</span>
-                  <span>Opt-outs {fmtInt(day.optOuts)}</span>
-                </div>
-              </article>
+              <V2MiniTrend
+                key={day.day}
+                day={day.day}
+                sent={day.messagesSent}
+                replyRate={day.replyRatePct}
+                booked={day.canonicalBookedCalls}
+                optOuts={day.optOuts}
+              />
             ))}
           </div>
         </V2Panel>
@@ -551,3 +360,5 @@ export default function InsightsV2() {
     </div>
   );
 }
+
+export default InsightsV2;

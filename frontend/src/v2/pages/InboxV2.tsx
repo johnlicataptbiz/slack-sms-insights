@@ -21,6 +21,22 @@ const fmtDateTime = (value: string | null) => {
   return date.toLocaleString();
 };
 
+const timeAgo = (value: string | null): string => {
+  if (!value) return '';
+  const date = new Date(value);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+};
+
 const shorten = (value: string | null, max = 100): string => {
   if (!value) return '';
   if (value.length <= max) return value;
@@ -71,6 +87,20 @@ const displaySetterName = (value: string | null | undefined): string | null => {
   return trimmed;
 };
 
+const getSetterAvatar = (name: string | null | undefined): string => {
+  const setter = displaySetterName(name);
+  if (setter === 'Jack') return 'J';
+  if (setter === 'Brandon') return 'B';
+  return '?';
+};
+
+const getSetterColor = (name: string | null | undefined): string => {
+  const setter = displaySetterName(name);
+  if (setter === 'Jack') return '#11b8d6';
+  if (setter === 'Brandon') return '#13b981';
+  return '#56607a';
+};
+
 type StateTone = 'red' | 'orange' | 'yellow' | 'green';
 
 const computeQualificationProgress = (state: QualificationStateV2): number => {
@@ -117,6 +147,7 @@ export default function InboxV2() {
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [justSentMessage, setJustSentMessage] = useState<{text: string; timestamp: string; confirmed?: boolean} | null>(null);
+  const [hoveredConversation, setHoveredConversation] = useState<string | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [qualificationState, setQualificationState] = useState<QualificationStateV2>({
@@ -158,6 +189,15 @@ export default function InboxV2() {
     if (ownerFilter === 'unassigned') return owner.length === 0;
     return true;
   });
+
+  // Analytics calculations
+  const totalConversations = conversations.length;
+  const unreadCount = conversations.filter(c => c.openNeedsReplyCount > 0).length;
+  const urgentCount = conversations.filter(c => c.escalation.level <= 2 && c.openNeedsReplyCount > 0).length;
+  const jackCount = conversations.filter(c => displaySetterName(c.ownerLabel) === 'Jack').length;
+  const brandonCount = conversations.filter(c => displaySetterName(c.ownerLabel) === 'Brandon').length;
+  const unassignedCount = conversations.filter(c => !c.ownerLabel).length;
+  const inboxHealth = Math.max(0, Math.min(100, 100 - (urgentCount * 10) - (unassignedCount * 5)));
 
   useEffect(() => {
     if (!selectedConversationId && conversations.length > 0) {
@@ -307,11 +347,9 @@ export default function InboxV2() {
         setSendStatus('sent');
         setJustSentMessage({ text: messageText, timestamp: new Date().toISOString(), confirmed: true });
         
-        // Clear composer after successful send
         setComposerText('');
         setSelectedDraftId(null);
         
-        // Reset button status after 2 seconds, but keep the message visible
         setTimeout(() => {
           setSendStatus('idle');
         }, 2000);
@@ -396,46 +434,88 @@ export default function InboxV2() {
     }
   };
 
+  const getHealthColor = (score: number): string => {
+    if (score >= 80) return '#13b981';
+    if (score >= 60) return '#f59d0d';
+    return '#ef4c62';
+  };
+
   return (
     <div className="V2Page V2Inbox">
-      <V2PageHeader
-        title={v2Copy.nav.inbox}
-        subtitle="Your conversations in one place."
-        right={
-          <div className="V2Inbox__controls">
-            <label className="V2Control">
-              <span>Status</span>
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as typeof statusFilter)}>
-                <option value="">All</option>
-                <option value="open">Open</option>
-                <option value="closed">Closed</option>
-                <option value="dnc">DNC</option>
-              </select>
-            </label>
-            <label className="V2Control">
-              <span>Search</span>
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Name, phone, contact key"
-              />
-            </label>
-            <label className="V2Control">
-              <span>Owner</span>
-              <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value as typeof ownerFilter)}>
-                <option value="all">All</option>
-                <option value="jack">Jack</option>
-                <option value="brandon">Brandon</option>
-                <option value="unassigned">Unassigned</option>
-              </select>
-            </label>
-            <label className="V2Control V2Control--check">
-              <input type="checkbox" checked={needsReplyOnly} onChange={(event) => setNeedsReplyOnly(event.target.checked)} />
-              <span>Needs reply only</span>
-            </label>
-          </div>
-        }
-      />
+      {/* Floating Filter Bar */}
+      <div className="V2Inbox__filterBar">
+        <div className="V2Inbox__filterGroup">
+          <button 
+            className={`V2Inbox__filterChip ${statusFilter === 'open' ? 'is-active' : ''}`}
+            onClick={() => setStatusFilter(statusFilter === 'open' ? '' : 'open')}
+          >
+            <span className="V2Inbox__filterDot" style={{ background: '#13b981' }} />
+            Open
+          </button>
+          <button 
+            className={`V2Inbox__filterChip ${statusFilter === 'closed' ? 'is-active' : ''}`}
+            onClick={() => setStatusFilter(statusFilter === 'closed' ? '' : 'closed')}
+          >
+            <span className="V2Inbox__filterDot" style={{ background: '#56607a' }} />
+            Closed
+          </button>
+          <button 
+            className={`V2Inbox__filterChip ${statusFilter === 'dnc' ? 'is-active' : ''}`}
+            onClick={() => setStatusFilter(statusFilter === 'dnc' ? '' : 'dnc')}
+          >
+            <span className="V2Inbox__filterDot" style={{ background: '#ef4c62' }} />
+            DNC
+          </button>
+        </div>
+
+        <div className="V2Inbox__searchBox">
+          <svg className="V2Inbox__searchIcon" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search conversations..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="V2Inbox__filterGroup">
+          <button 
+            className={`V2Inbox__ownerChip ${ownerFilter === 'jack' ? 'is-active' : ''}`}
+            onClick={() => setOwnerFilter(ownerFilter === 'jack' ? 'all' : 'jack')}
+            style={{ '--owner-color': '#11b8d6' } as React.CSSProperties}
+          >
+            <span className="V2Inbox__ownerAvatar">J</span>
+            Jack
+          </button>
+          <button 
+            className={`V2Inbox__ownerChip ${ownerFilter === 'brandon' ? 'is-active' : ''}`}
+            onClick={() => setOwnerFilter(ownerFilter === 'brandon' ? 'all' : 'brandon')}
+            style={{ '--owner-color': '#13b981' } as React.CSSProperties}
+          >
+            <span className="V2Inbox__ownerAvatar">B</span>
+            Brandon
+          </button>
+          <button 
+            className={`V2Inbox__ownerChip ${ownerFilter === 'unassigned' ? 'is-active' : ''}`}
+            onClick={() => setOwnerFilter(ownerFilter === 'unassigned' ? 'all' : 'unassigned')}
+          >
+            <span className="V2Inbox__ownerAvatar">?</span>
+            Unassigned
+          </button>
+        </div>
+
+        <label className={`V2Inbox__needsReplyToggle ${needsReplyOnly ? 'is-active' : ''}`}>
+          <input 
+            type="checkbox" 
+            checked={needsReplyOnly}
+            onChange={(e) => setNeedsReplyOnly(e.target.checked)}
+          />
+          <span className="V2Inbox__toggleSlider" />
+          <span>Needs reply</span>
+        </label>
+      </div>
 
       {flashMessage ? <div className="V2Inbox__flash">{flashMessage}</div> : null}
       
@@ -447,23 +527,44 @@ export default function InboxV2() {
         </div>
       )}
 
-      <section className="V2Inbox__layout">
-        <V2Panel title="Conversations" caption="Your message threads.">
+      <section className="V2Inbox__newLayout">
+        {/* Left: Enhanced Conversation List */}
+        <div className="V2Inbox__conversationColumn">
+          <div className="V2Inbox__listHeader">
+            <h2>Conversations</h2>
+            <span className="V2Inbox__listCount">{totalConversations} total</span>
+          </div>
+
           {listQuery.isLoading ? (
-            <V2State kind="loading">Loading inbox conversations...</V2State>
+            <div className="V2Inbox__skeletonList">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="V2Inbox__skeletonRow" style={{ animationDelay: `${i * 100}ms` }} />
+              ))}
+            </div>
           ) : listQuery.isError ? (
             <V2State kind="error">Failed to load inbox: {String((listQuery.error as Error)?.message || listQuery.error)}</V2State>
           ) : conversations.length === 0 ? (
-            <V2State kind="empty">No conversations match your filter.</V2State>
+            <div className="V2Inbox__emptyState">
+              <div className="V2Inbox__emptyIcon">📭</div>
+              <h3>No conversations</h3>
+              <p>Try adjusting your filters or search terms</p>
+            </div>
           ) : (
-            <div className="V2Inbox__conversationList">
-              {conversations.map((conversation) => {
+            <div className="V2Inbox__conversationList V2Inbox__conversationList--enhanced">
+              {conversations.map((conversation, index) => {
                 const isActive = selectedConversationId === conversation.id;
+                const isHovered = hoveredConversation === conversation.id;
+                const hasUnread = conversation.openNeedsReplyCount > 0;
+                const isUrgent = conversation.escalation.level <= 2 && hasUnread;
+                const setterName = displaySetterName(conversation.ownerLabel);
+                const setterColor = getSetterColor(conversation.ownerLabel);
+                const setterAvatar = getSetterAvatar(conversation.ownerLabel);
+                
                 return (
                   <button
                     key={conversation.id}
                     type="button"
-                    className={`V2Inbox__conversationRow ${isActive ? 'is-active' : ''}`}
+                    className={`V2Inbox__conversationCard ${isActive ? 'is-active' : ''} ${hasUnread ? 'has-unread' : ''} ${isUrgent ? 'is-urgent' : ''}`}
                     onClick={() => {
                       setSelectedConversationId(conversation.id);
                       setComposerText('');
@@ -471,266 +572,186 @@ export default function InboxV2() {
                       setDraftPrefillDoneForConversation(null);
                       setIsComposerModalOpen(true);
                     }}
+                    onMouseEnter={() => setHoveredConversation(conversation.id)}
+                    onMouseLeave={() => setHoveredConversation(null)}
+                    style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    <div className="V2Inbox__conversationTop">
-                      <strong>{conversation.contactName || conversation.contactPhone || conversation.contactKey}</strong>
-                      <span>{fmtDateTime(conversation.lastMessage.createdAt)}</span>
+                    {/* Avatar with status */}
+                    <div className="V2Inbox__cardAvatar">
+                      <span>{(conversation.contactName || conversation.contactPhone || '?').slice(0, 1).toUpperCase()}</span>
+                      {hasUnread && <span className="V2Inbox__unreadDot" />}
                     </div>
-                    <p>{shorten(conversation.lastMessage.body, 110)}</p>
-                    <div className="V2Inbox__conversationMeta">
-                      <span>{conversation.openNeedsReplyCount > 0 ? `${conversation.openNeedsReplyCount} needs reply` : 'No open reply items'}</span>
-                      <span>{conversation.ownerLabel || 'Unassigned'}</span>
-                      <span>{conversation.dnc ? 'DNC' : `Esc L${conversation.escalation.level}`}</span>
+
+                    {/* Main content */}
+                    <div className="V2Inbox__cardContent">
+                      <div className="V2Inbox__cardHeader">
+                        <h3 className="V2Inbox__cardName">
+                          {conversation.contactName || conversation.contactPhone || conversation.contactKey}
+                          {conversation.dnc && <span className="V2Inbox__dncBadge">DNC</span>}
+                        </h3>
+                        <span className="V2Inbox__cardTime">{timeAgo(conversation.lastMessage.createdAt)}</span>
+                      </div>
+                      
+                      <p className="V2Inbox__cardPreview">{shorten(conversation.lastMessage.body, 120)}</p>
+                      
+                      <div className="V2Inbox__cardMeta">
+                        <span 
+                          className="V2Inbox__escalationBadge"
+                          style={{ 
+                            background: `color-mix(in srgb, ${escalationToneForLevel(conversation.escalation.level) === 'red' ? '#ef4c62' : escalationToneForLevel(conversation.escalation.level) === 'orange' ? '#f59d0d' : escalationToneForLevel(conversation.escalation.level) === 'yellow' ? '#e6b01f' : '#13b981'} 15%, transparent)`,
+                            color: escalationToneForLevel(conversation.escalation.level) === 'red' ? '#ef4c62' : escalationToneForLevel(conversation.escalation.level) === 'orange' ? '#f59d0d' : escalationToneForLevel(conversation.escalation.level) === 'yellow' ? '#e6b01f' : '#13b981',
+                            borderColor: escalationToneForLevel(conversation.escalation.level) === 'red' ? '#ef4c62' : escalationToneForLevel(conversation.escalation.level) === 'orange' ? '#f59d0d' : escalationToneForLevel(conversation.escalation.level) === 'yellow' ? '#e6b01f' : '#13b981'
+                          }}
+                        >
+                          L{conversation.escalation.level}
+                        </span>
+                        
+                        {setterName && (
+                          <span className="V2Inbox__setterBadge" style={{ color: setterColor }}>
+                            <span className="V2Inbox__setterDot" style={{ background: setterColor }} />
+                            {setterName}
+                          </span>
+                        )}
+                        
+                        {conversation.openNeedsReplyCount > 0 && (
+                          <span className="V2Inbox__replyCount">
+                            {conversation.openNeedsReplyCount} needs reply
+                          </span>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Hover actions */}
+                    <div className={`V2Inbox__cardActions ${isHovered ? 'is-visible' : ''}`}>
+                      <button className="V2Inbox__actionBtn V2Inbox__actionBtn--primary" title="Quick reply">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
+                      </button>
+                    </div>
+
+                    {/* Unread indicator */}
+                    {hasUnread && <div className="V2Inbox__unreadIndicator" />}
                   </button>
                 );
               })}
             </div>
           )}
-        </V2Panel>
-
-        <div className="V2Inbox__threadColumn">
-          {!selectedConversationId ? (
-            <V2State kind="empty">Select a conversation to view details.</V2State>
-          ) : detailQuery.isLoading ? (
-            <V2State kind="loading">Loading conversation...</V2State>
-          ) : detailQuery.isError || !detail ? (
-            <V2State kind="error">
-              Failed to load conversation: {String((detailQuery.error as Error)?.message || detailQuery.error)}
-            </V2State>
-          ) : (
-            <>
-              <V2Panel
-                title={
-                  <span>
-                    {detail.contactCard.name || detail.contactCard.phone || detail.contactCard.contactKey}
-                    {detail.contactCard.dnc ? ' (DNC)' : ''}
-                  </span>
-                }
-                caption={`Last touch: ${fmtDateTime(detail.conversation.lastTouchAt)} · Reply due: ${fmtDateTime(detail.conversation.needsReplyDueAt)}`}
-              >
-                <div className="V2Inbox__threadActions">
-                  <button type="button" className="V2Inbox__button V2Inbox__button--secondary" onClick={() => setIsComposerModalOpen(true)}>
-                    Open Draft + Send
-                  </button>
-                </div>
-                <div className="V2Inbox__thread">
-                  {detail.messages.map((message) => {
-                    const leadLabel = detail.contactCard.name || detail.contactCard.phone || 'Lead';
-                    const defaultSetter = displaySetterName(detail.conversation.ownerLabel) || 'Setter';
-                    const speaker =
-                      message.direction === 'inbound' ? leadLabel : displaySetterName(message.alowareUser) || defaultSetter;
-                    return (
-                      <article key={message.id} className={`V2Inbox__message V2Inbox__message--${message.direction}`}>
-                        <header>
-                          <span>{speaker}</span>
-                          <time>{fmtDateTime(message.createdAt)}</time>
-                        </header>
-                        <p>{message.body || '(empty message)'}</p>
-                      </article>
-                    );
-                  })}
-                </div>
-              </V2Panel>
-            </>
-          )}
         </div>
 
-        <div className="V2Inbox__sideColumn">
-          {!detail ? (
-            <V2State kind="empty">Conversation context will appear here.</V2State>
-          ) : (
-            <>
-              <V2Panel
-                title="Contact Card"
-                caption="Contact context from Aloware and PT Biz conversation state."
-                className="V2Inbox__sidePanel V2Inbox__sidePanel--contact"
+        {/* Right: Analytics Dashboard */}
+        <div className="V2Inbox__analyticsColumn">
+          <div className="V2Inbox__analyticsPanel">
+            <h3 className="V2Inbox__analyticsTitle">Inbox Health</h3>
+            
+            <div className="V2Inbox__healthScore">
+              <div 
+                className="V2Inbox__healthRing"
+                style={{ 
+                  background: `conic-gradient(${getHealthColor(inboxHealth)} ${inboxHealth * 3.6}deg, rgba(7, 19, 36, 0.08) 0deg)` 
+                }}
               >
-                <div className="V2Inbox__contactHead">
-                  <span className="V2Inbox__contactAvatar">
-                    {(detail.contactCard.name || detail.contactCard.phone || '?').slice(0, 1).toUpperCase()}
-                  </span>
-                  <div>
-                    <p>{detail.contactCard.name || detail.contactCard.phone || 'Unknown contact'}</p>
-                    <small>{detail.contactCard.email || 'No email on file'}</small>
+                <span>{Math.round(inboxHealth)}</span>
+              </div>
+              <p className="V2Inbox__healthLabel">
+                {inboxHealth >= 80 ? 'Healthy' : inboxHealth >= 60 ? 'Needs attention' : 'Critical'}
+              </p>
+            </div>
+
+            <div className="V2Inbox__statGrid">
+              <div className="V2Inbox__statCard">
+                <span className="V2Inbox__statValue" style={{ color: unreadCount > 0 ? '#f59d0d' : '#13b981' }}>
+                  {unreadCount}
+                </span>
+                <span className="V2Inbox__statLabel">Unread</span>
+              </div>
+              <div className="V2Inbox__statCard">
+                <span className="V2Inbox__statValue" style={{ color: urgentCount > 0 ? '#ef4c62' : '#13b981' }}>
+                  {urgentCount}
+                </span>
+                <span className="V2Inbox__statLabel">Urgent</span>
+              </div>
+              <div className="V2Inbox__statCard">
+                <span className="V2Inbox__statValue">{jackCount}</span>
+                <span className="V2Inbox__statLabel">Jack</span>
+              </div>
+              <div className="V2Inbox__statCard">
+                <span className="V2Inbox__statValue">{brandonCount}</span>
+                <span className="V2Inbox__statLabel">Brandon</span>
+              </div>
+            </div>
+
+            {unassignedCount > 0 && (
+              <div className="V2Inbox__alertBanner">
+                <span className="V2Inbox__alertIcon">⚠️</span>
+                <span>{unassignedCount} unassigned conversations need owners</span>
+              </div>
+            )}
+
+            <div className="V2Inbox__workloadSection">
+              <h4>Team Workload</h4>
+              <div className="V2Inbox__workloadBars">
+                <div className="V2Inbox__workloadItem">
+                  <div className="V2Inbox__workloadHeader">
+                    <span className="V2Inbox__workloadName">
+                      <span className="V2Inbox__workloadAvatar" style={{ background: '#11b8d6' }}>J</span>
+                      Jack
+                    </span>
+                    <span>{jackCount} conv.</span>
+                  </div>
+                  <div className="V2Inbox__workloadBar">
+                    <div 
+                      className="V2Inbox__workloadFill" 
+                      style={{ 
+                        width: `${totalConversations > 0 ? (jackCount / totalConversations) * 100 : 0}%`,
+                        background: '#11b8d6'
+                      }} 
+                    />
                   </div>
                 </div>
-                <dl className="V2Inbox__cardList">
-                  <dt>Name</dt>
-                  <dd>{detail.contactCard.name || 'Unknown'}</dd>
-                  <dt>Phone</dt>
-                  <dd>{detail.contactCard.phone || 'Unknown'}</dd>
-                  <dt>Email</dt>
-                  <dd>{detail.contactCard.email || 'Unknown'}</dd>
-                  <dt>Timezone</dt>
-                  <dd>{detail.contactCard.timezone || 'Unknown'}</dd>
-                  <dt>Niche</dt>
-                  <dd>{detail.contactCard.niche || 'Unknown'}</dd>
-                  <dt>Monday history</dt>
-                  <dd>{detail.mondayTrail.length} recent records</dd>
-                </dl>
-              </V2Panel>
-
-              <V2Panel
-                title="Qualification State"
-                caption={`Progress ${qualificationProgressLive}/4`}
-                className={`V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${qualificationTone}`}
-              >
-                <div className="V2Inbox__stateTop">
-                  <span className="V2Inbox__stateBadge">{qualificationProgressLive} of 4 captured</span>
-                  <span className="V2Inbox__stateHint">
-                    {qualificationProgressLive >= 4 ? 'Ready for handoff' : `${4 - qualificationProgressLive} remaining`}
-                  </span>
-                </div>
-                <div className="V2Inbox__stateMeter" aria-hidden="true">
-                  <span style={{ width: `${qualificationProgressPct}%` }} />
-                </div>
-                <div className="V2Inbox__pillRow">
-                  {qualificationFields.map((field) => (
-                    <span key={field.key} className={`V2Inbox__pill ${field.complete ? 'is-complete' : ''}`}>
-                      {field.label}
+                <div className="V2Inbox__workloadItem">
+                  <div className="V2Inbox__workloadHeader">
+                    <span className="V2Inbox__workloadName">
+                      <span className="V2Inbox__workloadAvatar" style={{ background: '#13b981' }}>B</span>
+                      Brandon
                     </span>
-                  ))}
+                    <span>{brandonCount} conv.</span>
+                  </div>
+                  <div className="V2Inbox__workloadBar">
+                    <div 
+                      className="V2Inbox__workloadFill" 
+                      style={{ 
+                        width: `${totalConversations > 0 ? (brandonCount / totalConversations) * 100 : 0}%`,
+                        background: '#13b981'
+                      }} 
+                    />
+                  </div>
                 </div>
-
-                <label className="V2Control">
-                  <span>Full or part time</span>
-                  <select
-                    value={qualificationState.fullOrPartTime}
-                    onChange={(event) =>
-                      setQualificationState((prev) => ({
-                        ...prev,
-                        fullOrPartTime: event.target.value as QualificationStateV2['fullOrPartTime'],
-                      }))
-                    }
-                  >
-                    <option value="unknown">Unknown</option>
-                    <option value="full_time">Full time</option>
-                    <option value="part_time">Part time</option>
-                  </select>
-                </label>
-
-                <label className="V2Control">
-                  <span>Niche</span>
-                  <input
-                    value={qualificationState.niche || ''}
-                    onChange={(event) => setQualificationState((prev) => ({ ...prev, niche: event.target.value }))}
-                    placeholder="Athletes, active adults, etc"
-                  />
-                </label>
-
-                <label className="V2Control">
-                  <span>Revenue mix</span>
-                  <select
-                    value={qualificationState.revenueMix}
-                    onChange={(event) =>
-                      setQualificationState((prev) => ({
-                        ...prev,
-                        revenueMix: event.target.value as QualificationStateV2['revenueMix'],
-                      }))
-                    }
-                  >
-                    <option value="unknown">Unknown</option>
-                    <option value="mostly_cash">Mostly cash</option>
-                    <option value="mostly_insurance">Mostly insurance</option>
-                    <option value="balanced">Balanced</option>
-                  </select>
-                </label>
-
-                <label className="V2Control">
-                  <span>Coaching interest</span>
-                  <select
-                    value={qualificationState.coachingInterest}
-                    onChange={(event) =>
-                      setQualificationState((prev) => ({
-                        ...prev,
-                        coachingInterest: event.target.value as QualificationStateV2['coachingInterest'],
-                      }))
-                    }
-                  >
-                    <option value="unknown">Unknown</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  className="V2Inbox__stateAction V2Inbox__stateAction--primary"
-                  onClick={onSaveQualification}
-                  disabled={qualificationMutation.isPending}
-                >
-                  {qualificationMutation.isPending ? 'Saving...' : 'Save Qualification'}
-                </button>
-              </V2Panel>
-
-              <V2Panel
-                title="Escalation Override"
-                caption={`Current level ${detail.conversation.escalation.level}`}
-                className={`V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${escalationTone}`}
-              >
-                <div className="V2Inbox__stateTop">
-                  <span className="V2Inbox__stateBadge">Level {escalationLevel}</span>
-                  <span className="V2Inbox__stateHint">{escalationLevelSubtitle(escalationLevel)}</span>
-                </div>
-                <div className="V2Inbox__stateMeter" aria-hidden="true">
-                  <span style={{ width: `${escalationProgressPct}%` }} />
-                </div>
-                <div className="V2Inbox__levelRail" role="group" aria-label="Escalation level quick pick">
-                  {[1, 2, 3, 4].map((level) => (
-                    <button
-                      type="button"
-                      key={level}
-                      className={`V2Inbox__levelChip ${escalationLevel === level ? 'is-active' : ''}`}
-                      onClick={() => setEscalationLevel(level as 1 | 2 | 3 | 4)}
-                    >
-                      L{level}
-                    </button>
-                  ))}
-                </div>
-
-                <label className="V2Control">
-                  <span>Level</span>
-                  <select
-                    value={String(escalationLevel)}
-                    onChange={(event) => setEscalationLevel(Number.parseInt(event.target.value, 10) as 1 | 2 | 3 | 4)}
-                  >
-                    <option value="1">Level 1 Awareness</option>
-                    <option value="2">Level 2 Objection Bridge</option>
-                    <option value="3">Level 3 Call First</option>
-                    <option value="4">Level 4 Scaling Hybrid</option>
-                  </select>
-                </label>
-
-                <label className="V2Control">
-                  <span>Reason</span>
-                  <input
-                    value={escalationReason}
-                    onChange={(event) => setEscalationReason(event.target.value)}
-                    placeholder="Why this override applies"
-                  />
-                </label>
-
-                <button
-                  type="button"
-                  className="V2Inbox__stateAction V2Inbox__stateAction--secondary"
-                  onClick={onOverrideEscalation}
-                  disabled={escalationMutation.isPending}
-                >
-                  {escalationMutation.isPending ? 'Saving...' : 'Save Escalation'}
-                </button>
-
-                <div className="V2Inbox__escalationMeta">
-                  <span>Cadence: {qualificationLabel(detail.conversation.escalation.cadenceStatus)}</span>
-                  <span>Next follow up: {fmtDateTime(detail.conversation.escalation.nextFollowupDueAt)}</span>
-                </div>
-              </V2Panel>
-            </>
-          )}
+                {unassignedCount > 0 && (
+                  <div className="V2Inbox__workloadItem">
+                    <div className="V2Inbox__workloadHeader">
+                      <span className="V2Inbox__workloadName">
+                        <span className="V2Inbox__workloadAvatar" style={{ background: '#56607a' }}>?</span>
+                        Unassigned
+                      </span>
+                      <span>{unassignedCount} conv.</span>
+                    </div>
+                    <div className="V2Inbox__workloadBar">
+                      <div 
+                        className="V2Inbox__workloadFill" 
+                        style={{ 
+                          width: `${totalConversations > 0 ? (unassignedCount / totalConversations) * 100 : 0}%`,
+                          background: '#ef4c62'
+                        }} 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
+      {/* Composer Modal - Unchanged */}
       {isComposerModalOpen ? (
         <div className="V2Inbox__composerBackdrop" onClick={() => setIsComposerModalOpen(false)}>
           <section

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+@import https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
   --v2-font-display: 'Space Grotesk', 'Avenir Next', sans-serif;
@@ -2523,7 +2523,106 @@
   color: var(--v2-text);
 }
 
+/* Success Toast */
+.V2Inbox__successToast {
+  position: fixed;
+  top: 100px;
+  right: 1.5rem;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1.2rem;
+  background: linear-gradient(160deg, rgba(19, 185, 129, 0.15), rgba(255, 255, 255, 0.95));
+  border: 1px solid rgba(19, 185, 129, 0.35);
+  border-radius: var(--v2-radius-md);
+  box-shadow: var(--v2-shadow-2);
+  animation: v2-toast-in 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes v2-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.V2Inbox__successIcon {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  background: rgba(19, 185, 129, 0.2);
+  color: var(--v2-positive);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+/* Button States */
+.V2Inbox__button--sending {
+  position: relative;
+  color: transparent !important;
+}
+
+.V2Inbox__button--success {
+  background: linear-gradient(180deg, rgba(19, 185, 129, 0.25), rgba(255, 255, 255, 0.98)) !important;
+  border-color: rgba(19, 185, 129, 0.5) !important;
+  color: var(--v2-positive) !important;
+}
+
+.V2Inbox__buttonSpinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+}
+
+.V2Inbox__buttonSpinner::after {
+  content: '';
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(17, 184, 214, 0.2);
+  border-top-color: var(--v2-accent);
+  border-radius: 50%;
+  animation: v2-spin 0.8s linear infinite;
+}
+
+@keyframes v2-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Optimistic Message */
+.V2Inbox__chatMessage--sending {
+  opacity: 0.7;
+  animation: v2-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes v2-pulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.V2Inbox__sendingIndicator {
+  display: inline-block;
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  color: var(--v2-accent);
+  font-style: italic;
+}
+
 @media (max-width: 1360px) {
+
   .V2Inbox__layout {
     grid-template-columns: 1fr;
   }

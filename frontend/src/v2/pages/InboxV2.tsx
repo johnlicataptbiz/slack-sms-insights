@@ -115,6 +115,8 @@ export default function InboxV2() {
   const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] = useState<string | null>(null);
   const [selectedLineKey, setSelectedLineKey] = useState('');
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [justSentMessage, setJustSentMessage] = useState<{text: string; timestamp: string} | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [qualificationState, setQualificationState] = useState<QualificationStateV2>({
@@ -285,25 +287,41 @@ export default function InboxV2() {
     }
 
     setFlashMessage(null);
+    setSendStatus('sending');
+    
+    const messageText = composerText.trim();
+    
     try {
       const sendFromNumber = selectedLineOption?.lineId == null ? selectedLineOption?.fromNumber || null : null;
       const result = await sendMutation.mutateAsync({
         conversationId: selectedConversationId,
-        body: composerText.trim(),
+        body: messageText,
         idempotencyKey: `inbox-${Date.now()}`,
         ...(selectedLineOption?.lineId != null ? { lineId: selectedLineOption.lineId } : {}),
         ...(sendFromNumber ? { fromNumber: sendFromNumber } : {}),
         ...(selectedDraftId ? { draftId: selectedDraftId } : {}),
       });
       const lineSummary = formatSendLineLabel(result.data.lineSelection);
+      
       if (result.data.status === 'sent' || result.data.status === 'duplicate') {
-        setFlashMessage(
-          `${result.data.status === 'sent' ? 'Message sent' : 'Duplicate request skipped'}: ${result.data.reason} · ${lineSummary}`,
-        );
+        setSendStatus('sent');
+        setJustSentMessage({ text: messageText, timestamp: new Date().toISOString() });
+        
+        // Clear composer after successful send
+        setComposerText('');
+        setSelectedDraftId(null);
+        
+        // Reset status after 3 seconds
+        setTimeout(() => {
+          setSendStatus('idle');
+          setJustSentMessage(null);
+        }, 3000);
       } else {
+        setSendStatus('error');
         setFlashMessage(`Send blocked: ${result.data.reason} · ${lineSummary}`);
       }
     } catch (error) {
+      setSendStatus('error');
       setFlashMessage(`Send failed: ${String((error as Error)?.message || error)}`);
     }
   };
@@ -421,6 +439,14 @@ export default function InboxV2() {
       />
 
       {flashMessage ? <div className="V2Inbox__flash">{flashMessage}</div> : null}
+      
+      {/* Success Toast */}
+      {sendStatus === 'sent' && (
+        <div className="V2Inbox__successToast">
+          <span className="V2Inbox__successIcon">✓</span>
+          <span>Message sent successfully!</span>
+        </div>
+      )}
 
       <section className="V2Inbox__layout">
         <V2Panel title="Conversations" caption="Your message threads.">
@@ -761,6 +787,18 @@ export default function InboxV2() {
                         </article>
                       );
                     })}
+                    
+                    {/* Optimistic sent message */}
+                    {justSentMessage && (
+                      <article className="V2Inbox__chatMessage V2Inbox__chatMessage--outbound V2Inbox__chatMessage--sending">
+                        <div className="V2Inbox__chatMessageHeader">
+                          <span className="V2Inbox__chatSpeaker">You</span>
+                          <time className="V2Inbox__chatTime">{fmtDateTime(justSentMessage.timestamp)}</time>
+                        </div>
+                        <p className="V2Inbox__chatBody">{justSentMessage.text}</p>
+                        <span className="V2Inbox__sendingIndicator">Sending...</span>
+                      </article>
+                    )}
                   </div>
 
                   {/* Composer Area */}
@@ -795,7 +833,7 @@ export default function InboxV2() {
                         </button>
                         <button
                           type="button"
-                          className="V2Inbox__button V2Inbox__button--primary V2Inbox__button--small"
+                          className={`V2Inbox__button V2Inbox__button--primary V2Inbox__button--small ${sendStatus === 'sending' ? 'V2Inbox__button--sending' : ''} ${sendStatus === 'sent' ? 'V2Inbox__button--success' : ''}`}
                           onClick={onSend}
                           disabled={
                             sendMutation.isPending ||
@@ -804,7 +842,13 @@ export default function InboxV2() {
                             sendConfigQuery.isLoading
                           }
                         >
-                          {sendMutation.isPending ? '...' : 'Send'}
+                          {sendStatus === 'sending' ? (
+                            <span className="V2Inbox__buttonSpinner" />
+                          ) : sendStatus === 'sent' ? (
+                            'Sent!'
+                          ) : (
+                            'Send'
+                          )}
                         </button>
                       </div>
                     </div>

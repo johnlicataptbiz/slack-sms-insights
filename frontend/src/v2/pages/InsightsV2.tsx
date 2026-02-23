@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import type { SalesMetricsV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2SetterTrend, useV2WeeklySummary } from '../../api/v2Queries';
 import { v2Copy } from '../copy';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2RiskAlert, V2State, V2Term } from '../components/V2Primitives';
 
 const BUSINESS_TZ = 'America/Chicago';
 type InsightsRange = 'today' | '7d' | '30d';
@@ -100,6 +100,44 @@ export default function InsightsV2() {
       .filter((row) => row.messagesSent > 0)
       .sort((a, b) => b.optOutRatePct - a.optOutRatePct)
       .slice(0, 6);
+  }, [payload]);
+
+  const criticalRiskCount = useMemo(() => {
+    return highRisk.filter((row) => row.optOutRatePct >= 6).length;
+  }, [highRisk]);
+
+  // Sparkline data preparation from trendByDay
+  const sparklineData = useMemo(() => {
+    if (!payload?.trendByDay?.length) return null;
+    const sorted = [...payload.trendByDay].sort((a, b) => a.day.localeCompare(b.day));
+    return {
+      booked: sorted.map((d) => d.canonicalBookedCalls),
+      sent: sorted.map((d) => d.messagesSent),
+      contacted: sorted.map((d) => d.peopleContacted),
+      replyRate: sorted.map((d) => d.replyRatePct),
+      optOuts: sorted.map((d) => d.optOuts),
+    };
+  }, [payload]);
+
+  // Calculate trends (comparing last day to previous day)
+  const trends = useMemo<{
+    booked: 'up' | 'down' | 'flat';
+    sent: 'up' | 'down' | 'flat';
+    contacted: 'up' | 'down' | 'flat';
+    replyRate: 'up' | 'down' | 'flat';
+    optOuts: 'up' | 'down' | 'flat';
+  } | null>(() => {
+    if (!payload?.trendByDay?.length || payload.trendByDay.length < 2) return null;
+    const sorted = [...payload.trendByDay].sort((a, b) => a.day.localeCompare(b.day));
+    const latest = sorted[sorted.length - 1];
+    const prev = sorted[sorted.length - 2];
+    return {
+      booked: latest.canonicalBookedCalls > prev.canonicalBookedCalls ? 'up' : latest.canonicalBookedCalls < prev.canonicalBookedCalls ? 'down' : 'flat',
+      sent: latest.messagesSent > prev.messagesSent ? 'up' : latest.messagesSent < prev.messagesSent ? 'down' : 'flat',
+      contacted: latest.peopleContacted > prev.peopleContacted ? 'up' : latest.peopleContacted < prev.peopleContacted ? 'down' : 'flat',
+      replyRate: latest.replyRatePct > prev.replyRatePct ? 'up' : latest.replyRatePct < prev.replyRatePct ? 'down' : 'flat',
+      optOuts: latest.optOuts > prev.optOuts ? 'up' : latest.optOuts < prev.optOuts ? 'down' : 'flat',
+    };
   }, [payload]);
 
   const weeklyTrend = useMemo(() => {
@@ -206,22 +244,54 @@ export default function InsightsV2() {
         }
       />
 
+      <V2RiskAlert
+        title="High Opt-Out Risk Detected"
+        count={criticalRiskCount}
+        onAction={() => {
+          const element = document.querySelector('.V2Panel:has(.V2Table)');
+          element?.scrollIntoView({ behavior: 'smooth' });
+        }}
+      />
+
       <section className="V2MetricsGrid">
         <V2MetricCard
           label={<V2Term term="callsBookedSlack" label="Calls Booked" />}
           value={fmtInt(bookedTotalAllChannels)}
           meta={bookedMeta}
           tone="positive"
+          sparkline={sparklineData?.booked}
+          trend={trends?.booked}
         />
-        <V2MetricCard label="Messages Sent" value={fmtInt(payload.totals.messagesSent)} meta={sentMeta} />
-        <V2MetricCard label={<V2Term term="peopleContacted" />} value={fmtInt(payload.totals.peopleContacted)} meta={selectedWindowMeta} />
+        <V2MetricCard
+          label="Messages Sent"
+          value={fmtInt(payload.totals.messagesSent)}
+          meta={sentMeta}
+          sparkline={sparklineData?.sent}
+          trend={trends?.sent}
+        />
+        <V2MetricCard
+          label={<V2Term term="peopleContacted" />}
+          value={fmtInt(payload.totals.peopleContacted)}
+          meta={selectedWindowMeta}
+          sparkline={sparklineData?.contacted}
+          trend={trends?.contacted}
+        />
         <V2MetricCard
           label={<V2Term term="replyRatePeople" label="Reply Rate" />}
           value={fmtPct(payload.totals.replyRatePct)}
           meta={replyMeta}
           tone="accent"
+          sparkline={sparklineData?.replyRate}
+          trend={trends?.replyRate}
         />
-        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} meta={rangeMeta} tone="critical" />
+        <V2MetricCard
+          label={<V2Term term="optOuts" />}
+          value={fmtInt(payload.totals.optOuts)}
+          meta={rangeMeta}
+          tone="critical"
+          sparkline={sparklineData?.optOuts}
+          trend={trends?.optOuts === 'up' ? 'down' : trends?.optOuts === 'down' ? 'up' : 'flat'}
+        />
       </section>
 
       <V2Panel title={isWeeklyRange ? 'This Week' : selectedRangeLabel} caption={isWeeklyRange ? 'How the week went.' : `${selectedRangeLabel} totals.`}>

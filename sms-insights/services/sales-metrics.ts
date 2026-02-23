@@ -251,6 +251,7 @@ export const getSalesMetricsSummary = async (
   const trendMap = new Map<string, SalesTrendPoint>();
   const seqMap = new Map<string, TopSequenceRow>();
   const repMap = new Map<string, RepLeaderboardRow>();
+  const repRepliedContacts = new Map<string, Set<string>>();
 
   const emptyPoint = (day: string): SalesTrendPoint => ({
     day,
@@ -438,6 +439,12 @@ export const getSalesMetricsSummary = async (
       repliedContactsOverall.add(contactKey);
 
       const isSequenceReply = (attributedTouch?.sequence || '').trim().length > 0;
+      const replyRepName = (attributedTouch?.aloware_user || '').trim();
+      if (replyRepName) {
+        const set = repRepliedContacts.get(replyRepName) || new Set<string>();
+        set.add(contactKey);
+        repRepliedContacts.set(replyRepName, set);
+      }
 
       if (isSequenceReply) {
         const set = sequenceRepliedContactsByDay.get(inbound._day) || new Set<string>();
@@ -467,6 +474,11 @@ export const getSalesMetricsSummary = async (
     const point = trendMap.get(day) || emptyPoint(day);
     point.sequenceRepliesReceived += contacts.size;
     trendMap.set(day, point);
+  }
+  for (const [repName, row] of repMap.entries()) {
+    const replied = repRepliedContacts.get(repName)?.size ?? 0;
+    row.replyRatePct = row.outboundConversations > 0 ? (replied / row.outboundConversations) * 100 : 0;
+    repMap.set(repName, row);
   }
 
   // optOuts: unique contacts with opt-out inbound in range, credited to opt-out day

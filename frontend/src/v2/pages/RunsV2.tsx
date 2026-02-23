@@ -53,7 +53,7 @@ type RunRepInsight = {
   topSequenceLabel: string | null;
 };
 
-type RunViewModel = {
+export type RunViewModel = {
   title: string;
   subtitle: string;
   summaryPreview: string | null;
@@ -66,6 +66,15 @@ type RunViewModel = {
   outboundConversations: number | null;
   topSequences: RunSequenceInsight[];
   repRows: RunRepInsight[];
+};
+
+export const resolveSelectedRunViewModel = (
+  selected: RunV2 | null,
+  _cachedById?: Map<string, RunViewModel>,
+): RunViewModel | null => {
+  // Intentionally derive from selected payload to avoid stale list-cache view models
+  // (list fetch omits fullReport).
+  return selected ? buildRunViewModel(selected) : null;
 };
 
 const parseRange = (value: string | null): AllowedRange => {
@@ -349,7 +358,10 @@ export default function RunsV2() {
     return map;
   }, [runsData?.data.items]);
 
-  const selectedView = selected ? viewByRunId.get(selected.id) || buildRunViewModel(selected) : null;
+  // Always derive selected detail view from the selected run payload.
+  // The timeline list is fetched without fullReport, so reusing the list view model
+  // here can hide parsed sequence/rep sections.
+  const selectedView = resolveSelectedRunViewModel(selected, viewByRunId);
   const selectedSlackBookedTotal = selectedBookedMetricsQuery.data?.data.totals.canonicalBookedCalls ?? null;
   const selectedSlackBookedJack = selectedBookedMetricsQuery.data?.data.bookedCredit.jack ?? null;
   const selectedSlackBookedBrandon = selectedBookedMetricsQuery.data?.data.bookedCredit.brandon ?? null;

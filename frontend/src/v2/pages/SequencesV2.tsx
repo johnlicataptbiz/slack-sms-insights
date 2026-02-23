@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
 import { useV2SalesMetrics } from '../../api/v2Queries';
+import type { SalesMetricsV2 } from '../../api/v2-types';
 import { dayKeyInTimeZone, shiftIsoDay } from '../../utils/runDay';
 import { v2Copy } from '../copy';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
@@ -75,6 +76,40 @@ const riskLabel = (optOutRatePct: number) => {
   return 'healthy';
 };
 
+export const computeSequenceHeaderMetrics = (
+  payload: SalesMetricsV2,
+  rows: SalesMetricsV2['sequences'],
+) => {
+  const totalSent = rows.reduce((sum, row) => sum + row.messagesSent, 0);
+  const totalBookedAttributedToRows = rows.reduce((sum, row) => sum + row.canonicalBookedCalls, 0);
+  const totalBookedAfterReply = rows.reduce((sum, row) => sum + row.canonicalBookedAfterSmsReply, 0);
+  const totalOptOuts = rows.reduce((sum, row) => sum + row.optOuts, 0);
+  const attribution = payload.provenance.sequenceBookedAttribution;
+  const totalBookedAllChannels = payload.bookedCredit.total;
+  const matchedCalls = attribution?.matchedCalls ?? 0;
+  const unattributedCalls = attribution?.unattributedCalls ?? Math.max(0, totalBookedAllChannels - matchedCalls);
+  const manualCalls = attribution?.manualCalls ?? 0;
+  const namedSequenceCalls = Math.max(0, matchedCalls - manualCalls);
+  const totalCalls = attribution?.totalCalls ?? 0;
+  const totalBookedNonSmsOrUnknown =
+    attribution?.nonSmsOrUnknownCalls ?? Math.max(0, totalBookedAllChannels - totalBookedAfterReply);
+
+  return {
+    totalSent,
+    totalBookedAttributedToRows,
+    totalBookedAfterReply,
+    totalOptOuts,
+    attribution,
+    totalBookedAllChannels,
+    matchedCalls,
+    unattributedCalls,
+    manualCalls,
+    namedSequenceCalls,
+    totalCalls,
+    totalBookedNonSmsOrUnknown,
+  };
+};
+
 export default function SequencesV2() {
   const today = useMemo(() => dayKeyInTimeZone(new Date(), BUSINESS_TZ), []);
   const initialDay = useMemo(() => (today ? shiftIsoDay(today, -1) : null), [today]);
@@ -127,16 +162,20 @@ export default function SequencesV2() {
   if (isLoading) return <V2State kind="loading">Loading sequence performance…</V2State>;
   if (isError || !payload) return <V2State kind="error">Failed to load sequence performance: {String((error as Error)?.message || error)}</V2State>;
 
-  const totalSent = rows.reduce((sum, row) => sum + row.messagesSent, 0);
-  const totalBooked = rows.reduce((sum, row) => sum + row.canonicalBookedCalls, 0);
-  const totalBookedAfterReply = rows.reduce((sum, row) => sum + row.canonicalBookedAfterSmsReply, 0);
-  const totalBookedNonSmsOrUnknown = Math.max(0, totalBooked - totalBookedAfterReply);
-  const totalOptOuts = rows.reduce((sum, row) => sum + row.optOuts, 0);
-  const attribution = payload.provenance.sequenceBookedAttribution;
-  const matchedCalls = attribution?.matchedCalls ?? 0;
-  const manualCalls = attribution?.manualCalls ?? 0;
-  const namedSequenceCalls = Math.max(0, matchedCalls - manualCalls);
-  const totalCalls = attribution?.totalCalls ?? 0;
+  const {
+    totalSent,
+    totalBookedAttributedToRows,
+    totalBookedAfterReply,
+    totalOptOuts,
+    attribution,
+    totalBookedAllChannels,
+    matchedCalls,
+    unattributedCalls,
+    manualCalls,
+    namedSequenceCalls,
+    totalCalls,
+    totalBookedNonSmsOrUnknown,
+  } = computeSequenceHeaderMetrics(payload, rows);
 
   const toggleReviewed = (sequenceLabel: string) => {
     setReviewedMap((prev) => ({
@@ -201,7 +240,9 @@ export default function SequencesV2() {
       <section className="V2MetricsGrid">
         <V2MetricCard label="Sequences" value={String(rows.length)} />
         <V2MetricCard label="Messages Sent" value={fmtInt(totalSent)} />
-        <V2MetricCard label={<V2Term term="callsBookedSlack" />} value={fmtInt(totalBooked)} tone="positive" />
+        <V2MetricCard label="Booked calls (all channels, Slack source)" value={fmtInt(totalBookedAllChannels)} tone="positive" />
+        <V2MetricCard label="Booked attributed to sequence labels" value={fmtInt(totalBookedAttributedToRows)} tone="accent" />
+        <V2MetricCard label="Booked unattributed (IG/LinkedIn/Circle/unknown)" value={fmtInt(unattributedCalls)} />
         <V2MetricCard label="Booked after SMS reply" value={fmtInt(totalBookedAfterReply)} tone="accent" />
         <V2MetricCard label="Booked calls (non-SMS or unknown source)" value={fmtInt(totalBookedNonSmsOrUnknown)} />
         <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(totalOptOuts)} tone={totalOptOuts > 0 ? 'critical' : 'default'} />
@@ -253,7 +294,7 @@ export default function SequencesV2() {
         title="Sequence Table"
         caption={
           attribution
-            ? `Matched ${matchedCalls}/${totalCalls} booked calls to attribution buckets (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)"). Slack booked-call totals can be higher than SMS replies because they include non-SMS and unknown sources too. "First seen" is the first outbound timestamp found in PTBizSMS history.`
+            ? `Matched ${matchedCalls}/${totalCalls} booked calls to sequence attribution (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)", ${unattributedCalls} unattributed). Unattributed bookings often come from IG/LinkedIn/Circle/other non-SMS sources or unmatched First Conversion labels. "First seen" is the first outbound timestamp found in PTBizSMS history.`
             : 'No booked-call attribution metadata found. "First seen" is based on PTBizSMS outbound history.'
         }
       >
@@ -263,7 +304,7 @@ export default function SequencesV2() {
             <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
               <option value="messagesSent">Messages</option>
               <option value="replyRatePct">Reply rate</option>
-              <option value="canonicalBookedCalls">Booked (Slack first conversion)</option>
+              <option value="canonicalBookedCalls">Booked (attributed to this sequence)</option>
               <option value="canonicalBookedAfterSmsReply">Booked after SMS reply</option>
               <option value="optOutRatePct">Opt-out rate</option>
             </select>
@@ -278,7 +319,7 @@ export default function SequencesV2() {
                 <th className="is-right">Sent</th>
                 <th className="is-right">Replies</th>
                 <th className="is-right">Reply rate</th>
-                <th className="is-right">Booked (Slack first conversion)</th>
+                <th className="is-right">Booked (attributed to this sequence)</th>
                 <th className="is-right">Booked after SMS reply</th>
                 <th className="is-right">
                   <V2Term term="smsBookingHintsDiagnostic" label="SMS hints (QA)" />

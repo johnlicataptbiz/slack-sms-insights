@@ -13,6 +13,10 @@ export type ApiEnvelope<T> = {
 };
 
 export type SalesMetricsV2 = {
+  processing: {
+    model: 'live_rolling_metrics';
+    source: 'continuous_sms_events_and_booked_calls';
+  };
   timeRange: { from: string; to: string };
   totals: {
     messagesSent: number;
@@ -112,6 +116,10 @@ export type SalesMetricsBatchV2 = {
 };
 
 export type RunV2 = {
+  processing: {
+    model: 'snapshot_report';
+    derivedFrom: 'continuous_sms_events_and_booked_calls';
+  };
   id: string;
   createdAt: string;
   timestamp: string;

@@ -17,6 +17,10 @@ test('v2 guards accept minimally valid sales metrics envelope', () => {
       requestedMode: 'range',
     },
     data: {
+      processing: {
+        model: 'live_rolling_metrics',
+        source: 'continuous_sms_events_and_booked_calls',
+      },
       timeRange: { from: '2026-02-20T00:00:00Z', to: '2026-02-21T00:00:00Z' },
       totals: { messagesSent: 1, canonicalBookedCalls: 1 },
       bookedCredit: { total: 1, jack: 1, brandon: 0, selfBooked: 0 },
@@ -115,6 +119,10 @@ test('v2 guards accept sales metrics batch envelope', () => {
         {
           day: '2026-02-20',
           metrics: {
+            processing: {
+              model: 'live_rolling_metrics',
+              source: 'continuous_sms_events_and_booked_calls',
+            },
             timeRange: { from: '2026-02-20T00:00:00Z', to: '2026-02-20T23:59:59Z' },
             totals: { messagesSent: 1, canonicalBookedCalls: 1 },
             bookedCredit: { total: 1, jack: 1, brandon: 0, selfBooked: 0 },

@@ -83,6 +83,8 @@ describe('v2 contract mappers', () => {
     });
 
     assert.equal(v2.totals.canonicalBookedCalls, 9);
+    assert.equal(v2.processing.model, 'live_rolling_metrics');
+    assert.equal(v2.processing.source, 'continuous_sms_events_and_booked_calls');
     assert.equal(v2.bookedCredit.jack, 5);
     assert.equal(v2.sequences[0]?.diagnosticSmsBookingSignals, 5);
     assert.equal(v2.sequences[0]?.canonicalBookedCalls, 3);
@@ -118,6 +120,11 @@ describe('v2 contract mappers', () => {
     assert.equal(envelope.meta.schemaVersion, '2026.1');
     assert.equal(envelope.meta.timeZone, 'America/Chicago');
     assert.equal(envelope.data.pagination.count, 1);
+    assert.equal(envelope.data.items[0]?.processing.model, 'snapshot_report');
+    assert.equal(
+      envelope.data.items[0]?.processing.derivedFrom,
+      'continuous_sms_events_and_booked_calls',
+    );
     assert.equal(envelope.data.items[0]?.isLegacy, false);
   });
 

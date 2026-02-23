@@ -16,6 +16,10 @@ export type ApiEnvelope<T> = {
 };
 
 export type SalesMetricsV2 = {
+  processing: {
+    model: 'live_rolling_metrics';
+    source: 'continuous_sms_events_and_booked_calls';
+  };
   timeRange: { from: string; to: string };
   totals: {
     messagesSent: number;
@@ -126,6 +130,10 @@ export type RunsListV2 = {
 };
 
 export type RunV2 = {
+  processing: {
+    model: 'snapshot_report';
+    derivedFrom: 'continuous_sms_events_and_booked_calls';
+  };
   id: string;
   createdAt: string;
   timestamp: string;
@@ -490,6 +498,10 @@ export const toEnvelope = <T>(params: {
 });
 
 export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetricsV2 => ({
+  processing: {
+    model: 'live_rolling_metrics',
+    source: 'continuous_sms_events_and_booked_calls',
+  },
   timeRange: source.timeRange,
   totals: {
     messagesSent: source.totals.messagesSent,
@@ -558,6 +570,10 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
 });
 
 export const toRunV2 = (run: DailyRunRow, options?: { includeFullReport?: boolean }): RunV2 => ({
+  processing: {
+    model: 'snapshot_report',
+    derivedFrom: 'continuous_sms_events_and_booked_calls',
+  },
   id: run.id,
   createdAt: run.created_at,
   timestamp: run.timestamp,

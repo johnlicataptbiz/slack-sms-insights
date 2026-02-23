@@ -31,6 +31,11 @@ function assertEnvelopeMeta(value: unknown): asserts value is ApiEnvelope<unknow
 
 function assertRun(value: unknown): void {
   if (!isObject(value)) throw new Error('Invalid v2 run: not an object');
+  if (!isObject(value.processing)) throw new Error('Invalid v2 run.processing');
+  if (value.processing.model !== 'snapshot_report') throw new Error('Invalid v2 run.processing.model');
+  if (value.processing.derivedFrom !== 'continuous_sms_events_and_booked_calls') {
+    throw new Error('Invalid v2 run.processing.derivedFrom');
+  }
   if (!isString(value.id)) throw new Error('Invalid v2 run.id');
   if (!isString(value.timestamp)) throw new Error('Invalid v2 run.timestamp');
   if (!isString(value.channelId)) throw new Error('Invalid v2 run.channelId');
@@ -40,6 +45,13 @@ function assertRun(value: unknown): void {
 }
 
 const assertSalesMetricsPayload = (data: Record<string, unknown>, context: string): void => {
+  if (!isObject(data.processing)) throw new Error(`Invalid ${context}: processing missing`);
+  if (data.processing.model !== 'live_rolling_metrics') {
+    throw new Error(`Invalid ${context}: processing.model`);
+  }
+  if (data.processing.source !== 'continuous_sms_events_and_booked_calls') {
+    throw new Error(`Invalid ${context}: processing.source`);
+  }
   if (!isObject(data.totals)) throw new Error(`Invalid ${context}: totals missing`);
   if (!isNumber(data.totals.messagesSent)) throw new Error(`Invalid ${context}: totals.messagesSent`);
   if (!isNumber(data.totals.canonicalBookedCalls)) {

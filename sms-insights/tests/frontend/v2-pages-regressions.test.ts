@@ -6,6 +6,10 @@ import { resolveSelectedRunViewModel } from '../../../frontend/src/v2/pages/Runs
 import { computeSequenceHeaderMetrics } from '../../../frontend/src/v2/pages/SequencesV2.js';
 
 const baseRun = (overrides: Partial<RunV2> = {}): RunV2 => ({
+  processing: {
+    model: 'snapshot_report',
+    derivedFrom: 'continuous_sms_events_and_booked_calls',
+  },
   id: '11111111-1111-4111-8111-111111111111',
   createdAt: '2026-02-23T03:00:13.317Z',
   timestamp: '2026-02-23T03:00:13.317Z',
@@ -62,6 +66,10 @@ test('RunsV2 selected run view model ignores stale cached model and parses detai
 
 test('SequencesV2 header metrics use all-channel booked total and keep unattributed separate', () => {
   const payload: SalesMetricsV2 = {
+    processing: {
+      model: 'live_rolling_metrics',
+      source: 'continuous_sms_events_and_booked_calls',
+    },
     timeRange: { from: '2026-02-22T06:00:00.000Z', to: '2026-02-23T05:59:59.999Z' },
     totals: {
       messagesSent: 100,
@@ -143,6 +151,10 @@ test('SequencesV2 header metrics use all-channel booked total and keep unattribu
 
 test('InsightsV2 booked breakdown separates self-booked from non-SMS/unknown rollup', () => {
   const payload: SalesMetricsV2 = {
+    processing: {
+      model: 'live_rolling_metrics',
+      source: 'continuous_sms_events_and_booked_calls',
+    },
     timeRange: { from: '2026-02-16T06:00:00.000Z', to: '2026-02-23T05:59:59.999Z' },
     totals: {
       messagesSent: 1446,

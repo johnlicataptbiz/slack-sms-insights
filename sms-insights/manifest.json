@@ -34,7 +34,14 @@
   },
   "settings": {
     "event_subscriptions": {
-      "bot_events": ["app_home_opened", "app_mention", "message.channels", "message.groups"]
+      "bot_events": [
+        "app_home_opened",
+        "app_mention",
+        "message.channels",
+        "message.groups",
+        "reaction_added",
+        "reaction_removed"
+      ]
     },
     "interactivity": {
       "is_enabled": true

@@ -476,7 +476,7 @@ export default function RunsV2() {
     <div className="V2Page">
       <V2PageHeader
         title={v2Copy.nav.runs}
-        subtitle="Run history and run details. Start with the structured summary, then open raw text only when needed."
+        subtitle="Archive of daily/manual run logs. Start with the structured summary, then open raw text only when needed."
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">

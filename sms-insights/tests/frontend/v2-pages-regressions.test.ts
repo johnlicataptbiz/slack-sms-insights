@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { RunV2, SalesMetricsV2 } from '../../../frontend/src/api/v2-types.js';
+import { computeInsightsBookedBreakdown } from '../../../frontend/src/v2/pages/InsightsV2.js';
 import { resolveSelectedRunViewModel } from '../../../frontend/src/v2/pages/RunsV2.js';
 import { computeSequenceHeaderMetrics } from '../../../frontend/src/v2/pages/SequencesV2.js';
 
@@ -138,4 +139,52 @@ test('SequencesV2 header metrics use all-channel booked total and keep unattribu
   assert.equal(metrics.unattributedCalls, 9);
   assert.equal(metrics.totalBookedAfterReply, 1);
   assert.equal(metrics.totalBookedNonSmsOrUnknown, 11);
+});
+
+test('InsightsV2 booked breakdown separates self-booked from non-SMS/unknown rollup', () => {
+  const payload: SalesMetricsV2 = {
+    timeRange: { from: '2026-02-16T06:00:00.000Z', to: '2026-02-23T05:59:59.999Z' },
+    totals: {
+      messagesSent: 1446,
+      manualMessagesSent: 100,
+      sequenceMessagesSent: 1346,
+      peopleContacted: 1064,
+      manualPeopleContacted: 40,
+      sequencePeopleContacted: 1024,
+      repliesReceived: 106,
+      replyRatePct: 10,
+      manualRepliesReceived: 12,
+      manualReplyRatePct: 30,
+      sequenceRepliesReceived: 94,
+      sequenceReplyRatePct: 9.2,
+      canonicalBookedCalls: 42,
+      optOuts: 11,
+    },
+    bookedCredit: { total: 42, jack: 20, brandon: 8, selfBooked: 14 },
+    trendByDay: [],
+    sequences: [],
+    reps: [],
+    provenance: {
+      canonicalBookedSource: 'slack',
+      diagnosticBookingSignalsSource: 'sms_heuristics',
+      sequenceBookedAttribution: {
+        source: 'slack_booked_calls',
+        model: 'hubspot_first_conversion_fuzzy_v1',
+        totalCalls: 42,
+        matchedCalls: 30,
+        unattributedCalls: 12,
+        manualCalls: 8,
+        strictSmsReplyLinkedCalls: 14,
+        nonSmsOrUnknownCalls: 28,
+      },
+    },
+  };
+
+  const metrics = computeInsightsBookedBreakdown(payload);
+
+  assert.equal(metrics.bookedTotalAllChannels, 42);
+  assert.equal(metrics.bookedSmsLinkedStrict, 14);
+  assert.equal(metrics.bookedSelf, 14);
+  assert.equal(metrics.bookedNonSmsOrUnknown, 28);
+  assert.equal(metrics.bookedNonSmsOrUnknownExcludingSelf, 14);
 });

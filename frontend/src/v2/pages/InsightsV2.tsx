@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 
+import type { SalesMetricsV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2SetterTrend, useV2WeeklySummary } from '../../api/v2Queries';
 import { v2Copy } from '../copy';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
@@ -47,6 +48,24 @@ const rangeShortLabel = (range: InsightsRange): string => {
   if (range === 'today') return '1d';
   if (range === '30d') return '30d';
   return '7d';
+};
+
+export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2) => {
+  const bookedAttribution = payload.provenance.sequenceBookedAttribution;
+  const bookedTotalAllChannels = payload.totals.canonicalBookedCalls;
+  const bookedSmsLinkedStrict = bookedAttribution?.strictSmsReplyLinkedCalls ?? 0;
+  const bookedSelf = payload.bookedCredit.selfBooked;
+  const bookedNonSmsOrUnknown =
+    bookedAttribution?.nonSmsOrUnknownCalls ?? Math.max(0, bookedTotalAllChannels - bookedSmsLinkedStrict);
+  const bookedNonSmsOrUnknownExcludingSelf = Math.max(0, bookedNonSmsOrUnknown - bookedSelf);
+  return {
+    bookedAttribution,
+    bookedTotalAllChannels,
+    bookedSmsLinkedStrict,
+    bookedSelf,
+    bookedNonSmsOrUnknown,
+    bookedNonSmsOrUnknownExcludingSelf,
+  };
 };
 
 export default function InsightsV2() {
@@ -142,11 +161,14 @@ export default function InsightsV2() {
     return <V2State kind="error">Failed to load team insights: {String((error as Error)?.message || error)}</V2State>;
   }
 
-  const bookedAttribution = payload.provenance.sequenceBookedAttribution;
-  const bookedTotalAllChannels = payload.totals.canonicalBookedCalls;
-  const bookedSmsLinkedStrict = bookedAttribution?.strictSmsReplyLinkedCalls ?? 0;
-  const bookedNonSmsOrUnknown =
-    bookedAttribution?.nonSmsOrUnknownCalls ?? Math.max(0, bookedTotalAllChannels - bookedSmsLinkedStrict);
+  const {
+    bookedAttribution,
+    bookedTotalAllChannels,
+    bookedSmsLinkedStrict,
+    bookedSelf,
+    bookedNonSmsOrUnknown,
+    bookedNonSmsOrUnknownExcludingSelf,
+  } = computeInsightsBookedBreakdown(payload);
 
   const weeklySummary = weeklySummaryQuery.data?.data || null;
   const sourceStatus = weeklySummary?.sources.monday.status || 'disabled';
@@ -169,7 +191,7 @@ export default function InsightsV2() {
     <div className="V2Page V2Insights">
       <V2PageHeader
         title={v2Copy.nav.insights}
-        subtitle="Team performance at a glance. Calls booked come from Slack booked-call records, while SMS booking hints are separate coaching signals."
+        subtitle="Live team performance in rolling windows. Calls booked come from Slack booked-call records with self-booked shown separately."
         right={
           <label className="V2Control">
             <span>Range</span>
@@ -198,13 +220,18 @@ export default function InsightsV2() {
           tone="positive"
         />
         <V2MetricCard label="Booked SMS linked (strict)" value={fmtInt(bookedSmsLinkedStrict)} tone="accent" />
-        <V2MetricCard label="Booked calls (non-SMS or unknown source)" value={fmtInt(bookedNonSmsOrUnknown)} />
-        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} tone="critical" />
         <V2MetricCard
-          label={<V2Term term="smsBookingHintsDiagnostic" />}
-          value={fmtInt(payload.sequences.reduce((sum, row) => sum + row.diagnosticSmsBookingSignals, 0))}
-          meta="SMS heuristics only"
+          label="Self-booked calls"
+          value={fmtInt(bookedSelf)}
+          meta="No setter reaction on booked-call message"
+          tone="accent"
         />
+        <V2MetricCard
+          label="Booked calls (non-SMS/unknown, excluding self-booked)"
+          value={fmtInt(bookedNonSmsOrUnknownExcludingSelf)}
+          meta={`Raw non-SMS/unknown bucket is ${fmtInt(bookedNonSmsOrUnknown)} including self-booked`}
+        />
+        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} tone="critical" />
       </section>
 
       <V2Panel
@@ -410,18 +437,17 @@ export default function InsightsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Attribution Rules" caption="v2 keeps canonical booked calls and diagnostic hints separated by design.">
+        <V2Panel title="Attribution Rules" caption="Explicit split so self-booked does not hide inside unknown buckets.">
           <ul className="V2BulletList">
             <li>Calls Booked source: {payload.provenance.canonicalBookedSource} (canonical KPI).</li>
-            <li>SMS Booking Hints source: {payload.provenance.diagnosticBookingSignalsSource} (QA only).</li>
             <li>
               Channel split:
-              {` total ${fmtInt(bookedTotalAllChannels)}, SMS linked strict ${fmtInt(bookedSmsLinkedStrict)}, non SMS or unknown ${fmtInt(bookedNonSmsOrUnknown)}.`}
+              {` total ${fmtInt(bookedTotalAllChannels)}, SMS linked strict ${fmtInt(bookedSmsLinkedStrict)}, self-booked ${fmtInt(bookedSelf)}, non-SMS/unknown excluding self ${fmtInt(bookedNonSmsOrUnknownExcludingSelf)}.`}
             </li>
             <li>
               Sequence label coverage:{' '}
-              {payload.provenance.sequenceBookedAttribution
-                ? `${payload.provenance.sequenceBookedAttribution.matchedCalls}/${payload.provenance.sequenceBookedAttribution.totalCalls} (named: ${Math.max(0, payload.provenance.sequenceBookedAttribution.matchedCalls - payload.provenance.sequenceBookedAttribution.manualCalls)}, manual/direct: ${payload.provenance.sequenceBookedAttribution.manualCalls})`
+              {bookedAttribution
+                ? `${bookedAttribution.matchedCalls}/${bookedAttribution.totalCalls} (named: ${Math.max(0, bookedAttribution.matchedCalls - bookedAttribution.manualCalls)}, manual/direct: ${bookedAttribution.manualCalls})`
                 : 'n/a'}
             </li>
           </ul>
@@ -456,7 +482,7 @@ export default function InsightsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Daily Snapshot" caption={`Time zone ${data.meta.timeZone}.`}>
+        <V2Panel title="Live Trend" caption={`Rolling by-day trend in ${data.meta.timeZone}.`}>
           <div className="V2TrendList">
             {payload.trendByDay.map((day) => (
               <article key={day.day} className="V2TrendList__row">

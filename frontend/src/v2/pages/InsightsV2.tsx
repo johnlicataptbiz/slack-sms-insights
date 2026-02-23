@@ -219,7 +219,7 @@ export default function InsightsV2() {
           meta={replyMeta}
           tone="accent"
         />
-        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} meta={selectedWindowMeta} tone="critical" />
+        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} meta={rangeMeta} tone="critical" />
       </section>
 
       <V2Panel title={isWeeklyRange ? 'This Week' : selectedRangeLabel} caption={isWeeklyRange ? 'How the week went.' : `${selectedRangeLabel} totals.`}>

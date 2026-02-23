@@ -13,5 +13,5 @@ export default Manifest({
   icon: "assets/default_new_app_icon.png",
   workflows: [DailySmsReportWorkflow],
   outgoingDomains: [],
-  botScopes: ["commands", "chat:write", "chat:write.public"],
+  botScopes: ["commands", "chat:write", "chat:write.public", "reactions:read", "channels:history", "groups:history"],
 });

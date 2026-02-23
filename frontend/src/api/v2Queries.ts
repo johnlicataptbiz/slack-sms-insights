@@ -118,8 +118,11 @@ export const useV2SalesMetrics = (params: SalesMetricsQueryParams, options?: { e
     queryKey: ['v2', 'salesMetrics', params],
     enabled: options?.enabled ?? true,
     queryFn: async () => fetchV2SalesMetrics(params),
-    staleTime: 60_000,
-    retry: false,
+    staleTime: 30 * 1000,      // 30 seconds
+    gcTime: 5 * 60 * 1000,     // 5 minutes (cacheTime in v5)
+    retry: 3,                  // Retry 3 times on failure
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -161,8 +164,11 @@ export const useV2SetterTrend = (days: string[], tz: string) => {
         };
       });
     },
-    staleTime: 60_000,
-    retry: false,
+    staleTime: 60 * 1000,        // 1 minute
+    gcTime: 10 * 60 * 1000,      // 10 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -183,8 +189,11 @@ export const useV2Runs = (params: {
       assertRunsListV2Envelope(response);
       return response as ApiEnvelope<RunsListV2>;
     },
-    staleTime: 15_000,
-    retry: false,
+    staleTime: 30 * 1000,        // 30 seconds
+    gcTime: 5 * 60 * 1000,       // 5 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -197,8 +206,11 @@ export const useV2Run = (runId: string | null) => {
       assertRunV2Envelope(response);
       return response as ApiEnvelope<RunV2>;
     },
-    staleTime: 15_000,
-    retry: false,
+    staleTime: 60 * 1000,        // 1 minute
+    gcTime: 10 * 60 * 1000,      // 10 minutes
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -210,8 +222,11 @@ export const useV2Channels = () => {
       assertChannelsV2Envelope(response);
       return response as ApiEnvelope<ChannelsV2>;
     },
-    staleTime: 60_000,
-    retry: false,
+    staleTime: 5 * 60 * 1000,      // 5 minutes
+    gcTime: 30 * 60 * 1000,        // 30 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -234,8 +249,11 @@ export const useV2WeeklySummary = (params: { weekStart?: string; tz?: string }) 
       assertWeeklySummaryV2Envelope(response);
       return response as ApiEnvelope<WeeklyManagerSummaryV2>;
     },
-    staleTime: 60_000,
-    retry: false,
+    staleTime: 5 * 60 * 1000,      // 5 minutes
+    gcTime: 30 * 60 * 1000,        // 30 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };
 
@@ -268,8 +286,11 @@ export const useV2InboxConversations = (params: InboxListParams) => {
       assertInboxConversationListEnvelope(response);
       return response as ApiEnvelope<InboxConversationListV2>;
     },
-    staleTime: 10_000,
-    retry: false,
+    staleTime: 10 * 1000,          // 10 seconds
+    gcTime: 60 * 1000,             // 1 minute
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: true,  // Refresh when user returns to tab
   });
 };
 
@@ -282,8 +303,11 @@ export const useV2InboxConversationDetail = (conversationId: string | null) => {
       assertInboxConversationDetailEnvelope(response);
       return response as ApiEnvelope<InboxConversationDetailV2>;
     },
-    staleTime: 5_000,
-    retry: false,
+    staleTime: 5 * 1000,           // 5 seconds
+    gcTime: 60 * 1000,             // 1 minute
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: true,
   });
 };
 
@@ -427,8 +451,11 @@ export const useV2InboxSendConfig = () => {
       assertInboxSendConfigEnvelope(response);
       return response as ApiEnvelope<InboxSendConfigV2>;
     },
-    staleTime: 30_000,
-    retry: false,
+    staleTime: 60 * 1000,        // 1 minute
+    gcTime: 5 * 60 * 1000,         // 5 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };
 

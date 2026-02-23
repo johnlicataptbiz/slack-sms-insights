@@ -3,6 +3,16 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
 import {
+  listRunsSchema,
+  getRunSchema,
+  createRunSchema,
+  salesMetricsSchema,
+  workItemsQuerySchema,
+  validateQuery,
+  validateBody,
+  formatValidationErrors,
+} from './validation.js';
+import {
   getBookedCallAttributionSources,
   getBookedCallSmsReplyLinks,
   getBookedCallsSummary,
@@ -54,7 +64,7 @@ import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 
-import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem } from '../services/work-items.js';
+import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem, type WorkItemCursor } from '../services/work-items.js';
 
 import {
   toChannelsV2,
@@ -717,18 +727,29 @@ const handleOauthCallback: RequestHandler = async (req, res, logger) => {
 
 const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const channelId = url.searchParams.get('channelId') || undefined;
-  const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 100);
-  const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
-  const daysBack = Number.parseInt(url.searchParams.get('daysBack') || '7', 10) || 7;
-  const raw = url.searchParams.get('raw') === 'true';
-  const legacyOnly = url.searchParams.get('legacyOnly') === 'true';
-  const includeLegacy = url.searchParams.get('includeLegacy') === 'true';
-  const legacyMode = legacyOnly ? 'only' : includeLegacy ? 'include' : 'exclude';
+  
+  const queryParams = {
+    daysBack: url.searchParams.get('daysBack') || undefined,
+    channelId: url.searchParams.get('channelId') || undefined,
+    limit: url.searchParams.get('limit') || undefined,
+    offset: url.searchParams.get('offset') || undefined,
+    raw: url.searchParams.get('raw') === 'true',
+    legacyOnly: url.searchParams.get('legacyOnly') === 'true',
+    includeLegacy: url.searchParams.get('includeLegacy') === 'true',
+  };
+  
+  const validation = validateQuery(listRunsSchema, queryParams);
+  if (!validation.success) {
+    sendJson(res, 400, { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) }, origin);
+    return;
+  }
+  
+  const { channelId, limit, offset, daysBack, raw } = validation.data;
+  const legacyMode = queryParams.legacyOnly ? 'only' : queryParams.includeLegacy ? 'include' : 'exclude';
 
   const runs = await getDailyRuns(
     {
-      channelId: channelId as string | undefined,
+      channelId,
       limit,
       offset,
       daysBack,
@@ -743,14 +764,14 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
 
 const handleGetRunById: RequestHandler = async (req, res, logger, origin) => {
   const id = req.url?.split('/').pop();
-  if (!id) {
-    return sendJson(res, 400, { error: 'Missing run ID' }, origin);
-  }
-  if (!isUuid(id)) {
-    return sendJson(res, 400, { error: 'Invalid run ID' }, origin);
+  
+  const validation = validateQuery(getRunSchema, { id: id || '' });
+  if (!validation.success) {
+    sendJson(res, 400, { error: 'Invalid run ID', details: formatValidationErrors(validation.error) }, origin);
+    return;
   }
 
-  const run = await getDailyRunById(id, logger);
+  const run = await getDailyRunById(validation.data.id, logger);
   if (!run) {
     return sendJson(res, 404, { error: 'Run not found' }, origin);
   }
@@ -764,37 +785,27 @@ const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
     return sendJson(res, 401, { error: 'Invalid bot token' }, origin);
   }
 
-  type LegacyRunPayload = {
-    channelId: string;
-    channelName?: string;
-    reportType: 'daily' | 'manual' | 'test';
-    status: 'success' | 'error' | 'pending';
-    errorMessage?: string;
-    summaryText?: string;
-    fullReport?: string;
-    durationMs?: number;
-  };
-
-  let body: Partial<LegacyRunPayload>;
+  let rawBody: unknown;
   try {
-    body = (await parseJsonBody(req)) as Partial<LegacyRunPayload>;
+    rawBody = await parseJsonBody(req);
   } catch (error) {
     sendBodyParseError(res, origin, error);
     return;
   }
 
-  if (!body.channelId || !body.reportType || !body.status) {
-    return sendJson(res, 400, { error: 'Missing required fields: channelId, reportType, status' }, origin);
+  const validation = validateBody(createRunSchema, rawBody);
+  if (!validation.success) {
+    sendJson(res, 400, { error: 'Invalid request body', details: formatValidationErrors(validation.error) }, origin);
+    return;
   }
 
-  const { channelId, channelName, reportType, status, errorMessage, summaryText, fullReport, durationMs } =
-    body as LegacyRunPayload;
+  const { channelId, channelName, reportType, status, errorMessage, summaryText, fullReport, durationMs } = validation.data;
 
   try {
     const runId = await logDailyRun(
       {
         channelId,
-        channelName,
+        channelName: channelName ?? undefined,
         reportType,
         status,
         errorMessage,
@@ -1180,15 +1191,24 @@ const buildSalesMetricsPayload = async (params: {
 
 const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
+  
+  const queryParams = {
+    from: url.searchParams.get('from') || undefined,
+    to: url.searchParams.get('to') || undefined,
+    day: url.searchParams.get('day') || undefined,
+    range: url.searchParams.get('range') || undefined,
+    tz: url.searchParams.get('tz') || undefined,
+  };
+  
+  const validation = validateQuery(salesMetricsSchema, queryParams);
+  if (!validation.success) {
+    sendJson(res, 400, { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) }, origin);
+    return;
+  }
+  
   let resolved: ReturnType<typeof resolveMetricsRange>;
   try {
-    resolved = resolveMetricsRange({
-      from: url.searchParams.get('from'),
-      to: url.searchParams.get('to'),
-      day: url.searchParams.get('day'),
-      range: url.searchParams.get('range'),
-      tz: url.searchParams.get('tz'),
-    });
+    resolved = resolveMetricsRange(validation.data);
   } catch (error) {
     return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
   }
@@ -1404,20 +1424,38 @@ const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
 
 const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const type = url.searchParams.get('type') || undefined;
-  const repId = url.searchParams.get('repId') || undefined;
-  const severity = (url.searchParams.get('severity') || undefined) as 'low' | 'med' | 'high' | undefined;
-  const overdueOnly = url.searchParams.get('overdueOnly') === 'true';
-  const dueBefore = url.searchParams.get('dueBefore') || undefined;
-  const _search = url.searchParams.get('search') || undefined; // Not implemented in service yet, but good to have param
-
-  const limit = Math.min(Number.parseInt(url.searchParams.get('limit') || '50', 10) || 50, 200);
-  const offset = Number.parseInt(url.searchParams.get('offset') || '0', 10) || 0;
-
-  const cursorParam = url.searchParams.get('cursor') || undefined;
-  const cursor = cursorParam ? decodeWorkItemCursor(cursorParam) : undefined;
+  
+  const queryParams = {
+    type: url.searchParams.get('type') || undefined,
+    repId: url.searchParams.get('repId') || undefined,
+    severity: url.searchParams.get('severity') || undefined,
+    overdueOnly: url.searchParams.get('overdueOnly') === 'true',
+    dueBefore: url.searchParams.get('dueBefore') || undefined,
+    limit: url.searchParams.get('limit') || undefined,
+    offset: url.searchParams.get('offset') || undefined,
+    cursor: url.searchParams.get('cursor') || undefined,
+  };
+  
+  const validation = validateQuery(workItemsQuerySchema, queryParams);
+  if (!validation.success) {
+    sendJson(res, 400, { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) }, origin);
+    return;
+  }
+  
+  const { type, repId, severity, overdueOnly, dueBefore, limit, offset, cursor } = validation.data;
   const authUser = getVerifiedSlackUser(req);
   const meRepId = (authUser.user_id || authUser.user || '').trim() || undefined;
+
+  // Decode cursor string to WorkItemCursor object if provided
+  let decodedCursor: WorkItemCursor | undefined;
+  if (cursor) {
+    try {
+      decodedCursor = decodeWorkItemCursor(cursor);
+    } catch {
+      sendJson(res, 400, { error: 'Invalid cursor format' }, origin);
+      return;
+    }
+  }
 
   const { items, nextCursor: _nextCursor } = await listOpenWorkItems(
     {
@@ -1427,8 +1465,8 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
       overdueOnly,
       dueBefore,
       limit,
-      offset: cursor ? undefined : offset, // prefer cursor when provided
-      cursor,
+      offset: decodedCursor ? undefined : offset, // prefer cursor when provided
+      cursor: decodedCursor,
     },
     logger,
   );

@@ -1,4 +1,5 @@
 import { App, LogLevel } from '@slack/bolt';
+import compression from 'compression';
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -8,6 +9,7 @@ import { handleApiRoute } from './api/routes.js';
 import registerListeners from './listeners/index.js';
 import { initDatabase, initializeSchema } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
+import { logger } from './services/logger.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
@@ -89,13 +91,20 @@ app.error(async (error) => {
       try {
         frontendIndex = readFileSync(join(frontendDistPath, 'index.html'), 'utf-8');
       } catch {
-        app.logger.warn('Frontend dist not found; dashboard will be unavailable');
+        logger.app.warn('Frontend dist not found; dashboard will be unavailable');
       }
     }
 
     // Start HTTP server with API + static file serving
     const port = Number.parseInt(process.env.PORT || '3000', 10);
-    const server = createServer(async (req, res) => {
+    
+    // Compression middleware wrapper
+    const compressionMiddleware = compression();
+    const server = createServer((req, res) => {
+      // Apply compression
+      compressionMiddleware(req, res, () => {
+        // Continue with request handling
+        void (async () => {
       const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
 
       // Handle API routes
@@ -124,20 +133,23 @@ app.error(async (error) => {
         'Content-Type': 'text/plain',
       });
       res.end('Health check: OK');
+        })();
+      });
     });
 
     server.listen(port, '0.0.0.0', () => {
-      app.logger.info(`🌐 HTTP server listening on port ${port}`);
+      logger.app.info(`🌐 HTTP server listening on port ${port}`);
     });
 
     // Start Bolt App
     if (process.env.SLACK_BOT_TOKEN !== 'xoxb-dummy') {
       await app.start();
-      app.logger.info('⚡️ Bolt app is running via Socket Mode!');
+      logger.app.info('⚡️ Bolt app is running via Socket Mode!');
     } else {
-      app.logger.info('⚡️ Bolt app skipped (dummy token detected)');
+      logger.app.info('⚡️ Bolt app skipped (dummy token detected)');
     }
-    app.logger.info('Token config diagnostics', {
+    logger.app.info({
+      msg: 'Token config diagnostics',
       alowareApiTokenLength: safeEnvLen(process.env.ALOWARE_API_TOKEN),
       alowareWebhookTokenLength: safeEnvLen(process.env.ALOWARE_WEBHOOK_API_TOKEN),
       alowareFormTokenLength: safeEnvLen(process.env.ALOWARE_FORM_API_TOKEN),

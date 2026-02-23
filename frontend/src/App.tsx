@@ -65,6 +65,41 @@ const DefaultRoute = () => {
   return <Navigate to={mode === 'v2' ? '/v2/insights' : '/legacy'} replace />;
 };
 
+const CheckingSessionView = () => {
+  return (
+    <main
+      style={{
+        minHeight: '100vh',
+        display: 'grid',
+        placeItems: 'center',
+        padding: '1.5rem',
+        fontFamily: 'Manrope, system-ui, sans-serif',
+        background:
+          'radial-gradient(1200px 600px at 8% -10%, rgba(17, 184, 214, 0.22), transparent 50%), radial-gradient(900px 560px at 100% 0%, rgba(19, 185, 129, 0.16), transparent 44%), linear-gradient(160deg, #f3f8fc 0%, #edf5fa 55%, #e9f1f8 100%)',
+      }}
+    >
+      <section
+        style={{
+          width: 'min(560px, 100%)',
+          borderRadius: '18px',
+          border: '1px solid rgba(7, 19, 36, 0.12)',
+          background: 'linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.86))',
+          boxShadow: '0 16px 40px rgba(8, 12, 29, 0.18)',
+          padding: '1.1rem 1.2rem',
+        }}
+      >
+        <p style={{ margin: 0, textTransform: 'uppercase', letterSpacing: '0.14em', fontSize: '0.68rem', color: '#56607a', fontWeight: 700 }}>
+          PT Biz Setter Ops
+        </p>
+        <h1 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem', color: '#0c1429', fontWeight: 800 }}>Checking secure session</h1>
+        <p style={{ margin: '0.35rem 0 0', color: '#56607a', fontSize: '0.92rem' }}>
+          Verifying your dashboard access before loading the app.
+        </p>
+      </section>
+    </main>
+  );
+};
+
 export default function App() {
   const [authState, setAuthState] = useState<'checking' | 'authenticated' | 'unauthenticated'>('checking');
 
@@ -90,11 +125,7 @@ export default function App() {
   }, []);
 
   if (authState === 'checking') {
-    return (
-      <main style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', fontFamily: 'system-ui' }}>
-        Checking secure session...
-      </main>
-    );
+    return <CheckingSessionView />;
   }
 
   if (authState === 'unauthenticated') {

@@ -112,6 +112,7 @@ export default function InboxV2() {
   const [isComposerModalOpen, setIsComposerModalOpen] = useState(false);
   const [composerText, setComposerText] = useState('');
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] = useState<string | null>(null);
   const [selectedLineKey, setSelectedLineKey] = useState('');
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -214,15 +215,23 @@ export default function InboxV2() {
   }, [detail]);
 
   useEffect(() => {
+    setDraftPrefillDoneForConversation(null);
+  }, [selectedConversationId]);
+
+  useEffect(() => {
     if (!detail) return;
-    if (detail.drafts.length === 0) return;
-    if (composerText.trim().length > 0) return;
+    if (!selectedConversationId) return;
+    if (draftPrefillDoneForConversation === selectedConversationId) return;
 
     const latestDraft = detail.drafts[0];
     if (!latestDraft) return;
-    setComposerText(latestDraft.text);
-    setSelectedDraftId(latestDraft.id);
-  }, [detail, composerText]);
+
+    if (composerText.trim().length === 0) {
+      setComposerText(latestDraft.text);
+      setSelectedDraftId(latestDraft.id);
+    }
+    setDraftPrefillDoneForConversation(selectedConversationId);
+  }, [detail, composerText, selectedConversationId, draftPrefillDoneForConversation]);
 
   useEffect(() => {
     if (!isComposerModalOpen || !selectedConversationId || !detail) return;
@@ -252,6 +261,7 @@ export default function InboxV2() {
       });
       setComposerText(result.data.text);
       setSelectedDraftId(result.data.id);
+      setDraftPrefillDoneForConversation(selectedConversationId);
       if (result.data.generationMode === 'contextual_fallback') {
         const firstWarning = result.data.generationWarnings[0] || 'AI generation unavailable';
         setFlashMessage(`Draft generated in contextual fallback mode. ${firstWarning}`);
@@ -327,6 +337,14 @@ export default function InboxV2() {
     }
   };
 
+  const onClearDraft = () => {
+    if (!selectedConversationId) return;
+    setComposerText('');
+    setSelectedDraftId(null);
+    setDraftPrefillDoneForConversation(selectedConversationId);
+    setFlashMessage('Draft cleared. You can regenerate or type a new message.');
+  };
+
   const onSaveQualification = async () => {
     if (!selectedConversationId) return;
 
@@ -365,7 +383,7 @@ export default function InboxV2() {
     <div className="V2Page V2Inbox">
       <V2PageHeader
         title={v2Copy.nav.inbox}
-        subtitle="Two way SMS inbox with qualification state, escalation controls, and strict draft suggestions."
+        subtitle="Two-way SMS inbox with clear conversation context, drafting tools, and send controls."
         right={
           <div className="V2Inbox__controls">
             <label className="V2Control">
@@ -425,6 +443,7 @@ export default function InboxV2() {
                       setSelectedConversationId(conversation.id);
                       setComposerText('');
                       setSelectedDraftId(null);
+                      setDraftPrefillDoneForConversation(null);
                       setIsComposerModalOpen(true);
                     }}
                   >
@@ -463,10 +482,10 @@ export default function InboxV2() {
                     {detail.contactCard.dnc ? ' (DNC)' : ''}
                   </span>
                 }
-                caption={`Last touch: ${fmtDateTime(detail.conversation.lastTouchAt)} · Needs reply due: ${fmtDateTime(detail.conversation.needsReplyDueAt)}`}
+                caption={`Last touch: ${fmtDateTime(detail.conversation.lastTouchAt)} · Reply due: ${fmtDateTime(detail.conversation.needsReplyDueAt)}`}
               >
                 <div className="V2Inbox__threadActions">
-                  <button type="button" onClick={() => setIsComposerModalOpen(true)}>
+                  <button type="button" className="V2Inbox__button V2Inbox__button--secondary" onClick={() => setIsComposerModalOpen(true)}>
                     Open Draft + Send
                   </button>
                 </div>
@@ -499,7 +518,7 @@ export default function InboxV2() {
             <>
               <V2Panel
                 title="Contact Card"
-                caption="Enriched from Aloware and PT Biz conversation state."
+                caption="Contact context from Aloware and PT Biz conversation state."
                 className="V2Inbox__sidePanel V2Inbox__sidePanel--contact"
               >
                 <div className="V2Inbox__contactHead">
@@ -522,7 +541,7 @@ export default function InboxV2() {
                   <dd>{detail.contactCard.timezone || 'Unknown'}</dd>
                   <dt>Niche</dt>
                   <dd>{detail.contactCard.niche || 'Unknown'}</dd>
-                  <dt>monday trail</dt>
+                  <dt>Monday history</dt>
                   <dd>{detail.mondayTrail.length} recent records</dd>
                 </dl>
               </V2Panel>
@@ -729,7 +748,7 @@ export default function InboxV2() {
                     <section className="V2Inbox__composerPrimary">
                       <div className="V2Inbox__composerIntro">
                         <p className="V2Inbox__sendMeta">
-                          Draft only workflow with strict lint guardrails and manual send approval.
+                          Draft workflow with lint checks and manual send approval.
                         </p>
                         <p className="V2Inbox__sendMeta">
                           Lead: {detail.contactCard.name || detail.contactCard.phone || detail.contactCard.contactKey} · Owner:{' '}
@@ -741,7 +760,16 @@ export default function InboxV2() {
                         ref={composerRef}
                         className="V2Inbox__composer"
                         value={composerText}
-                        onChange={(event) => setComposerText(event.target.value)}
+                        onChange={(event) => {
+                          const nextText = event.target.value;
+                          setComposerText(nextText);
+                          if (selectedDraftId) {
+                            const selectedDraft = detail.drafts.find((draft) => draft.id === selectedDraftId);
+                            if (!selectedDraft || selectedDraft.text !== nextText) {
+                              setSelectedDraftId(null);
+                            }
+                          }
+                        }}
                         placeholder="Generate a draft or type your message here"
                       />
 
@@ -754,7 +782,21 @@ export default function InboxV2() {
                             onClick={onGenerateDraft}
                             disabled={generateDraftMutation.isPending || sendMutation.isPending}
                           >
-                            {generateDraftMutation.isPending ? 'Generating...' : 'Generate Draft'}
+                            {generateDraftMutation.isPending
+                              ? selectedDraftId
+                                ? 'Regenerating...'
+                                : 'Generating...'
+                              : selectedDraftId
+                                ? 'Regenerate Draft'
+                                : 'Generate Draft'}
+                          </button>
+                          <button
+                            type="button"
+                            className="V2Inbox__button V2Inbox__button--ghost"
+                            onClick={onClearDraft}
+                            disabled={generateDraftMutation.isPending || sendMutation.isPending || (!selectedDraftId && composerText.length === 0)}
+                          >
+                            Clear Draft
                           </button>
                           <button
                             type="button"
@@ -775,6 +817,7 @@ export default function InboxV2() {
                       {detail.drafts.length > 0 ? (
                         <div className="V2Inbox__drafts V2Inbox__drafts--composer">
                           <h4>Recent drafts</h4>
+                          <p className="V2Inbox__sendMeta">Select any draft below to reuse it.</p>
                           {detail.drafts.map((draft) => (
                             <button
                               key={draft.id}

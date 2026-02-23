@@ -402,7 +402,7 @@ const loadRelevantSources = async (params: {
 export const syncRecentSetterBookedCallsToMonday = async (
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{ status: 'skipped' | 'success'; pushed: number; checked: number }> => {
-  if (!mondayConfig.personalSyncEnabled) {
+  if (!mondayConfig.outboundEnabled || !mondayConfig.personalSyncEnabled) {
     return { status: 'skipped', pushed: 0, checked: 0 };
   }
 
@@ -435,6 +435,10 @@ export const syncBookedCallToPersonalBoardFromSlackMessage = async (
   },
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{ status: 'skipped' | 'synced' | 'error'; reason?: string }> => {
+  if (!mondayConfig.outboundEnabled) {
+    return { status: 'skipped', reason: 'MONDAY_OUTBOUND_ENABLED is false' };
+  }
+
   if (!mondayConfig.personalSyncEnabled) {
     return { status: 'skipped', reason: 'MONDAY_PERSONAL_SYNC_ENABLED is false' };
   }

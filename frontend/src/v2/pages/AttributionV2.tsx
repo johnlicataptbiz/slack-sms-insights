@@ -24,7 +24,7 @@ export default function AttributionV2() {
     <div className="V2Page">
       <V2PageHeader
         title="Attribution Deep Dive"
-        subtitle="This page explains what we count and why (manual vs sequence), plus how we credit replies and booked calls."
+        subtitle="How booked calls and reply signals are counted, including manual vs sequence attribution."
       />
 
       <section className="V2MetricsGrid">
@@ -36,24 +36,24 @@ export default function AttributionV2() {
       </section>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Canonical Layer (Slack)" caption="This drives KPI decisions and setter credit.">
+        <V2Panel title="Booked Calls Source (Slack)" caption="This is the booked-call KPI and setter credit source.">
           <ul className="V2BulletList">
             <li>Source: Slack booked-call channel + reaction-based credit routing.</li>
-            <li>This is the KPI used in manager decisions, scorecards, and weekly reviews.</li>
+            <li>This is the KPI used in scorecards and weekly reviews.</li>
             <li>Day-by-day trend uses this same canonical booked-call count.</li>
           </ul>
         </V2Panel>
 
-        <V2Panel title="Diagnostic Layer (SMS Hints)" caption="Useful for QA and signal detection, not canonical KPI accounting.">
+        <V2Panel title="SMS Hint Signals (Support View)" caption="Useful for QA and early signal checks, not booked-call KPI totals.">
           <ul className="V2BulletList">
             <li>Source: SMS body heuristics.</li>
             <li>Used to coach messaging quality and catch conversion signals early.</li>
-            <li>Never mixed into booked-call totals in v2 schema.</li>
+            <li>Not included in booked-call totals in v2.</li>
           </ul>
         </V2Panel>
       </div>
 
-      <V2Panel title="Coverage" caption='How many booked calls were matched to a sequence label vs "No sequence (manual/direct)".'>
+      <V2Panel title="Coverage" caption='How many booked calls matched a sequence label vs "No sequence (manual/direct)".'>
         <div className="V2SplitStat">
           <div>
             <span>Total Calls Booked</span>

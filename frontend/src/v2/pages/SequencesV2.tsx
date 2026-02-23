@@ -147,7 +147,7 @@ export default function SequencesV2() {
 
   const copySetterNote = async (row: (typeof rows)[number]) => {
     const note = [
-      `Setter Ops watchlist: ${row.label}`,
+      `Sequence watchlist: ${row.label}`,
       `Risk level: ${riskLabel(row.optOutRatePct)} (${fmtPct(row.optOutRatePct)} opt-out rate)`,
       `Volume: ${fmtInt(row.messagesSent)} sent | ${fmtInt(row.repliesReceived)} replies | ${fmtInt(row.optOuts)} opt-outs`,
       'Action: tighten opener + CTA, narrow segment targeting, and lower daily send until opt-out rate settles below 3%.',
@@ -173,7 +173,7 @@ export default function SequencesV2() {
     <div className="V2Page">
       <V2PageHeader
         title={v2Copy.nav.sequences}
-        subtitle="Clear sequence performance metrics for calls booked, replies, and opt-outs. Sequence names are preserved exactly as stored."
+        subtitle="Sequence performance by sends, replies, booked calls, and opt-outs. Sequence names are shown exactly as stored."
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">
@@ -203,11 +203,11 @@ export default function SequencesV2() {
         <V2MetricCard label="Messages Sent" value={fmtInt(totalSent)} />
         <V2MetricCard label={<V2Term term="callsBookedSlack" />} value={fmtInt(totalBooked)} tone="positive" />
         <V2MetricCard label="Booked after SMS reply" value={fmtInt(totalBookedAfterReply)} tone="accent" />
-        <V2MetricCard label="Booked non SMS or unknown" value={fmtInt(totalBookedNonSmsOrUnknown)} />
+        <V2MetricCard label="Booked calls (non-SMS or unknown source)" value={fmtInt(totalBookedNonSmsOrUnknown)} />
         <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(totalOptOuts)} tone={totalOptOuts > 0 ? 'critical' : 'default'} />
       </section>
 
-      <V2Panel title="High Opt-Out Watchlist" caption="Setter Ops Pack action queue for sequences above watch thresholds.">
+      <V2Panel title="High Opt-Out Watchlist" caption="Priority action queue for sequences above watch thresholds.">
         {watchlistRows.length === 0 ? (
           <V2State kind="empty">No sequences are currently above watch thresholds (sent 20+ and opt-out rate 3%+).</V2State>
         ) : (
@@ -253,8 +253,8 @@ export default function SequencesV2() {
         title="Sequence Table"
         caption={
           attribution
-            ? `Matched ${matchedCalls}/${totalCalls} booked calls to attribution buckets (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)"). Booked (Slack first conversion) can exceed replies because it is sourced from booked-call records plus first-conversion mapping, not SMS reply counts. First seen is the earliest outbound timestamp observed in PTBizSMS data (not sequence rename history).`
-            : 'No booked attribution metadata available. First seen is based on PTBizSMS outbound history.'
+            ? `Matched ${matchedCalls}/${totalCalls} booked calls to attribution buckets (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)"). Slack booked-call totals can be higher than SMS replies because they include non-SMS and unknown sources too. "First seen" is the first outbound timestamp found in PTBizSMS history.`
+            : 'No booked-call attribution metadata found. "First seen" is based on PTBizSMS outbound history.'
         }
       >
         <div className="V2TableActions">

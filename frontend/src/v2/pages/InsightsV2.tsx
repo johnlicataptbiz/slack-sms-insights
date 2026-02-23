@@ -29,9 +29,9 @@ const sourceTone = (status: 'ready' | 'stale' | 'missing' | 'disabled'): 'positi
 };
 
 const sourceText = (status: 'ready' | 'stale' | 'missing' | 'disabled'): string => {
-  if (status === 'ready') return 'monday synced';
-  if (status === 'stale') return 'monday stale';
-  if (status === 'missing') return 'monday missing';
+  if (status === 'ready') return 'Monday synced';
+  if (status === 'stale') return 'Monday stale';
+  if (status === 'missing') return 'Monday missing';
   return 'PTBizSMS only';
 };
 
@@ -142,7 +142,7 @@ export default function InsightsV2() {
     <div className="V2Page V2Insights">
       <V2PageHeader
         title={v2Copy.nav.insights}
-        subtitle="High-level team view for setter performance. Calls Booked (Slack) is canonical, while SMS Booking Hints remain diagnostic."
+        subtitle="Team performance at a glance. Calls booked come from Slack booked-call records, while SMS booking hints are separate coaching signals."
         right={
           <label className="V2Control">
             <span>Range</span>
@@ -175,7 +175,7 @@ export default function InsightsV2() {
           tone="positive"
         />
         <V2MetricCard label="Booked SMS linked (strict)" value={fmtInt(bookedSmsLinkedStrict)} tone="accent" />
-        <V2MetricCard label="Booked non SMS or unknown" value={fmtInt(bookedNonSmsOrUnknown)} />
+        <V2MetricCard label="Booked calls (non-SMS or unknown source)" value={fmtInt(bookedNonSmsOrUnknown)} />
         <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(payload.totals.optOuts)} tone="critical" />
         <V2MetricCard
           label={<V2Term term="smsBookingHintsDiagnostic" />}
@@ -184,7 +184,7 @@ export default function InsightsV2() {
         />
       </section>
 
-      <V2Panel title="Weekly Summary (Manager Pack)" caption="Trailing 7-day view with team totals and per-setter trend.">
+      <V2Panel title="Weekly Summary" caption="Past 7 days with team totals and per-setter trend.">
         {weeklyEnvelopeQuery.isLoading || weeklyTrendQuery.isLoading || weeklySummaryQuery.isLoading ? (
           <V2State kind="loading">Loading weekly summary…</V2State>
         ) : weeklySummary && weeklyTrendSummary ? (

@@ -345,7 +345,7 @@ export const syncWeeklySummaryToMonday = async (
   } = {},
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{ status: 'skipped' | 'synced'; weekStart: string; itemId: string | null }> => {
-  if (!mondayConfig.writebackEnabled) {
+  if (!mondayConfig.outboundEnabled || !mondayConfig.writebackEnabled) {
     const summary = await getWeeklyManagerSummary(params, logger);
     return { status: 'skipped', weekStart: summary.window.weekStart, itemId: null };
   }

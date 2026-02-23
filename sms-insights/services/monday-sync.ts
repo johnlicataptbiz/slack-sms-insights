@@ -21,6 +21,7 @@ export const mondayConfig = {
   syncEnabled: parseBool(process.env.MONDAY_SYNC_ENABLED),
   writebackEnabled: parseBool(process.env.MONDAY_WRITEBACK_ENABLED),
   personalSyncEnabled: parseBool(process.env.MONDAY_PERSONAL_SYNC_ENABLED),
+  outboundEnabled: parseBool(process.env.MONDAY_OUTBOUND_ENABLED),
   acqBoardId: (process.env.MONDAY_ACQ_BOARD_ID || '5077164868').trim(),
   myCallsBoardId: (process.env.MONDAY_MY_CALLS_BOARD_ID || '10029059942').trim(),
   personalBoardId: (
@@ -198,7 +199,7 @@ export const runMondayMaintenanceCycle = async (
       logger?.warn?.('Monday sync cycle failed', syncResult.error);
     }
 
-    if (mondayConfig.writebackEnabled) {
+    if (mondayConfig.outboundEnabled && mondayConfig.writebackEnabled) {
       try {
         const weekly = await import('./weekly-manager-summary.js');
         await weekly.syncWeeklySummaryToMonday({}, logger);
@@ -207,7 +208,7 @@ export const runMondayMaintenanceCycle = async (
       }
     }
 
-    if (mondayConfig.personalSyncEnabled) {
+    if (mondayConfig.outboundEnabled && mondayConfig.personalSyncEnabled) {
       try {
         const personal = await import('./monday-personal-writeback.js');
         const result = await personal.syncRecentSetterBookedCallsToMonday(logger);
@@ -222,15 +223,18 @@ export const runMondayMaintenanceCycle = async (
 };
 
 export const startMondaySyncJobs = (logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>): (() => void) => {
-  if (!mondayConfig.syncEnabled && !mondayConfig.writebackEnabled && !mondayConfig.personalSyncEnabled) {
+  const weeklyWritebackEnabled = mondayConfig.outboundEnabled && mondayConfig.writebackEnabled;
+  const personalWritebackEnabled = mondayConfig.outboundEnabled && mondayConfig.personalSyncEnabled;
+  if (!mondayConfig.syncEnabled && !weeklyWritebackEnabled && !personalWritebackEnabled) {
     logger?.info?.('Monday jobs disabled');
     return () => {};
   }
 
   logger?.info?.('Starting monday maintenance jobs', {
     syncEnabled: mondayConfig.syncEnabled,
-    writebackEnabled: mondayConfig.writebackEnabled,
-    personalSyncEnabled: mondayConfig.personalSyncEnabled,
+    writebackEnabled: weeklyWritebackEnabled,
+    personalSyncEnabled: personalWritebackEnabled,
+    outboundEnabled: mondayConfig.outboundEnabled,
     boardId: mondayConfig.acqBoardId,
     personalBoardId: mondayConfig.personalBoardId,
     intervalMs: mondayConfig.pollIntervalMs,

@@ -135,7 +135,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     <div className="V2Page">
       <V2PageHeader
         title={`${name} Scorecard`}
-        subtitle={`Daily activity summary for business day ${day || 'current'} (${BUSINESS_TZ}). Deltas compare against ${prevDay || 'prior day'} for coaching context.`}
+        subtitle={`Daily activity summary for business day ${day || 'current'} (${BUSINESS_TZ}). Deltas compare against ${prevDay || 'prior day'}.`}
       />
 
       <section className="V2MetricsGrid">
@@ -201,7 +201,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           )}
         </V2Panel>
 
-        <V2Panel title="At-Risk Flags" caption="Setter Ops Pack checks for execution drift.">
+        <V2Panel title="At-Risk Flags" caption="Simple checks for execution drift.">
           {riskFlags.length ? (
             <div className="V2RiskFlags">
               {riskFlags.map((flag) => (

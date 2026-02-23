@@ -464,7 +464,7 @@ export default function RunsV2() {
     <div className="V2Page">
       <V2PageHeader
         title={v2Copy.nav.runs}
-        subtitle="Historical run log and run detail viewer. Structured snapshot first, raw text only when needed."
+        subtitle="Run history and run details. Start with the structured summary, then open raw text only when needed."
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">
@@ -501,7 +501,7 @@ export default function RunsV2() {
         }
       />
 
-      <V2Panel title="Saved Views (Manager Pack)" caption="Save and share range, channel, and selected run via URL.">
+      <V2Panel title="Saved Views" caption="Save and share range, channel, and selected run via URL.">
         <div className="V2SavedViews">
           <div className="V2SavedViews__composer">
             <input
@@ -639,7 +639,7 @@ export default function RunsV2() {
                   }
                   meta={
                     selectedReportDay
-                      ? `Report day ${selectedReportDay}. Can exceed SMS replies due to non SMS or unknown source.`
+                      ? `Report day ${selectedReportDay}. This can be higher than SMS replies when source is non-SMS or unknown.`
                       : 'Report day not detected for this run.'
                   }
                   tone={(selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'}

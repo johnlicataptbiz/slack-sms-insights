@@ -187,6 +187,8 @@ export default function InsightsV2() {
       ? `${runRate.bookedDelta >= 0 ? '+' : ''}${runRate.bookedDelta} vs yesterday`
       : rangeMeta;
 
+  const selectedWindowMeta = rangeMeta;
+
   return (
     <div className="V2Page V2Insights">
       <V2PageHeader

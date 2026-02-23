@@ -116,7 +116,7 @@ export default function InboxV2() {
   const [selectedLineKey, setSelectedLineKey] = useState('');
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
-  const [justSentMessage, setJustSentMessage] = useState<{text: string; timestamp: string} | null>(null);
+  const [justSentMessage, setJustSentMessage] = useState<{text: string; timestamp: string; confirmed?: boolean} | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [qualificationState, setQualificationState] = useState<QualificationStateV2>({
@@ -305,17 +305,16 @@ export default function InboxV2() {
       
       if (result.data.status === 'sent' || result.data.status === 'duplicate') {
         setSendStatus('sent');
-        setJustSentMessage({ text: messageText, timestamp: new Date().toISOString() });
+        setJustSentMessage({ text: messageText, timestamp: new Date().toISOString(), confirmed: true });
         
         // Clear composer after successful send
         setComposerText('');
         setSelectedDraftId(null);
         
-        // Reset status after 3 seconds
+        // Reset button status after 2 seconds, but keep the message visible
         setTimeout(() => {
           setSendStatus('idle');
-          setJustSentMessage(null);
-        }, 3000);
+        }, 2000);
       } else {
         setSendStatus('error');
         setFlashMessage(`Send blocked: ${result.data.reason} · ${lineSummary}`);
@@ -790,13 +789,15 @@ export default function InboxV2() {
                     
                     {/* Optimistic sent message */}
                     {justSentMessage && (
-                      <article className="V2Inbox__chatMessage V2Inbox__chatMessage--outbound V2Inbox__chatMessage--sending">
+                      <article className={`V2Inbox__chatMessage V2Inbox__chatMessage--outbound ${!justSentMessage.confirmed ? 'V2Inbox__chatMessage--sending' : 'V2Inbox__chatMessage--confirmed'}`}>
                         <div className="V2Inbox__chatMessageHeader">
                           <span className="V2Inbox__chatSpeaker">You</span>
                           <time className="V2Inbox__chatTime">{fmtDateTime(justSentMessage.timestamp)}</time>
                         </div>
                         <p className="V2Inbox__chatBody">{justSentMessage.text}</p>
-                        <span className="V2Inbox__sendingIndicator">Sending...</span>
+                        <span className="V2Inbox__sendingIndicator">
+                          {!justSentMessage.confirmed ? 'Sending...' : '✓ Sent'}
+                        </span>
                       </article>
                     )}
                   </div>

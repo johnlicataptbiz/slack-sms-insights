@@ -1,6 +1,3 @@
-import { useMemo, useState } from 'react';
-
-import type { SalesMetricsV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2SetterTrend, useV2WeeklySummary } from '../../api/v2Queries';
 import { v2Copy } from '../copy';
 import { V2MetricCard, V2PageHeader, V2Panel, V2RiskAlert, V2State, V2Term } from '../components/V2Primitives';

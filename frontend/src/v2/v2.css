@@ -2604,16 +2604,18 @@
   animation: v2-pulse 1.5s ease-in-out infinite;
 }
 
-@keyframes v2-pulse {
-  0%, 100% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 0.4;
-  }
+.V2Inbox__chatMessage--confirmed {
+  opacity: 1;
+  border-left: 3px solid var(--v2-positive);
+}
+
+.V2Inbox__chatMessage--confirmed .V2Inbox__sendingIndicator {
+  color: var(--v2-positive);
+  font-weight: 600;
 }
 
 .V2Inbox__sendingIndicator {
+
   display: inline-block;
   margin-top: 0.35rem;
   font-size: 0.72rem;

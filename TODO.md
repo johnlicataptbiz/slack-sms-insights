@@ -7,4 +7,4 @@
 - [x] 3. Add CSS to `frontend/src/v2/v2.css` — staleness banner + redesigned run cards
 - [x] 4. Overhaul `frontend/src/v2/pages/RunsV2.tsx` — staleness banner, redesigned cards
 - [x] 5. Deploy backend: `railway up --service sms-insights`
-- [x] 6. Verify Railway logs — service running ✅; `[cron]` line absent → `SLACK_USER_TOKEN` not set in Railway env; cron self-disables gracefully
+- [x] 6. Verify Railway logs — `[cron] Daily report cron started — fires at 6:00 AM CT targeting <@U0AEZGJA3BL>` ✅ confirmed in new deployment (19:27 UTC)

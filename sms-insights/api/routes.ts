@@ -694,7 +694,6 @@ const handleOauthCallback: RequestHandler = async (req, res, logger) => {
       sendJson(res, 500, { error: 'OAuth succeeded but no user token was returned' });
       return;
     }
-
     const auth = await slack.auth.test({ token });
     const sessionUser: DashboardSessionUser = {
       user_id: auth.user_id || response.authed_user?.id || undefined,

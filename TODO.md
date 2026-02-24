@@ -18,4 +18,4 @@
 - [x] RunsV2.tsx — Improve Saved Views (remove nested details, add toggle in header)
 - [x] v2.css — Add status border modifiers + latestBadge styles
 - [x] npm run build — verify TypeScript (✓ 127 modules, 0 errors)
-- [ ] Browser verify Daily Activity page at ptbizsms.com/v2/runs
+- [x] Browser verify Daily Activity page at ptbizsms.com/v2/runs

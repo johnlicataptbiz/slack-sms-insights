@@ -544,7 +544,12 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
     messagesSent: row.messagesSent,
     repliesReceived: row.repliesReceived,
     replyRatePct: row.replyRatePct,
-    canonicalBookedCalls: row.slackBookedCalls ?? 0,
+    // Use raw Aloware sequence field from sms_events for attribution.
+    // slackBookedCalls (HubSpot first-conversion fuzzy match) is unreliable for
+    // per-sequence attribution — it misses sequences like "Hiring Guide" entirely.
+    // bookingSignalsSms uses the actual `sequence` column on each outbound SMS event,
+    // which correctly handles multi-day conversations and A/B version testing.
+    canonicalBookedCalls: row.bookingSignalsSms,
     canonicalBookedAfterSmsReply: row.slackBookedAfterSmsReply ?? 0,
     canonicalBookedJack: row.slackBookedJack ?? 0,
     canonicalBookedBrandon: row.slackBookedBrandon ?? 0,

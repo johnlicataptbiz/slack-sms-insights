@@ -19,6 +19,7 @@ const MESSAGES_SENT_PATTERN = /Messages sent:\s*([0-9,]+)/i;
 const REPLIES_RECEIVED_PATTERN = /Replies received:\s*([0-9,]+)/i;
 const REPLY_RATE_PATTERN = /Replies received:\s*[0-9,]+\s*\(([0-9.]+)%\)/i;
 const CALLS_BOOKED_PATTERN = /Calls booked(?:\s*\(Slack\))?:\s*([0-9,]+)/i;
+const BOOKINGS_ALT_PATTERN = /- Book(?:ings?|ed):\s*([0-9,]+)/i;
 const OPT_OUTS_PATTERN = /Opt-outs:\s*([0-9,]+)/i;
 const OUTBOUND_FROM_SUMMARY_PATTERN = /Outbound conversations:\s*([0-9,]+)/i;
 const SUMMARY_NOISE_PATTERNS = [/^PT BIZ - DAILY SMS SNAPSHOT/i, /^Date:/i, /^Time Range:/i, /^Split By Line/i];
@@ -267,7 +268,9 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
     ? parsed?.totalRepliesReceived ?? null
     : matchNumber(run.summaryText, REPLIES_RECEIVED_PATTERN);
   const replyRatePct = hasParsedBreakdown ? parsed?.overallReplyRate ?? null : matchNumber(run.summaryText, REPLY_RATE_PATTERN);
-  const booked = hasParsedBreakdown ? parsed?.totalBooked ?? null : matchNumber(run.summaryText, CALLS_BOOKED_PATTERN);
+  const booked = hasParsedBreakdown
+    ? parsed?.totalBooked ?? null
+    : matchNumber(run.summaryText, CALLS_BOOKED_PATTERN) ?? matchNumber(run.summaryText, BOOKINGS_ALT_PATTERN);
   const optOuts = hasParsedBreakdown ? parsed?.totalOptOuts ?? null : matchNumber(run.summaryText, OPT_OUTS_PATTERN);
   const outboundConversations = sumMatches(fullReport, OUTBOUND_CONVERSATIONS_PATTERN) ?? matchNumber(run.summaryText, OUTBOUND_FROM_SUMMARY_PATTERN);
 

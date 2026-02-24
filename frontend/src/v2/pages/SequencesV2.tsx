@@ -1,718 +1,594 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 
 import { useV2SalesMetrics, useV2Scoreboard } from '../../api/v2Queries';
-import type { SalesMetricsV2 } from '../../api/v2-types';
-import { dayKeyInTimeZone, shiftIsoDay } from '../../utils/runDay';
-import { v2Copy } from '../copy';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
+import type { SalesMetricsV2, ScoreboardLeadMagnetRow } from '../../api/v2-types';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 
 const BUSINESS_TZ = 'America/Chicago';
-const watchlistStateStorageKey = 'ptbizsms-v2-sequence-watchlist-reviewed';
-const unattributedSequenceLabel = 'Unattributed / other channels / unknown';
+const MANUAL_LABEL = 'No sequence (manual/direct)';
 
-type Mode = 'day' | '7d' | '30d';
-type Sort = 'messagesSent' | 'replyRatePct' | 'canonicalBookedCalls' | 'canonicalBookedAfterSmsReply' | 'optOutRatePct';
+type Mode = '7d' | '30d';
+type Sort =
+  | 'messagesSent'
+  | 'replyRatePct'
+  | 'canonicalBookedCalls'
+  | 'canonicalBookedAfterSmsReply'
+  | 'optOutRatePct';
+
+// ─── Formatters ──────────────────────────────────────────────────────────────
 
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtInt = (n: number) => n.toLocaleString();
+
 const fmtDay = (iso: string | null) => {
   if (!iso) return '—';
   const value = iso.trim();
   if (!value) return '—';
-
-  const dayOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (dayOnlyMatch) {
-    const year = Number.parseInt(dayOnlyMatch[1] || '', 10);
-    const month = Number.parseInt(dayOnlyMatch[2] || '', 10);
-    const day = Number.parseInt(dayOnlyMatch[3] || '', 10);
-    if (Number.isFinite(year) && Number.isFinite(month) && Number.isFinite(day)) {
-      const utcDate = new Date(Date.UTC(year, month - 1, day));
-      return utcDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
-    }
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) {
+    const utcDate = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+    return utcDate.toLocaleDateString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
   }
-
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return value;
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 };
+
 const fmtDateTime = (value: string) => {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return value;
   return dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
+
 const maskPhone = (value: string | null) => {
   if (!value) return 'n/a';
   const digits = value.replace(/\D/g, '');
   if (digits.length < 4) return value;
   return `***${digits.slice(-4)}`;
 };
+
 const bucketLabel = (value: 'jack' | 'brandon' | 'selfBooked') => {
   if (value === 'jack') return 'Jack';
   if (value === 'brandon') return 'Brandon';
   return 'Self-booked';
 };
 
-const readWatchlistState = () => {
-  if (typeof window === 'undefined') return {} as Record<string, boolean>;
-  try {
-    const raw = localStorage.getItem(watchlistStateStorageKey);
-    if (!raw) return {} as Record<string, boolean>;
-    const parsed = JSON.parse(raw);
-    if (typeof parsed !== 'object' || parsed === null) return {} as Record<string, boolean>;
-    return parsed as Record<string, boolean>;
-  } catch {
-    return {} as Record<string, boolean>;
-  }
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+type AuditRow = SalesMetricsV2['sequences'][0]['bookedAuditRows'][0];
+
+type MergedSeqRow = {
+  label: string;
+  leadMagnet: string;
+  version: string;
+  firstSeenAt: string | null;
+  messagesSent: number;
+  uniqueContacted: number | null;
+  uniqueReplied: number | null;
+  repliesReceived: number;
+  replyRatePct: number;
+  canonicalBookedCalls: number;
+  canonicalBookedAfterSmsReply: number;
+  canonicalBookedJack: number;
+  canonicalBookedBrandon: number;
+  canonicalBookedSelf: number;
+  bookingRatePct: number | null;
+  optOuts: number;
+  optOutRatePct: number;
+  bookedAuditRows: AuditRow[];
+  diagnosticSmsBookingSignals: number;
+  isManual: boolean;
 };
 
-const riskTone = (optOutRatePct: number): 'critical' | 'accent' | 'default' => {
-  if (optOutRatePct >= 6) return 'critical';
-  if (optOutRatePct >= 3) return 'accent';
-  return 'default';
-};
-
-const riskLabel = (optOutRatePct: number) => {
-  if (optOutRatePct >= 6) return 'high risk';
-  if (optOutRatePct >= 3) return 'watch';
-  return 'healthy';
-};
-
-export const computeSequenceHeaderMetrics = (
-  payload: SalesMetricsV2,
-  rows: SalesMetricsV2['sequences'],
-) => {
-  const totalSent = rows.reduce((sum, row) => sum + row.messagesSent, 0);
-  const totalBookedAttributedToRows = rows.reduce((sum, row) => sum + row.canonicalBookedCalls, 0);
-  const totalBookedAfterReply = rows.reduce((sum, row) => sum + row.canonicalBookedAfterSmsReply, 0);
-  const totalOptOuts = rows.reduce((sum, row) => sum + row.optOuts, 0);
-  const attribution = payload.provenance.sequenceBookedAttribution;
-  const totalBookedAllChannels = payload.bookedCredit.total;
-  const matchedCalls = attribution?.matchedCalls ?? 0;
-  const unattributedCalls = attribution?.unattributedCalls ?? Math.max(0, totalBookedAllChannels - matchedCalls);
-  const manualCalls = attribution?.manualCalls ?? 0;
-  const namedSequenceCalls = Math.max(0, matchedCalls - manualCalls);
-  const totalCalls = attribution?.totalCalls ?? 0;
-  const totalBookedNonSmsOrUnknown =
-    attribution?.nonSmsOrUnknownCalls ?? Math.max(0, totalBookedAllChannels - totalBookedAfterReply);
-
-  return {
-    totalSent,
-    totalBookedAttributedToRows,
-    totalBookedAfterReply,
-    totalOptOuts,
-    attribution,
-    totalBookedAllChannels,
-    matchedCalls,
-    unattributedCalls,
-    manualCalls,
-    namedSequenceCalls,
-    totalCalls,
-    totalBookedNonSmsOrUnknown,
-  };
-};
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SequencesV2() {
-  const today = useMemo(() => dayKeyInTimeZone(new Date(), BUSINESS_TZ), []);
-  const initialDay = useMemo(() => (today ? shiftIsoDay(today, -1) : null), [today]);
-
-  const [mode, setMode] = useState<Mode>('day');
-  const [selectedDay, setSelectedDay] = useState<string | null>(initialDay);
-  const [search, setSearch] = useState('');
+  const [mode, setMode] = useState<Mode>('7d');
   const [sort, setSort] = useState<Sort>('messagesSent');
-  const [reviewedMap, setReviewedMap] = useState<Record<string, boolean>>(() => readWatchlistState());
-  const [copiedSequence, setCopiedSequence] = useState<string | null>(null);
-  const [expandedAuditRows, setExpandedAuditRows] = useState<Record<string, boolean>>({});
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
 
-  const query = useMemo(() => {
-    if (mode === 'day' && selectedDay) return { day: selectedDay, tz: BUSINESS_TZ } as const;
-    if (mode === '7d') return { range: '7d' as const, tz: BUSINESS_TZ };
-    return { range: '30d' as const, tz: BUSINESS_TZ };
-  }, [mode, selectedDay]);
+  const salesMetricsQuery = useV2SalesMetrics({ range: mode, tz: BUSINESS_TZ });
+  const scoreboardQuery = useV2Scoreboard({ tz: BUSINESS_TZ });
 
-  const { data, isLoading, isError, error } = useV2SalesMetrics(query);
-  const payload = data?.data;
+  const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading;
+  const isError = salesMetricsQuery.isError || scoreboardQuery.isError;
 
-  // Scoreboard data for new panels (weekly window)
-  const { data: scoreboardData, isLoading: isScoreboardLoading } = useV2Scoreboard({
-    weekStart: selectedDay || undefined,
-    tz: BUSINESS_TZ,
-  });
-  const scoreboard = scoreboardData?.data;
+  const salesMetrics = salesMetricsQuery.data?.data;
+  const scoreboard = scoreboardQuery.data?.data;
 
-  const rows = useMemo(() => {
-    if (!payload) return [];
-    const queryText = search.trim().toLowerCase();
-    const unattributedCalls =
-      payload.provenance.sequenceBookedAttribution?.unattributedCalls ??
-      Math.max(0, payload.bookedCredit.total - (payload.provenance.sequenceBookedAttribution?.matchedCalls ?? 0));
+  // Build scoreboard lookup by label for leadMagnet / version / uniqueContacted
+  const scoreboardByLabel = useMemo(() => {
+    const map = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
+    for (const seq of scoreboard?.sequences ?? []) {
+      map.set(seq.label, seq);
+    }
+    return map;
+  }, [scoreboard?.sequences]);
 
-    const baseRows = [...payload.sequences]
-      .filter((row) => (queryText ? row.label.toLowerCase().includes(queryText) : true));
+  // Merge sales-metrics sequences with scoreboard metadata
+  const mergedRows = useMemo((): MergedSeqRow[] => {
+    const smSeqs = salesMetrics?.sequences ?? [];
+    return smSeqs.map((seq) => {
+      const sb = scoreboardByLabel.get(seq.label);
+      return {
+        label: seq.label,
+        leadMagnet: sb?.leadMagnet && sb.leadMagnet !== seq.label ? sb.leadMagnet : '',
+        version: sb?.version ?? '',
+        firstSeenAt: seq.firstSeenAt,
+        messagesSent: seq.messagesSent,
+        uniqueContacted: sb?.uniqueContacted ?? null,
+        uniqueReplied: sb?.uniqueReplied ?? null,
+        repliesReceived: seq.repliesReceived,
+        replyRatePct: seq.replyRatePct,
+        canonicalBookedCalls: seq.canonicalBookedCalls,
+        canonicalBookedAfterSmsReply: seq.canonicalBookedAfterSmsReply,
+        canonicalBookedJack: seq.canonicalBookedJack,
+        canonicalBookedBrandon: seq.canonicalBookedBrandon,
+        canonicalBookedSelf: seq.canonicalBookedSelf,
+        bookingRatePct: sb?.bookingRatePct ?? null,
+        optOuts: seq.optOuts,
+        optOutRatePct: seq.optOutRatePct,
+        bookedAuditRows: seq.bookedAuditRows,
+        diagnosticSmsBookingSignals: seq.diagnosticSmsBookingSignals,
+        isManual: seq.label === MANUAL_LABEL,
+      };
+    });
+  }, [salesMetrics?.sequences, scoreboardByLabel]);
 
-    if (unattributedCalls > 0) {
-      const matchesSearch = !queryText || unattributedSequenceLabel.toLowerCase().includes(queryText);
-      if (matchesSearch) {
-        baseRows.push({
-          label: unattributedSequenceLabel,
-          firstSeenAt: null,
-          messagesSent: 0,
-          repliesReceived: 0,
-          replyRatePct: 0,
-          canonicalBookedCalls: unattributedCalls,
-          canonicalBookedAfterSmsReply: 0,
-          canonicalBookedJack: 0,
-          canonicalBookedBrandon: 0,
-          canonicalBookedSelf: 0,
-          bookedAuditRows: [],
-          diagnosticSmsBookingSignals: 0,
-          optOuts: 0,
-          optOutRatePct: 0,
-        });
+  // Sort — manual/unattributed always last
+  const sortedRows = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...mergedRows].sort((a, b) => {
+      if (a.isManual && !b.isManual) return 1;
+      if (!a.isManual && b.isManual) return -1;
+      switch (sort) {
+        case 'messagesSent':
+          return dir * (a.messagesSent - b.messagesSent);
+        case 'replyRatePct':
+          return dir * (a.replyRatePct - b.replyRatePct);
+        case 'canonicalBookedCalls':
+          return dir * (a.canonicalBookedCalls - b.canonicalBookedCalls);
+        case 'canonicalBookedAfterSmsReply':
+          return dir * (a.canonicalBookedAfterSmsReply - b.canonicalBookedAfterSmsReply);
+        case 'optOutRatePct':
+          return dir * (a.optOutRatePct - b.optOutRatePct);
+        default:
+          return 0;
       }
-    }
+    });
+  }, [mergedRows, sort, sortDir]);
 
-    return baseRows
-      .sort((a, b) => {
-        const diff = b[sort] - a[sort];
-        if (diff !== 0) return diff;
-        return a.label.localeCompare(b.label);
-      });
-  }, [payload, search, sort]);
+  // KPI totals
+  const kpis = useMemo(() => {
+    const activeRows = mergedRows.filter((r) => !r.isManual && r.messagesSent > 0);
+    const totalMessages = mergedRows.reduce((s, r) => s + r.messagesSent, 0);
+    const totalReplied = mergedRows.reduce((s, r) => s + r.repliesReceived, 0);
+    const totalBooked = mergedRows.reduce((s, r) => s + r.canonicalBookedCalls, 0);
+    const avgReplyRate = totalMessages > 0 ? (totalReplied / totalMessages) * 100 : 0;
+    return {
+      activeSequences: activeRows.length,
+      totalMessages,
+      totalBooked,
+      avgReplyRate,
+    };
+  }, [mergedRows]);
 
-  const watchlistRows = useMemo(() => {
-    return rows
-      .filter((row) => row.messagesSent >= 20 && row.optOutRatePct >= 3)
-      .sort((a, b) => b.optOutRatePct - a.optOutRatePct)
-      .slice(0, 8);
-  }, [rows]);
-
-  const hasFirstSeenData = useMemo(() => {
-    return rows.some((row) => Boolean(row.firstSeenAt && row.firstSeenAt.trim().length > 0));
-  }, [rows]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(watchlistStateStorageKey, JSON.stringify(reviewedMap));
-  }, [reviewedMap]);
-
-  if (isLoading) return <V2State kind="loading">Loading sequence performance…</V2State>;
-  if (isError || !payload) return <V2State kind="error">Failed to load sequence performance: {String((error as Error)?.message || error)}</V2State>;
-
-  const {
-    totalSent,
-    totalBookedAttributedToRows,
-    totalBookedAfterReply,
-    totalOptOuts,
-    attribution,
-    totalBookedAllChannels,
-    matchedCalls,
-    unattributedCalls,
-    manualCalls,
-    namedSequenceCalls,
-    totalCalls,
-    // totalBookedNonSmsOrUnknown is computed but not yet displayed in the UI
-  } = computeSequenceHeaderMetrics(payload, payload.sequences);
-
-  const toggleReviewed = (sequenceLabel: string) => {
-    setReviewedMap((prev) => ({
-      ...prev,
-      [sequenceLabel]: !prev[sequenceLabel],
-    }));
+  const toggleExpanded = (label: string) => {
+    setExpandedLabels((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
   };
 
-  const copySetterNote = async (row: (typeof rows)[number]) => {
-    const note = [
-      `Sequence watchlist: ${row.label}`,
-      `Risk level: ${riskLabel(row.optOutRatePct)} (${fmtPct(row.optOutRatePct)} opt-out rate)`,
-      `Volume: ${fmtInt(row.messagesSent)} sent | ${fmtInt(row.repliesReceived)} replies | ${fmtInt(row.optOuts)} opt-outs`,
-      'Action: tighten opener + CTA, narrow segment targeting, and lower daily send until opt-out rate settles below 3%.',
-    ].join('\n');
-
-    try {
-      await navigator.clipboard.writeText(note);
-      setCopiedSequence(row.label);
-      window.setTimeout(() => setCopiedSequence((current) => (current === row.label ? null : current)), 1200);
-    } catch {
-      setCopiedSequence(null);
+  const handleSortClick = (col: Sort) => {
+    if (sort === col) {
+      setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
+    } else {
+      setSort(col);
+      setSortDir('desc');
     }
   };
 
-  const toggleAuditRow = (label: string) => {
-    setExpandedAuditRows((prev) => ({
-      ...prev,
-      [label]: !prev[label],
-    }));
-  };
+  const sortArrow = (col: Sort) =>
+    sort === col ? <span className="V2Table__sortArrow">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span> : null;
+
+  const leadMagnetRows: ScoreboardLeadMagnetRow[] = scoreboard?.leadMagnetComparison ?? [];
+  const monthlyBookings = scoreboard?.monthly.bookings;
+
+  if (isLoading) {
+    return (
+      <div className="V2Page">
+        <V2State kind="loading">Loading sequences…</V2State>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="V2Page">
+        <V2State kind="error">Failed to load sequence data. Check your connection and try again.</V2State>
+      </div>
+    );
+  }
 
   return (
     <div className="V2Page">
+      {/* ── Header ── */}
       <V2PageHeader
-        title={v2Copy.nav.sequences}
-        subtitle="See how each sequence is performing."
+        title="Sequences"
+        subtitle={`Performance across all active sequences · ${mode === '7d' ? 'Last 7 days' : 'Last 30 days'}`}
         right={
           <div className="V2ControlsRow">
-            <label className="V2Control">
-              <span>View</span>
-              <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
-                <option value="day">Day by day</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-              </select>
-            </label>
-            {mode === 'day' ? (
-              <label className="V2Control">
-                <span>Business Day</span>
-                <input type="date" value={selectedDay || ''} onChange={(e) => setSelectedDay(e.target.value || null)} />
-              </label>
-            ) : null}
-            <label className="V2Control">
-              <span>Find Sequence</span>
-              <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Sequence name" />
-            </label>
+            <div className="V2ModeToggle">
+              <button
+                type="button"
+                className={`V2ModeToggle__btn${mode === '7d' ? ' is-active' : ''}`}
+                onClick={() => setMode('7d')}
+              >
+                7d
+              </button>
+              <button
+                type="button"
+                className={`V2ModeToggle__btn${mode === '30d' ? ' is-active' : ''}`}
+                onClick={() => setMode('30d')}
+              >
+                30d
+              </button>
+            </div>
           </div>
         }
       />
 
+      {/* ── KPI Summary ── */}
       <section className="V2MetricsGrid">
-        <V2MetricCard label="Sequences" value={String(rows.length)} meta="active in window" />
-        <V2MetricCard label="Messages Sent" value={fmtInt(totalSent)} />
         <V2MetricCard
-          label="Total Sets"
-          value={fmtInt(totalBookedAllChannels)}
-          tone="positive"
-          meta={`${fmtInt(totalBookedAttributedToRows)} attributed to sequences`}
+          label="Active Sequences"
+          value={String(kpis.activeSequences)}
+          meta={`${mode} window`}
         />
         <V2MetricCard
-          label={<V2Term term="optOuts" />}
-          value={fmtInt(totalOptOuts)}
-          tone={totalOptOuts > 0 ? 'critical' : 'default'}
-          meta={totalSent > 0 ? `${((totalOptOuts / totalSent) * 100).toFixed(2)}% of sent` : undefined}
+          label="Messages Sent"
+          value={fmtInt(kpis.totalMessages)}
+          meta="all sequences"
+        />
+        <V2MetricCard
+          label="Booked Calls"
+          value={fmtInt(kpis.totalBooked)}
+          tone={kpis.totalBooked > 0 ? 'positive' : 'default'}
+          meta="Slack-attributed (canonical)"
+        />
+        <V2MetricCard
+          label="Avg Reply Rate"
+          value={fmtPct(kpis.avgReplyRate)}
+          tone={kpis.avgReplyRate >= 10 ? 'positive' : 'default'}
+          meta="messages-sent basis"
         />
       </section>
 
-      {/* New Scoreboard Panels - Volume & Reply Split */}
-      {scoreboard && !isScoreboardLoading ? (
-        <>
-          <V2Panel
-            title="Volume & Reply Split"
-            caption="Compare sequence-initiated vs manual outreach performance."
-          >
-            <div className="V2SplitGrid">
-              <div className="V2SplitCard">
-                <h4>Messages Sent</h4>
-                <div className="V2SplitBar">
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
-                    style={{ width: `${scoreboard.weekly.volume.sequencePct}%` }}
-                  />
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--manual"
-                    style={{ width: `${scoreboard.weekly.volume.manualPct}%` }}
-                  />
-                </div>
-                <div className="V2SplitLegend">
-                  <span>Sequence: {fmtInt(scoreboard.weekly.volume.sequence)} ({fmtPct(scoreboard.weekly.volume.sequencePct)})</span>
-                  <span>Manual: {fmtInt(scoreboard.weekly.volume.manual)} ({fmtPct(scoreboard.weekly.volume.manualPct)})</span>
-                </div>
-              </div>
-              <div className="V2SplitCard">
-                <h4>Unique Leads</h4>
-                <div className="V2SplitBar">
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
-                    style={{
-                      width: `${
-                        scoreboard.weekly.uniqueLeads.total > 0
-                          ? (scoreboard.weekly.uniqueLeads.sequence / scoreboard.weekly.uniqueLeads.total) * 100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--manual"
-                    style={{
-                      width: `${
-                        scoreboard.weekly.uniqueLeads.total > 0
-                          ? (scoreboard.weekly.uniqueLeads.manual / scoreboard.weekly.uniqueLeads.total) * 100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-                <div className="V2SplitLegend">
-                  <span>Sequence: {fmtInt(scoreboard.weekly.uniqueLeads.sequence)}</span>
-                  <span>Manual: {fmtInt(scoreboard.weekly.uniqueLeads.manual)}</span>
-                </div>
-              </div>
-              <div className="V2SplitCard">
-                <h4>Replies</h4>
-                <div className="V2SplitBar">
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
-                    style={{
-                      width: `${
-                        scoreboard.weekly.replies.overall.count > 0
-                          ? (scoreboard.weekly.replies.sequence.count / scoreboard.weekly.replies.overall.count) * 100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--manual"
-                    style={{
-                      width: `${
-                        scoreboard.weekly.replies.overall.count > 0
-                          ? (scoreboard.weekly.replies.manual.count / scoreboard.weekly.replies.overall.count) * 100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-                <div className="V2SplitLegend">
-                  <span>
-                    Sequence: {fmtInt(scoreboard.weekly.replies.sequence.count)} ({fmtPct(scoreboard.weekly.replies.sequence.ratePct)} rate)
-                  </span>
-                  <span>
-                    Manual: {fmtInt(scoreboard.weekly.replies.manual.count)} ({fmtPct(scoreboard.weekly.replies.manual.ratePct)} rate)
-                  </span>
-                </div>
-              </div>
-            </div>
-          </V2Panel>
-
-          <V2Panel
-            title="Booking Attribution"
-            caption="Who gets credit for bookings: sequence-initiated vs manual, and by rep."
-          >
-            <div className="V2SplitGrid">
-              <div className="V2SplitCard">
-                <h4>By Initiator Type</h4>
-                <div className="V2SplitBar">
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
-                    style={{
-                      width: `${
-                        scoreboard.weekly.bookings.total > 0
-                          ? (scoreboard.weekly.bookings.sequenceInitiated / scoreboard.weekly.bookings.total) * 100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                  <div
-                    className="V2SplitBar__segment V2SplitBar__segment--manual"
-                    style={{
-                      width: `${
-                        scoreboard.weekly.bookings.total > 0
-                          ? (scoreboard.weekly.bookings.manualInitiated / scoreboard.weekly.bookings.total) * 100
-                          : 0
-                      }%`,
-                    }}
-                  />
-                </div>
-                <div className="V2SplitLegend">
-                  <span>Sequence-initiated: {fmtInt(scoreboard.weekly.bookings.sequenceInitiated)}</span>
-                  <span>Manual-initiated: {fmtInt(scoreboard.weekly.bookings.manualInitiated)}</span>
-                </div>
-              </div>
-              <div className="V2SplitCard">
-                <h4>By Rep</h4>
-                <div className="V2RepBreakdown">
-                  <div className="V2RepRow">
-                    <span className="V2RepRow__name">Jack</span>
-                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.jack)}</span>
-                  </div>
-                  <div className="V2RepRow">
-                    <span className="V2RepRow__name">Brandon</span>
-                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.brandon)}</span>
-                  </div>
-                  <div className="V2RepRow">
-                    <span className="V2RepRow__name">Self-booked</span>
-                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.selfBooked)}</span>
-                  </div>
-                  <div className="V2RepRow V2RepRow--total">
-                    <span className="V2RepRow__name">Total</span>
-                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.total)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </V2Panel>
-
-          <V2Panel
-            title="Lead Magnet Comparison"
-            caption="Compare Legacy vs V2 versions of each lead magnet."
-          >
-            {scoreboard.leadMagnetComparison.length === 0 ? (
-              <V2State kind="empty">No lead magnet comparison data available.</V2State>
-            ) : (
-              <div className="V2LeadMagnetTable">
-                <table className="V2Table">
-                  <thead>
-                    <tr>
-                      <th>Lead Magnet</th>
-                      <th className="is-right">Version</th>
-                      <th className="is-right">Sent</th>
-                      <th className="is-right">Leads</th>
-                      <th className="is-right">Replies</th>
-                      <th className="is-right">Reply Rate</th>
-                      <th className="is-right">Booked</th>
-                      <th className="is-right">Booking Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scoreboard.leadMagnetComparison.map((row) => (
-                      <Fragment key={row.leadMagnet}>
-                        {row.legacy ? (
-                          <tr>
-                            <td rowSpan={row.v2 ? 2 : 1}>{row.leadMagnet}</td>
-                            <td className="is-right">Legacy</td>
-                            <td className="is-right">{fmtInt(row.legacy.messagesSent)}</td>
-                            <td className="is-right">{fmtInt(row.legacy.uniqueContacted)}</td>
-                            <td className="is-right">{fmtInt(row.legacy.uniqueReplied)}</td>
-                            <td className="is-right">{fmtPct(row.legacy.replyRatePct)}</td>
-                            <td className="is-right">{fmtInt(row.legacy.canonicalBookedCalls)}</td>
-                            <td className="is-right">{fmtPct(row.legacy.bookingRatePct)}</td>
-                          </tr>
-                        ) : null}
-                        {row.v2 ? (
-                          <tr>
-                            {row.legacy ? null : <td rowSpan={row.legacy ? 2 : 1}>{row.leadMagnet}</td>}
-                            <td className="is-right">V2</td>
-                            <td className="is-right">{fmtInt(row.v2.messagesSent)}</td>
-                            <td className="is-right">{fmtInt(row.v2.uniqueContacted)}</td>
-                            <td className="is-right">{fmtInt(row.v2.uniqueReplied)}</td>
-                            <td className="is-right">{fmtPct(row.v2.replyRatePct)}</td>
-                            <td className="is-right">{fmtInt(row.v2.canonicalBookedCalls)}</td>
-                            <td className="is-right">{fmtPct(row.v2.bookingRatePct)}</td>
-                          </tr>
-                        ) : null}
-                      </Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </V2Panel>
-        </>
-      ) : null}
-
-      {/* Sets Attribution — shows how sets are credited to sequences across multi-day convos */}
+      {/* ── Sequence Performance Table ── */}
       <V2Panel
-        title="Sets Attribution"
-        caption={`${fmtInt(totalBookedAllChannels)} total sets. Attribution uses HubSpot first-conversion label matching — so a set is credited to the sequence that started the conversation, even if the booking happened days later.`}
+        title="Sequence Performance"
+        caption={`${sortedRows.length} sequences · Booked = Slack-attributed canonical calls · click column headers to sort`}
       >
-        <div className="V2SetsAttribution">
-          <div className="V2SetsAttribution__bar">
-            {totalBookedAllChannels > 0 ? (
-              <>
-                <div
-                  className="V2SetsAttribution__segment V2SetsAttribution__segment--sms"
-                  style={{ width: `${(totalBookedAttributedToRows / totalBookedAllChannels) * 100}%` }}
-                  title={`Sequence-attributed: ${totalBookedAttributedToRows}`}
-                />
-                <div
-                  className="V2SetsAttribution__segment V2SetsAttribution__segment--unattr"
-                  style={{ width: `${(unattributedCalls / totalBookedAllChannels) * 100}%` }}
-                  title={`Unmatched: ${unattributedCalls}`}
-                />
-              </>
-            ) : (
-              <div className="V2SetsAttribution__segment V2SetsAttribution__segment--empty" style={{ width: '100%' }} />
-            )}
-          </div>
-          <div className="V2SetsAttribution__legend">
-            <div className="V2SetsAttribution__legendItem">
-              <span className="V2SetsAttribution__dot V2SetsAttribution__dot--sms" />
-              <div>
-                <span className="V2SetsAttribution__legendLabel">Sequence-Attributed</span>
-                <span className="V2SetsAttribution__legendDesc">Credited to the sequence that started the conversation (HubSpot first conversion)</span>
-              </div>
-              <span className="V2SetsAttribution__legendValue">{fmtInt(totalBookedAttributedToRows)}</span>
-              <span className="V2SetsAttribution__legendPct">
-                {totalBookedAllChannels > 0 ? fmtPct((totalBookedAttributedToRows / totalBookedAllChannels) * 100) : '—'}
-              </span>
-            </div>
-            <div className="V2SetsAttribution__legendItem V2SetsAttribution__legendItem--sub">
-              <span className="V2SetsAttribution__dot V2SetsAttribution__dot--confirm" />
-              <div>
-                <span className="V2SetsAttribution__legendLabel">↳ Confirmed SMS Reply</span>
-                <span className="V2SetsAttribution__legendDesc">Subset: contact replied to an outbound SMS before booking (strictest signal)</span>
-              </div>
-              <span className="V2SetsAttribution__legendValue">{fmtInt(totalBookedAfterReply)}</span>
-              <span className="V2SetsAttribution__legendPct">
-                {totalBookedAllChannels > 0 ? fmtPct((totalBookedAfterReply / totalBookedAllChannels) * 100) : '—'}
-              </span>
-            </div>
-            {unattributedCalls > 0 ? (
-              <div className="V2SetsAttribution__legendItem V2SetsAttribution__legendItem--muted">
-                <span className="V2SetsAttribution__dot V2SetsAttribution__dot--unattr" />
-                <div>
-                  <span className="V2SetsAttribution__legendLabel">Unmatched / Other Channels</span>
-                  <span className="V2SetsAttribution__legendDesc">IG, LinkedIn, Circle, website, or no label match found</span>
-                </div>
-                <span className="V2SetsAttribution__legendValue">{fmtInt(unattributedCalls)}</span>
-                <span className="V2SetsAttribution__legendPct">
-                  {totalBookedAllChannels > 0 ? fmtPct((unattributedCalls / totalBookedAllChannels) * 100) : '—'}
-                </span>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </V2Panel>
-
-      <V2Panel title="At-Risk Sequences" caption="Sequences that need attention.">
-        {watchlistRows.length === 0 ? (
-          <V2State kind="empty">All clear! No sequences need attention.</V2State>
+        {sortedRows.length === 0 ? (
+          <V2State kind="empty">No sequence data for this window.</V2State>
         ) : (
-          <div className="V2Watchlist">
-            {watchlistRows.map((row) => {
-              const reviewed = Boolean(reviewedMap[row.label]);
-              const tone = riskTone(row.optOutRatePct);
-              return (
-                <article className={`V2Watchlist__item ${reviewed ? 'is-reviewed' : ''}`} key={row.label}>
-                  <div className="V2Watchlist__head">
-                    <div>
-                      <h3>{row.label}</h3>
-                      <div className="V2Watchlist__stats">
-                        <span className="V2Watchlist__stat">
-                          📤 {fmtInt(row.messagesSent)} sent
-                        </span>
-                        <span className="V2Watchlist__stat">
-                          💬 {fmtInt(row.repliesReceived)} replies
-                        </span>
-                        <span className={`V2Watchlist__stat V2Watchlist__stat--${tone === 'critical' ? 'critical' : 'warning'}`}>
-                          🚫 {fmtInt(row.optOuts)} opt-outs ({fmtPct(row.optOutRatePct)})
-                        </span>
-                      </div>
-                    </div>
-                    <span className={`V2RiskTag V2RiskTag--${tone}`}>{riskLabel(row.optOutRatePct)}</span>
-                  </div>
-                  <div className="V2Watchlist__actions">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearch(row.label);
-                        setSort('optOutRatePct');
-                      }}
-                    >
-                      Focus in table
-                    </button>
-                    <button type="button" onClick={() => void copySetterNote(row)}>
-                      {copiedSequence === row.label ? 'Copied' : 'Copy coaching note'}
-                    </button>
-                    <button type="button" onClick={() => toggleReviewed(row.label)}>
-                      {reviewed ? 'Mark unreviewed' : 'Mark reviewed'}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+          <div className="V2TableWrap">
+            <table className="V2Table V2Table--sequences">
+              <thead>
+                <tr>
+                  <th className="V2Table__col--label">Sequence</th>
+                  <th className="V2Table__col--leadMagnet">Lead Magnet</th>
+                  <th className="V2Table__col--version">Ver.</th>
+                  <th className="V2Table__col--date">First Seen</th>
+                  <th
+                    className="is-right is-sortable"
+                    onClick={() => handleSortClick('messagesSent')}
+                  >
+                    Sent{sortArrow('messagesSent')}
+                  </th>
+                  <th className="is-right">Replied</th>
+                  <th
+                    className="is-right is-sortable"
+                    onClick={() => handleSortClick('replyRatePct')}
+                  >
+                    Reply Rate{sortArrow('replyRatePct')}
+                  </th>
+                  <th
+                    className="is-right is-sortable"
+                    onClick={() => handleSortClick('canonicalBookedCalls')}
+                  >
+                    Booked{sortArrow('canonicalBookedCalls')}
+                  </th>
+                  <th
+                    className="is-right is-sortable"
+                    onClick={() => handleSortClick('canonicalBookedAfterSmsReply')}
+                  >
+                    w/ SMS Reply{sortArrow('canonicalBookedAfterSmsReply')}
+                  </th>
+                  <th className="is-right">Booking Rate</th>
+                  <th
+                    className="is-right is-sortable"
+                    onClick={() => handleSortClick('optOutRatePct')}
+                  >
+                    Opt-Out Rate{sortArrow('optOutRatePct')}
+                  </th>
+                  <th className="is-right">Opt-Outs</th>
+                  <th className="is-center V2Table__col--expand" />
+                </tr>
+              </thead>
+              <tbody>
+                {sortedRows.map((row) => {
+                  const expanded = expandedLabels.has(row.label);
+                  const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
+                  const isHighBooking = row.bookingRatePct !== null && row.bookingRatePct >= 5;
+                  const rowClass = [
+                    'V2Table__row',
+                    row.isManual ? 'V2Table__row--manual' : '',
+                    isHighOptOut ? 'V2Table__row--warn' : '',
+                    isHighBooking && !isHighOptOut ? 'V2Table__row--positive' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ');
+
+                  return (
+                    <Fragment key={row.label}>
+                      <tr className={rowClass}>
+                        <td className="V2Table__col--label">
+                          <span className="V2Table__seqName" title={row.label}>
+                            {row.label}
+                          </span>
+                        </td>
+                        <td className="V2Table__col--leadMagnet">
+                          {row.isManual ? (
+                            <span className="V2Badge V2Badge--muted">manual</span>
+                          ) : row.leadMagnet ? (
+                            <span className="V2Table__leadMagnetText">{row.leadMagnet}</span>
+                          ) : (
+                            <span className="V2Table__dim">—</span>
+                          )}
+                        </td>
+                        <td className="V2Table__col--version">
+                          {row.version ? (
+                            <span className="V2Badge V2Badge--version">{row.version}</span>
+                          ) : (
+                            <span className="V2Table__dim">—</span>
+                          )}
+                        </td>
+                        <td className="V2Table__col--date V2Table__dim">
+                          {fmtDay(row.firstSeenAt)}
+                        </td>
+                        <td className="is-right">{fmtInt(row.messagesSent)}</td>
+                        <td className="is-right">
+                          {row.uniqueReplied !== null
+                            ? fmtInt(row.uniqueReplied)
+                            : fmtInt(row.repliesReceived)}
+                        </td>
+                        <td className="is-right">{fmtPct(row.replyRatePct)}</td>
+                        <td className="is-right">
+                          <strong>{fmtInt(row.canonicalBookedCalls)}</strong>
+                        </td>
+                        <td className="is-right V2Table__dim">
+                          {fmtInt(row.canonicalBookedAfterSmsReply)}
+                        </td>
+                        <td className="is-right">
+                          {row.bookingRatePct !== null ? fmtPct(row.bookingRatePct) : <span className="V2Table__dim">—</span>}
+                        </td>
+                        <td className={`is-right${isHighOptOut ? ' V2Table__cell--warn' : ''}`}>
+                          {fmtPct(row.optOutRatePct)}
+                        </td>
+                        <td className="is-right">{fmtInt(row.optOuts)}</td>
+                        <td className="is-center">
+                          <button
+                            type="button"
+                            className="V2Table__expandBtn"
+                            onClick={() => toggleExpanded(row.label)}
+                            aria-expanded={expanded}
+                            title={expanded ? 'Collapse audit' : 'Expand audit'}
+                          >
+                            {expanded ? '▲' : '▼'}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {expanded && (
+                        <tr className="V2Table__auditRow">
+                          <td colSpan={13}>
+                            <div className="V2SeqAudit">
+                              {/* Booking breakdown summary */}
+                              <div className="V2SeqAudit__summary">
+                                <div className="V2SeqAudit__summaryItem">
+                                  <span className="V2SeqAudit__summaryLabel">Booked (Slack)</span>
+                                  <span className="V2SeqAudit__summaryValue">
+                                    {fmtInt(row.canonicalBookedCalls)}
+                                    {row.canonicalBookedCalls > 0 && (
+                                      <span className="V2SeqAudit__breakdown">
+                                        {' '}— Jack {fmtInt(row.canonicalBookedJack)} / Brandon{' '}
+                                        {fmtInt(row.canonicalBookedBrandon)} / Self{' '}
+                                        {fmtInt(row.canonicalBookedSelf)}
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="V2SeqAudit__summaryItem">
+                                  <span className="V2SeqAudit__summaryLabel">w/ SMS Reply</span>
+                                  <span className="V2SeqAudit__summaryValue">
+                                    {fmtInt(row.canonicalBookedAfterSmsReply)}
+                                  </span>
+                                </div>
+                                <div className="V2SeqAudit__summaryItem V2SeqAudit__summaryItem--diagnostic">
+                                  <span className="V2SeqAudit__summaryLabel">
+                                    SMS Booking Signals
+                                    <span className="V2SeqAudit__hint"> (diagnostic, not canonical)</span>
+                                  </span>
+                                  <span className="V2SeqAudit__summaryValue V2SeqAudit__summaryValue--muted">
+                                    {fmtInt(row.diagnosticSmsBookingSignals)}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Per-booking audit rows */}
+                              {row.bookedAuditRows.length === 0 ? (
+                                <V2State kind="empty">
+                                  No Slack booked-call audit rows for this sequence in this window.
+                                </V2State>
+                              ) : (
+                                <div className="V2AuditList">
+                                  {row.bookedAuditRows
+                                    .slice()
+                                    .sort(
+                                      (a, b) =>
+                                        new Date(b.eventTs).getTime() - new Date(a.eventTs).getTime(),
+                                    )
+                                    .map((audit) => (
+                                      <article key={audit.bookedCallId} className="V2AuditItem">
+                                        <header className="V2AuditItem__header">
+                                          <strong>{fmtDateTime(audit.eventTs)}</strong>
+                                          <span
+                                            className={`V2Badge V2Badge--${
+                                              audit.bucket === 'jack'
+                                                ? 'jack'
+                                                : audit.bucket === 'brandon'
+                                                  ? 'brandon'
+                                                  : 'self'
+                                            }`}
+                                          >
+                                            {bucketLabel(audit.bucket)}
+                                          </span>
+                                          <span
+                                            className={`V2Badge V2Badge--${audit.strictSmsReplyLinked ? 'positive' : 'muted'}`}
+                                          >
+                                            SMS reply: {audit.strictSmsReplyLinked ? 'yes' : 'no'}
+                                          </span>
+                                        </header>
+                                        <p className="V2AuditItem__meta">
+                                          First conversion:{' '}
+                                          <em>{audit.firstConversion || 'n/a'}</em> · Contact:{' '}
+                                          {audit.contactName || 'n/a'} · Phone:{' '}
+                                          {maskPhone(audit.contactPhone)}
+                                        </p>
+                                        <p className="V2AuditItem__reason">
+                                          Reason:{' '}
+                                          {audit.strictSmsReplyReason.replace(/_/g, ' ')}
+                                          {audit.latestReplyAt
+                                            ? ` · Latest SMS reply: ${fmtDateTime(audit.latestReplyAt)}`
+                                            : ''}
+                                        </p>
+                                      </article>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </V2Panel>
 
-      <V2Panel
-        title="Sequence Table"
-        caption={
-          attribution
-            ? `Matched ${matchedCalls}/${totalCalls} booked calls to sequence attribution (${namedSequenceCalls} named sequences, ${manualCalls} "No sequence (manual/direct)", ${unattributedCalls} unattributed). Unattributed bookings often come from IG/LinkedIn/Circle/other non-SMS sources or unmatched First Conversion labels. Table includes an explicit "${unattributedSequenceLabel}" row when applicable. "First seen" is the first outbound timestamp found in PTBizSMS history.`
-            : 'No booked-call attribution metadata found. "First seen" is based on PTBizSMS outbound history.'
-        }
-      >
-        <div className="V2TableActions">
-          <label>
-            Sort by{' '}
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
-              <option value="messagesSent">Messages</option>
-              <option value="replyRatePct">Reply rate</option>
-              <option value="canonicalBookedCalls">Booked (attributed to this sequence)</option>
-              <option value="canonicalBookedAfterSmsReply">Booked after SMS reply</option>
-              <option value="optOutRatePct">Opt-out rate</option>
-            </select>
-          </label>
-        </div>
-        <div className="V2TableWrap">
-          <table className="V2Table">
-            <thead>
-              <tr>
-                <th>Sequence</th>
-                {hasFirstSeenData ? <th>First seen</th> : null}
-                <th className="is-right">Sent</th>
-                <th className="is-right">Replies</th>
-                <th className="is-right">Reply rate</th>
-                <th className="is-right">Booked (attributed to this sequence)</th>
-                <th className="is-right">Booked after SMS reply</th>
-                <th className="is-right">
-                  <V2Term term="smsBookingHintsDiagnostic" label="SMS hints (QA)" />
-                </th>
-                <th className="is-right">Opt-out rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const expanded = Boolean(expandedAuditRows[row.label]);
-                const colSpan = hasFirstSeenData ? 9 : 8;
-                return (
-                  <Fragment key={row.label}>
-                    <tr key={`${row.label}-summary`} className={row.optOutRatePct >= 6 ? 'is-risk-critical' : row.optOutRatePct >= 3 ? 'is-risk-watch' : ''}>
-                      <td>
-                        <div className="V2SequenceCell">
-                          <span>{row.label}</span>
-                          <button type="button" className="V2SequenceCell__auditToggle" onClick={() => toggleAuditRow(row.label)}>
-                            {expanded ? 'Hide' : 'View'} audit ({row.bookedAuditRows.length})
-                          </button>
-                        </div>
-                      </td>
-                      {hasFirstSeenData ? <td>{fmtDay(row.firstSeenAt)}</td> : null}
-                      <td className="is-right">{row.messagesSent.toLocaleString()}</td>
-                      <td className="is-right">{row.repliesReceived.toLocaleString()}</td>
-                      <td className="is-right">{fmtPct(row.replyRatePct)}</td>
-                      <td className="is-right">{row.canonicalBookedCalls.toLocaleString()}</td>
-                      <td className="is-right">{row.canonicalBookedAfterSmsReply.toLocaleString()}</td>
-                      <td className="is-right">{row.diagnosticSmsBookingSignals.toLocaleString()}</td>
-                      <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
-                    </tr>
-                    {expanded ? (
-                      <tr key={`${row.label}-audit`} className="V2Table__auditRow">
-                        <td colSpan={colSpan}>
-                          {row.bookedAuditRows.length === 0 ? (
-                            <V2State kind="empty">No booked-call audit rows for this sequence in this window.</V2State>
-                          ) : (
-                            <div className="V2AuditList">
-                              {row.bookedAuditRows
-                                .slice()
-                                .sort((a, b) => new Date(b.eventTs).getTime() - new Date(a.eventTs).getTime())
-                                .map((audit) => (
-                                  <article key={audit.bookedCallId} className="V2AuditItem">
-                                    <header>
-                                      <strong>{fmtDateTime(audit.eventTs)}</strong>
-                                      <span>{bucketLabel(audit.bucket)}</span>
-                                      <span>
-                                        SMS reply link: {audit.strictSmsReplyLinked ? 'yes' : 'no'} ({audit.strictSmsReplyReason})
-                                      </span>
-                                    </header>
-                                    <p>
-                                      First conversion: {audit.firstConversion || 'n/a'} | Contact: {audit.contactName || 'n/a'} | Phone:{' '}
-                                      {maskPhone(audit.contactPhone)}
-                                    </p>
-                                    <p>
-                                      Slack source: {audit.slackChannelId}:{audit.slackMessageTs}
-                                      {audit.latestReplyAt ? ` | Latest SMS reply: ${fmtDateTime(audit.latestReplyAt)}` : ''}
-                                    </p>
-                                  </article>
-                                ))}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </V2Panel>
+      {/* ── Lead Magnet Comparison ── */}
+      {leadMagnetRows.length > 0 && (
+        <V2Panel
+          title="Lead Magnet Comparison"
+          caption="Legacy vs v2 sequences by lead magnet · weekly scoreboard window"
+        >
+          <div className="V2TableWrap">
+            <table className="V2Table">
+              <thead>
+                <tr>
+                  <th>Lead Magnet</th>
+                  <th className="is-right">Legacy Sent</th>
+                  <th className="is-right">Legacy Reply Rate</th>
+                  <th className="is-right">Legacy Booked</th>
+                  <th className="is-right">v2 Sent</th>
+                  <th className="is-right">v2 Reply Rate</th>
+                  <th className="is-right">v2 Booked</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leadMagnetRows.map((row) => (
+                  <tr key={row.leadMagnet}>
+                    <td>{row.leadMagnet}</td>
+                    <td className="is-right">
+                      {row.legacy ? fmtInt(row.legacy.messagesSent) : <span className="V2Table__dim">—</span>}
+                    </td>
+                    <td className="is-right">
+                      {row.legacy ? fmtPct(row.legacy.replyRatePct) : <span className="V2Table__dim">—</span>}
+                    </td>
+                    <td className="is-right">
+                      {row.legacy ? fmtInt(row.legacy.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
+                    </td>
+                    <td className="is-right">
+                      {row.v2 ? fmtInt(row.v2.messagesSent) : <span className="V2Table__dim">—</span>}
+                    </td>
+                    <td className="is-right">
+                      {row.v2 ? fmtPct(row.v2.replyRatePct) : <span className="V2Table__dim">—</span>}
+                    </td>
+                    <td className="is-right">
+                      {row.v2 ? fmtInt(row.v2.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </V2Panel>
+      )}
+
+      {/* ── Booking Attribution (Monthly) ── */}
+      {monthlyBookings && (
+        <V2Panel
+          title="Booking Attribution (Monthly)"
+          caption="How booked calls are attributed across setters and conversation types · monthly scoreboard window"
+        >
+          <div className="V2SeqAttribution">
+            <div className="V2SeqAttribution__grid">
+              <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
+                <span className="V2SeqAttribution__label">Total Booked</span>
+                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.total)}</span>
+              </div>
+              <div className="V2SeqAttribution__item">
+                <span className="V2SeqAttribution__label">Jack</span>
+                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.jack)}</span>
+              </div>
+              <div className="V2SeqAttribution__item">
+                <span className="V2SeqAttribution__label">Brandon</span>
+                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.brandon)}</span>
+              </div>
+              <div className="V2SeqAttribution__item">
+                <span className="V2SeqAttribution__label">Self-Booked</span>
+                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.selfBooked)}</span>
+              </div>
+              <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
+                <span className="V2SeqAttribution__label">Sequence-Initiated</span>
+                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
+              </div>
+              <div className="V2SeqAttribution__item">
+                <span className="V2SeqAttribution__label">Manual-Initiated</span>
+                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
+              </div>
+            </div>
+            <p className="V2SeqAttribution__note">
+              Attribution model: sequence-initiated conversation. A sequence gets credit when it
+              triggered the first outbound contact with a lead, even if manual follow-ups preceded
+              the booking.
+            </p>
+          </div>
+        </V2Panel>
+      )}
     </div>
   );
 }

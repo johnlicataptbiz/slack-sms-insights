@@ -64,12 +64,12 @@ type AuditRow = SalesMetricsV2['sequences'][0]['bookedAuditRows'][0];
 
 type MergedSeqRow = {
   label: string;
+  // metadata from scoreboard (window-independent)
   leadMagnet: string;
   version: string;
+  // all numeric fields exclusively from sales-metrics (respects mode toggle)
   firstSeenAt: string | null;
   messagesSent: number;
-  uniqueContacted: number | null;
-  uniqueReplied: number | null;
   repliesReceived: number;
   replyRatePct: number;
   canonicalBookedCalls: number;
@@ -77,7 +77,6 @@ type MergedSeqRow = {
   canonicalBookedJack: number;
   canonicalBookedBrandon: number;
   canonicalBookedSelf: number;
-  bookingRatePct: number | null;
   optOuts: number;
   optOutRatePct: number;
   bookedAuditRows: AuditRow[];
@@ -111,7 +110,8 @@ export default function SequencesV2() {
     return map;
   }, [scoreboard?.sequences]);
 
-  // Merge sales-metrics sequences with scoreboard metadata
+  // Merge: numeric fields exclusively from sales-metrics (time-range consistent).
+  // Scoreboard is used only for window-independent metadata: leadMagnet, version.
   const mergedRows = useMemo((): MergedSeqRow[] => {
     const smSeqs = salesMetrics?.sequences ?? [];
     return smSeqs.map((seq) => {
@@ -122,8 +122,6 @@ export default function SequencesV2() {
         version: sb?.version ?? '',
         firstSeenAt: seq.firstSeenAt,
         messagesSent: seq.messagesSent,
-        uniqueContacted: sb?.uniqueContacted ?? null,
-        uniqueReplied: sb?.uniqueReplied ?? null,
         repliesReceived: seq.repliesReceived,
         replyRatePct: seq.replyRatePct,
         canonicalBookedCalls: seq.canonicalBookedCalls,
@@ -131,7 +129,6 @@ export default function SequencesV2() {
         canonicalBookedJack: seq.canonicalBookedJack,
         canonicalBookedBrandon: seq.canonicalBookedBrandon,
         canonicalBookedSelf: seq.canonicalBookedSelf,
-        bookingRatePct: sb?.bookingRatePct ?? null,
         optOuts: seq.optOuts,
         optOutRatePct: seq.optOutRatePct,
         bookedAuditRows: seq.bookedAuditRows,
@@ -276,7 +273,7 @@ export default function SequencesV2() {
       {/* ── Sequence Performance Table ── */}
       <V2Panel
         title="Sequence Performance"
-        caption={`${sortedRows.length} sequences · Booked = Slack-attributed canonical calls · click column headers to sort`}
+        caption={`${sortedRows.length} sequences · all numbers from ${mode} rolling window · Booked = Slack-attributed canonical · click headers to sort`}
       >
         {sortedRows.length === 0 ? (
           <V2State kind="empty">No sequence data for this window.</V2State>
@@ -314,7 +311,6 @@ export default function SequencesV2() {
                   >
                     w/ SMS Reply{sortArrow('canonicalBookedAfterSmsReply')}
                   </th>
-                  <th className="is-right">Booking Rate</th>
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('optOutRatePct')}
@@ -329,7 +325,7 @@ export default function SequencesV2() {
                 {sortedRows.map((row) => {
                   const expanded = expandedLabels.has(row.label);
                   const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
-                  const isHighBooking = row.bookingRatePct !== null && row.bookingRatePct >= 5;
+                  const isHighBooking = row.canonicalBookedCalls > 0 && !row.isManual;
                   const rowClass = [
                     'V2Table__row',
                     row.isManual ? 'V2Table__row--manual' : '',
@@ -367,20 +363,13 @@ export default function SequencesV2() {
                           {fmtDay(row.firstSeenAt)}
                         </td>
                         <td className="is-right">{fmtInt(row.messagesSent)}</td>
-                        <td className="is-right">
-                          {row.uniqueReplied !== null
-                            ? fmtInt(row.uniqueReplied)
-                            : fmtInt(row.repliesReceived)}
-                        </td>
+                        <td className="is-right">{fmtInt(row.repliesReceived)}</td>
                         <td className="is-right">{fmtPct(row.replyRatePct)}</td>
                         <td className="is-right">
                           <strong>{fmtInt(row.canonicalBookedCalls)}</strong>
                         </td>
                         <td className="is-right V2Table__dim">
                           {fmtInt(row.canonicalBookedAfterSmsReply)}
-                        </td>
-                        <td className="is-right">
-                          {row.bookingRatePct !== null ? fmtPct(row.bookingRatePct) : <span className="V2Table__dim">—</span>}
                         </td>
                         <td className={`is-right${isHighOptOut ? ' V2Table__cell--warn' : ''}`}>
                           {fmtPct(row.optOutRatePct)}

@@ -19,3 +19,12 @@
 - [x] v2.css — Add status border modifiers + latestBadge styles
 - [x] npm run build — verify TypeScript (✓ 127 modules, 0 errors)
 - [x] Browser verify Daily Activity page at ptbizsms.com/v2/runs
+
+## Inbox Chat Thread Layout Fix
+
+- [x] v2.css — `.V2Inbox__composerModalBody`: add `flex: 1; min-height: 0` so modal body fills constrained height and `overflow: auto` works
+- [x] v2.css — `.V2Inbox__chatThread`: increase `max-height` from `380px` → `480px`, add `scroll-behavior: smooth`
+- [x] InboxV2.tsx — Add `chatThreadRef` (`useRef<HTMLDivElement>`) and attach to `.V2Inbox__chatThread`
+- [x] InboxV2.tsx — Add `useEffect` to auto-scroll thread to bottom on `detail?.messages` or `justSentMessage` change
+- [x] npm run build — verify TypeScript (✓ 127 modules, 0 errors)
+- [x] Committed `df9c0e6` and pushed to `origin/main` → Vercel deployed

@@ -71,9 +71,33 @@ export const createRunSchema = z.object({
 
 /**
  * GET /api/sales-metrics query parameters
+ *
+ * Supports three mutually-exclusive modes (same as the v2 endpoint):
+ *   • day=YYYY-MM-DD  — single calendar day in `tz`
+ *   • from + to       — explicit ISO-8601 range
+ *   • range           — rolling window shorthand
+ *
+ * Previously this schema only accepted `range` and silently stripped `day`,
+ * `from`, `to`, and `tz`, causing every request to fall back to the 7-day
+ * default regardless of what the caller passed.
  */
 export const salesMetricsSchema = z.object({
-  range: z.enum(['1d', '7d', '30d', '90d']).default('7d'),
+  /** Single-day mode: YYYY-MM-DD in the given tz (e.g. 2026-02-23) */
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD').optional(),
+  /** Explicit range start — ISO 8601 */
+  from: z.string().optional(),
+  /** Explicit range end — ISO 8601 */
+  to: z.string().optional(),
+  /**
+   * Rolling window shorthand.
+   * Must match the values accepted by resolveMetricsRange ('today' | '7d' | '30d').
+   * Defaults to '7d' when no day/from/to/range is provided (preserves backward compat).
+   * NOTE: '1d' and '90d' were previously listed here but are not handled by
+   * resolveMetricsRange and would have thrown at runtime.
+   */
+  range: z.enum(['today', '7d', '30d']).default('7d'),
+  /** IANA timezone string (e.g. America/Chicago). Defaults to DEFAULT_BUSINESS_TIMEZONE. */
+  tz: z.string().optional(),
 });
 
 /**

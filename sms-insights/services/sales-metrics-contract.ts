@@ -1,5 +1,5 @@
-import type { BookedCallsSummary } from './booked-calls.js';
 import type { RepLeaderboardRow, SalesMetricsSummary, SalesTrendPoint, TopSequenceRow } from './sales-metrics.js';
+import type { BookedCallsSummary } from './booked-calls.js';
 
 export type CanonicalSalesMetricsSlice = {
   totals: SalesMetricsSummary['totals'];
@@ -42,8 +42,9 @@ export const buildCanonicalSalesMetricsSlice = (
         booked: 0,
         optOuts: 0,
       } satisfies SalesTrendPoint);
-    const slackBooked = bookedByDay.get(day)?.booked ?? 0;
-    return { ...base, booked: slackBooked };
+    // Use Slack booked-calls count for the day; fall back to SMS heuristic if no Slack data exists.
+    const bookedDay = bookedByDay.get(day);
+    return { ...base, booked: bookedDay?.booked ?? base.booked };
   });
 
   const topSequences = summary.topSequences.map((row) => ({
@@ -55,6 +56,7 @@ export const buildCanonicalSalesMetricsSlice = (
     booked: row.bookingSignalsSms,
   }));
 
+  // Use Slack booked-calls as the canonical booked count; SMS heuristic signals are diagnostic only.
   const totals = {
     ...summary.totals,
     booked: bookedCalls.totals.booked,
@@ -66,6 +68,7 @@ export const buildCanonicalSalesMetricsSlice = (
     trendByDay,
     topSequences,
     repLeaderboard,
+    // Pass through the full Slack booked-calls breakdown (jack / brandon / selfBooked).
     bookedCalls: bookedCalls.totals,
     consistency: {
       totalsBookedMatches: totals.booked === bookedCalls.totals.booked,

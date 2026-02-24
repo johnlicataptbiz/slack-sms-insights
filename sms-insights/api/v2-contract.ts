@@ -561,6 +561,10 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
     repName: row.repName,
     outboundConversations: row.outboundConversations,
     replyRatePct: row.replyRatePct,
+    // TODO(Bug 3): canonicalBookedCalls is always 0 here because repLeaderboard rows only carry
+    // SMS heuristic signals (bookingSignalsSms). Slack booked-calls are attributed to jack/brandon/
+    // selfBooked buckets in bookedCalls.totals but are not yet joined to the rep leaderboard.
+    // Fix: cross-reference bookedCalls.totals.jack/brandon with repName to populate this field.
     canonicalBookedCalls: 0,
     diagnosticSmsBookingSignals: row.bookingSignalsSms,
     optOuts: row.optOuts,

@@ -1249,7 +1249,8 @@ const handleGetSalesMetricsV2: RequestHandler = async (req, res, logger, origin)
       from: url.searchParams.get('from'),
       to: url.searchParams.get('to'),
       day: url.searchParams.get('day'),
-      range: url.searchParams.get('range'),
+      // Default to '7d' when no range/day/from/to is provided (preserves backward compat)
+      range: url.searchParams.get('range') ?? '7d',
       tz: url.searchParams.get('tz'),
     });
   } catch (error) {

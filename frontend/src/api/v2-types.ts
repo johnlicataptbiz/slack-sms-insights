@@ -79,6 +79,8 @@ export type SalesMetricsV2 = {
       strictSmsReplyLinked: boolean;
       latestReplyAt: string | null;
       strictSmsReplyReason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
+      /** Sequence the contact was actively enrolled in at booking time, when different from the attributed sequence. */
+      convertedViaSequence?: string | null;
     }>;
     diagnosticSmsBookingSignals: number;
     optOuts: number;

@@ -4463,6 +4463,17 @@ color: var(--v2-text);
   color: var(--v2-muted);
 }
 
+.V2Badge--via {
+  background: #ede9fe;
+  color: #5b21b6;
+  border: 1px solid #c4b5fd;
+  font-style: italic;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .V2Badge--positive {
   background: rgba(19, 185, 129, 0.12);
   border-color: rgba(19, 185, 129, 0.3);

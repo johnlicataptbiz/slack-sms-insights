@@ -86,6 +86,8 @@ export type SalesMetricsV2 = {
         | 'no_contact_phone'
         | 'no_reply_before_booking'
         | 'invalid_booking_timestamp';
+      /** Sequence the contact was actively enrolled in at booking time, when different from the attributed sequence. */
+      convertedViaSequence?: string | null;
     }>;
     diagnosticSmsBookingSignals: number;
     optOuts: number;
@@ -454,6 +456,7 @@ type SalesMetricsV1Compatible = {
         | 'no_contact_phone'
         | 'no_reply_before_booking'
         | 'invalid_booking_timestamp';
+      convertedViaSequence?: string | null;
     }>;
   }>;
   repLeaderboard: Array<{

@@ -457,6 +457,11 @@ export default function SequencesV2() {
                                           >
                                             SMS reply: {audit.strictSmsReplyLinked ? 'yes' : 'no'}
                                           </span>
+                                          {audit.convertedViaSequence && (
+                                            <span className="V2Badge V2Badge--via" title={`Contact was actively enrolled in this sequence at booking time`}>
+                                              via {audit.convertedViaSequence}
+                                            </span>
+                                          )}
                                         </header>
                                         <p className="V2AuditItem__meta">
                                           First conversion:{' '}

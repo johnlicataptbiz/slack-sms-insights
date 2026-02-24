@@ -30,6 +30,16 @@ export type SequenceBookedAuditRow = {
   smsSequenceLabel: string | null;
   /** Timestamp of the most recent outbound SMS to this contact before the booking. */
   smsLatestOutboundAt: string | null;
+  /**
+   * When the booking is attributed to Sequence A via firstConversion (fuzzy match) but the
+   * contact was actively enrolled in a different Sequence B at booking time (from sms_events),
+   * this field holds Sequence B's label.
+   *
+   * Interpretation: "Lead magnet = A, but they were converted while in B."
+   * Example: firstConversion = "Hiring Guide" → attributed to "Hiring Guide - 2026 v1.2",
+   *          but sms_events shows they were in "Call Pitched NO Reply" when they booked.
+   */
+  convertedViaSequence: string | null;
 };
 
 export type SequenceBookedBreakdown = {
@@ -296,6 +306,14 @@ export const attributeSlackBookedCallsToSequences = (
       attributionSource,
       smsSequenceLabel: smsLookup?.sequenceLabel ?? null,
       smsLatestOutboundAt: smsLookup?.latestOutboundAt ?? null,
+      // Set when firstConversion fuzzy-matched to Sequence A but SMS lookup shows the contact
+      // was actively in a different Sequence B at booking time (e.g., a follow-up sequence).
+      convertedViaSequence:
+        attributionSource === 'fuzzy_text_match' &&
+        smsLookup &&
+        smsLookup.sequenceLabel !== resolvedLabel
+          ? smsLookup.sequenceLabel
+          : null,
     });
     byLabel.set(resolvedLabel, row);
     totals.matchedCalls += 1;

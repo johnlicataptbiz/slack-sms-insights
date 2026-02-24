@@ -804,11 +804,20 @@ export default function InboxV2() {
                 <>
                   {/* Conversation Thread - Chat Style */}
                   <div className="V2Inbox__chatThread">
-                    {detail.messages.map((message) => {
+{detail.messages.map((message) => {
                       const leadLabel = detail.contactCard.name || detail.contactCard.phone || 'Lead';
+                      // For outbound messages: prefer inferring from message body (e.g., "Jack with PT Biz")
+                      // Fall back to alowareUser field, then to default setter
                       const defaultSetter = displaySetterName(detail.conversation.ownerLabel) || 'Setter';
-                      const speaker =
-                        message.direction === 'inbound' ? leadLabel : displaySetterName(message.alowareUser) || defaultSetter;
+                      let speaker: string;
+                      if (message.direction === 'inbound') {
+                        speaker = leadLabel;
+                      } else {
+                        // Try to infer from message body for sequence messages
+                        const bodySenderMatch = message.body?.match(/^Hey.*?,\s*(\w+(?:\s+\w+)?)\s+with\s+PT/i);
+                        const bodySender = bodySenderMatch?.[1] || null;
+                        speaker = displaySetterName(bodySender) || displaySetterName(message.alowareUser) || defaultSetter;
+                      }
                       return (
                         <article key={message.id} className={`V2Inbox__chatMessage V2Inbox__chatMessage--${message.direction}`}>
                           <div className="V2Inbox__chatMessageHeader">

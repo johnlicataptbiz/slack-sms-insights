@@ -5,7 +5,7 @@ import { useV2Channels, useV2Run, useV2Runs, useV2SalesMetrics } from '../../api
 import type { RunV2 } from '../../api/v2-types';
 import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser';
 import { v2Copy } from '../copy';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2StatBar } from '../components/V2Primitives';
 
 const savedViewsStorageKey = 'ptbizsms-v2-runs-saved-views';
 const BUSINESS_TZ = 'America/Chicago';
@@ -293,6 +293,7 @@ export default function RunsV2() {
   const [savedViews, setSavedViews] = useState<SavedRunsView[]>(() => readSavedViews());
   const [newViewName, setNewViewName] = useState('');
   const [copied, setCopied] = useState<'current' | string | null>(null);
+  const [showSavedViews, setShowSavedViews] = useState(false);
 
   const daysBack = parseRange(searchParams.get('range'));
   const channelId = searchParams.get('channel') || null;
@@ -361,6 +362,17 @@ export default function RunsV2() {
   // Always derive selected detail view from the selected run payload.
   // The timeline list is fetched without fullReport, so reusing the list view model
   // here can hide parsed sequence/rep sections.
+  const aggregateStats = useMemo(() => {
+    const items = runsData?.data.items || [];
+    const totalRuns = items.length;
+    const allViews = items.map((r) => viewByRunId.get(r.id) || buildRunViewModel(r));
+    const totalMessagesSent = allViews.reduce((sum, v) => sum + (v.messagesSent ?? 0), 0);
+    const totalBooked = allViews.reduce((sum, v) => sum + (v.booked ?? 0), 0);
+    const replyRates = allViews.map((v) => v.replyRatePct).filter((r): r is number => r !== null);
+    const avgReplyRate = replyRates.length > 0 ? replyRates.reduce((a, b) => a + b, 0) / replyRates.length : null;
+    return { totalRuns, totalMessagesSent, totalBooked, avgReplyRate };
+  }, [runsData?.data.items, viewByRunId]);
+
   const selectedView = resolveSelectedRunViewModel(selected, viewByRunId);
   const selectedSlackBookedTotal = selectedBookedMetricsQuery.data?.data.totals.canonicalBookedCalls ?? null;
   const selectedSlackBookedJack = selectedBookedMetricsQuery.data?.data.bookedCredit.jack ?? null;
@@ -509,25 +521,60 @@ export default function RunsV2() {
                 ))}
               </select>
             </label>
+            <button
+              type="button"
+              className="V2Shell__defsButton"
+              onClick={() => setShowSavedViews((v) => !v)}
+            >
+              {showSavedViews ? '✕ Saved Views' : '⊞ Saved Views'}
+            </button>
           </div>
         }
       />
+
+      <section className="V2MetricsGrid">
+        <V2MetricCard
+          label="Total Runs"
+          value={String(aggregateStats.totalRuns)}
+          meta={`Last ${daysBack} day${daysBack === 1 ? '' : 's'}`}
+        />
+        <V2MetricCard
+          label="Messages Sent"
+          value={aggregateStats.totalMessagesSent > 0 ? formatCount(aggregateStats.totalMessagesSent) : '—'}
+          meta="across all runs"
+        />
+        <V2MetricCard
+          label="Booked Calls"
+          value={aggregateStats.totalBooked > 0 ? formatCount(aggregateStats.totalBooked) : '—'}
+          tone="positive"
+          meta="across all runs"
+        />
+        <V2MetricCard
+          label="Avg Reply Rate"
+          value={formatPct(aggregateStats.avgReplyRate)}
+          meta="across runs with data"
+          tone={aggregateStats.avgReplyRate !== null && aggregateStats.avgReplyRate >= 15 ? 'positive' : 'default'}
+        />
+      </section>
 
       <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
         {!isRunDetailFocused ? (
           <V2Panel title="Run Timeline" caption={`Showing ${runsData.data.items.length} runs`} className="V2RunsLayout__timeline">
             <div className="V2RunList">
-              {runsData.data.items.map((run) => {
+              {runsData.data.items.map((run, index) => {
                 const runView = viewByRunId.get(run.id) || buildRunViewModel(run);
                 return (
                   <button
                     key={run.id}
-                    className={`V2RunList__item ${selected?.id === run.id ? 'is-active' : ''}`}
+                    className={`V2RunList__item V2RunList__item--${run.status} ${selected?.id === run.id ? 'is-active' : ''}`}
                     type="button"
                     onClick={() => setSelected(run.id)}
                   >
                     <div className="V2RunList__head">
-                      <span>{runView.title}</span>
+                      <span>
+                        {runView.title}
+                        {index === 0 && <span className="V2RunList__latestBadge">Latest</span>}
+                      </span>
                       <div className="V2RunList__badges">
                         <span className={`V2Tag V2Tag--${statusTone(run.status)}`}>{run.status}</span>
                         <span className="V2Tag V2Tag--accent">{run.reportType}</span>
@@ -590,34 +637,27 @@ export default function RunsV2() {
                   tone="accent"
                 />
                 <V2MetricCard
-                  label="Booked (Run report metric)"
+                  label="Booked (Report)"
                   value={formatCount(selectedView.booked)}
                   tone={(selectedView.booked ?? 0) > 0 ? 'positive' : 'default'}
+                  meta="From run report text"
                 />
                 <V2MetricCard
-                  label="Booked total (Slack first conversion)"
+                  label="Booked (Slack)"
                   value={
                     selectedBookedMetricsQuery.isLoading
-                      ? 'Loading...'
+                      ? 'Loading…'
                       : selectedBookedMetricsQuery.isError
                         ? 'Error'
                         : formatCount(selectedSlackBookedTotal)
                   }
-                  meta={
-                    selectedReportDay
-                      ? `Report day ${selectedReportDay}. This can be higher than SMS replies when source is non-SMS or unknown.`
-                      : 'Report day not detected for this run.'
-                  }
+                  meta={selectedReportDay ? `Report day ${selectedReportDay}` : 'Report day not detected'}
                   tone={(selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'}
                 />
                 <V2MetricCard
-                  label="Jack booked / Brandon booked / Self booked"
-                  value={selectedBookedMetricsQuery.isLoading ? 'Loading...' : selectedSlackBookedSplit}
-                  meta={
-                    selectedBookedMetricsQuery.isError
-                      ? `Could not load booked split: ${String((selectedBookedMetricsQuery.error as Error)?.message || selectedBookedMetricsQuery.error)}`
-                      : 'Slack first conversion credit split for this report day.'
-                  }
+                  label="Setter Split"
+                  value={selectedBookedMetricsQuery.isLoading ? 'Loading…' : selectedSlackBookedSplit}
+                  meta="Jack / Brandon / Self (Slack credit)"
                 />
                 <V2MetricCard
                   label="Opt-Outs"
@@ -626,6 +666,22 @@ export default function RunsV2() {
                   tone={(selectedView.optOuts ?? 0) > 0 ? 'critical' : 'default'}
                 />
               </div>
+
+              {selectedSlackBookedTotal !== null && selectedSlackBookedTotal > 0 && (
+                <V2Panel
+                  title="Setter Split"
+                  caption="How booked calls are credited across setters and self-bookings for this report day."
+                >
+                  <V2StatBar
+                    segments={[
+                      { label: 'Jack', value: selectedSlackBookedJack ?? 0, color: '#11b8d6' },
+                      { label: 'Brandon', value: selectedSlackBookedBrandon ?? 0, color: '#13b981' },
+                      { label: 'Self', value: selectedSlackBookedSelf ?? 0, color: 'var(--v2-muted)' },
+                    ]}
+                    total={selectedSlackBookedTotal}
+                  />
+                </V2Panel>
+              )}
 
               <div className="V2Grid V2Grid--2">
                 <section className="V2RunDetail__section">
@@ -737,16 +793,15 @@ export default function RunsV2() {
         </V2Panel>
       </div>
 
-      <V2Panel title="Saved Views (Optional)" caption="Collapsed by default so run timeline/details stay first.">
-        <details className="V2RunDetail__raw">
-          <summary>Open saved views</summary>
+      {showSavedViews && (
+        <V2Panel title="Saved Views" caption="Save and share specific run views. Up to 12 saved.">
           <div className="V2SavedViews">
             <div className="V2SavedViews__composer">
               <input
                 type="text"
                 value={newViewName}
                 onChange={(e) => setNewViewName(e.target.value)}
-                placeholder="View name (example: Jack weekly + main line)"
+                placeholder="View name (e.g. Jack weekly + main line)"
               />
               <button type="button" onClick={saveCurrentView}>
                 Save current view
@@ -783,8 +838,8 @@ export default function RunsV2() {
               <V2State kind="empty">No saved views yet.</V2State>
             )}
           </div>
-        </details>
-      </V2Panel>
+        </V2Panel>
+      )}
     </div>
   );
 }

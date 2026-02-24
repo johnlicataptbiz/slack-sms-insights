@@ -1,51 +1,21 @@
-# Code Quality Improvements - TODO
+# Task TODO
 
-## ✅ Completed Tasks
+## Tasks
 
-### 1. Install Dependencies
-- [x] pino (structured logging)
-- [x] pino-pretty (log formatting)
-- [x] zod (schema validation)
-- [x] compression (response compression)
+- [x] Read all relevant files (SequencesV2.tsx, InboxV2.tsx, routes.ts, aloware-client.ts, listeners/messages/index.ts, v2.css)
+- [x] Fix SequencesV2.tsx TypeScript warning — remove unused `totalBookedNonSmsOrUnknown` destructuring
+- [x] InboxV2.tsx — Add Refresh button in composer modal header (Aloware webhook stale-data fix)
+- [x] InboxV2.tsx — Expand composer modal to 2-column layout with qualification/escalation/send-line sidebar
+- [x] v2.css — Add/adjust responsive rules for expanded composer modal sidebar
+- [x] Browser verify Sequences page at ptbizsms.com/v2/sequences
 
-### 2. TypeScript Strict Mode
-- [x] Already enabled in tsconfig.json
+## Daily Activity Page Overhaul
 
-### 3. Logger Migration
-- [x] Created `services/logger.ts` with pino configuration
-- [x] Migrated `app.ts` to use structured logging
-- [x] Migrated `api/routes.ts` to use structured logging
-- [x] Fixed pino object logging format (removed object wrapping)
-- [x] Created custom type declarations for compression middleware
-
-### 4. Zod Validation
-- [x] Created `api/validation.ts` with schemas:
-  - `listRunsSchema` - Query params for listing runs
-  - `getRunSchema` - Path params for getting a run
-  - `createRunSchema` - Body validation for creating runs
-  - `salesMetricsSchema` - Query params for sales metrics
-  - `workItemsQuerySchema` - Query params for work items
-- [x] Integrated validation into API routes
-- [x] Fixed validation helper return types (error → errors)
-
-### 5. React Query Caching
-- [x] Configured `staleTime` (5 minutes default)
-- [x] Configured `gcTime` (10 minutes default)
-- [x] Added retry logic with exponential backoff
-- [x] Disabled `refetchOnWindowFocus` for better UX
-
-## 📝 Remaining Console Statements
-
-The following directories still contain console.* statements (acceptable for scripts):
-
-- `scripts/` - 98 console statements (one-off utilities, acceptable)
-
-Main application code (services/, listeners/, api/) is now clean.
-
-## 🎯 Next Steps (Optional)
-
-1. **Migrate script console statements** - Low priority (scripts are one-off utilities)
-2. **Add request ID tracking** - For better request tracing across logs
-3. **Add performance metrics** - Track API response times
-4. **Add health check endpoint** - For monitoring
-5. **Add rate limiting** - Protect API endpoints
+- [x] RunsV2.tsx — Add 4 aggregate KPI cards (Total Runs, Total Messages Sent, Total Booked Calls, Avg Reply Rate)
+- [x] RunsV2.tsx — Enhance run list cards with status-colored borders + Latest badge
+- [x] RunsV2.tsx — Clean up verbose KPI card labels in run detail
+- [x] RunsV2.tsx — Add V2StatBar setter split visualization in run detail
+- [x] RunsV2.tsx — Improve Saved Views (remove nested details, add toggle in header)
+- [x] v2.css — Add status border modifiers + latestBadge styles
+- [x] npm run build — verify TypeScript (✓ 127 modules, 0 errors)
+- [ ] Browser verify Daily Activity page at ptbizsms.com/v2/runs

@@ -84,6 +84,14 @@ const displaySetterName = (value: string | null | undefined): string | null => {
   const lower = trimmed.toLowerCase();
   if (lower.includes('jack')) return 'Jack';
   if (lower.includes('brandon')) return 'Brandon';
+  // Filter out system/dashboard/automated users
+  if (
+    lower.includes('dashboard') ||
+    lower.includes('password') ||
+    lower.includes('system') ||
+    lower.includes('bot') ||
+    lower.includes('automated')
+  ) return null;
   return trimmed;
 };
 
@@ -592,7 +600,11 @@ export default function InboxV2() {
                         <span className="V2Inbox__cardTime">{timeAgo(conversation.lastMessage.createdAt)}</span>
                       </div>
                       
-                      <p className="V2Inbox__cardPreview">{shorten(conversation.lastMessage.body, 120)}</p>
+                      <p className="V2Inbox__cardPreview">
+                        {shorten(conversation.lastMessage.body, 120) || (
+                          <span style={{ fontStyle: 'italic', opacity: 0.5 }}>No message preview</span>
+                        )}
+                      </p>
                       
                       <div className="V2Inbox__cardMeta">
                         <span 

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import type { SalesMetricsV2 } from '../../api/v2-types';
-import { useV2SalesMetrics, useV2SetterTrend, useV2WeeklySummary } from '../../api/v2Queries';
+import { useV2SalesMetrics, useV2WeeklySummary } from '../../api/v2Queries';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend } from '../components/V2Primitives';
 
 const BUSINESS_TZ = 'America/Chicago';
@@ -61,7 +61,6 @@ export function InsightsV2() {
   const [range, setRange] = useState<InsightsRange>('7d');
   const { data: payloadEnvelope, isLoading, error } = useV2SalesMetrics({ range });
   const { data: weeklyEnvelope } = useV2WeeklySummary({});
-  const { data: setterTrend } = useV2SetterTrend([], BUSINESS_TZ);
 
   const payload = payloadEnvelope?.data;
   const weekly = weeklyEnvelope?.data;
@@ -124,10 +123,10 @@ export function InsightsV2() {
   }
 
   const breakdown = computeInsightsBookedBreakdown(payload);
-  
-  // Get setter data from trend
-  const setterJack = setterTrend?.find((d) => d.setters.jack);
-  const setterBrandon = setterTrend?.find((d) => d.setters.brandon);
+
+  // Derive setter stats directly from the already-loaded sales metrics reps array
+  const jackRep = payload.reps.find((r) => r.repName.toLowerCase().includes('jack'));
+  const brandonRep = payload.reps.find((r) => r.repName.toLowerCase().includes('brandon'));
 
   return (
     <div className="V2Page">
@@ -212,13 +211,13 @@ export function InsightsV2() {
             <div className="V2WeeklySummary__stats">
               <article>
                 <span>Jack's Sets</span>
-                <strong>{fmtInt(weekly?.setters?.jack?.canonicalBookedCalls ?? 0)}</strong>
-                <em>{fmtInt(weekly?.setters?.jack?.outboundConversations ?? 0)} conversations</em>
+                <strong>{fmtInt(payload.bookedCredit.jack)}</strong>
+                <em>{fmtInt(jackRep?.outboundConversations ?? 0)} conversations</em>
               </article>
               <article>
                 <span>Brandon's Sets</span>
-                <strong>{fmtInt(weekly?.setters?.brandon?.canonicalBookedCalls ?? 0)}</strong>
-                <em>{fmtInt(weekly?.setters?.brandon?.outboundConversations ?? 0)} conversations</em>
+                <strong>{fmtInt(payload.bookedCredit.brandon)}</strong>
+                <em>{fmtInt(brandonRep?.outboundConversations ?? 0)} conversations</em>
               </article>
               <article>
                 <span>Self Bookings</span>
@@ -227,8 +226,8 @@ export function InsightsV2() {
               </article>
               <article>
                 <span>Total Outreach</span>
-                <strong>{fmtInt(weekly?.teamTotals?.messagesSent ?? 0)}</strong>
-                <em>{fmtInt(weekly?.teamTotals?.peopleContacted ?? 0)} people contacted</em>
+                <strong>{fmtInt(payload.totals.messagesSent)}</strong>
+                <em>{fmtInt(payload.totals.peopleContacted)} people contacted</em>
               </article>
             </div>
 
@@ -236,17 +235,17 @@ export function InsightsV2() {
               <article>
                 <h3>Jack's Performance</h3>
                 <p>
-                  {fmtInt(setterJack?.setters.jack.outboundConversations ?? 0)} conversations ·{' '}
-                  {fmtPctMaybe(setterJack?.setters.jack.replyRatePct)} reply rate ·{' '}
-                  {fmtInt(setterJack?.setters.jack.bookedCalls ?? 0)} sets
+                  {fmtInt(jackRep?.outboundConversations ?? 0)} conversations ·{' '}
+                  {fmtPctMaybe(jackRep?.replyRatePct)} reply rate ·{' '}
+                  {fmtInt(payload.bookedCredit.jack)} sets
                 </p>
               </article>
               <article>
                 <h3>Brandon's Performance</h3>
                 <p>
-                  {fmtInt(setterBrandon?.setters.brandon.outboundConversations ?? 0)} conversations ·{' '}
-                  {fmtPctMaybe(setterBrandon?.setters.brandon.replyRatePct)} reply rate ·{' '}
-                  {fmtInt(setterBrandon?.setters.brandon.bookedCalls ?? 0)} sets
+                  {fmtInt(brandonRep?.outboundConversations ?? 0)} conversations ·{' '}
+                  {fmtPctMaybe(brandonRep?.replyRatePct)} reply rate ·{' '}
+                  {fmtInt(payload.bookedCredit.brandon)} sets
                 </p>
               </article>
             </div>

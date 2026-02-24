@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+ @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
 
 :root {
   --v2-font-display: 'Space Grotesk', 'Avenir Next', sans-serif;
@@ -1628,6 +1629,124 @@
   .V2WeeklySummary__extras {
     grid-template-columns: 1fr;
   }
+}
+
+/* Sets Attribution Panel */
+.V2SetsAttribution {
+  display: grid;
+  gap: 1rem;
+}
+
+.V2SetsAttribution__bar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(7, 19, 36, 0.08);
+}
+
+.V2SetsAttribution__segment {
+  height: 100%;
+  transition: width 400ms ease;
+}
+
+.V2SetsAttribution__segment--sms {
+  background: var(--v2-accent);
+}
+
+.V2SetsAttribution__segment--other {
+  background: var(--v2-positive);
+}
+
+.V2SetsAttribution__segment--unattr {
+  background: var(--v2-muted);
+  opacity: 0.4;
+}
+
+.V2SetsAttribution__segment--empty {
+  background: rgba(7, 19, 36, 0.06);
+}
+
+.V2SetsAttribution__legend {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.V2SetsAttribution__legendItem {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--v2-radius-sm);
+  background: rgba(245, 250, 255, 0.7);
+  border: 1px solid rgba(7, 19, 36, 0.08);
+}
+
+.V2SetsAttribution__legendItem--muted {
+  opacity: 0.65;
+}
+
+.V2SetsAttribution__legendItem--sub {
+  background: rgba(17, 184, 214, 0.06);
+  border-color: rgba(17, 184, 214, 0.15);
+  margin-left: 1.2rem;
+}
+
+.V2SetsAttribution__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.V2SetsAttribution__dot--sms {
+  background: var(--v2-accent);
+}
+
+.V2SetsAttribution__dot--other {
+  background: var(--v2-positive);
+}
+
+.V2SetsAttribution__dot--unattr {
+  background: var(--v2-muted);
+  opacity: 0.5;
+}
+
+.V2SetsAttribution__dot--confirm {
+  background: var(--v2-accent);
+  opacity: 0.55;
+  width: 8px;
+  height: 8px;
+}
+
+.V2SetsAttribution__legendLabel {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--v2-text);
+}
+
+.V2SetsAttribution__legendDesc {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--v2-muted);
+  margin-top: 0.1rem;
+}
+
+.V2SetsAttribution__legendValue {
+  font-family: var(--v2-font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  min-width: 2ch;
+  text-align: right;
+}
+
+.V2SetsAttribution__legendPct {
+  font-size: 0.78rem;
+  color: var(--v2-muted);
+  min-width: 3.5ch;
+  text-align: right;
 }
 
 /* Visual Components - Stat Bar */

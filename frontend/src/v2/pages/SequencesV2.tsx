@@ -269,13 +269,83 @@ export default function SequencesV2() {
       <section className="V2MetricsGrid">
         <V2MetricCard label="Sequences" value={String(rows.length)} meta="active in window" />
         <V2MetricCard label="Messages Sent" value={fmtInt(totalSent)} />
-        <V2MetricCard label="Total Sets" value={fmtInt(totalBookedAllChannels)} tone="positive" meta="all channels" />
-        <V2MetricCard label="Sets via Sequence" value={fmtInt(totalBookedAttributedToRows)} tone="accent" meta="attributed to labels" />
-        <V2MetricCard label="Unattributed Sets" value={fmtInt(unattributedCalls)} meta="IG/LinkedIn/Circle/unknown" />
-        <V2MetricCard label="Sets After SMS Reply" value={fmtInt(totalBookedAfterReply)} tone="accent" />
-        <V2MetricCard label="Non-SMS Sets" value={fmtInt(totalBookedNonSmsOrUnknown)} meta="non-SMS or unknown source" />
-        <V2MetricCard label={<V2Term term="optOuts" />} value={fmtInt(totalOptOuts)} tone={totalOptOuts > 0 ? 'critical' : 'default'} />
+        <V2MetricCard
+          label="Total Sets"
+          value={fmtInt(totalBookedAllChannels)}
+          tone="positive"
+          meta={`${fmtInt(totalBookedAttributedToRows)} attributed to sequences`}
+        />
+        <V2MetricCard
+          label={<V2Term term="optOuts" />}
+          value={fmtInt(totalOptOuts)}
+          tone={totalOptOuts > 0 ? 'critical' : 'default'}
+          meta={totalSent > 0 ? `${((totalOptOuts / totalSent) * 100).toFixed(2)}% of sent` : undefined}
+        />
       </section>
+
+      {/* Sets Attribution — shows how sets are credited to sequences across multi-day convos */}
+      <V2Panel
+        title="Sets Attribution"
+        caption={`${fmtInt(totalBookedAllChannels)} total sets. Attribution uses HubSpot first-conversion label matching — so a set is credited to the sequence that started the conversation, even if the booking happened days later.`}
+      >
+        <div className="V2SetsAttribution">
+          <div className="V2SetsAttribution__bar">
+            {totalBookedAllChannels > 0 ? (
+              <>
+                <div
+                  className="V2SetsAttribution__segment V2SetsAttribution__segment--sms"
+                  style={{ width: `${(totalBookedAttributedToRows / totalBookedAllChannels) * 100}%` }}
+                  title={`Sequence-attributed: ${totalBookedAttributedToRows}`}
+                />
+                <div
+                  className="V2SetsAttribution__segment V2SetsAttribution__segment--unattr"
+                  style={{ width: `${(unattributedCalls / totalBookedAllChannels) * 100}%` }}
+                  title={`Unmatched: ${unattributedCalls}`}
+                />
+              </>
+            ) : (
+              <div className="V2SetsAttribution__segment V2SetsAttribution__segment--empty" style={{ width: '100%' }} />
+            )}
+          </div>
+          <div className="V2SetsAttribution__legend">
+            <div className="V2SetsAttribution__legendItem">
+              <span className="V2SetsAttribution__dot V2SetsAttribution__dot--sms" />
+              <div>
+                <span className="V2SetsAttribution__legendLabel">Sequence-Attributed</span>
+                <span className="V2SetsAttribution__legendDesc">Credited to the sequence that started the conversation (HubSpot first conversion)</span>
+              </div>
+              <span className="V2SetsAttribution__legendValue">{fmtInt(totalBookedAttributedToRows)}</span>
+              <span className="V2SetsAttribution__legendPct">
+                {totalBookedAllChannels > 0 ? fmtPct((totalBookedAttributedToRows / totalBookedAllChannels) * 100) : '—'}
+              </span>
+            </div>
+            <div className="V2SetsAttribution__legendItem V2SetsAttribution__legendItem--sub">
+              <span className="V2SetsAttribution__dot V2SetsAttribution__dot--confirm" />
+              <div>
+                <span className="V2SetsAttribution__legendLabel">↳ Confirmed SMS Reply</span>
+                <span className="V2SetsAttribution__legendDesc">Subset: contact replied to an outbound SMS before booking (strictest signal)</span>
+              </div>
+              <span className="V2SetsAttribution__legendValue">{fmtInt(totalBookedAfterReply)}</span>
+              <span className="V2SetsAttribution__legendPct">
+                {totalBookedAllChannels > 0 ? fmtPct((totalBookedAfterReply / totalBookedAllChannels) * 100) : '—'}
+              </span>
+            </div>
+            {unattributedCalls > 0 ? (
+              <div className="V2SetsAttribution__legendItem V2SetsAttribution__legendItem--muted">
+                <span className="V2SetsAttribution__dot V2SetsAttribution__dot--unattr" />
+                <div>
+                  <span className="V2SetsAttribution__legendLabel">Unmatched / Other Channels</span>
+                  <span className="V2SetsAttribution__legendDesc">IG, LinkedIn, Circle, website, or no label match found</span>
+                </div>
+                <span className="V2SetsAttribution__legendValue">{fmtInt(unattributedCalls)}</span>
+                <span className="V2SetsAttribution__legendPct">
+                  {totalBookedAllChannels > 0 ? fmtPct((unattributedCalls / totalBookedAllChannels) * 100) : '—'}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      </V2Panel>
 
       <V2Panel title="At-Risk Sequences" caption="Sequences that need attention.">
         {watchlistRows.length === 0 ? (

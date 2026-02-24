@@ -19,6 +19,18 @@ export default defineConfig({
             target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
             changeOrigin: true,
             ws: true,
+            // When proxying to a remote production target the browser sends
+            // Origin: http://localhost:5173 which Railway's CORS allowlist rejects.
+            // Override the Origin header so the backend sees a known-good origin.
+            ...(process.env.VITE_API_TARGET
+              ? {
+                  configure: (proxy) => {
+                    proxy.on('proxyReq', (proxyReq) => {
+                      proxyReq.setHeader('Origin', 'https://ptbizsms.com');
+                    });
+                  },
+                }
+              : {}),
           },
         },
   },

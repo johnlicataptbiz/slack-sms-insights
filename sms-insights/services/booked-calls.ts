@@ -33,6 +33,7 @@ export type BookedCallAttributionSource = {
   line: string | null;
   contactName: string | null;
   contactPhone: string | null;
+  contactEmail: string | null;
   slackChannelId: string;
   slackMessageTs: string;
   text: string | null;
@@ -295,6 +296,8 @@ export const getBookedCallAttributionSources = async (params: {
     const line = parseFallbackField(fallback, 'Line');
     const contactName = parseContactNameFromFallback(fallback);
     const contactPhone = parseContactPhoneFromFallback(fallback);
+    // parseFallbackField strips <mailto:email|email> → plain email address
+    const contactEmail = parseFallbackField(fallback, 'Email')?.toLowerCase().trim() || null;
 
     if (!hasAttribution) {
       const eventMs = new Date(c.event_ts).getTime();
@@ -318,6 +321,7 @@ export const getBookedCallAttributionSources = async (params: {
       line,
       contactName,
       contactPhone,
+      contactEmail,
       slackChannelId: c.slack_channel_id,
       slackMessageTs: c.slack_message_ts,
       text: c.text,
@@ -352,86 +356,228 @@ export const getBookedCallSequenceFromSmsEvents = async (
   const pool = getPool();
   if (!pool) throw new Error('Database not initialized');
 
-  // Build phone key → list of { bookedCallId, bookingTs } entries
   type CallEntry = { bookedCallId: string; bookingTs: number };
+
+  // Build phone key → entries (primary signal — direct phone match)
   const phoneKeyToEntries = new Map<string, CallEntry[]>();
+  // Build email key → entries (secondary — email → inbox_contact_profiles → phone → sms_events)
+  const emailKeyToEntries = new Map<string, CallEntry[]>();
+  // Build contact name key → entries (last resort — name match, higher false-positive risk)
+  const nameKeyToEntries = new Map<string, CallEntry[]>();
 
   for (const call of calls) {
-    const phoneKey = normalizePhoneKey(call.contactPhone);
-    if (!phoneKey) continue;
     const bookingTs = new Date(call.eventTs).getTime();
     if (!Number.isFinite(bookingTs)) continue;
-    const list = phoneKeyToEntries.get(phoneKey) || [];
-    list.push({ bookedCallId: call.bookedCallId, bookingTs });
-    phoneKeyToEntries.set(phoneKey, list);
+
+    const phoneKey = normalizePhoneKey(call.contactPhone);
+    if (phoneKey) {
+      const list = phoneKeyToEntries.get(phoneKey) || [];
+      list.push({ bookedCallId: call.bookedCallId, bookingTs });
+      phoneKeyToEntries.set(phoneKey, list);
+    } else if (call.contactEmail) {
+      // Email path: resolve phone via inbox_contact_profiles
+      const emailKey = call.contactEmail;
+      const list = emailKeyToEntries.get(emailKey) || [];
+      list.push({ bookedCallId: call.bookedCallId, bookingTs });
+      emailKeyToEntries.set(emailKey, list);
+    } else {
+      // Name match only when no phone or email is available
+      const nameKey = normalizeContactNameKey(call.contactName);
+      if (nameKey) {
+        const list = nameKeyToEntries.get(nameKey) || [];
+        list.push({ bookedCallId: call.bookedCallId, bookingTs });
+        nameKeyToEntries.set(nameKey, list);
+      }
+    }
   }
 
-  if (phoneKeyToEntries.size === 0) return results;
+  if (phoneKeyToEntries.size === 0 && emailKeyToEntries.size === 0 && nameKeyToEntries.size === 0) return results;
 
-  const phoneKeys = [...phoneKeyToEntries.keys()];
-  const allBookingTs = [...phoneKeyToEntries.values()].flatMap((entries) => entries.map((e) => e.bookingTs));
+  // Compute overall time range across all entries
+  const allEntries = [
+    ...[...phoneKeyToEntries.values()].flat(),
+    ...[...emailKeyToEntries.values()].flat(),
+    ...[...nameKeyToEntries.values()].flat(),
+  ];
+  const allBookingTs = allEntries.map((e) => e.bookingTs);
   const minBookingTs = Math.min(...allBookingTs);
   const maxBookingTs = Math.max(...allBookingTs);
   const lookbackMs = SMS_SEQUENCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
   const fromIso = new Date(minBookingTs - lookbackMs).toISOString();
   const toIso = new Date(maxBookingTs).toISOString();
 
-  try {
-    const { rows } = await pool.query<{
-      phone_key: string;
-      sequence: string;
-      event_ts: string;
-    }>(
-      `
-      SELECT
-        RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
-        TRIM(sequence) AS sequence,
-        event_ts
-      FROM sms_events
-      WHERE direction = 'outbound'
-        AND contact_phone IS NOT NULL
-        AND sequence IS NOT NULL AND TRIM(sequence) != ''
-        AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
-        AND event_ts >= $2::timestamptz
-        AND event_ts <= $3::timestamptz
-      ORDER BY event_ts ASC
-      `,
-      [phoneKeys, fromIso, toIso],
-    );
-
-    // Build phone key → sorted outbound events (ascending by ts, so we can scan for latest-before-booking)
-    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
-    for (const row of rows) {
-      const ts = new Date(row.event_ts).getTime();
-      if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
-      const list = outboundByPhone.get(row.phone_key) || [];
-      list.push({ sequence: row.sequence, ts });
-      outboundByPhone.set(row.phone_key, list);
+  // Helper: find the most recent outbound sequence within lookback window before bookingTs
+  const resolveBest = (
+    outbounds: Array<{ sequence: string; ts: number }>,
+    bookingTs: number,
+  ): { sequence: string; ts: number } | null => {
+    let bestSequence: string | null = null;
+    let bestTs = -1;
+    for (const outbound of outbounds) {
+      if (outbound.ts > bookingTs) continue;
+      if (bookingTs - outbound.ts > lookbackMs) continue;
+      if (outbound.ts > bestTs) {
+        bestTs = outbound.ts;
+        bestSequence = outbound.sequence;
+      }
     }
+    return bestSequence ? { sequence: bestSequence, ts: bestTs } : null;
+  };
 
-    // For each call, find the most recent outbound sequence within the lookback window before booking
-    for (const [phoneKey, entries] of phoneKeyToEntries) {
-      const outbounds = outboundByPhone.get(phoneKey);
-      if (!outbounds || outbounds.length === 0) continue;
-
-      for (const { bookedCallId, bookingTs } of entries) {
-        let bestSequence: string | null = null;
-        let bestTs = -1;
-
-        for (const outbound of outbounds) {
-          if (outbound.ts > bookingTs) continue; // must be before booking
-          if (bookingTs - outbound.ts > lookbackMs) continue; // within lookback window
-          if (outbound.ts > bestTs) {
-            bestTs = outbound.ts;
-            bestSequence = outbound.sequence;
+  try {
+    // --- Phone-based lookup ---
+    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
+    if (phoneKeyToEntries.size > 0) {
+      const phoneKeys = [...phoneKeyToEntries.keys()];
+      const { rows } = await pool.query<{ phone_key: string; sequence: string; event_ts: string }>(
+        `
+        SELECT
+          RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
+          TRIM(sequence) AS sequence,
+          event_ts
+        FROM sms_events
+        WHERE direction = 'outbound'
+          AND contact_phone IS NOT NULL
+          AND sequence IS NOT NULL AND TRIM(sequence) != ''
+          AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
+          AND event_ts >= $2::timestamptz
+          AND event_ts <= $3::timestamptz
+        ORDER BY event_ts ASC
+        `,
+        [phoneKeys, fromIso, toIso],
+      );
+      for (const row of rows) {
+        const ts = new Date(row.event_ts).getTime();
+        if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
+        const list = outboundByPhone.get(row.phone_key) || [];
+        list.push({ sequence: row.sequence, ts });
+        outboundByPhone.set(row.phone_key, list);
+      }
+      for (const [phoneKey, entries] of phoneKeyToEntries) {
+        const outbounds = outboundByPhone.get(phoneKey);
+        if (!outbounds || outbounds.length === 0) continue;
+        for (const { bookedCallId, bookingTs } of entries) {
+          const best = resolveBest(outbounds, bookingTs);
+          if (best) {
+            results.set(bookedCallId, {
+              sequenceLabel: best.sequence,
+              latestOutboundAt: new Date(best.ts).toISOString(),
+            });
           }
         }
+      }
+    }
 
-        if (bestSequence) {
-          results.set(bookedCallId, {
-            sequenceLabel: bestSequence,
-            latestOutboundAt: new Date(bestTs).toISOString(),
-          });
+    // --- Email-based lookup (via inbox_contact_profiles: email → phone → sms_events) ---
+    if (emailKeyToEntries.size > 0) {
+      const emailKeys = [...emailKeyToEntries.keys()];
+      // Step 1: resolve email → phone via inbox_contact_profiles
+      const { rows: profileRows } = await pool.query<{ email_key: string; phone_key: string }>(
+        `
+        SELECT
+          LOWER(TRIM(email)) AS email_key,
+          RIGHT(regexp_replace(phone, '\\D', '', 'g'), 10) AS phone_key
+        FROM inbox_contact_profiles
+        WHERE email IS NOT NULL AND TRIM(email) != ''
+          AND phone IS NOT NULL AND TRIM(phone) != ''
+          AND LOWER(TRIM(email)) = ANY($1::text[])
+        `,
+        [emailKeys],
+      );
+      const emailToPhoneKey = new Map<string, string>();
+      for (const row of profileRows) {
+        if (row.email_key && row.phone_key && row.phone_key.length === 10) {
+          emailToPhoneKey.set(row.email_key, row.phone_key);
+        }
+      }
+
+      const emailDerivedPhoneKeys = [...new Set([...emailToPhoneKey.values()])];
+      if (emailDerivedPhoneKeys.length > 0) {
+        // Step 2: phone → sms_events outbound sequence
+        const { rows } = await pool.query<{ phone_key: string; sequence: string; event_ts: string }>(
+          `
+          SELECT
+            RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
+            TRIM(sequence) AS sequence,
+            event_ts
+          FROM sms_events
+          WHERE direction = 'outbound'
+            AND contact_phone IS NOT NULL
+            AND sequence IS NOT NULL AND TRIM(sequence) != ''
+            AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
+            AND event_ts >= $2::timestamptz
+            AND event_ts <= $3::timestamptz
+          ORDER BY event_ts ASC
+          `,
+          [emailDerivedPhoneKeys, fromIso, toIso],
+        );
+        const outboundByEmailPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
+        for (const row of rows) {
+          const ts = new Date(row.event_ts).getTime();
+          if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
+          const list = outboundByEmailPhone.get(row.phone_key) || [];
+          list.push({ sequence: row.sequence, ts });
+          outboundByEmailPhone.set(row.phone_key, list);
+        }
+        for (const [emailKey, entries] of emailKeyToEntries) {
+          const phoneKey = emailToPhoneKey.get(emailKey);
+          if (!phoneKey) continue;
+          const outbounds = outboundByEmailPhone.get(phoneKey);
+          if (!outbounds || outbounds.length === 0) continue;
+          for (const { bookedCallId, bookingTs } of entries) {
+            if (results.has(bookedCallId)) continue;
+            const best = resolveBest(outbounds, bookingTs);
+            if (best) {
+              results.set(bookedCallId, {
+                sequenceLabel: best.sequence,
+                latestOutboundAt: new Date(best.ts).toISOString(),
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // --- Name-based lookup (last resort for calls without phone or email) ---
+    const outboundByName = new Map<string, Array<{ sequence: string; ts: number }>>();
+    if (nameKeyToEntries.size > 0) {
+      const nameKeys = [...nameKeyToEntries.keys()];
+      const { rows } = await pool.query<{ contact_name_key: string; sequence: string; event_ts: string }>(
+        `
+        SELECT
+          LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) AS contact_name_key,
+          TRIM(sequence) AS sequence,
+          event_ts
+        FROM sms_events
+        WHERE direction = 'outbound'
+          AND contact_name IS NOT NULL
+          AND sequence IS NOT NULL AND TRIM(sequence) != ''
+          AND LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) = ANY($1::text[])
+          AND event_ts >= $2::timestamptz
+          AND event_ts <= $3::timestamptz
+        ORDER BY event_ts ASC
+        `,
+        [nameKeys, fromIso, toIso],
+      );
+      for (const row of rows) {
+        const ts = new Date(row.event_ts).getTime();
+        if (!row.contact_name_key || !row.sequence || !Number.isFinite(ts)) continue;
+        const list = outboundByName.get(row.contact_name_key) || [];
+        list.push({ sequence: row.sequence, ts });
+        outboundByName.set(row.contact_name_key, list);
+      }
+      for (const [nameKey, entries] of nameKeyToEntries) {
+        const outbounds = outboundByName.get(nameKey);
+        if (!outbounds || outbounds.length === 0) continue;
+        for (const { bookedCallId, bookingTs } of entries) {
+          if (results.has(bookedCallId)) continue; // already resolved via phone
+          const best = resolveBest(outbounds, bookingTs);
+          if (best) {
+            results.set(bookedCallId, {
+              sequenceLabel: best.sequence,
+              latestOutboundAt: new Date(best.ts).toISOString(),
+            });
+          }
         }
       }
     }

@@ -132,7 +132,6 @@ export default function InboxV2() {
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [justSentMessage, setJustSentMessage] = useState<{text: string; timestamp: string; confirmed?: boolean} | null>(null);
-  const [hoveredConversation, setHoveredConversation] = useState<string | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
 
@@ -545,7 +544,6 @@ export default function InboxV2() {
             <div className="V2Inbox__conversationList V2Inbox__conversationList--enhanced">
               {conversations.map((conversation, index) => {
                 const isActive = selectedConversationId === conversation.id;
-                const isHovered = hoveredConversation === conversation.id;
                 const hasUnread = conversation.openNeedsReplyCount > 0;
                 const isUrgent = conversation.escalation.level <= 2 && hasUnread;
                 const setterName = displaySetterName(conversation.ownerLabel);
@@ -555,7 +553,7 @@ export default function InboxV2() {
                   <button
                     key={conversation.id}
                     type="button"
-                    className={`V2Inbox__conversationCard ${isActive ? 'is-active' : ''} ${hasUnread ? 'has-unread' : ''} ${isUrgent ? 'is-urgent' : ''}`}
+                    className={`V2Inbox__convCard ${isActive ? 'is-active' : ''} ${hasUnread ? 'has-unread' : ''} ${isUrgent ? 'is-urgent' : ''}`}
                     onClick={() => {
                       setSelectedConversationId(conversation.id);
                       setComposerText('');
@@ -563,68 +561,45 @@ export default function InboxV2() {
                       setDraftPrefillDoneForConversation(null);
                       setIsComposerModalOpen(true);
                     }}
-                    onMouseEnter={() => setHoveredConversation(conversation.id)}
-                    onMouseLeave={() => setHoveredConversation(null)}
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
-                    {/* Avatar with status */}
-                    <div className="V2Inbox__cardAvatar">
-                      <span>{(conversation.contactName || conversation.contactPhone || '?').slice(0, 1).toUpperCase()}</span>
-                      {hasUnread && <span className="V2Inbox__unreadDot" />}
-                    </div>
-
-                    {/* Main content */}
-                    <div className="V2Inbox__cardContent">
-                      <div className="V2Inbox__cardHeader">
-                        <h3 className="V2Inbox__cardName">
+                    {/* Row 1: name + time */}
+                    <div className="V2Inbox__convRow">
+                      <div className="V2Inbox__convNameWrap">
+                        {hasUnread && <span className="V2Inbox__convPip" />}
+                        <span className="V2Inbox__convName">
                           {conversation.contactName || conversation.contactPhone || conversation.contactKey}
                           {conversation.dnc && <span className="V2Inbox__dncBadge">DNC</span>}
-                        </h3>
-                        <span className="V2Inbox__cardTime">{timeAgo(conversation.lastMessage.createdAt)}</span>
-                      </div>
-                      
-                      <p className="V2Inbox__cardPreview">
-                        {shorten(conversation.lastMessage.body, 120) || (
-                          <span style={{ fontStyle: 'italic', opacity: 0.5 }}>No message preview</span>
-                        )}
-                      </p>
-                      
-                      <div className="V2Inbox__cardMeta">
-                        <span 
-                          className="V2Inbox__escalationBadge"
-                          style={{ 
-                            background: `color-mix(in srgb, ${escalationToneForLevel(conversation.escalation.level) === 'red' ? '#ef4c62' : escalationToneForLevel(conversation.escalation.level) === 'orange' ? '#f59d0d' : escalationToneForLevel(conversation.escalation.level) === 'yellow' ? '#e6b01f' : '#13b981'} 15%, transparent)`,
-                            color: escalationToneForLevel(conversation.escalation.level) === 'red' ? '#ef4c62' : escalationToneForLevel(conversation.escalation.level) === 'orange' ? '#f59d0d' : escalationToneForLevel(conversation.escalation.level) === 'yellow' ? '#e6b01f' : '#13b981',
-                            borderColor: escalationToneForLevel(conversation.escalation.level) === 'red' ? '#ef4c62' : escalationToneForLevel(conversation.escalation.level) === 'orange' ? '#f59d0d' : escalationToneForLevel(conversation.escalation.level) === 'yellow' ? '#e6b01f' : '#13b981'
-                          }}
-                        >
-                          L{conversation.escalation.level}
                         </span>
-                        
-                        {setterName && (
-                          <span className="V2Inbox__setterBadge" style={{ color: setterColor }}>
-                            <span className="V2Inbox__setterDot" style={{ background: setterColor }} />
-                            {setterName}
-                          </span>
-                        )}
-                        
-                        {conversation.openNeedsReplyCount > 0 && (
-                          <span className="V2Inbox__replyCount">
-                            {conversation.openNeedsReplyCount} needs reply
-                          </span>
-                        )}
                       </div>
+                      <span className="V2Inbox__convTime">{timeAgo(conversation.lastMessage.createdAt)}</span>
                     </div>
 
-                    {/* Hover actions */}
-                    <div className={`V2Inbox__cardActions ${isHovered ? 'is-visible' : ''}`}>
-                      <button className="V2Inbox__actionBtn V2Inbox__actionBtn--primary" title="Quick reply">
-                        <svg viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" /><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" /></svg>
-                      </button>
-                    </div>
+                    {/* Row 2: direction + preview */}
+                    <p className="V2Inbox__convPreview">
+                      <span className="V2Inbox__convDir" data-dir={conversation.lastMessage.direction}>
+                        {conversation.lastMessage.direction === 'inbound' ? '←' : '→'}
+                      </span>
+                      {shorten(conversation.lastMessage.body, 85) || <em>No preview</em>}
+                    </p>
 
-                    {/* Unread indicator */}
-                    {hasUnread && <div className="V2Inbox__unreadIndicator" />}
+                    {/* Row 3: tags — always visible */}
+                    <div className="V2Inbox__convTags">
+                      <span className="V2Inbox__convEscTag" data-tone={escalationToneForLevel(conversation.escalation.level)}>
+                        L{conversation.escalation.level}
+                      </span>
+                      {setterName && (
+                        <span className="V2Inbox__convOwnerTag" style={{ '--c': setterColor } as React.CSSProperties}>
+                          <span className="V2Inbox__convOwnerDot" />
+                          {setterName}
+                        </span>
+                      )}
+                      {conversation.openNeedsReplyCount > 0 && (
+                        <span className="V2Inbox__convReplyTag">
+                          {conversation.openNeedsReplyCount} needs reply
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}

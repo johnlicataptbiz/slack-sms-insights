@@ -327,6 +327,122 @@ export const getBookedCallAttributionSources = async (params: {
   return normalized;
 };
 
+export type BookedCallSmsSequenceLookup = {
+  sequenceLabel: string;
+  latestOutboundAt: string;
+};
+
+const SMS_SEQUENCE_LOOKBACK_DAYS = 30;
+
+/**
+ * For each BookedCallAttributionSource that has a contactPhone, queries sms_events
+ * for the most recent outbound sequence sent to that phone within SMS_SEQUENCE_LOOKBACK_DAYS
+ * before the booking timestamp.
+ *
+ * Returns Map<bookedCallId, BookedCallSmsSequenceLookup>.
+ * Calls with no contactPhone or no matching outbound events are omitted from the map.
+ */
+export const getBookedCallSequenceFromSmsEvents = async (
+  calls: BookedCallAttributionSource[],
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<Map<string, BookedCallSmsSequenceLookup>> => {
+  const results = new Map<string, BookedCallSmsSequenceLookup>();
+  if (calls.length === 0) return results;
+
+  const pool = getPool();
+  if (!pool) throw new Error('Database not initialized');
+
+  // Build phone key → list of { bookedCallId, bookingTs } entries
+  type CallEntry = { bookedCallId: string; bookingTs: number };
+  const phoneKeyToEntries = new Map<string, CallEntry[]>();
+
+  for (const call of calls) {
+    const phoneKey = normalizePhoneKey(call.contactPhone);
+    if (!phoneKey) continue;
+    const bookingTs = new Date(call.eventTs).getTime();
+    if (!Number.isFinite(bookingTs)) continue;
+    const list = phoneKeyToEntries.get(phoneKey) || [];
+    list.push({ bookedCallId: call.bookedCallId, bookingTs });
+    phoneKeyToEntries.set(phoneKey, list);
+  }
+
+  if (phoneKeyToEntries.size === 0) return results;
+
+  const phoneKeys = [...phoneKeyToEntries.keys()];
+  const allBookingTs = [...phoneKeyToEntries.values()].flatMap((entries) => entries.map((e) => e.bookingTs));
+  const minBookingTs = Math.min(...allBookingTs);
+  const maxBookingTs = Math.max(...allBookingTs);
+  const lookbackMs = SMS_SEQUENCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
+  const fromIso = new Date(minBookingTs - lookbackMs).toISOString();
+  const toIso = new Date(maxBookingTs).toISOString();
+
+  try {
+    const { rows } = await pool.query<{
+      phone_key: string;
+      sequence: string;
+      event_ts: string;
+    }>(
+      `
+      SELECT
+        RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
+        TRIM(sequence) AS sequence,
+        event_ts
+      FROM sms_events
+      WHERE direction = 'outbound'
+        AND contact_phone IS NOT NULL
+        AND sequence IS NOT NULL AND TRIM(sequence) != ''
+        AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
+        AND event_ts >= $2::timestamptz
+        AND event_ts <= $3::timestamptz
+      ORDER BY event_ts ASC
+      `,
+      [phoneKeys, fromIso, toIso],
+    );
+
+    // Build phone key → sorted outbound events (ascending by ts, so we can scan for latest-before-booking)
+    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
+    for (const row of rows) {
+      const ts = new Date(row.event_ts).getTime();
+      if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
+      const list = outboundByPhone.get(row.phone_key) || [];
+      list.push({ sequence: row.sequence, ts });
+      outboundByPhone.set(row.phone_key, list);
+    }
+
+    // For each call, find the most recent outbound sequence within the lookback window before booking
+    for (const [phoneKey, entries] of phoneKeyToEntries) {
+      const outbounds = outboundByPhone.get(phoneKey);
+      if (!outbounds || outbounds.length === 0) continue;
+
+      for (const { bookedCallId, bookingTs } of entries) {
+        let bestSequence: string | null = null;
+        let bestTs = -1;
+
+        for (const outbound of outbounds) {
+          if (outbound.ts > bookingTs) continue; // must be before booking
+          if (bookingTs - outbound.ts > lookbackMs) continue; // within lookback window
+          if (outbound.ts > bestTs) {
+            bestTs = outbound.ts;
+            bestSequence = outbound.sequence;
+          }
+        }
+
+        if (bestSequence) {
+          results.set(bookedCallId, {
+            sequenceLabel: bestSequence,
+            latestOutboundAt: new Date(bestTs).toISOString(),
+          });
+        }
+      }
+    }
+  } catch (error) {
+    logger?.error?.('Failed to compute booked-call sequence from SMS events', error);
+    throw error;
+  }
+
+  return results;
+};
+
 export const getBookedCallSmsReplyLinks = async (
   calls: BookedCallAttributionSource[],
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,

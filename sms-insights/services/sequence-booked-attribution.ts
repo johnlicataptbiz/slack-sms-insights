@@ -2,6 +2,7 @@ import type {
   BookedCallAttributionBucket,
   BookedCallAttributionSource,
   BookedCallSmsReplyLink,
+  BookedCallSmsSequenceLookup,
 } from './booked-calls.js';
 import { bookedCallSourceKey } from './booked-calls.js';
 import type { TopSequenceRow } from './sales-metrics.js';
@@ -23,6 +24,12 @@ export type SequenceBookedAuditRow = {
   strictSmsReplyLinked: boolean;
   latestReplyAt: string | null;
   strictSmsReplyReason: BookedCallSmsReplyLink['reason'];
+  /** How the sequence label was resolved for this booking. */
+  attributionSource: 'sms_phone_match' | 'fuzzy_text_match';
+  /** Raw sequence label from sms_events (present when attributionSource = 'sms_phone_match'). */
+  smsSequenceLabel: string | null;
+  /** Timestamp of the most recent outbound SMS to this contact before the booking. */
+  smsLatestOutboundAt: string | null;
 };
 
 export type SequenceBookedBreakdown = {
@@ -46,6 +53,10 @@ export type SequenceBookedAttributionResult = {
     brandon: number;
     selfBooked: number;
     bookedAfterSmsReply: number;
+    /** Calls attributed via exact phone-number match from sms_events. */
+    smsPhoneMatchedCalls: number;
+    /** Calls attributed via fuzzy firstConversion text match (fallback). */
+    fuzzyTextMatchedCalls: number;
   };
 };
 
@@ -198,6 +209,7 @@ export const attributeSlackBookedCallsToSequences = (
   sequenceRows: TopSequenceRow[],
   calls: BookedCallAttributionSource[],
   smsReplyLinks: Map<string, BookedCallSmsReplyLink> = new Map(),
+  smsSequenceLookup: Map<string, BookedCallSmsSequenceLookup> = new Map(),
 ): SequenceBookedAttributionResult => {
   const candidates: CandidateSequence[] = sequenceRows.map((row) => ({
     label: row.label,
@@ -226,23 +238,44 @@ export const attributeSlackBookedCallsToSequences = (
     brandon: 0,
     selfBooked: 0,
     bookedAfterSmsReply: 0,
+    smsPhoneMatchedCalls: 0,
+    fuzzyTextMatchedCalls: 0,
   };
 
   for (const call of calls) {
     totals.totalCalls += 1;
     bump(totals, call.bucket);
 
-    const resolved = resolveSequenceLabel(call.firstConversion, candidates);
-    if (!resolved.label) {
-      totals.unattributedCalls += 1;
-      continue;
-    }
-
     const sourceKey = bookedCallSourceKey(call);
     const smsLink = smsReplyLinks.get(sourceKey);
     const strictLinked = smsLink?.hasPriorReply === true;
 
-    const row = byLabel.get(resolved.label) || emptyBreakdown();
+    // Primary: exact phone-number match from sms_events outbound events.
+    // Fallback: fuzzy firstConversion text match against known sequence candidates.
+    const smsLookup = smsSequenceLookup.get(call.bookedCallId);
+    let resolvedLabel: string | null = null;
+    let isManual = false;
+    let attributionSource: 'sms_phone_match' | 'fuzzy_text_match' = 'fuzzy_text_match';
+
+    if (smsLookup) {
+      // The sequence label from sms_events is the ground truth — use it directly.
+      resolvedLabel = smsLookup.sequenceLabel;
+      isManual = resolvedLabel === MANUAL_SEQUENCE_LABEL;
+      attributionSource = 'sms_phone_match';
+    } else {
+      // No phone match — fall back to fuzzy firstConversion text matching.
+      const resolved = resolveSequenceLabel(call.firstConversion, candidates);
+      resolvedLabel = resolved.label;
+      isManual = resolved.manual;
+      attributionSource = 'fuzzy_text_match';
+    }
+
+    if (!resolvedLabel) {
+      totals.unattributedCalls += 1;
+      continue;
+    }
+
+    const row = byLabel.get(resolvedLabel) || emptyBreakdown();
     bump(row, call.bucket);
     if (strictLinked) row.bookedAfterSmsReply += 1;
     row.auditRows.push({
@@ -260,11 +293,16 @@ export const attributeSlackBookedCallsToSequences = (
       strictSmsReplyLinked: strictLinked,
       latestReplyAt: smsLink?.latestReplyAt || null,
       strictSmsReplyReason: smsLink?.reason || 'no_reply_before_booking',
+      attributionSource,
+      smsSequenceLabel: smsLookup?.sequenceLabel ?? null,
+      smsLatestOutboundAt: smsLookup?.latestOutboundAt ?? null,
     });
-    byLabel.set(resolved.label, row);
+    byLabel.set(resolvedLabel, row);
     totals.matchedCalls += 1;
-    if (resolved.manual) totals.manualCalls += 1;
+    if (isManual) totals.manualCalls += 1;
     if (strictLinked) totals.bookedAfterSmsReply += 1;
+    if (attributionSource === 'sms_phone_match') totals.smsPhoneMatchedCalls += 1;
+    else totals.fuzzyTextMatchedCalls += 1;
   }
 
   return { byLabel, totals };

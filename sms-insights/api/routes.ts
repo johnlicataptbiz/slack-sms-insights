@@ -14,6 +14,7 @@ import {
 } from './validation.js';
 import {
   getBookedCallAttributionSources,
+  getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
   getBookedCallsSummary,
 } from '../services/booked-calls.js';
@@ -1130,12 +1131,16 @@ const buildSalesMetricsPayload = async (params: {
     }),
   ]);
 
-  const smsReplyLinks = await getBookedCallSmsReplyLinks(bookedAttributionSources, params.logger);
+  const [smsReplyLinks, smsSequenceLookup] = await Promise.all([
+    getBookedCallSmsReplyLinks(bookedAttributionSources, params.logger),
+    getBookedCallSequenceFromSmsEvents(bookedAttributionSources, params.logger),
+  ]);
   const canonical = buildCanonicalSalesMetricsSlice(summary, bookedCalls);
   const sequenceBookedAttribution = attributeSlackBookedCallsToSequences(
     canonical.topSequences,
     bookedAttributionSources,
     smsReplyLinks,
+    smsSequenceLookup,
   );
   const topSequences = canonical.topSequences.map((row) => {
     const booked = sequenceBookedAttribution.byLabel.get(row.label);
@@ -1177,12 +1182,14 @@ const buildSalesMetricsPayload = async (params: {
       sequenceLabelPolicy: 'preserve-exact' as const,
       sequenceBookedAttribution: {
         source: 'slack_booked_calls' as const,
-        model: 'hubspot_first_conversion_fuzzy_v1',
+        model: 'sms_phone_match_v2_with_fuzzy_fallback',
         totalCalls: sequenceBookedAttribution.totals.totalCalls,
         matchedCalls: sequenceBookedAttribution.totals.matchedCalls,
         unattributedCalls: sequenceBookedAttribution.totals.unattributedCalls,
         manualCalls: sequenceBookedAttribution.totals.manualCalls,
         strictSmsReplyLinkedCalls: sequenceBookedAttribution.totals.bookedAfterSmsReply,
+        smsPhoneMatchedCalls: sequenceBookedAttribution.totals.smsPhoneMatchedCalls,
+        fuzzyTextMatchedCalls: sequenceBookedAttribution.totals.fuzzyTextMatchedCalls,
         nonSmsOrUnknownCalls: Math.max(
           0,
           sequenceBookedAttribution.totals.totalCalls - sequenceBookedAttribution.totals.bookedAfterSmsReply,

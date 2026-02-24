@@ -63,6 +63,7 @@ import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time
 
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
+import { getScoreboardData } from '../services/scoreboard.js';
 
 import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem, type WorkItemCursor } from '../services/work-items.js';
 
@@ -904,6 +905,14 @@ const handleGetChannelsV2: RequestHandler = async (_req, res, logger, origin) =>
     }),
     origin,
   );
+};
+
+const handleGetScoreboardV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const weekStart = (url.searchParams.get('weekStart') || '').trim();
+  const tz = (url.searchParams.get('tz') || '').trim();
+  const data = await getScoreboardData({ weekStart: weekStart || undefined, timeZone: tz || undefined }, logger);
+  sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone }), origin);
 };
 
 const handleGetWeeklySummaryV2: RequestHandler = async (req, res, logger, origin) => {
@@ -2804,6 +2813,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/runs/:id', handler: handleGetRunByIdV2 },
   { method: 'GET', path: '/api/v2/channels', handler: handleGetChannelsV2 },
   { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
+  { method: 'GET', path: '/api/v2/scoreboard', handler: handleGetScoreboardV2 },
   { method: 'GET', path: '/api/v2/inbox/send-config', handler: handleGetInboxSendConfigV2 },
   { method: 'POST', path: '/api/v2/inbox/send-config/default', handler: handlePostInboxSendDefaultV2 },
   { method: 'GET', path: '/api/v2/inbox/conversations', handler: handleGetInboxConversationsV2 },

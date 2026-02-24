@@ -74,7 +74,7 @@ async function main() {
   // This is conservative: it won't delete runs that differ in content, and it won't delete runs far apart in time.
   const whereParts: string[] = [`timestamp > NOW() - INTERVAL '${args.daysBack} days'`];
   if (!args.includeTest) whereParts.push(`report_type <> 'test'`);
-  if (args.channel) whereParts.push(`channel_id = $1`);
+  if (args.channel) whereParts.push('channel_id = $1');
   const whereSql = whereParts.length ? `WHERE ${whereParts.join(' AND ')}` : '';
 
   const query = `
@@ -147,7 +147,7 @@ async function main() {
 
     if (args.apply) {
       const ids = rows.map((r) => r.id);
-      const del = await client.query(`DELETE FROM daily_runs WHERE id = ANY($1::uuid[])`, [ids]);
+      const del = await client.query('DELETE FROM daily_runs WHERE id = ANY($1::uuid[])', [ids]);
       console.log(`Deleted rows: ${del.rowCount ?? 0}`);
     } else {
       console.log('Dry run only; no deletions performed.');

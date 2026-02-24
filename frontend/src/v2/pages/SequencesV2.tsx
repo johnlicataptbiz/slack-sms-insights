@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 
-import { useV2SalesMetrics } from '../../api/v2Queries';
+import { useV2SalesMetrics, useV2Scoreboard } from '../../api/v2Queries';
 import type { SalesMetricsV2 } from '../../api/v2-types';
 import { dayKeyInTimeZone, shiftIsoDay } from '../../utils/runDay';
 import { v2Copy } from '../copy';
@@ -131,6 +131,13 @@ export default function SequencesV2() {
 
   const { data, isLoading, isError, error } = useV2SalesMetrics(query);
   const payload = data?.data;
+
+  // Scoreboard data for new panels (weekly window)
+  const { data: scoreboardData, isLoading: isScoreboardLoading } = useV2Scoreboard({
+    weekStart: selectedDay || undefined,
+    tz: BUSINESS_TZ,
+  });
+  const scoreboard = scoreboardData?.data;
 
   const rows = useMemo(() => {
     if (!payload) return [];
@@ -282,6 +289,212 @@ export default function SequencesV2() {
           meta={totalSent > 0 ? `${((totalOptOuts / totalSent) * 100).toFixed(2)}% of sent` : undefined}
         />
       </section>
+
+      {/* New Scoreboard Panels - Volume & Reply Split */}
+      {scoreboard && !isScoreboardLoading ? (
+        <>
+          <V2Panel
+            title="Volume & Reply Split"
+            caption="Compare sequence-initiated vs manual outreach performance."
+          >
+            <div className="V2SplitGrid">
+              <div className="V2SplitCard">
+                <h4>Messages Sent</h4>
+                <div className="V2SplitBar">
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
+                    style={{ width: `${scoreboard.weekly.volume.sequencePct}%` }}
+                  />
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--manual"
+                    style={{ width: `${scoreboard.weekly.volume.manualPct}%` }}
+                  />
+                </div>
+                <div className="V2SplitLegend">
+                  <span>Sequence: {fmtInt(scoreboard.weekly.volume.sequence)} ({fmtPct(scoreboard.weekly.volume.sequencePct)})</span>
+                  <span>Manual: {fmtInt(scoreboard.weekly.volume.manual)} ({fmtPct(scoreboard.weekly.volume.manualPct)})</span>
+                </div>
+              </div>
+              <div className="V2SplitCard">
+                <h4>Unique Leads</h4>
+                <div className="V2SplitBar">
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
+                    style={{
+                      width: `${
+                        scoreboard.weekly.uniqueLeads.total > 0
+                          ? (scoreboard.weekly.uniqueLeads.sequence / scoreboard.weekly.uniqueLeads.total) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--manual"
+                    style={{
+                      width: `${
+                        scoreboard.weekly.uniqueLeads.total > 0
+                          ? (scoreboard.weekly.uniqueLeads.manual / scoreboard.weekly.uniqueLeads.total) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <div className="V2SplitLegend">
+                  <span>Sequence: {fmtInt(scoreboard.weekly.uniqueLeads.sequence)}</span>
+                  <span>Manual: {fmtInt(scoreboard.weekly.uniqueLeads.manual)}</span>
+                </div>
+              </div>
+              <div className="V2SplitCard">
+                <h4>Replies</h4>
+                <div className="V2SplitBar">
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
+                    style={{
+                      width: `${
+                        scoreboard.weekly.replies.overall.count > 0
+                          ? (scoreboard.weekly.replies.sequence.count / scoreboard.weekly.replies.overall.count) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--manual"
+                    style={{
+                      width: `${
+                        scoreboard.weekly.replies.overall.count > 0
+                          ? (scoreboard.weekly.replies.manual.count / scoreboard.weekly.replies.overall.count) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <div className="V2SplitLegend">
+                  <span>
+                    Sequence: {fmtInt(scoreboard.weekly.replies.sequence.count)} ({fmtPct(scoreboard.weekly.replies.sequence.ratePct)} rate)
+                  </span>
+                  <span>
+                    Manual: {fmtInt(scoreboard.weekly.replies.manual.count)} ({fmtPct(scoreboard.weekly.replies.manual.ratePct)} rate)
+                  </span>
+                </div>
+              </div>
+            </div>
+          </V2Panel>
+
+          <V2Panel
+            title="Booking Attribution"
+            caption="Who gets credit for bookings: sequence-initiated vs manual, and by rep."
+          >
+            <div className="V2SplitGrid">
+              <div className="V2SplitCard">
+                <h4>By Initiator Type</h4>
+                <div className="V2SplitBar">
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--sequence"
+                    style={{
+                      width: `${
+                        scoreboard.weekly.bookings.total > 0
+                          ? (scoreboard.weekly.bookings.sequenceInitiated / scoreboard.weekly.bookings.total) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                  <div
+                    className="V2SplitBar__segment V2SplitBar__segment--manual"
+                    style={{
+                      width: `${
+                        scoreboard.weekly.bookings.total > 0
+                          ? (scoreboard.weekly.bookings.manualInitiated / scoreboard.weekly.bookings.total) * 100
+                          : 0
+                      }%`,
+                    }}
+                  />
+                </div>
+                <div className="V2SplitLegend">
+                  <span>Sequence-initiated: {fmtInt(scoreboard.weekly.bookings.sequenceInitiated)}</span>
+                  <span>Manual-initiated: {fmtInt(scoreboard.weekly.bookings.manualInitiated)}</span>
+                </div>
+              </div>
+              <div className="V2SplitCard">
+                <h4>By Rep</h4>
+                <div className="V2RepBreakdown">
+                  <div className="V2RepRow">
+                    <span className="V2RepRow__name">Jack</span>
+                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.jack)}</span>
+                  </div>
+                  <div className="V2RepRow">
+                    <span className="V2RepRow__name">Brandon</span>
+                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.brandon)}</span>
+                  </div>
+                  <div className="V2RepRow">
+                    <span className="V2RepRow__name">Self-booked</span>
+                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.selfBooked)}</span>
+                  </div>
+                  <div className="V2RepRow V2RepRow--total">
+                    <span className="V2RepRow__name">Total</span>
+                    <span className="V2RepRow__value">{fmtInt(scoreboard.weekly.bookings.total)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </V2Panel>
+
+          <V2Panel
+            title="Lead Magnet Comparison"
+            caption="Compare Legacy vs V2 versions of each lead magnet."
+          >
+            {scoreboard.leadMagnetComparison.length === 0 ? (
+              <V2State kind="empty">No lead magnet comparison data available.</V2State>
+            ) : (
+              <div className="V2LeadMagnetTable">
+                <table className="V2Table">
+                  <thead>
+                    <tr>
+                      <th>Lead Magnet</th>
+                      <th className="is-right">Version</th>
+                      <th className="is-right">Sent</th>
+                      <th className="is-right">Leads</th>
+                      <th className="is-right">Replies</th>
+                      <th className="is-right">Reply Rate</th>
+                      <th className="is-right">Booked</th>
+                      <th className="is-right">Booking Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scoreboard.leadMagnetComparison.map((row) => (
+                      <Fragment key={row.leadMagnet}>
+                        {row.legacy ? (
+                          <tr>
+                            <td rowSpan={row.v2 ? 2 : 1}>{row.leadMagnet}</td>
+                            <td className="is-right">Legacy</td>
+                            <td className="is-right">{fmtInt(row.legacy.messagesSent)}</td>
+                            <td className="is-right">{fmtInt(row.legacy.uniqueContacted)}</td>
+                            <td className="is-right">{fmtInt(row.legacy.uniqueReplied)}</td>
+                            <td className="is-right">{fmtPct(row.legacy.replyRatePct)}</td>
+                            <td className="is-right">{fmtInt(row.legacy.canonicalBookedCalls)}</td>
+                            <td className="is-right">{fmtPct(row.legacy.bookingRatePct)}</td>
+                          </tr>
+                        ) : null}
+                        {row.v2 ? (
+                          <tr>
+                            {row.legacy ? null : <td rowSpan={row.legacy ? 2 : 1}>{row.leadMagnet}</td>}
+                            <td className="is-right">V2</td>
+                            <td className="is-right">{fmtInt(row.v2.messagesSent)}</td>
+                            <td className="is-right">{fmtInt(row.v2.uniqueContacted)}</td>
+                            <td className="is-right">{fmtInt(row.v2.uniqueReplied)}</td>
+                            <td className="is-right">{fmtPct(row.v2.replyRatePct)}</td>
+                            <td className="is-right">{fmtInt(row.v2.canonicalBookedCalls)}</td>
+                            <td className="is-right">{fmtPct(row.v2.bookingRatePct)}</td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </V2Panel>
+        </>
+      ) : null}
 
       {/* Sets Attribution — shows how sets are credited to sequences across multi-day convos */}
       <V2Panel

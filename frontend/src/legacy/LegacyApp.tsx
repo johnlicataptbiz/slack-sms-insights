@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { client } from '../api/client';
 import Dashboard from '../pages/Dashboard';
 import { Insights } from '../pages/Insights';

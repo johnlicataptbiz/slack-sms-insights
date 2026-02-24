@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ApiError } from '../api/client';
 import { useSalesMetrics } from '../api/queries';
 import { dayKeyInTimeZone, shiftIsoDay } from '../utils/runDay';

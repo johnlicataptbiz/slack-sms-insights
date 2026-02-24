@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import RunDetail from './RunDetail';
 import '../styles/RunList.css';
 

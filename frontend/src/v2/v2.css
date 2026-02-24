@@ -3905,3 +3905,102 @@
   border-radius: 999px;
   font-size: 0.7rem;
 }
+
+/* ============================================================
+   SCOREBOARD V2 — NEW PANELS
+   ============================================================ */
+
+/* Split Grid for Volume/Reply/Booking panels */
+.V2SplitGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--v2-space-4);
+}
+
+.V2SplitCard {
+  border: 1px solid rgba(7, 19, 36, 0.1);
+  border-radius: var(--v2-radius-md);
+  padding: var(--v2-space-4);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.V2SplitCard h4 {
+  margin: 0 0 var(--v2-space-3);
+  font-family: var(--v2-font-display);
+  font-size: 0.95rem;
+  color: var(--v2-text);
+}
+
+/* Split Bar */
+.V2SplitBar {
+  display: flex;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(7, 19, 36, 0.08);
+}
+
+.V2SplitBar__segment {
+  height: 100%;
+  transition: width 400ms ease;
+}
+
+.V2SplitBar__segment--sequence {
+  background: var(--v2-accent);
+}
+
+.V2SplitBar__segment--manual {
+  background: var(--v2-muted);
+  opacity: 0.6;
+}
+
+/* Split Legend */
+.V2SplitLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-3);
+  margin-top: var(--v2-space-3);
+  font-size: 0.78rem;
+  color: var(--v2-muted);
+}
+
+/* Rep Breakdown */
+.V2RepBreakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--v2-space-2);
+}
+
+.V2RepRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--v2-space-2) var(--v2-space-3);
+  border-radius: var(--v2-radius-sm);
+  background: rgba(7, 19, 36, 0.04);
+}
+
+.V2RepRow__name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--v2-text);
+}
+
+.V2RepRow__value {
+  font-family: var(--v2-font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--v2-text);
+}
+
+.V2RepRow--total {
+  border-top: 2px solid rgba(7, 19, 36, 0.12);
+  padding-top: var(--v2-space-3);
+  margin-top: var(--v2-space-2);
+  background: rgba(17, 184, 214, 0.08);
+}
+
+/* Lead Magnet Table */
+.V2LeadMagnetTable {
+  overflow-x: auto;
+}

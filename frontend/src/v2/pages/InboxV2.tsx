@@ -79,13 +79,6 @@ const displaySetterName = (value: string | null | undefined): string | null => {
   return trimmed;
 };
 
-const getSetterAvatar = (name: string | null | undefined): string => {
-  const setter = displaySetterName(name);
-  if (setter === 'Jack') return 'J';
-  if (setter === 'Brandon') return 'B';
-  return '?';
-};
-
 const getSetterColor = (name: string | null | undefined): string => {
   const setter = displaySetterName(name);
   if (setter === 'Jack') return '#11b8d6';
@@ -557,7 +550,6 @@ export default function InboxV2() {
                 const isUrgent = conversation.escalation.level <= 2 && hasUnread;
                 const setterName = displaySetterName(conversation.ownerLabel);
                 const setterColor = getSetterColor(conversation.ownerLabel);
-                const setterAvatar = getSetterAvatar(conversation.ownerLabel);
                 
                 return (
                   <button

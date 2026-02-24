@@ -9,6 +9,7 @@ import type {
   RunsListV2,
   SalesMetricsBatchV2,
   SalesMetricsV2,
+  ScoreboardV2,
   SendMessageResultV2,
   WeeklyManagerSummaryV2,
 } from './v2-types';
@@ -229,5 +230,53 @@ export function assertInboxSendConfigEnvelope(value: unknown): asserts value is 
   }
   if (!isBoolean(value.data.requiresSelection)) {
     throw new Error('Invalid send-config response: requiresSelection');
+  }
+}
+
+export function assertScoreboardV2Envelope(value: unknown): asserts value is ApiEnvelope<ScoreboardV2> {
+  if (!isObject(value)) throw new Error('Invalid scoreboard response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid scoreboard response: data must be object');
+
+  const data = value.data;
+
+  // Window
+  if (!isObject(data.window)) throw new Error('Invalid scoreboard response: window missing');
+  if (!isString(data.window.weekStart)) throw new Error('Invalid scoreboard response: window.weekStart');
+  if (!isString(data.window.weekEnd)) throw new Error('Invalid scoreboard response: window.weekEnd');
+  if (!isString(data.window.monthStart)) throw new Error('Invalid scoreboard response: window.monthStart');
+  if (!isString(data.window.monthEnd)) throw new Error('Invalid scoreboard response: window.monthEnd');
+  if (!isString(data.window.timeZone)) throw new Error('Invalid scoreboard response: window.timeZone');
+
+  // Weekly/Monthly splits
+  const assertSplit = (obj: unknown, ctx: string): void => {
+    if (!isObject(obj)) throw new Error(`Invalid scoreboard response: ${ctx} missing`);
+    if (!isObject(obj.volume)) throw new Error(`Invalid scoreboard response: ${ctx}.volume missing`);
+    if (!isObject(obj.uniqueLeads)) throw new Error(`Invalid scoreboard response: ${ctx}.uniqueLeads missing`);
+    if (!isObject(obj.replies)) throw new Error(`Invalid scoreboard response: ${ctx}.replies missing`);
+    if (!isObject(obj.bookings)) throw new Error(`Invalid scoreboard response: ${ctx}.bookings missing`);
+  };
+
+  assertSplit(data.weekly, 'weekly');
+  assertSplit(data.monthly, 'monthly');
+
+  // Sequences
+  if (!Array.isArray(data.sequences)) throw new Error('Invalid scoreboard response: sequences must be array');
+
+  // Lead magnet comparison
+  if (!Array.isArray(data.leadMagnetComparison)) {
+    throw new Error('Invalid scoreboard response: leadMagnetComparison must be array');
+  }
+
+  // Timing
+  if (!isObject(data.timing)) throw new Error('Invalid scoreboard response: timing missing');
+
+  // Compliance
+  if (!isObject(data.compliance)) throw new Error('Invalid scoreboard response: compliance missing');
+
+  // Provenance
+  if (!isObject(data.provenance)) throw new Error('Invalid scoreboard response: provenance missing');
+  if (data.provenance.attributionModel !== 'sequence_initiated_conversation') {
+    throw new Error('Invalid scoreboard response: provenance.attributionModel');
   }
 }

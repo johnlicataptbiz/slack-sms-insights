@@ -11,6 +11,7 @@ import {
   assertRunsListV2Envelope,
   assertSalesMetricsBatchV2Envelope,
   assertSalesMetricsV2Envelope,
+  assertScoreboardV2Envelope,
   assertSendMessageResultEnvelope,
   assertWeeklySummaryV2Envelope,
 } from './v2Guards';
@@ -26,6 +27,7 @@ import type {
   RunsListV2,
   SalesMetricsBatchV2,
   SalesMetricsV2,
+  ScoreboardV2,
   SendMessageResultV2,
   WeeklyManagerSummaryV2,
 } from './v2-types';
@@ -475,5 +477,34 @@ export const useV2SetDefaultSendLine = () => {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'send-config'] });
     },
+  });
+};
+
+// ─── Scoreboard V2 Hook ───────────────────────────────────────────────────────────
+
+const toScoreboardSearchParams = (params: { weekStart?: string; tz?: string }): URLSearchParams => {
+  const searchParams = new URLSearchParams();
+  if (params.weekStart) searchParams.set('weekStart', params.weekStart);
+  if (params.tz) searchParams.set('tz', params.tz);
+  return searchParams;
+};
+
+export const useV2Scoreboard = (params: { weekStart?: string; tz?: string }) => {
+  const searchParams = toScoreboardSearchParams(params);
+  const queryString = searchParams.toString();
+  const suffix = queryString ? `?${queryString}` : '';
+
+  return useQuery({
+    queryKey: ['v2', 'scoreboard', params.weekStart || null, params.tz || null],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/scoreboard${suffix}`);
+      assertScoreboardV2Envelope(response);
+      return response as ApiEnvelope<ScoreboardV2>;
+    },
+    staleTime: 60 * 1000,        // 1 minute
+    gcTime: 5 * 60 * 1000,      // 5 minutes
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
   });
 };

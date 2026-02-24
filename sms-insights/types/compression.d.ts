@@ -1,5 +1,5 @@
 declare module 'compression' {
-  import type { IncomingMessage, ServerResponse } from 'http';
+  import type { IncomingMessage, ServerResponse } from 'node:http';
   
   interface CompressionOptions {
     filter?: (req: IncomingMessage, res: ServerResponse) => boolean;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import RunList from '../components/RunList';
 import '../styles/DataPages.css';
 import '../styles/Dashboard.css';

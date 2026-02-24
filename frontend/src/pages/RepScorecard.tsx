@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { useSalesMetrics } from '../api/queries';
 import { resolveCurrentBusinessDay, shiftIsoDay } from '../utils/runDay';
 import '../styles/DataPages.css';

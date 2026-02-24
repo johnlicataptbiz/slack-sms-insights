@@ -1,231 +1,306 @@
-# Implementation Plan: PT Biz SMS Insights Dashboard
+# Implementation Plan: Sequence Attribution Fix + SequencesV2 Analytics Expansion
 
-[Overview]
-Transform the existing SMS Insights dashboard into a production-grade, fully-documented, and maintainable system with improved code quality, comprehensive testing, and enhanced user experience. The goal is to establish best practices for long-term maintainability while delivering immediate value through documentation, code quality improvements, and UI/UX enhancements.
+## Overview
 
-[Types]
-No changes to core API types required. Add new types for UI state management, validation schemas, and error handling.
+Fix the booking attribution model so that a sequence which triggers a lead's first reply is credited for the booking — even if the setter sends 3–30 manual follow-up messages before the lead books. Then surface the corrected metrics and new analytics panels inside the existing `SequencesV2` page (no new pages).
 
-New types to add:
-- `Theme`: 'light' | 'dark' | 'system'
-- `SidebarState`: 'expanded' | 'collapsed'
-- `WidgetConfig`: { id: string; type: string; position: number }
-- `ValidationError`: { field: string; message: string; code: string }
-- `ApiErrorResponse`: { error: string; details?: ValidationError[]; requestId: string }
+---
 
-[Files]
-Single sentence: Create comprehensive documentation, implement structured logging, add input validation, and enhance frontend performance.
+## Core Attribution Model Change
 
-Detailed breakdown:
+### Current (broken) model in `sales-metrics.ts`
+"Last outbound touch within 14 days before booking, preferring sequenced."
 
-**New Files:**
-- `README.md` - Complete project overview with architecture diagrams, quick start, and links to all documentation
-- `CONTRIBUTING.md` - Development workflow, coding standards, PR process, and commit conventions
-- `API.md` - Complete API endpoint documentation with request/response examples
-- `frontend/src/components/README.md` - Component library usage guide with examples
-- `.env.example` - Template with all environment variables and descriptions
-- `sms-insights/services/logger.ts` - Structured logging with pino
-- `sms-insights/api/validation.ts` - Zod schemas for all API inputs
-- `sms-insights/middleware/error-handler.ts` - Centralized error handling middleware
-- `frontend/src/components/ErrorBoundary.tsx` - React error boundary for crash recovery
-- `frontend/src/hooks/useDebounce.ts` - Debounce hook for search inputs
-- `frontend/src/hooks/useLocalStorage.ts` - Persistent state hook
-- `docs/adr/` - Architecture Decision Records folder
-- `docs/adr/001-why-tailwind-v4.md` - ADR for Tailwind v4 choice
-- `docs/adr/002-why-shadcn-ui.md` - ADR for shadcn/ui choice
-- `docs/adr/003-why-react-query.md` - ADR for React Query choice
+**Problem:** After a sequence triggers a reply, the setter sends manual follow-ups. The "last outbound" before booking is now a manual message, so the booking gets credited to manual — even though the sequence started the conversation.
 
-**Modified Files:**
-- `sms-insights/app.ts` - Replace console.* with logger, add error middleware
-- `sms-insights/api/routes.ts` - Add Zod validation to all routes
-- `sms-insights/scripts/*.ts` - Inject logger instead of console.*
-- `frontend/src/api/v2Queries.ts` - Add caching configuration
-- `frontend/src/api/client.ts` - Add request/response interceptors
-- `frontend/src/components/v2/ChartsGrid.tsx` - Add memoization, theme support
-- `frontend/src/components/v2/KPIGrid.tsx` - Add skeleton loading states
-- `frontend/src/components/v2/CampaignsTable.tsx` - Add virtualization for large datasets
-- `frontend/src/pages/DashboardV2.tsx` - Add error boundary wrapper
-- `frontend/src/v2/V2App.tsx` - Add route-level code splitting
-- `frontend/vite.config.ts` - Add bundle analyzer, optimize deps
-- `frontend/package.json` - Add testing dependencies (vitest, @testing-library/react, msw)
-- `sms-insights/package.json` - Add pino, zod, compression
-- `tsconfig.json` - Enable strict mode
+### New (correct) model: "Sequence-Initiated Conversation"
 
-**Deleted/Deprecated:**
-- Remove all console.log/error/warn from production code paths
-- Deprecate legacy CSS files in favor of Tailwind
-- Remove unused imports and dead code
+```
+For each booking event on a contact:
+  1. Find the contact's FIRST inbound reply that occurred after any outbound.
+  2. Find the outbound that triggered that first reply (within 48h window).
+  3. If that triggering outbound had a sequence label → attribute booking to that sequence.
+  4. If no sequence triggered a reply (or no reply at all) → fall back to last outbound touch
+     within 14 days (current behavior), preferring sequenced over manual.
+```
 
-[Functions]
-Single sentence: Implement structured logging, input validation, error handling, and performance optimizations across the stack.
+This correctly handles:
+- Sequence → reply → 30 manual messages → booking = **sequence gets credit**
+- Manual → reply → booking = **manual gets credit**
+- Sequence → no reply → manual → reply → booking = **manual gets credit** (sequence didn't trigger the reply)
+- Sequence → reply → no booking = **sequence gets reply credit, no booking credit**
 
-Detailed breakdown:
+---
 
-**New Functions:**
-- `createLogger(name: string): Logger` - Factory for namespaced loggers
-- `validateRequest<T>(schema: ZodSchema<T>, req: Request): Promise<T>` - Request validation helper
-- `handleApiError(error: unknown, req: Request, res: Response): void` - Centralized error handler
-- `useDebounce<T>(value: T, delay: number): T` - React hook for debouncing
-- `useLocalStorage<T>(key: string, initialValue: T): [T, (v: T) => void]` - Persistent state hook
-- `memoizedChartData(data: ChartData[]): ChartData[]` - Chart data memoization
-- `formatErrorForUser(error: ApiError): string` - User-friendly error messages
+## [Types]
 
-**Modified Functions:**
-- `handleApiRoute()` - Add validation layer, structured logging, error handling
-- `useV2Runs()` - Add staleTime, cacheTime, retry logic
-- `useV2SalesMetrics()` - Add polling interval configuration
-- `KPIGrid()` - Add React.memo, skeleton states
-- `ChartsGrid()` - Add theme-aware colors, memoization
+### New types in `sms-insights/api/v2-contract.ts`
 
-**Removed Functions:**
-- All inline console.log statements (replaced with logger)
+```typescript
+export type ScoreboardVolumeSplit = {
+  total: number;
+  sequence: number;
+  manual: number;
+  sequencePct: number;
+  manualPct: number;
+};
 
-[Classes]
-No class-based changes required. The codebase uses functional programming patterns.
+export type ScoreboardUniqueSplit = {
+  total: number;
+  sequence: number;
+  manual: number;
+};
 
-[Dependencies]
-Single sentence: Add structured logging, validation, testing, and performance monitoring dependencies.
+export type ScoreboardReplySplit = {
+  sequence: { count: number; ratePct: number };
+  manual: { count: number; ratePct: number };
+  overall: { count: number; ratePct: number };
+};
 
-Detailed breakdown:
+export type ScoreboardBookingSplit = {
+  total: number;
+  jack: number;
+  brandon: number;
+  selfBooked: number;
+  sequenceInitiated: number;   // booking where a sequence triggered the first reply
+  manualInitiated: number;     // booking where no sequence triggered a reply
+};
 
-**New Dependencies (Backend):**
-- `pino` - High-performance JSON logger
-- `pino-pretty` - Development log formatter
-- `zod` - Runtime type validation
-- `compression` - Response compression middleware
-- `@sentry/node` - Error tracking (optional)
+export type ScoreboardSequenceRow = {
+  label: string;
+  leadMagnet: string;       // normalized base name (version stripped)
+  version: string;          // 'Legacy' | 'V2' | 'A' | 'B' | ''
+  messagesSent: number;
+  uniqueContacted: number;
+  uniqueReplied: number;
+  replyRatePct: number;
+  canonicalBookedCalls: number;
+  bookingRatePct: number;
+  optOuts: number;
+  optOutRatePct: number;
+};
 
-**New Dependencies (Frontend):**
-- `vitest` - Unit testing framework
-- `@testing-library/react` - Component testing utilities
-- `@testing-library/user-event` - User interaction simulation
-- `msw` - Mock Service Worker for API mocking
-- `@tanstack/react-virtual` - Virtual scrolling for large tables
-- `react-error-boundary` - Error boundary component
-- `use-debounce` - Debounce hook (or custom implementation)
-- `@sentry/react` - Frontend error tracking (optional)
-- `web-vitals` - Core Web Vitals reporting
+export type ScoreboardLeadMagnetRow = {
+  leadMagnet: string;
+  legacy: {
+    messagesSent: number;
+    uniqueContacted: number;
+    uniqueReplied: number;
+    replyRatePct: number;
+    canonicalBookedCalls: number;
+    bookingRatePct: number;
+  } | null;
+  v2: {
+    messagesSent: number;
+    uniqueContacted: number;
+    uniqueReplied: number;
+    replyRatePct: number;
+    canonicalBookedCalls: number;
+    bookingRatePct: number;
+  } | null;
+};
 
-**Version Updates:**
-- Upgrade React Query to v5 (if not already)
-- Ensure TypeScript 5.9+ strict mode compatibility
+export type ScoreboardTimingRow = {
+  dayOfWeek: string;   // 'Mon' | 'Tue' | ... | 'Sun'
+  outboundCount: number;
+  replyCount: number;
+  replyRatePct: number;
+};
 
-[Testing]
-Single sentence: Implement comprehensive testing strategy including unit, component, integration, and E2E tests.
+export type ScoreboardV2 = {
+  window: {
+    weekStart: string;
+    weekEnd: string;
+    monthStart: string;
+    monthEnd: string;
+    timeZone: string;
+  };
+  weekly: {
+    volume: ScoreboardVolumeSplit;
+    uniqueLeads: ScoreboardUniqueSplit;
+    replies: ScoreboardReplySplit;
+    bookings: ScoreboardBookingSplit;
+  };
+  monthly: {
+    volume: ScoreboardVolumeSplit;
+    uniqueLeads: ScoreboardUniqueSplit;
+    replies: ScoreboardReplySplit;
+    bookings: ScoreboardBookingSplit;
+  };
+  sequences: ScoreboardSequenceRow[];
+  leadMagnetComparison: ScoreboardLeadMagnetRow[];
+  timing: {
+    medianTimeToFirstReplyMinutes: number | null;
+    replyRateByDayOfWeek: ScoreboardTimingRow[];
+  };
+  compliance: {
+    optOutRateWeeklyPct: number;
+    optOutRateMonthlyPct: number;
+    topOptOutSequences: Array<{ label: string; optOuts: number; optOutRatePct: number }>;
+  };
+  provenance: {
+    attributionModel: 'sequence_initiated_conversation';
+    weeklyBookingTotal: number;
+    monthlyBookingTotal: number;
+  };
+};
+```
 
-Detailed breakdown:
+### New frontend types in `frontend/src/api/v2-types.ts`
+Mirror all `ScoreboardV2` types above (identical shape, no transformation needed).
 
-**Test File Requirements:**
-- `sms-insights/tests/services/logger.test.ts` - Logger functionality
-- `sms-insights/tests/api/validation.test.ts` - Validation schemas
-- `sms-insights/tests/api/routes.test.ts` - API route handlers
-- `frontend/src/components/v2/KPIGrid.test.tsx` - Component rendering
-- `frontend/src/components/v2/ChartsGrid.test.tsx` - Chart interactions
-- `frontend/src/hooks/useDebounce.test.ts` - Hook behavior
-- `frontend/src/api/v2Queries.test.ts` - Query hooks with MSW
-- `e2e/dashboard.spec.ts` - Playwright E2E tests
+---
 
-**Testing Strategy:**
-1. Unit tests for utilities and hooks
-2. Component tests with mocked API calls
-3. Integration tests for API routes with test database
-4. E2E tests for critical user flows (login, view dashboard, filter data)
+## [Files]
 
-[Implementation Order]
-Single sentence: Execute in phases: documentation first, then code quality, then features, finally testing and monitoring.
+### New Files
 
-Numbered steps:
-1. **Phase 1: Documentation (Week 1)**
-   - Create comprehensive README.md
-   - Write CONTRIBUTING.md with coding standards
-   - Document API endpoints in API.md
-   - Create .env.example template
-   - Write ADRs for key architectural decisions
+| Path | Purpose |
+|------|---------|
+| `sms-insights/services/scoreboard.ts` | Core service: builds `ScoreboardV2` using the new attribution model |
 
-2. **Phase 2: Backend Code Quality (Week 1-2)**
-   - Implement structured logging with pino
-   - Create Zod validation schemas
-   - Add centralized error handling middleware
-   - Replace all console.* with logger calls
-   - Enable TypeScript strict mode
-   - Add input validation to all API routes
+### Modified Files
 
-3. **Phase 3: Frontend Code Quality (Week 2)**
-   - Add React Query caching configuration
-   - Implement error boundaries
-   - Add debouncing to search inputs
-   - Memoize expensive components (charts)
-   - Add skeleton loading states
-   - Implement virtual scrolling for tables
+| Path | Changes |
+|------|---------|
+| `sms-insights/services/sales-metrics.ts` | **Fix attribution model**: replace "last outbound touch" with "sequence-initiated conversation" logic for booking and reply attribution |
+| `sms-insights/api/v2-contract.ts` | Add `ScoreboardV2` and sub-types |
+| `sms-insights/api/routes.ts` | Add `GET /api/v2/scoreboard` route + `handleGetScoreboardV2` handler |
+| `frontend/src/api/v2-types.ts` | Add `ScoreboardV2` and sub-types |
+| `frontend/src/api/v2Queries.ts` | Add `useV2Scoreboard(params)` React Query hook |
+| `frontend/src/v2/pages/SequencesV2.tsx` | Add 3 new panels: Volume Split, Lead Magnet Comparison, Timing & Compliance |
+| `frontend/src/v2/v2.css` | Add CSS for new panels |
 
-4. **Phase 4: Testing Infrastructure (Week 3)**
-   - Set up Vitest for unit testing
-   - Configure React Testing Library
-   - Implement MSW for API mocking
-   - Write tests for critical paths
-   - Set up Playwright for E2E testing
+---
 
-5. **Phase 5: UI/UX Enhancements (Week 3-4)**
-   - Complete V2 dashboard pages (Campaigns, Leads, Calls)
-   - Add date range picker to charts
-   - Implement export functionality
-   - Add filter persistence to URL
-   - Improve mobile responsiveness
-   - Add keyboard shortcuts
+## [Functions]
 
-6. **Phase 6: DevOps & Monitoring (Week 4)**
-   - Set up GitHub Actions CI/CD
-   - Add Sentry error tracking
-   - Implement health check endpoints
-   - Add Web Vitals monitoring
-   - Configure branch preview environments
+### Modified: `sms-insights/services/sales-metrics.ts`
 
-7. **Phase 7: Final Review & Polish (Week 5)**
-   - Code review all changes
-   - Performance audit (Lighthouse)
-   - Accessibility audit (WCAG 2.1)
-   - Security audit
-   - Update all documentation
-   - Create deployment runbook
+**`getSalesMetricsSummary()`** — change booking attribution logic:
 
-[Success Criteria]
-- Lighthouse performance score >90
-- 100% TypeScript strict mode compliance
-- Zero console.* in production code paths
-- All API routes have input validation
-- Test coverage >70% for critical paths
-- Documentation complete and accurate
-- Mobile-responsive design
-- Accessibility WCAG 2.1 AA compliance
+Replace the current "last outbound touch" loop with a two-pass approach:
 
-[Risks and Mitigations]
-- **Risk**: Breaking changes during strict mode enablement
-  - **Mitigation**: Incremental migration, thorough testing
-- **Risk**: Performance regression from new dependencies
-  - **Mitigation**: Bundle analysis, tree-shaking verification
-- **Risk**: Database migration issues
-  - **Mitigation**: Backward-compatible changes only, backup strategy
-- **Risk**: User disruption during V2 rollout
-  - **Mitigation**: Feature flags, gradual rollout, easy rollback
+```typescript
+// Pass 1: For each contact, find the outbound that triggered their FIRST reply.
+// This is the "conversation initiator" — the touch that gets booking credit.
+const conversationInitiatorByContact = new Map<string, EventRow>(); // contactKey → initiating outbound
 
-[Appendix: Current State Assessment]
+for (const [contactKey, list] of eventsByContact.entries()) {
+  const firstInbound = list.find(e => e.direction === 'inbound');
+  if (!firstInbound) continue;
+  const firstInboundTs = new Date(firstInbound.event_ts).getTime();
 
-**Strengths:**
-- Modern React 19 with TypeScript
-- Tailwind CSS v4 with shadcn/ui components
-- React Query for server state management
-- Recharts for data visualization
-- Proper database schema with PostgreSQL
-- Slack OAuth authentication
-- Real-time updates via polling
+  // Find the outbound that triggered this first reply (within 48h, prefer sequenced)
+  let latestOutbound: EventRow | undefined;
+  let latestSequencedOutbound: EventRow | undefined;
+  for (const candidate of list) {
+    if (candidate.direction !== 'outbound') continue;
+    const ts = new Date(candidate.event_ts).getTime();
+    if (ts > firstInboundTs) break;
+    if (firstInboundTs - ts > REPLY_TRIGGER_WINDOW_MS) continue; // 48h
+    latestOutbound = candidate;
+    if ((candidate.sequence || '').trim()) latestSequencedOutbound = candidate;
+  }
+  const initiator = latestSequencedOutbound || latestOutbound;
+  if (initiator) conversationInitiatorByContact.set(contactKey, initiator);
+}
 
-**Weaknesses:**
-- Minimal documentation (README is one line)
-- Console logging in production code (98 instances)
-- No input validation on API routes
-- Missing error boundaries
-- No caching configuration for React Query
-- Incomplete V2 dashboard (missing pages)
-- Limited test coverage
-- No structured logging
-- No performance monitoring
+// Pass 2: For each booking, attribute to the conversation initiator (not last touch).
+for (const [contactKey, list] of eventsByContact.entries()) {
+  for (const e of list) {
+    if (!isHighConfidenceBookingSignal(e.direction, e.body || '')) continue;
+    
+    const initiator = conversationInitiatorByContact.get(contactKey);
+    // Fall back to last-touch if no initiator found (cold booking, no prior reply)
+    const attributedTouch = initiator ?? findLastOutboundBeforeBooking(list, e);
+    const sequenceLabel = (attributedTouch?.sequence || '').trim() || MANUAL_SEQUENCE_LABEL;
+    // ... credit booking to sequenceLabel
+  }
+}
+```
+
+**New constant**: `const REPLY_TRIGGER_WINDOW_MS = 48 * 60 * 60 * 1000;` (48 hours)
+
+### New: `sms-insights/services/scoreboard.ts`
+
+```typescript
+export const getScoreboardData = async (
+  params: { weekStart?: string; timeZone?: string },
+  logger?: Logger
+): Promise<ScoreboardV2>
+
+// Internal helpers
+const resolveWeekWindow = (weekStart: string | undefined, tz: string): { weekStart: Date; weekEnd: Date }
+const resolveMonthWindow = (weekStart: Date, tz: string): { monthStart: Date; monthEnd: Date }
+const buildVolumeSplit = (events: EventRow[], from: Date, to: Date): ScoreboardVolumeSplit
+const buildUniqueSplit = (events: EventRow[], from: Date, to: Date): ScoreboardUniqueSplit
+const buildReplySplit = (events: EventRow[], initiatorMap: Map<string, EventRow>, from: Date, to: Date): ScoreboardReplySplit
+const buildBookingSplit = (
+  events: EventRow[],
+  initiatorMap: Map<string, EventRow>,
+  bookedCalls: BookedCallSummary,
+  sequenceAttribution: SequenceAttributionResult,
+  from: Date, to: Date
+): ScoreboardBookingSplit
+const buildSequenceRows = (events: EventRow[], initiatorMap: Map<string, EventRow>, bookedCalls: BookedCallSummary, sequenceAttribution: SequenceAttributionResult, from: Date, to: Date): ScoreboardSequenceRow[]
+const buildLeadMagnetComparison = (sequenceRows: ScoreboardSequenceRow[]): ScoreboardLeadMagnetRow[]
+const buildTimingMetrics = (events: EventRow[], initiatorMap: Map<string, EventRow>, tz: string): ScoreboardTimingMetrics
+const buildComplianceMetrics = (events: EventRow[], sequenceRows: ScoreboardSequenceRow[], from: Date, to: Date): ScoreboardComplianceMetrics
+const parseLeadMagnetAndVersion = (label: string): { leadMagnet: string; version: string }
+const buildConversationInitiatorMap = (eventsByContact: Map<string, EventRow[]>): Map<string, EventRow>
+const computeMedianTimeToFirstReply = (events: EventRow[], initiatorMap: Map<string, EventRow>): number | null
+```
+
+### New: `sms-insights/api/routes.ts` — `handleGetScoreboardV2`
+
+```typescript
+const handleGetScoreboardV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const weekStart = url.searchParams.get('weekStart') || undefined;
+  const tz = url.searchParams.get('tz') || undefined;
+  const data = await getScoreboardData({ weekStart, timeZone: tz }, logger);
+  sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone }), origin);
+};
+```
+
+### New: `frontend/src/api/v2Queries.ts` — `useV2Scoreboard`
+
+```typescript
+export const useV2Scoreboard = (params: { weekStart?: string; tz?: string }) =>
+  useQuery({ queryKey: ['v2-scoreboard', params], queryFn: () => fetchScoreboard(params) });
+```
+
+### Modified: `frontend/src/v2/pages/SequencesV2.tsx`
+
+Add 3 new `<V2Panel>` sections **below** the existing Sequence Table:
+
+1. **Volume & Reply Split Panel** — shows weekly sequence vs manual volume, unique leads, reply rates side-by-side
+2. **Lead Magnet Comparison Panel** — table grouping sequences by lead magnet, Legacy vs V2 columns
+3. **Timing & Compliance Panel** — median time to first reply, reply rate by day of week, top opt-out sequences
+
+The existing header metrics, Sets Attribution panel, At-Risk Watchlist, and Sequence Table remain unchanged.
+
+---
+
+## [Implementation Order]
+
+1. **Fix attribution model in `sales-metrics.ts`** — most impactful change; fixes existing data shown in SequencesV2 immediately.
+2. **Add `ScoreboardV2` types to `sms-insights/api/v2-contract.ts`**.
+3. **Create `sms-insights/services/scoreboard.ts`** — new service using the fixed attribution model.
+4. **Add `handleGetScoreboardV2` + route to `sms-insights/api/routes.ts`**.
+5. **Add `ScoreboardV2` types to `frontend/src/api/v2-types.ts`**.
+6. **Add `useV2Scoreboard` hook to `frontend/src/api/v2Queries.ts`**.
+7. **Enhance `frontend/src/v2/pages/SequencesV2.tsx`** — add 3 new panels using scoreboard data.
+8. **Add CSS to `frontend/src/v2/v2.css`**.
+9. **Build verification** — `npm run build` in `frontend/`, confirm 0 TypeScript errors.
+
+---
+
+## Out of Scope
+
+- Reply rate by step number (step not stored in `sms_events`)
+- Show rate / close rate (not in any current data source)
+- Messages sent to opted-out numbers (not tracked at send time)
+- Enrollment count (Aloware enrollment events not ingested)
+- New pages / routes (merging into SequencesV2 per user direction)

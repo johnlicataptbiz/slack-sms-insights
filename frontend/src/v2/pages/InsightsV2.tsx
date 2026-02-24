@@ -4,7 +4,6 @@ import type { SalesMetricsV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2WeeklySummary } from '../../api/v2Queries';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend } from '../components/V2Primitives';
 
-const BUSINESS_TZ = 'America/Chicago';
 type InsightsRange = 'today' | '7d' | '30d';
 
 const fmtInt = (n: number) => n.toLocaleString();

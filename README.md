@@ -64,54 +64,9 @@ PT Biz SMS Insights is a comprehensive analytics platform that:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🚀 Quick Start
+## 🚀 Getting Started
 
-### Prerequisites
-
-- Node.js 18+
-- PostgreSQL 15+ (or Railway PostgreSQL)
-- Slack app credentials
-- Aloware API token (optional)
-
-### 1. Clone and Install
-
-```bash
-git clone <repo-url>
-cd SlackCLI
-
-# Install backend dependencies
-cd sms-insights
-npm install
-
-# Install frontend dependencies
-cd ../frontend
-npm install
-```
-
-### 2. Configure Environment
-
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your credentials
-# Required: DATABASE_URL, SLACK_BOT_TOKEN, SLACK_APP_TOKEN
-# Optional: ALOWARE_API_TOKEN, MONDAY_API_TOKEN, OPENAI_API_KEY
-```
-
-### 3. Start Development Servers
-
-```bash
-# Terminal 1: Start backend
-cd sms-insights
-npm run dev
-
-# Terminal 2: Start frontend
-cd frontend
-npm run dev
-```
-
-Visit http://localhost:5173 for the dashboard.
+For a comprehensive guide to setting up your local development environment, see the **[Onboarding Document](ONBOARDING.md)**.
 
 ## 📁 Project Structure
 
@@ -155,6 +110,7 @@ SlackCLI/
 
 ## 📚 Documentation
 
+- **[Onboarding Guide](ONBOARDING.md)** - Comprehensive setup and development guide.
 - **[Local Development](LOCAL_DEV.md)** - Detailed setup instructions
 - **[Deployment](DEPLOYMENT.md)** - Production deployment guide
 - **[API Reference](API.md)** - API endpoint documentation

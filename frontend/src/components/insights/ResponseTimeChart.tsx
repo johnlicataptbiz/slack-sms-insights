@@ -1,4 +1,4 @@
-import React from 'react';
+
 import type { ResponseTimeBucket } from '../../api/types';
 
 interface Props {

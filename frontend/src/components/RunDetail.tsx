@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSalesMetrics } from '../api/queries';
 import { parseReport } from '../utils/reportParser';
 import { DEFAULT_BUSINESS_TIME_ZONE, resolveRunBusinessDay } from '../utils/runDay';

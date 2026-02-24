@@ -73,7 +73,7 @@ async function main() {
     query += ` AND timestamp > NOW() - INTERVAL '${args.daysBack} days'`;
   }
 
-  query += ` ORDER BY timestamp DESC`;
+  query += ' ORDER BY timestamp DESC';
 
   if (args.limit) {
     params.push(args.limit);
@@ -124,8 +124,8 @@ async function main() {
           `  timestamp:   ${row.timestamp}`,
           `  report_type: ${row.report_type}`,
           `  status:      ${row.status}`,
-          needsReportDate ? `  report_date: ${row.report_date ?? '(null)'} -> ${nextReportDate}` : `  report_date: (no change)`,
-          needsSummary ? `  summary_text: ${JSON.stringify((row.summary_text ?? '').slice(0, 80))} -> ${JSON.stringify(nextSummary.slice(0, 80))}` : `  summary_text: (no change)`,
+          needsReportDate ? `  report_date: ${row.report_date ?? '(null)'} -> ${nextReportDate}` : '  report_date: (no change)',
+          needsSummary ? `  summary_text: ${JSON.stringify((row.summary_text ?? '').slice(0, 80))} -> ${JSON.stringify(nextSummary.slice(0, 80))}` : '  summary_text: (no change)',
         ].join('\n'),
       );
       continue;

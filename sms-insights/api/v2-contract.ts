@@ -544,12 +544,10 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
     messagesSent: row.messagesSent,
     repliesReceived: row.repliesReceived,
     replyRatePct: row.replyRatePct,
-    // Use raw Aloware sequence field from sms_events for attribution.
-    // slackBookedCalls (HubSpot first-conversion fuzzy match) is unreliable for
-    // per-sequence attribution — it misses sequences like "Hiring Guide" entirely.
-    // bookingSignalsSms uses the actual `sequence` column on each outbound SMS event,
-    // which correctly handles multi-day conversations and A/B version testing.
-    canonicalBookedCalls: row.bookingSignalsSms,
+    // Attribution priority:
+    // 1. slackBookedCalls — real Slack booked-calls channel data, attributed to sequences via
+    //    fuzzy match on firstConversion. This is the ground truth for actual bookings.
+    canonicalBookedCalls: row.slackBookedCalls ?? 0,
     canonicalBookedAfterSmsReply: row.slackBookedAfterSmsReply ?? 0,
     canonicalBookedJack: row.slackBookedJack ?? 0,
     canonicalBookedBrandon: row.slackBookedBrandon ?? 0,
@@ -634,3 +632,113 @@ export const toWeeklyManagerSummaryV2 = (summary: WeeklyManagerSummary): WeeklyM
   atRiskFlags: summary.atRiskFlags,
   actionsNextWeek: summary.actionsNextWeek,
 });
+
+// ─── Scoreboard V2 Types ───────────────────────────────────────────────────────────
+
+export type ScoreboardVolumeSplit = {
+  total: number;
+  sequence: number;
+  manual: number;
+  sequencePct: number;
+  manualPct: number;
+};
+
+export type ScoreboardUniqueSplit = {
+  total: number;
+  sequence: number;
+  manual: number;
+};
+
+export type ScoreboardReplySplit = {
+  sequence: { count: number; ratePct: number };
+  manual: { count: number; ratePct: number };
+  overall: { count: number; ratePct: number };
+};
+
+export type ScoreboardBookingSplit = {
+  total: number;
+  jack: number;
+  brandon: number;
+  selfBooked: number;
+  sequenceInitiated: number;
+  manualInitiated: number;
+};
+
+export type ScoreboardSequenceRow = {
+  label: string;
+  leadMagnet: string;
+  version: string;
+  messagesSent: number;
+  uniqueContacted: number;
+  uniqueReplied: number;
+  replyRatePct: number;
+  canonicalBookedCalls: number;
+  bookingRatePct: number;
+  optOuts: number;
+  optOutRatePct: number;
+};
+
+export type ScoreboardLeadMagnetRow = {
+  leadMagnet: string;
+  legacy: {
+    messagesSent: number;
+    uniqueContacted: number;
+    uniqueReplied: number;
+    replyRatePct: number;
+    canonicalBookedCalls: number;
+    bookingRatePct: number;
+  } | null;
+  v2: {
+    messagesSent: number;
+    uniqueContacted: number;
+    uniqueReplied: number;
+    replyRatePct: number;
+    canonicalBookedCalls: number;
+    bookingRatePct: number;
+  } | null;
+};
+
+export type ScoreboardTimingRow = {
+  dayOfWeek: string;
+  outboundCount: number;
+  replyCount: number;
+  replyRatePct: number;
+};
+
+export type ScoreboardV2 = {
+  window: {
+    weekStart: string;
+    weekEnd: string;
+    monthStart: string;
+    monthEnd: string;
+    timeZone: string;
+  };
+  weekly: {
+    volume: ScoreboardVolumeSplit;
+    uniqueLeads: ScoreboardUniqueSplit;
+    replies: ScoreboardReplySplit;
+    bookings: ScoreboardBookingSplit;
+  };
+  monthly: {
+    volume: ScoreboardVolumeSplit;
+    uniqueLeads: ScoreboardUniqueSplit;
+    replies: ScoreboardReplySplit;
+    bookings: ScoreboardBookingSplit;
+  };
+  sequences: ScoreboardSequenceRow[];
+  leadMagnetComparison: ScoreboardLeadMagnetRow[];
+  timing: {
+    medianTimeToFirstReplyMinutes: number | null;
+    replyRateByDayOfWeek: ScoreboardTimingRow[];
+  };
+  compliance: {
+    optOutRateWeeklyPct: number;
+    optOutRateMonthlyPct: number;
+    topOptOutSequences: Array<{ label: string; optOuts: number; optOutRatePct: number }>;
+  };
+  provenance: {
+    attributionModel: 'sequence_initiated_conversation';
+    weeklyBookingTotal: number;
+    monthlyBookingTotal: number;
+  };
+};

@@ -237,6 +237,9 @@ export const getSalesMetricsSummary = async (
   }
 
   const ATTRIBUTION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+  // Window for finding the outbound that triggered a contact's first reply.
+  // Shorter than the booking attribution window — we want the direct trigger, not a distant touch.
+  const REPLY_TRIGGER_WINDOW_MS = 48 * 60 * 60 * 1000;
 
   const eventsByContact = new Map<string, EventRow[]>();
   for (const e of events) {
@@ -499,7 +502,52 @@ export const getSalesMetricsSummary = async (
     trendMap.set(day, point);
   }
 
-  // booking attribution: for each contact, find booking events in range; attribute each booking to latest outbound touch within 14 days
+  // Conversation initiator map: for each contact, find the outbound that triggered their FIRST reply.
+  // This implements the "sequence-initiated conversation" attribution model:
+  // a sequence that triggers a reply gets booking credit even if the setter sends many manual
+  // follow-ups before the lead books (sequence → reply → 30 manual messages → booking = sequence credit).
+  const conversationInitiatorByContact = new Map<string, EventRow>();
+  for (const [contactKey, list] of eventsByContact.entries()) {
+    // Find the first inbound that came after any outbound
+    let firstOutboundTs: number | undefined;
+    let firstInboundAfterOutbound: EventRow | undefined;
+    for (const e of list) {
+      const ts = new Date(e.event_ts).getTime();
+      if (!Number.isFinite(ts)) continue;
+      if (e.direction === 'outbound' && firstOutboundTs === undefined) {
+        firstOutboundTs = ts;
+      }
+      if (e.direction === 'inbound' && firstOutboundTs !== undefined && ts > firstOutboundTs) {
+        firstInboundAfterOutbound = e;
+        break;
+      }
+    }
+    if (!firstInboundAfterOutbound) continue;
+
+    const firstInboundTs = new Date(firstInboundAfterOutbound.event_ts).getTime();
+    // Find the outbound that triggered this first reply (within 48h, prefer sequenced)
+    let latestOutboundBeforeFirstReply: EventRow | undefined;
+    let latestSequencedOutboundBeforeFirstReply: EventRow | undefined;
+    for (const candidate of list) {
+      if (candidate.direction !== 'outbound') continue;
+      const candidateTs = new Date(candidate.event_ts).getTime();
+      if (!Number.isFinite(candidateTs)) continue;
+      if (candidateTs > firstInboundTs) break;
+      if (firstInboundTs - candidateTs > REPLY_TRIGGER_WINDOW_MS) continue;
+      latestOutboundBeforeFirstReply = candidate;
+      if ((candidate.sequence || '').trim().length > 0) {
+        latestSequencedOutboundBeforeFirstReply = candidate;
+      }
+    }
+    const initiator = latestSequencedOutboundBeforeFirstReply || latestOutboundBeforeFirstReply;
+    if (initiator) {
+      conversationInitiatorByContact.set(contactKey, initiator);
+    }
+  }
+
+  // booking attribution: for each contact, find booking events in range; attribute each booking to
+  // the conversation initiator (outbound that triggered first reply). Falls back to last outbound
+  // touch within 14 days for contacts with no prior reply (cold bookings).
   for (const [_contactKey, list] of eventsByContact.entries()) {
     for (const e of list) {
       const body = (e.body || '').trim();
@@ -526,7 +574,10 @@ export const getSalesMetricsSummary = async (
         }
       }
 
-      const attributedTouch = latestSequencedOutbound || latestOutbound;
+      // Use conversation initiator (sequence that triggered first reply) if available.
+      // Fall back to last-touch attribution for contacts with no prior reply.
+      const initiator = conversationInitiatorByContact.get(_contactKey);
+      const attributedTouch = initiator ?? (latestSequencedOutbound || latestOutbound);
       const sequenceLabel = (attributedTouch?.sequence || '').trim() || MANUAL_SEQUENCE_LABEL;
 
       // credit booking to booking day

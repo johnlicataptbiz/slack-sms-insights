@@ -168,6 +168,41 @@ const toIsoDay = (value: string | null): string | null => {
   return parsed.toISOString().slice(0, 10);
 };
 
+const getTodayCT = (): { date: string; hour: number } => {
+  const now = new Date();
+  const ctString = now.toLocaleString('en-US', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+  });
+  const [datePart, timePart] = ctString.split(', ');
+  const [month, day, year] = datePart.split('/');
+  return {
+    date: `${year}-${month}-${day}`,
+    hour: Number.parseInt(timePart, 10),
+  };
+};
+
+const extractDateStampParts = (run: RunV2): { month: string; day: string } => {
+  const reportDay = extractReportDayLabel(run);
+  const isoDay = toIsoDay(reportDay);
+  if (isoDay) {
+    const date = new Date(`${isoDay}T12:00:00.000Z`);
+    return {
+      month: date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }),
+      day: String(date.getUTCDate()),
+    };
+  }
+  const date = new Date(run.timestamp);
+  return {
+    month: date.toLocaleDateString('en-US', { month: 'short' }),
+    day: String(date.getDate()),
+  };
+};
+
 const formatCount = (value: number | null): string => {
   if (value === null) return '—';
   return Math.round(value).toLocaleString();
@@ -294,6 +329,7 @@ export default function RunsV2() {
   const [newViewName, setNewViewName] = useState('');
   const [copied, setCopied] = useState<'current' | string | null>(null);
   const [showSavedViews, setShowSavedViews] = useState(false);
+  const [staleBannerDismissed, setStaleBannerDismissed] = useState(false);
 
   const daysBack = parseRange(searchParams.get('range'));
   const channelId = searchParams.get('channel') || null;
@@ -372,6 +408,18 @@ export default function RunsV2() {
     const avgReplyRate = replyRates.length > 0 ? replyRates.reduce((a, b) => a + b, 0) / replyRates.length : null;
     return { totalRuns, totalMessagesSent, totalBooked, avgReplyRate };
   }, [runsData?.data.items, viewByRunId]);
+
+  const isStale = useMemo(() => {
+    const { date: todayCT, hour: hourCT } = getTodayCT();
+    if (hourCT < 7) return false; // Before 7 AM CT — cron hasn't had time to fire yet
+    const items = runsData?.data.items || [];
+    const hasTodayDailyRun = items.some((run) => {
+      if (run.reportType !== 'daily') return false;
+      const reportDay = toIsoDay(extractReportDayLabel(run));
+      return reportDay === todayCT;
+    });
+    return !hasTodayDailyRun;
+  }, [runsData?.data.items]);
 
   const selectedView = resolveSelectedRunViewModel(selected, viewByRunId);
   const selectedSlackBookedTotal = selectedBookedMetricsQuery.data?.data.totals.canonicalBookedCalls ?? null;
@@ -532,6 +580,24 @@ export default function RunsV2() {
         }
       />
 
+      {isStale && !staleBannerDismissed && (
+        <div className="V2StalenessBanner">
+          <span className="V2StalenessBanner__icon">⚠️</span>
+          <p className="V2StalenessBanner__text">
+            No daily run recorded for today yet.{' '}
+            <span>The 6 AM CT cron may not have fired — check Railway logs or trigger a manual run.</span>
+          </p>
+          <button
+            type="button"
+            className="V2StalenessBanner__dismiss"
+            aria-label="Dismiss"
+            onClick={() => setStaleBannerDismissed(true)}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       <section className="V2MetricsGrid">
         <V2MetricCard
           label="Total Runs"
@@ -570,27 +636,35 @@ export default function RunsV2() {
                     type="button"
                     onClick={() => setSelected(run.id)}
                   >
-                    <div className="V2RunList__head">
-                      <span>
-                        {runView.title}
-                        {index === 0 && <span className="V2RunList__latestBadge">Latest</span>}
-                      </span>
-                      <div className="V2RunList__badges">
-                        <span className={`V2Tag V2Tag--${statusTone(run.status)}`}>{run.status}</span>
-                        <span className="V2Tag V2Tag--accent">{run.reportType}</span>
+                    {(() => {
+                      const stamp = extractDateStampParts(run);
+                      return (
+                        <div className={`V2RunList__dateStamp V2RunList__dateStamp--${run.status}`}>
+                          <span className="V2RunList__dateMonth">{stamp.month}</span>
+                          <span className="V2RunList__dateDay">{stamp.day}</span>
+                        </div>
+                      );
+                    })()}
+                    <div className="V2RunList__body">
+                      <div className="V2RunList__head">
+                        <span>
+                          {runView.title}
+                          {index === 0 && <span className="V2RunList__latestBadge">Latest</span>}
+                        </span>
+                        <div className="V2RunList__badges">
+                          <span className={`V2Tag V2Tag--${statusTone(run.status)}`}>{run.status}</span>
+                          <span className="V2Tag V2Tag--accent">{run.reportType}</span>
+                        </div>
                       </div>
+                      <p className="V2RunList__meta">{channelLabel(run)} | {runDateLabel(run)}</p>
+                      <div className="V2RunList__kpis">
+                        <span>Sent {formatCount(runView.messagesSent)}</span>
+                        <span>Replies {formatCount(runView.repliesReceived)}</span>
+                        <span>Booked Calls {formatCount(runView.booked)}</span>
+                        <span>Opt-outs {formatCount(runView.optOuts)}</span>
+                      </div>
+                      <p className="V2RunList__summary">{runView.summaryPreview || 'No structured summary stored for this run.'}</p>
                     </div>
-                    <p className="V2RunList__meta">
-                      {channelLabel(run)} | {runDateLabel(run)}
-                    </p>
-                    <p className="V2RunList__meta">{runView.subtitle}</p>
-                    <div className="V2RunList__kpis">
-                      <span>Sent {formatCount(runView.messagesSent)}</span>
-                      <span>Replies {formatCount(runView.repliesReceived)}</span>
-                      <span>Booked Calls {formatCount(runView.booked)}</span>
-                      <span>Opt-outs {formatCount(runView.optOuts)}</span>
-                    </div>
-                    <p className="V2RunList__summary">{runView.summaryPreview || 'No structured summary stored for this run.'}</p>
                   </button>
                 );
               })}

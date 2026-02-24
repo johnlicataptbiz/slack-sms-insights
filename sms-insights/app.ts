@@ -156,9 +156,11 @@ app.error(async (error) => {
       mondayTokenLength: safeEnvLen(process.env.MONDAY_API_TOKEN),
     });
 
-    // 🕒 Schedule 6:00 AM Daily Report
-    // const { scheduleDailyReport } = await import('./services/scheduler.js');
-    // await scheduleDailyReport(app);
+    // 🕒 Daily Report Cron — fires at 6:00 AM CT every day via user token
+    if (process.env.SLACK_BOT_TOKEN !== 'xoxb-dummy') {
+      const { startDailyReportCron } = await import('./services/cron-scheduler.js');
+      await startDailyReportCron(app);
+    }
 
     // monday read-sync/writeback maintenance jobs (feature-flag gated).
     // startMondaySyncJobs(app.logger);

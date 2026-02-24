@@ -1,4 +1,4 @@
-# Deployment Guide: Vercel + Railway
+s# Deployment Guide: Vercel + Railway
 
 This project is split across two platforms for optimal scalability:
 - **Vercel**: React frontend dashboard
@@ -36,6 +36,18 @@ railway services
 ```
 
 ### 1.3 Set environment variables
+
+> ⚠️ **Important — use the private database endpoint in production.**
+> Railway exposes two database URLs:
+> - `DATABASE_PRIVATE_URL` — routes over Railway's internal network (no egress fees, faster)
+> - `DATABASE_PUBLIC_URL` — routes through the public TCP proxy (incurs egress fees)
+>
+> Always set `DATABASE_URL` to the **private** URL when the app runs inside Railway:
+> ```bash
+> railway variables --service sms-insights --set \
+>   "DATABASE_URL=postgresql://postgres:<password>@postgres.railway.internal:5432/railway"
+> ```
+> Use `DATABASE_PUBLIC_URL` only when connecting **from outside Railway** (e.g. local scripts).
 
 ```bash
 # Get the DATABASE_URL from Railway
@@ -225,6 +237,16 @@ railway rollback  # Redeploy previous version
 
 **"DATABASE_URL not set"**
 → Verify Railway PostgreSQL is running and variables are synced
+
+**"database does not exist" / doubled URL error**
+→ The `DATABASE_URL` variable may have been set to a concatenated value (two URLs joined).
+Fix it by explicitly setting the private URL:
+```bash
+railway variables --service sms-insights --set \
+  "DATABASE_URL=postgresql://postgres:<password>@postgres.railway.internal:5432/railway"
+railway up --service sms-insights --detach  # fresh deploy picks up new value
+```
+Note: `railway redeploy` reuses the old deployment snapshot — always use `railway up` after changing variables.
 
 **"Unauthorized" on API calls**
 → Check SLACK_CLIENT_ID/SECRET are set on Railway

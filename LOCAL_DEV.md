@@ -37,10 +37,17 @@ echo "postgresql://$(whoami):@localhost:5432/sms_insights"
 cd /Users/jl/Desktop/SlackCLI
 railway link
 
-# Get DATABASE_URL
-railway variables | grep DATABASE_URL
-# Copy the value
+# Get the public URL (needed for connections from outside Railway)
+railway variables --service sms-insights --json | python3 -c \
+  "import json,sys; d=json.load(sys.stdin); print(d.get('DATABASE_PUBLIC_URL',''))"
+# Copy the value — use this as DATABASE_URL in your local .env
 ```
+
+> ⚠️ **Public vs Private URL**
+> - `DATABASE_PRIVATE_URL` (`postgres.railway.internal`) — only reachable **inside** Railway's network. Use this for the production `DATABASE_URL` env var on the Railway service.
+> - `DATABASE_PUBLIC_URL` (`crossover.proxy.rlwy.net`) — reachable from your laptop. Use this in your local `.env` or when running scripts locally.
+>
+> Never hardcode either URL in source files — always read from `process.env.DATABASE_URL`.
 
 Note: if you copy/paste commands from a web page and see `&&` or `<<` in your terminal, those are HTML-escaped operators.
 Replace them with the real shell operators (`&&`, `<<`) or the command will fail in zsh with a parse error.
@@ -66,7 +73,7 @@ cd ..
 ```bash
 cp .env.sample .env
 # Edit .env and fill in:
-# - DATABASE_URL (from above)
+# - DATABASE_URL (from above — use the public Railway URL for local dev)
 # - SLACK_BOT_TOKEN
 # - SLACK_APP_TOKEN
 # - SLACK_CLIENT_ID
@@ -163,8 +170,20 @@ npm install
 
 **"DATABASE_URL not set"**
 - API endpoints will return 503
-- Check your .env file has DATABASE_URL
+- Check your `.env` file has `DATABASE_URL` set to the **public** Railway URL (for local dev)
 - Check database is accessible
+
+**"database does not exist" error on startup**
+- Your `DATABASE_URL` may be a doubled/concatenated value
+- Verify with: `railway variables --service sms-insights --json | python3 -c "import json,sys; print(json.load(sys.stdin).get('DATABASE_URL',''))"`
+- Fix by re-setting it explicitly (see `DEPLOYMENT.md` troubleshooting)
+
+**Running scripts locally (e.g. `investigate-bookings.ts`)**
+- Scripts read `DATABASE_URL` from the environment — pass the public URL:
+  ```bash
+  DATABASE_URL="postgresql://postgres:<password>@crossover.proxy.rlwy.net:56263/railway" \
+    npx tsx scripts/investigate-bookings.ts
+  ```
 
 **Frontend can't reach API**
 - Check VITE_API_URL in .env (should be http://localhost:3000)

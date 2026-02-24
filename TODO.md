@@ -1,18 +1,15 @@
-# TODO: Scoreboard Implementation
+# Fix: Switch Database Connection from Public to Private Endpoint
 
-## Backend
-- [x] 1. Fix attribution model in sales-metrics.ts (conversationInitiatorByContact)
-- [x] 2. Create scoreboard.ts service
-- [x] 3. Add scoreboard route to routes.ts
+## Goal
+Remove hardcoded public Railway TCP proxy URLs from scripts and use `process.env.DATABASE_URL`
+so the production app can be pointed at the private endpoint (no egress fees).
 
-## Frontend Types & API
-- [ ] 4. Add ScoreboardV2 types to v2-contract.ts
-- [ ] 5. Add scoreboard query hook to v2Queries.ts
-- [ ] 6. Add scoreboard guard to v2Guards.ts
+## Steps
 
-## Frontend UI
-- [ ] 7. Add Volume & Reply Split panel to SequencesV2.tsx
-- [ ] 8. Add Booking Attribution panel to SequencesV2.tsx
-- [ ] 9. Add Lead Magnet Comparison panel to SequencesV2.tsx
-- [ ] 10. Add CSS for new panels to v2.css
-
+- [x] Audit codebase for hardcoded public URLs and `DATABASE_URL` usage
+- [x] Update `sms-insights/scripts/clear-bad-backfill.ts` — replace hardcoded `DATABASE_PUBLIC_URL` with `process.env.DATABASE_URL`
+- [x] Update `sms-insights/scripts/investigate-bookings.ts` — replace hardcoded `DATABASE_PUBLIC_URL` with `process.env.DATABASE_URL`
+- [x] Update `sms-insights/scripts/cleanup-booked-calls-dupes.ts` — replace hardcoded `DATABASE_PUBLIC_URL` with `process.env.DATABASE_URL`
+- [x] Rebuild: `cd sms-insights && npm run build`
+- [x] Fix `DATABASE_URL` Railway variable via CLI — set to private endpoint `postgres.railway.internal:5432`
+- [x] Deploy via `railway up` from repo root — new deployment confirmed: ✅ Database connection pool initialized

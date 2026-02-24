@@ -170,6 +170,47 @@ npx tsc --noEmit  # ✅ No TypeScript errors
 
 ---
 
+## 6. Database Private Endpoint (Egress Fee Fix)
+
+### Problem
+Three scripts hardcoded the Railway public TCP proxy URL directly in source:
+```typescript
+// Before — hardcoded public URL in scripts (incurs Railway egress fees)
+const DATABASE_PUBLIC_URL = "postgresql://postgres:...@crossover.proxy.rlwy.net:56263/railway";
+const pool = new Pool({ connectionString: DATABASE_PUBLIC_URL });
+```
+
+Additionally, the `DATABASE_URL` Railway environment variable had a doubled/concatenated value (two URLs joined with no separator), causing `pg` to fail with:
+```
+FATAL: database "railwaypostgresql://postgres:...@p" does not exist
+```
+
+### Fix
+
+**Scripts updated** — replaced hardcoded constant with `process.env.DATABASE_URL`:
+- `scripts/clear-bad-backfill.ts`
+- `scripts/investigate-bookings.ts`
+- `scripts/cleanup-booked-calls-dupes.ts`
+
+```typescript
+// After — reads from environment, same pattern as cleanup-daily-runs.ts
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) throw new Error('DATABASE_URL environment variable is required');
+const pool = new Pool({ connectionString: databaseUrl });
+```
+
+**Railway variable fixed** — `DATABASE_URL` set to the private endpoint:
+```
+postgresql://postgres:...@postgres.railway.internal:5432/railway
+```
+
+### Result
+- Production app connects via Railway's private network → zero egress fees
+- Scripts run locally by passing `DATABASE_URL=<public_url>` in the shell
+- No credentials or URLs hardcoded in source
+
+---
+
 ## Summary
 
 The codebase now has:
@@ -178,5 +219,6 @@ The codebase now has:
 - ✅ Optimized React Query caching
 - ✅ Response compression
 - ✅ Full TypeScript strict mode compliance
+- ✅ Database connecting via private Railway network (no egress fees)
 
 All improvements are backward-compatible and production-ready.

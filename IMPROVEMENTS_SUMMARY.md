@@ -25,7 +25,19 @@ This document summarizes the comprehensive improvements made to the PT Biz SMS I
 - **Contributing Guide**: Conventional commits, code review process, testing strategy
 - **Environment Template**: 50+ variables with descriptions and examples
 
-### 2. Code Quality Improvements (Phase 2 Started)
+### 2. Database Private Endpoint Fix (Production Fix)
+
+**Problem:** Three scripts hardcoded the Railway public TCP proxy URL (`crossover.proxy.rlwy.net`) directly in source, always routing through the public endpoint and incurring egress fees. The production `DATABASE_URL` variable also had a doubled/concatenated value causing `pg` to fail with `FATAL: database "railwaypostgresql://..." does not exist`.
+
+**Fix:**
+- Removed hardcoded `DATABASE_PUBLIC_URL` constant from `scripts/clear-bad-backfill.ts`, `scripts/investigate-bookings.ts`, `scripts/cleanup-booked-calls-dupes.ts`
+- All scripts now use `process.env.DATABASE_URL` (consistent with `cleanup-daily-runs.ts`)
+- `DATABASE_URL` Railway variable corrected to the private endpoint: `postgres.railway.internal:5432`
+- Deployed via `railway up` (not `railway redeploy` — redeploy reuses old variable snapshot)
+
+**Result:** Production app connects via Railway's private network (zero egress fees). Local scripts pass the public URL via shell environment.
+
+### 3. Code Quality Improvements (Phase 2 Started)
 
 #### New Backend Services:
 

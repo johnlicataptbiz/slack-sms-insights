@@ -141,6 +141,7 @@ export default function InboxV2() {
   const [justSentMessage, setJustSentMessage] = useState<{text: string; timestamp: string; confirmed?: boolean} | null>(null);
   const [hoveredConversation, setHoveredConversation] = useState<string | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const chatThreadRef = useRef<HTMLDivElement | null>(null);
 
   const [qualificationState, setQualificationState] = useState<QualificationStateV2>({
     fullOrPartTime: 'unknown',
@@ -271,6 +272,12 @@ export default function InboxV2() {
     if (!isComposerModalOpen || !selectedConversationId || !detail) return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
   }, [isComposerModalOpen, selectedConversationId, detail?.conversation.id]);
+
+  // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
+  useEffect(() => {
+    if (!chatThreadRef.current) return;
+    chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
+  }, [detail?.messages, justSentMessage]);
 
   useEffect(() => {
     if (!isComposerModalOpen) return;
@@ -799,7 +806,7 @@ export default function InboxV2() {
                 <div className="V2Inbox__composerGrid">
                   <div className="V2Inbox__composerPrimary">
                   {/* Conversation Thread - Chat Style */}
-                  <div className="V2Inbox__chatThread">
+                  <div className="V2Inbox__chatThread" ref={chatThreadRef}>
 {detail.messages.map((message) => {
                       const leadLabel = detail.contactCard.name || detail.contactCard.phone || 'Lead';
                       // For outbound messages: prefer inferring from message body (e.g., "Jack with PT Biz")

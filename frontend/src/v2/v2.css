@@ -2623,6 +2623,8 @@
 .V2Inbox__composerModalBody {
   padding: 1rem 1.2rem 1.15rem;
   overflow: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .V2Inbox__composerGrid {
@@ -2750,10 +2752,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  max-height: 380px;
+  max-height: 480px;
   overflow-y: auto;
   padding: 0.5rem 0.25rem;
   margin-bottom: 0.75rem;
+  scroll-behavior: smooth;
 }
 
 .V2Inbox__chatMessage {

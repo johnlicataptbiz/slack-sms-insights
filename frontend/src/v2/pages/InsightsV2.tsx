@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 
-import type { SalesMetricsV2, WeeklyManagerSummaryV2 } from '../../api/v2-types';
+import type { SalesMetricsV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2SetterTrend, useV2WeeklySummary } from '../../api/v2Queries';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend } from '../components/V2Primitives';
 
 const BUSINESS_TZ = 'America/Chicago';
 type InsightsRange = 'today' | '7d' | '30d';

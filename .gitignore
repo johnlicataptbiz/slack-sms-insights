@@ -16,3 +16,4 @@ frontend/node_modules/
 .playwright-cli/
 output/
 .cocoindex_code/
+*.cpuprofile.txt

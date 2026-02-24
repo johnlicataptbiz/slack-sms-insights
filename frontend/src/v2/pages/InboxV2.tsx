@@ -11,8 +11,7 @@ import {
   useV2UpdateQualification,
 } from '../../api/v2Queries';
 import type { QualificationStateV2 } from '../../api/v2-types';
-import { v2Copy } from '../copy';
-import { V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
+import { V2State } from '../components/V2Primitives';
 
 const fmtDateTime = (value: string | null) => {
   if (!value) return 'n/a';
@@ -43,21 +42,6 @@ const shorten = (value: string | null, max = 100): string => {
   return `${value.slice(0, max)}...`;
 };
 
-const qualificationLabel = (value: string) => {
-  if (value === 'full_time') return 'Full time';
-  if (value === 'part_time') return 'Part time';
-  if (value === 'mostly_cash') return 'Mostly cash';
-  if (value === 'mostly_insurance') return 'Mostly insurance';
-  if (value === 'balanced') return 'Balanced';
-  if (value === 'high') return 'High';
-  if (value === 'medium') return 'Medium';
-  if (value === 'low') return 'Low';
-  if (value === 'podcast_sent') return 'Podcast sent';
-  if (value === 'call_offered') return 'Call offered';
-  if (value === 'nurture_pool') return 'Nurture pool';
-  if (value === 'idle') return 'Idle';
-  return 'Unknown';
-};
 
 const formatSendLineLabel = (params: {
   label?: string | null;
@@ -767,7 +751,7 @@ export default function InboxV2() {
       {isComposerModalOpen ? (
         <div className="V2Inbox__composerBackdrop" onClick={() => setIsComposerModalOpen(false)}>
           <section
-            className="V2Inbox__composerModal V2Inbox__composerModal--chat"
+            className="V2Inbox__composerModal"
             role="dialog"
             aria-modal="true"
             aria-label="Conversation and SMS composer"
@@ -786,9 +770,20 @@ export default function InboxV2() {
                   <h3>Conversation</h3>
                 )}
               </div>
-              <button type="button" className="V2Inbox__composerClose" onClick={() => setIsComposerModalOpen(false)}>
-                ✕
-              </button>
+              <div className="V2Inbox__composerHeaderActions">
+                <button
+                  type="button"
+                  className="V2Inbox__button V2Inbox__button--small"
+                  onClick={() => void detailQuery.refetch()}
+                  disabled={detailQuery.isFetching}
+                  title="Refresh conversation from database"
+                >
+                  {detailQuery.isFetching ? '↻ Syncing…' : '↻ Refresh'}
+                </button>
+                <button type="button" className="V2Inbox__composerClose" onClick={() => setIsComposerModalOpen(false)}>
+                  ✕
+                </button>
+              </div>
             </header>
 
             <div className="V2Inbox__composerModalBody">
@@ -801,7 +796,8 @@ export default function InboxV2() {
                   Failed to load conversation: {String((detailQuery.error as Error)?.message || detailQuery.error)}
                 </V2State>
               ) : (
-                <>
+                <div className="V2Inbox__composerGrid">
+                  <div className="V2Inbox__composerPrimary">
                   {/* Conversation Thread - Chat Style */}
                   <div className="V2Inbox__chatThread">
 {detail.messages.map((message) => {
@@ -950,7 +946,167 @@ export default function InboxV2() {
                       </div>
                     </div>
                   </div>
-                </>
+                  </div>
+
+                  {/* Sidebar: Qualification, Escalation, Send Line */}
+                  <div className="V2Inbox__composerSidebar V2Inbox__sideColumn">
+
+                    {/* Qualification Panel */}
+                    <div className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${qualificationTone}`}>
+                      <p className="V2Panel__title">Qualification</p>
+                      <div className="V2Inbox__stateTop">
+                        <span className="V2Inbox__stateBadge">{qualificationProgressLive}/4 fields</span>
+                        <span className="V2Inbox__stateHint">{qualificationProgressPct}% complete</span>
+                      </div>
+                      <div className="V2Inbox__stateMeter">
+                        <span style={{ width: `${qualificationProgressPct}%` }} />
+                      </div>
+                      <div className="V2Inbox__pillRow">
+                        {qualificationFields.map((field) => (
+                          <span key={field.key} className={`V2Inbox__pill ${field.complete ? 'is-complete' : ''}`}>
+                            {field.label}
+                          </span>
+                        ))}
+                      </div>
+                      <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.75rem' }}>
+                        <label className="V2Control">
+                          <span>Full or Part Time</span>
+                          <select
+                            value={qualificationState.fullOrPartTime}
+                            onChange={(e) => setQualificationState((prev) => ({ ...prev, fullOrPartTime: e.target.value as QualificationStateV2['fullOrPartTime'] }))}
+                          >
+                            <option value="unknown">Unknown</option>
+                            <option value="full_time">Full Time</option>
+                            <option value="part_time">Part Time</option>
+                          </select>
+                        </label>
+                        <label className="V2Control">
+                          <span>Niche</span>
+                          <input
+                            type="text"
+                            value={qualificationState.niche || ''}
+                            onChange={(e) => setQualificationState((prev) => ({ ...prev, niche: e.target.value }))}
+                            placeholder="e.g. Sports performance"
+                          />
+                        </label>
+                        <label className="V2Control">
+                          <span>Revenue Mix</span>
+                          <select
+                            value={qualificationState.revenueMix}
+                            onChange={(e) => setQualificationState((prev) => ({ ...prev, revenueMix: e.target.value as QualificationStateV2['revenueMix'] }))}
+                          >
+                            <option value="unknown">Unknown</option>
+                            <option value="mostly_cash">Mostly Cash</option>
+                            <option value="mostly_insurance">Mostly Insurance</option>
+                            <option value="balanced">Balanced</option>
+                          </select>
+                        </label>
+                        <label className="V2Control">
+                          <span>Coaching Interest</span>
+                          <select
+                            value={qualificationState.coachingInterest}
+                            onChange={(e) => setQualificationState((prev) => ({ ...prev, coachingInterest: e.target.value as QualificationStateV2['coachingInterest'] }))}
+                          >
+                            <option value="unknown">Unknown</option>
+                            <option value="high">High</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                          </select>
+                        </label>
+                        <button
+                          type="button"
+                          className="V2Inbox__stateAction V2Inbox__stateAction--primary"
+                          onClick={onSaveQualification}
+                          disabled={qualificationMutation.isPending}
+                        >
+                          {qualificationMutation.isPending ? 'Saving…' : 'Save Qualification'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Escalation Panel */}
+                    <div className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${escalationTone}`}>
+                      <p className="V2Panel__title">Escalation</p>
+                      <div className="V2Inbox__stateTop">
+                        <span className="V2Inbox__stateBadge">L{escalationLevel} · {escalationLevelSubtitle(escalationLevel)}</span>
+                        <span className="V2Inbox__stateHint">{escalationProgressPct}%</span>
+                      </div>
+                      <div className="V2Inbox__stateMeter">
+                        <span style={{ width: `${escalationProgressPct}%` }} />
+                      </div>
+                      <div className="V2Inbox__levelRail">
+                        {([1, 2, 3, 4] as const).map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            className={`V2Inbox__levelChip ${escalationLevel === level ? 'is-active' : ''}`}
+                            onClick={() => setEscalationLevel(level)}
+                          >
+                            L{level}
+                          </button>
+                        ))}
+                      </div>
+                      <label className="V2Control" style={{ marginTop: '0.5rem' }}>
+                        <span>Reason / Note</span>
+                        <textarea
+                          value={escalationReason}
+                          onChange={(e) => setEscalationReason(e.target.value)}
+                          rows={2}
+                          placeholder="Optional override reason…"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="V2Inbox__stateAction V2Inbox__stateAction--primary"
+                        style={{ marginTop: '0.5rem' }}
+                        onClick={onOverrideEscalation}
+                        disabled={escalationMutation.isPending}
+                      >
+                        {escalationMutation.isPending ? 'Saving…' : 'Save Escalation'}
+                      </button>
+                    </div>
+
+                    {/* Send Line Panel */}
+                    {lineOptions.length > 0 && (
+                      <div className="V2Panel V2Inbox__sidePanel">
+                        <p className="V2Panel__title">Send Line</p>
+                        <p className="V2Panel__caption" style={{ fontSize: '0.78rem', marginBottom: '0.5rem' }}>
+                          Default: {savedDefaultSummary}
+                        </p>
+                        <label className="V2Control">
+                          <span>Active Line</span>
+                          <select value={selectedLineKey} onChange={(e) => setSelectedLineKey(e.target.value)}>
+                            <option value="">Select a line…</option>
+                            {lineOptions.map((option) => (
+                              <option key={option.key} value={option.key}>
+                                {formatSendLineLabel(option)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="V2Inbox__button V2Inbox__button--primary V2Inbox__button--small"
+                            onClick={onSaveDefaultLine}
+                            disabled={setDefaultLineMutation.isPending || !selectedLineOption}
+                          >
+                            Save as Default
+                          </button>
+                          <button
+                            type="button"
+                            className="V2Inbox__button V2Inbox__button--small"
+                            onClick={onClearDefaultLine}
+                            disabled={setDefaultLineMutation.isPending}
+                          >
+                            Clear Default
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                </div>
               )}
             </div>
           </section>

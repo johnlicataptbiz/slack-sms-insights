@@ -203,7 +203,7 @@ export default function SequencesV2() {
     manualCalls,
     namedSequenceCalls,
     totalCalls,
-    totalBookedNonSmsOrUnknown,
+    // totalBookedNonSmsOrUnknown is computed but not yet displayed in the UI
   } = computeSequenceHeaderMetrics(payload, payload.sequences);
 
   const toggleReviewed = (sequenceLabel: string) => {

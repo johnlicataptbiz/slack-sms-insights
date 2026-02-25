@@ -313,6 +313,9 @@ export type InboxConversationV2 = {
   };
   qualification: QualificationStateV2;
   escalation: EscalationStateV2;
+  objectionTags: string[];
+  callOutcome: string | null;
+  guardrailOverrideCount: number;
 };
 
 export type InboxConversationDetailV2 = {

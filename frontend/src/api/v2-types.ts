@@ -260,6 +260,9 @@ export type InboxConversationV2 = {
   };
   qualification: QualificationStateV2;
   escalation: EscalationStateV2;
+  objectionTags: string[];
+  callOutcome: CallOutcomeV2 | null;
+  guardrailOverrideCount: number;
 };
 
 export type InboxConversationListV2 = {

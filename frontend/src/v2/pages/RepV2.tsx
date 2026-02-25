@@ -173,6 +173,12 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           value={fmtInt(metrics.hints)}
           meta={deltas ? `${fmtDeltaInt(deltas.hints)} vs prior day` : 'No prior-day baseline yet'}
         />
+        <V2MetricCard
+          label="Booking Rate"
+          value={metrics.outbound > 0 ? `${((metrics.booked / metrics.outbound) * 100).toFixed(1)}%` : 'n/a'}
+          meta={`${fmtInt(metrics.booked)} booked / ${fmtInt(metrics.outbound)} outbound`}
+          tone={metrics.outbound > 0 && (metrics.booked / metrics.outbound) * 100 >= 5 ? 'positive' : 'default'}
+        />
       </section>
 
       <div className="V2Grid V2Grid--2">

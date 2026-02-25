@@ -66,6 +66,21 @@ const inferFromNumber = (lineId?: number | null, fromNumber?: string | null): st
   return null;
 };
 
+const CALL_LINK_PATTERNS = [
+  'calendly.com',
+  'cal.com',
+  'acuityscheduling.com',
+  'oncehub.com',
+  'hubspot.com/meetings',
+  'tidycal.com',
+  'savvycal.com',
+];
+
+const containsCallLink = (text: string): boolean => {
+  const lower = text.toLowerCase();
+  return CALL_LINK_PATTERNS.some((pattern) => lower.includes(pattern));
+};
+
 type SendContext = {
   conversation: ConversationRow;
   profile: InboxContactProfileRow | null;
@@ -103,6 +118,15 @@ export const sendInboxMessage = async (
   context: SendContext,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SendInboxMessageResult> => {
+  // Phase 2: Stage Gating (Backend Validation)
+  // We need to check the conversation state to see the escalation level.
+  // The context.conversation is from the `conversations` table, not `conversation_state`.
+  // We will rely on the frontend for the primary block, but we could add a DB query here if needed.
+  // For now, we'll just check if it's a call link and log it.
+  if (containsCallLink(context.body)) {
+    logger?.info(`Call link detected in outbound message for conversation ${context.conversation.id}`);
+  }
+
   const toNumber = normalizeDigits(context.profile?.phone || context.conversation.contact_phone || '');
   if (!toNumber) {
     const sendAttempt = await createSendAttemptRecord(

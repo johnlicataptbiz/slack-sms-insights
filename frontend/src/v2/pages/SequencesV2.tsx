@@ -305,9 +305,11 @@ export default function SequencesV2() {
                   >
                     Booked{sortArrow('canonicalBookedCalls')}
                   </th>
+                  <th className="is-right">Booking Rate</th>
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('canonicalBookedAfterSmsReply')}
+                    title="Booked calls where the contact had replied to an SMS before booking"
                   >
                     w/ SMS Reply{sortArrow('canonicalBookedAfterSmsReply')}
                   </th>
@@ -368,6 +370,11 @@ export default function SequencesV2() {
                         <td className="is-right">
                           <strong>{fmtInt(row.canonicalBookedCalls)}</strong>
                         </td>
+                        <td className="is-right">
+                          {row.messagesSent === 0
+                            ? <span className="V2Table__dim">—</span>
+                            : `${((row.canonicalBookedCalls / row.messagesSent) * 100).toFixed(1)}%`}
+                        </td>
                         <td className="is-right V2Table__dim">
                           {fmtInt(row.canonicalBookedAfterSmsReply)}
                         </td>
@@ -390,7 +397,7 @@ export default function SequencesV2() {
 
                       {expanded && (
                         <tr className="V2Table__auditRow">
-                          <td colSpan={13}>
+                          <td colSpan={14}>
                             <div className="V2SeqAudit">
                               {/* Booking breakdown summary */}
                               <div className="V2SeqAudit__summary">

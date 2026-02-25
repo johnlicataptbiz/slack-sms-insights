@@ -195,6 +195,16 @@ export function InsightsV2() {
           meta="From website & ads"
           tone="accent"
         />
+        <V2MetricCard
+          label="Booking Rate"
+          value={
+            payload.totals.peopleContacted > 0
+              ? `${((payload.totals.canonicalBookedCalls / payload.totals.peopleContacted) * 100).toFixed(1)}%`
+              : 'n/a'
+          }
+          meta={`${fmtInt(payload.totals.canonicalBookedCalls)} booked / ${fmtInt(payload.totals.peopleContacted)} contacted`}
+          tone={payload.totals.peopleContacted > 0 && (payload.totals.canonicalBookedCalls / payload.totals.peopleContacted) * 100 >= 5 ? 'positive' : 'default'}
+        />
       </div>
 
       <div className="V2Grid V2Grid--2-1">
@@ -252,7 +262,7 @@ export function InsightsV2() {
             <div className="V2WeeklySummary__meta">
               <span>Source: {payload.provenance.canonicalBookedSource}</span>
               <span>Synced: {fmtDateTime(weekly?.sources?.monday?.lastSyncAt ?? null)}</span>
-              <span>Window: {payload.timeRange.from} → {payload.timeRange.to}</span>
+              <span>Window: {new Date(payload.timeRange.from).toLocaleDateString()} → {new Date(payload.timeRange.to).toLocaleDateString()}</span>
             </div>
 
             <div className="V2WeeklySummary__extras">
@@ -342,16 +352,27 @@ export function InsightsV2() {
 
         <V2Panel title="Daily Stats" caption={`Your numbers by day.`}>
           <div style={{ display: 'grid', gap: '0.5rem' }}>
-            {payload.trendByDay.map((day) => (
-              <V2MiniTrend
-                key={day.day}
-                day={day.day}
-                sent={day.messagesSent}
-                replyRate={day.replyRatePct}
-                booked={day.canonicalBookedCalls}
-                optOuts={day.optOuts}
-              />
-            ))}
+            {payload.trendByDay.map((day) => {
+              // Format ISO date (2026-02-19) → human-readable (Feb 19)
+              const m = day.day.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+              const dayLabel = m
+                ? new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]))).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    timeZone: 'UTC',
+                  })
+                : day.day;
+              return (
+                <V2MiniTrend
+                  key={day.day}
+                  day={dayLabel}
+                  sent={day.messagesSent}
+                  replyRate={day.replyRatePct}
+                  booked={day.canonicalBookedCalls}
+                  optOuts={day.optOuts}
+                />
+              );
+            })}
           </div>
         </V2Panel>
       </div>

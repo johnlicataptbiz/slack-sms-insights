@@ -1633,6 +1633,9 @@ const toInboxConversationV2 = (row: {
   state_cadence_status: 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool' | null;
   state_next_followup_due_at: string | null;
   state_last_podcast_sent_at: string | null;
+  state_objection_tags?: string[] | null;
+  state_call_outcome?: string | null;
+  state_guardrail_override_count?: number | null;
 }) => {
   const ownerFromRep = repDisplayName(row.current_rep_id);
   const ownerFromUser = inferOwnerLabelFromHint(row.latest_outbound_user);
@@ -1685,6 +1688,9 @@ const toInboxConversationV2 = (row: {
       nextFollowupDueAt: row.state_next_followup_due_at || null,
       lastPodcastSentAt: row.state_last_podcast_sent_at || null,
     },
+    objectionTags: row.state_objection_tags || [],
+    callOutcome: row.state_call_outcome || null,
+    guardrailOverrideCount: row.state_guardrail_override_count || 0,
   };
 };
 
@@ -2229,6 +2235,9 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
     state_last_podcast_sent_at: ensuredState.last_podcast_sent_at,
     state_cadence_status: ensuredState.cadence_status,
     state_next_followup_due_at: ensuredState.next_followup_due_at,
+    state_objection_tags: ensuredState.objection_tags ?? conversation.state_objection_tags ?? [],
+    state_call_outcome: ensuredState.call_outcome ?? conversation.state_call_outcome ?? null,
+    state_guardrail_override_count: ensuredState.guardrail_override_count ?? conversation.state_guardrail_override_count ?? 0,
   };
 
   const payload = {

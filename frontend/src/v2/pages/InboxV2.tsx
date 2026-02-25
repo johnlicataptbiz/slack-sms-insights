@@ -56,6 +56,36 @@ const shorten = (value: string | null, max = 100): string => {
   return `${value.slice(0, max)}...`;
 };
 
+// ---------------------------------------------------------------------------
+// Link Detection
+// ---------------------------------------------------------------------------
+const CALL_LINK_PATTERNS = [
+  'calendly.com',
+  'cal.com',
+  'acuityscheduling.com',
+  'oncehub.com',
+  'hubspot.com/meetings',
+  'tidycal.com',
+  'savvycal.com',
+];
+
+const PODCAST_LINK_PATTERNS = [
+  'ptbizinsider.com',
+  'spotify.com',
+  'podcasts.apple.com',
+  'anchor.fm',
+  'buzzsprout.com',
+];
+
+const containsCallLink = (text: string): boolean => {
+  const lower = text.toLowerCase();
+  return CALL_LINK_PATTERNS.some((pattern) => lower.includes(pattern));
+};
+
+const containsPodcastLink = (text: string): boolean => {
+  const lower = text.toLowerCase();
+  return PODCAST_LINK_PATTERNS.some((pattern) => lower.includes(pattern));
+};
 
 // ---------------------------------------------------------------------------
 // SMS segment counter
@@ -217,6 +247,13 @@ export default function InboxV2() {
   const [localObjectionTags, setLocalObjectionTags] = useState<string[]>([]);
   const [localCallOutcome, setLocalCallOutcome] = useState<CallOutcomeV2 | null>(null);
 
+  // Phase 2 Guardrail Modal state
+  const [isGuardrailModalOpen, setIsGuardrailModalOpen] = useState(false);
+  const [guardrailChecks, setGuardrailChecks] = useState<Record<string, boolean>>({});
+  const [pendingMessageText, setPendingMessageText] = useState<string | null>(null);
+  // Double Pitch Protection banner
+  const [showDoublePitchWarning, setShowDoublePitchWarning] = useState(false);
+
   const qualificationProgressLive = computeQualificationProgress(qualificationState);
   const qualificationTone = qualificationToneForProgress(qualificationProgressLive);
   const qualificationProgressPct = Math.round((qualificationProgressLive / 4) * 100);
@@ -336,8 +373,8 @@ export default function InboxV2() {
     setEscalationLevel(detail.conversation.escalation.level);
     setEscalationReason(detail.conversation.escalation.reason || '');
     setAssignLabel(detail.conversation.ownerLabel || '');
-    setLocalObjectionTags(((detail.conversation as any).objectionTags as string[]) ?? []);
-    setLocalCallOutcome(((detail.conversation as any).callOutcome as CallOutcomeV2 | null) ?? null);
+    setLocalObjectionTags(detail.conversation.objectionTags ?? []);
+    setLocalCallOutcome(detail.conversation.callOutcome ?? null);
   }, [detail]);
 
   useEffect(() => {
@@ -345,6 +382,7 @@ export default function InboxV2() {
     // Clear the optimistic sent-message bubble so it doesn't bleed into the
     // next conversation's thread when the user switches contacts.
     setJustSentMessage(null);
+    setShowDoublePitchWarning(false);
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -419,11 +457,52 @@ export default function InboxV2() {
       return;
     }
 
+    const messageText = composerText.trim();
+
+    // Phase 2: Stage Gating
+    if (containsCallLink(messageText) && escalationLevel <= 1) {
+      setFlashMessage('Stage Gating: Select escalation stage (L2+) before offering a call link.');
+      return;
+    }
+
+    // Phase 2: Double Pitch Protection — detect prior outbound call link with no inbound reply since
+    if (containsCallLink(messageText) && detail?.messages) {
+      const msgs = detail.messages;
+      // Find the last outbound call link index
+      let lastCallLinkOutboundIdx = -1;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].direction === 'outbound' && msgs[i].body && containsCallLink(msgs[i].body!)) {
+          lastCallLinkOutboundIdx = i;
+          break;
+        }
+      }
+      if (lastCallLinkOutboundIdx !== -1) {
+        // Check if there's any inbound reply AFTER that outbound call link
+        const hasReplyAfter = msgs.slice(lastCallLinkOutboundIdx + 1).some(m => m.direction === 'inbound');
+        if (!hasReplyAfter) {
+          // Show the banner and block send — user must dismiss or it stays visible
+          setShowDoublePitchWarning(true);
+          return;
+        }
+      }
+    }
+
+    // Phase 2: Guardrail Checklist (L3/L4)
+    if (containsCallLink(messageText) && escalationLevel >= 3) {
+      setPendingMessageText(messageText);
+      setIsGuardrailModalOpen(true);
+      return;
+    }
+
+    await executeSend(messageText);
+  };
+
+  const executeSend = async (messageText: string) => {
+    if (!selectedConversationId) return;
+
     setFlashMessage(null);
     setSendStatus('sending');
-    
-    const messageText = composerText.trim();
-    
+
     try {
       const sendFromNumber = selectedLineOption?.lineId == null ? selectedLineOption?.fromNumber || null : null;
       const result = await sendMutation.mutateAsync({
@@ -443,6 +522,19 @@ export default function InboxV2() {
         setComposerText('');
         setSelectedDraftId(null);
         
+        // Phase 2: Auto-Snooze
+        if (containsPodcastLink(messageText)) {
+          const snoozeUntil = new Date();
+          snoozeUntil.setHours(snoozeUntil.getHours() + 72); // 72 hours
+          await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: snoozeUntil.toISOString() });
+          setFlashMessage('Podcast sent. Auto-snoozed for 72 hours.');
+        } else if (containsCallLink(messageText)) {
+          const snoozeUntil = new Date();
+          snoozeUntil.setHours(snoozeUntil.getHours() + 96); // 96 hours (4 days)
+          await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: snoozeUntil.toISOString() });
+          setFlashMessage('Call link sent. Auto-snoozed for 4 days.');
+        }
+
         setTimeout(() => {
           setSendStatus('idle');
         }, 2000);
@@ -631,7 +723,7 @@ export default function InboxV2() {
   const onInsertTemplate = (body: string) => {
     const name = detail?.contactCard.name || '';
     const filled = body.replace(/\{\{name\}\}/gi, name);
-    setComposerText((prev) => (prev ? `${prev}\n${filled}` : filled));
+    setComposerText(filled);
     setShowTemplates(false);
   };
 
@@ -661,6 +753,43 @@ export default function InboxV2() {
     if (score >= 80) return '#13b981';
     if (score >= 60) return '#f59d0d';
     return '#ef4c62';
+  };
+
+  const GUARDRAIL_SIGNALS = [
+    { id: 'timeline', label: 'Timeline — Has a clear start date in mind' },
+    { id: 'cash', label: 'Cash Intent — Expressed desire to go cash-pay' },
+    { id: 'revenue', label: 'Revenue Ambition — Mentioned revenue goal or frustration with current income' },
+    { id: 'frustration', label: 'Frustration — Expressed frustration with current situation' },
+    { id: 'complexity', label: 'Complexity — Has a complex case (multiple staff, insurance transition)' },
+    { id: 'engagement', label: 'Engagement — Replied 3+ times in this thread' },
+    { id: 'howto', label: 'How-To Question — Asked a how-to or implementation question' },
+  ];
+
+  const checkedGuardrailsCount = Object.values(guardrailChecks).filter(Boolean).length;
+  const canPassGuardrails = checkedGuardrailsCount >= 2;
+
+  const canOverrideGuardrails = checkedGuardrailsCount >= 1;
+
+  const onConfirmGuardrails = async () => {
+    if (!selectedConversationId || !pendingMessageText) return;
+    
+    if (!canPassGuardrails) {
+      if (!canOverrideGuardrails) {
+        setFlashMessage('Guardrail insufficient. Check at least 1 signal to override.');
+        return;
+      }
+      // Log override
+      try {
+        await incrementGuardrailOverrideMutation.mutateAsync(selectedConversationId);
+      } catch (error) {
+        console.error('Failed to log override', error);
+      }
+    }
+
+    setIsGuardrailModalOpen(false);
+    setGuardrailChecks({});
+    await executeSend(pendingMessageText);
+    setPendingMessageText(null);
   };
 
   return (
@@ -1032,6 +1161,72 @@ export default function InboxV2() {
         </div>
       </section>
 
+      {/* Guardrail Checklist Modal */}
+      {isGuardrailModalOpen && (
+        <div className="V2Inbox__composerBackdrop" style={{ zIndex: 1000 }}>
+          <div className="V2Panel" style={{ width: '400px', margin: '10vh auto', background: 'var(--v2-surface)', padding: '1.5rem' }}>
+            <h3 style={{ marginBottom: '1rem' }}>Guardrail Checklist</h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--v2-muted)', marginBottom: '1rem' }}>
+              You are offering a call link at L{escalationLevel}. Please confirm at least 2 buying signals are present.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
+              {GUARDRAIL_SIGNALS.map((signal) => (
+                <label key={signal.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={guardrailChecks[signal.id] || false}
+                    onChange={(e) => setGuardrailChecks(prev => ({ ...prev, [signal.id]: e.target.checked }))}
+                  />
+                  {signal.label}
+                </label>
+              ))}
+            </div>
+
+            {!canPassGuardrails && (
+              <div style={{ marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(239, 76, 98, 0.1)', borderRadius: '4px', border: '1px solid var(--v2-critical)' }}>
+                <p style={{ fontSize: '0.8rem', color: 'var(--v2-critical)' }}>
+                  ⚠ Guardrail insufficient. Podcast-first escalation recommended.
+                </p>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="V2Inbox__button"
+                onClick={() => {
+                  setIsGuardrailModalOpen(false);
+                  setPendingMessageText(null);
+                  setGuardrailChecks({});
+                }}
+              >
+                Cancel
+              </button>
+              {canPassGuardrails ? (
+                <button
+                  type="button"
+                  className="V2Inbox__button V2Inbox__button--primary"
+                  onClick={onConfirmGuardrails}
+                >
+                  Send Anyway
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="V2Inbox__button V2Inbox__button--primary"
+                  onClick={onConfirmGuardrails}
+                  disabled={!canOverrideGuardrails}
+                  title={!canOverrideGuardrails ? 'Check at least 1 signal to override' : 'Override guardrail and send'}
+                >
+                  Override &amp; Send
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Composer Modal - Unchanged */}
       {isComposerModalOpen ? (
         <div className="V2Inbox__composerBackdrop" onClick={() => setIsComposerModalOpen(false)}>
@@ -1133,7 +1328,7 @@ export default function InboxV2() {
                       >
                         {snoozeMutation.isPending ? '…' : 'Snooze'}
                       </button>
-                      {(detail.conversation as any).nextFollowupDueAt && (
+                      {detail.conversation.escalation.nextFollowupDueAt && (
                         <button
                           type="button"
                           className="V2Inbox__button V2Inbox__button--small"
@@ -1222,6 +1417,32 @@ export default function InboxV2() {
 
                   {/* Composer Area */}
                   <div className="V2Inbox__chatComposer">
+                    {/* Double Pitch Protection Banner */}
+                    {showDoublePitchWarning && (
+                      <div style={{
+                        background: 'rgba(245, 157, 13, 0.12)',
+                        border: '1px solid #f59d0d',
+                        borderRadius: '4px',
+                        padding: '0.5rem 0.75rem',
+                        marginBottom: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.5rem',
+                        fontSize: '0.8rem',
+                        color: '#f59d0d',
+                      }}>
+                        <span>⚠ Call link already sent — no reply yet. Consider a calibrated question instead.</span>
+                        <button
+                          type="button"
+                          style={{ background: 'none', border: 'none', color: '#f59d0d', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.25rem' }}
+                          onClick={() => setShowDoublePitchWarning(false)}
+                          title="Dismiss warning and send anyway"
+                        >
+                          Send anyway ✕
+                        </button>
+                      </div>
+                    )}
                     <div className="V2Inbox__chatInputRow">
                       <textarea
                         ref={composerRef}
@@ -1684,7 +1905,7 @@ export default function InboxV2() {
                           {incrementGuardrailOverrideMutation.isPending ? '…' : '⚠ Log Guardrail Override'}
                         </button>
                         <p style={{ fontSize: '0.68rem', color: 'var(--v2-muted)', marginTop: '0.25rem' }}>
-                          Overrides: {((detail?.conversation as any)?.guardrailOverrideCount as number | undefined) ?? 0}
+                          Overrides: {detail?.conversation.guardrailOverrideCount ?? 0}
                         </p>
                       </div>
                     </div>

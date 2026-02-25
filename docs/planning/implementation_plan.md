@@ -1,261 +1,154 @@
-# PT Biz Revenue Messaging System — Implementation Plan
-## Phase 2 Advanced + Phase 3 Foundation
+# PT Biz Revenue Messaging System — Phase 2 Implementation Plan
 
-**Last updated:** Current session  
-**Status:** Phase 1 + Phase 2 core ✅ Complete → Phase 2 Advanced + Phase 3 in progress
+## 1. Information Gathered (Site Audit Results)
 
----
+A comprehensive audit of the live site (`https://ptbizsms.com/v2/inbox`) and the codebase has been completed. The Phase 1 and Phase 3 features are largely functional, but several critical bugs were identified, primarily stemming from a mismatch between the database schema and the API contract for Phase 3 fields. Additionally, the analytical pages lack depth and visual clarity.
 
-## COMPLETED (Phase 1 + Phase 2 Core)
+### Bugs & Edge Cases Detected
+1. **BUG #1 (Stage Gating NOT enforced):** The frontend currently allows sending call links regardless of the escalation level. This is a missing Phase 2 feature.
+2. **BUG #2 (Template APPENDS instead of replaces):** The `onInsertTemplate` function in `InboxV2.tsx` appends the template text to the existing `composerText` instead of replacing it.
+3. **BUG #3, #5, #6 (Phase 3 fields missing/wiped):** The `InboxConversationV2` TypeScript interface in `v2-contract.ts` and `v2-types.ts` does not include the Phase 3 fields (`objectionTags`, `callOutcome`, `guardrailOverrideCount`). Consequently, the `toInboxConversationV2` mapping function in `routes.ts` does not map these fields from the database row to the API response. The frontend attempts to access them using `as any` casts, which results in `undefined`. This causes the local state to be reset to empty/null on every query re-fetch.
+4. **BUG #4 (Escalation button active state lost):** The `useEffect` in `InboxV2.tsx` correctly syncs `escalationLevel` from `detail.conversation.escalation.level`. However, a timing issue or a missing query invalidation in the `useV2OverrideEscalation` mutation causes the local state to be out of sync with the UI after a save.
+5. **BUG #7 ("Stop" replies showing as "needs reply"):** Opt-out requests (e.g., "Stop", "STOP") are not automatically DNC'd and remain in the urgent queue.
+6. **BUG #8 (Monday Pipeline all zeros):** The Monday sync is stale (data from 2/23, today is 2/25).
+7. **BUG #9 (Daily Activity Discrepancy):** The Daily Activity page shows 0 booked calls for 2/23, but the Performance page shows 4 sets for the same day.
 
-- ✅ Flash-to-wrong-contact bug fixed (`isComposerModalOpen` guard in auto-select `useEffect`)
-- ✅ Conversation status toggle (Open / Closed / DNC) — UI + backend + DB
-- ✅ SMS segment counter (GSM-7 160/153, Unicode 70/67, warn/danger CSS)
-- ✅ Bounce error tooltips (`ALOWARE_ERROR_MAP` + `humanizeAlowareError`)
-- ✅ Whisper notes (internal team notes, not visible to lead)
-- ✅ Snooze with date-based follow-up
-- ✅ Conversation assignment (owner label)
-- ✅ Message templates (create / insert / delete)
-- ✅ All 13 backend endpoints verified ✅
+### UX & Analytical Gaps Identified
+*   **Performance Page (`/v2/insights`):**
+    *   KPI Definitions panel is open by default, wasting screen real estate.
+    *   "Actions Next Week" only provides 1 generic recommendation.
+    *   No trend charts/sparklines for visual context; just raw numbers.
+    *   No conversion funnel visualization.
+    *   Daily Stats show raw numbers and ISO date formats (`2026-02-19`).
+    *   ↓↑ arrows on KPI cards lack benchmark/target context.
+    *   No "Booking Rate" metric (conversations → booked calls %).
+    *   Sets Breakdown and Call Sources lack visual charts.
+    *   List Health lacks a "Reply Rate" column.
+*   **Sequences Page (`/v2/sequences`):**
+    *   No "Booking Rate" column (booked/sent ratio) — only raw "Booked" count.
+    *   No visual charts — all tables.
+    *   "w/ SMS Reply" column is not explained anywhere.
+    *   Underperformers (e.g., CPFM Check In: 476 sent, 0 booked) and top performers (e.g., Cash Practice Field Manual: 12 booked) are not visually flagged.
+    *   Lead Magnet Comparison table is mostly empty/useless (all v2 columns "—").
+    *   No trend data — just 7d or 30d window.
+*   **Inbox Page (`/v2/inbox`):**
+    *   Stage → Call Conversion shows all 0% because Phase 2 call gating is not built yet.
+    *   Top Objections data is very sparse.
+    *   Many phone-number-only contacts (no name enrichment).
+    *   No pagination — all 75 conversations shown at once.
+*   **Rep Stats Pages (`/v2/rep/jack`, `/v2/rep/brandon`):**
+    *   Shows data for a specific business day (e.g., 2026-02-23) instead of a rolling window or today.
+    *   "Booking Hints" are not shown/explained.
+    *   "Day by Day" shows just deltas, no trend chart.
+    *   No weekly/monthly trend.
+    *   No "Booking Rate" metric.
+*   **Daily Activity Page (`/v2/runs`):**
+    *   No visual chart — just a list of runs.
+    *   No run selected by default in "Run Details".
+    *   No "Reply Rate" column in the run list.
 
----
-
-## NEXT: Phase 2 Advanced + Phase 3 Foundation
-
-### Priority Order (from roadmap BUILD PRIORITY ORDER)
-
-```
-ABSOLUTE FIRST (remaining Layer 2 core):
-  → Stage gating before call link
-  → Guardrail enforcement
-  → Objection tagging
-  → Follow-up enforcement (podcast / call triggers)
-  → Double pitch protection
-  → Call outcome tagging
-
-SECOND (Layer 3 foundation):
-  → Stage-to-call conversion dashboard
-  → Objection frequency dashboard
-  → Source attribution
-  → Analytics export
-```
-
----
-
-## FEATURE SPECS
-
-### Feature 1: Objection Tagging Engine
-**Roadmap:** Layer 2 — "At least one objection tag required before moving thread to Objection stage"
-
-**Tags:** Money / Time / Spouse / Saturation / Patient payment doubt / Fear of risk / Marketing / Staffing / Scaling
-
-**Podcast episode suggestions per tag:**
-- Money → "The Cash-Pay PT Business Model" episode
-- Time → "Systemizing Your Practice" episode  
-- Spouse → "Getting Buy-In From Your Partner" episode
-- Saturation → "Niche Domination Strategy" episode
-- Fear of risk → "Risk Reversal Framework" episode
-- Marketing → "PT Marketing That Actually Works" episode
-- Staffing → "Building Your Dream Team" episode
-- Scaling → "Scaling Beyond One Location" episode
-
-**DB change:** `ALTER TABLE conversation_state ADD COLUMN IF NOT EXISTS objection_tags TEXT[] NOT NULL DEFAULT '{}'`
-
-**Backend:**
-- `updateObjectionTags(conversationId, tags: string[])` in inbox-store.ts
-- `POST /api/v2/inbox/conversations/:id/objection-tags` in routes.ts
-
-**Frontend:**
-- Objection tag panel in composer sidebar (below Escalation panel)
-- Multi-select tag chips (toggle on/off)
-- Podcast episode suggestion shown when tag selected
-- Warning if escalation level = 2 (Objection) and no tags set
+### Phase 2 Requirements (Conversion Control)
+*   **Stage Gating:** Block sending messages containing call links if the escalation level is 1 (Awareness).
+*   **Guardrail Checklist:** Require a checklist of 7 signals to be completed (≥2 checked) before allowing a call link to be sent at L3/L4.
+*   **Double Pitch Protection:** Warn the user if a call link was already sent and no reply has been received.
+*   **Podcast/Call Auto-Snooze:** Automatically create follow-up reminders when podcast or call links are sent.
+*   **Objection Tag Requirement:** Require at least one objection tag before moving a thread to L2 (Objection stage).
 
 ---
 
-### Feature 2: Stage Gating Before Call Link
-**Roadmap:** Layer 2 — "System blocks call link send if stage tag is null. Modal prompt: Select escalation stage before offering call."
+## 2. Detailed Code Update Plan
 
-**Call link detection patterns:**
-- `calendly.com`, `cal.com`, `acuityscheduling.com`, `oncehub.com`, `hubspot.com/meetings`, `tidycal.com`, `savvycal.com`
+### Step 1: Fix API Contract & Mapping (Bugs #3, #5, #6)
+*   **`sms-insights/api/v2-contract.ts` & `frontend/src/api/v2-types.ts`:**
+    *   Update the `InboxConversationV2` interface to include the missing Phase 3 fields:
+        ```typescript
+        objectionTags: string[];
+        callOutcome: CallOutcomeV2 | null;
+        guardrailOverrideCount: number;
+        ```
+*   **`sms-insights/api/routes.ts`:**
+    *   Update the `toInboxConversationV2` function signature to accept the new fields from the DB row (`state_objection_tags`, `state_call_outcome`, `state_guardrail_override_count`).
+    *   Map these fields to the returned object:
+        ```typescript
+        objectionTags: row.state_objection_tags || [],
+        callOutcome: (row.state_call_outcome as CallOutcomeV2) || null,
+        guardrailOverrideCount: row.state_guardrail_override_count || 0,
+        ```
 
-**Logic:**
-- If composer text contains call link AND escalation level === 1 → block send
-- Show inline warning: "⚠ Stage required — Select escalation level before offering a discovery call"
-- Send button disabled until level > 1
+### Step 2: Fix Frontend State Management (Bugs #2, #3, #4, #5, #6)
+*   **`frontend/src/v2/pages/InboxV2.tsx`:**
+    *   **Bug #2:** Update `onInsertTemplate` to replace the text: `setComposerText(filled);`.
+    *   **Bugs #3, #5, #6:** Remove the `as any` casts in the `useEffect` that syncs state from `detail`. Use the newly typed fields directly:
+        ```typescript
+        setLocalObjectionTags(detail.conversation.objectionTags);
+        setLocalCallOutcome(detail.conversation.callOutcome);
+        ```
+        Update the Guardrail Override display to use `detail.conversation.guardrailOverrideCount`.
+    *   **Bug #4:** Ensure the `useV2OverrideEscalation` mutation in `v2Queries.ts` correctly invalidates the `['v2', 'inbox', 'conversation', variables.conversationId]` query key.
 
-**Frontend only** — no backend changes needed.
+### Step 3: Implement Phase 2 Database Tables
+*   **`sms-insights/scripts/migrate-phase2-tables.ts`:**
+    *   Run the existing migration script to create the `follow_up_reminders` and `call_link_sends` tables.
 
----
+### Step 4: Implement Stage Gating & Guardrails (Phase 2)
+*   **`frontend/src/v2/pages/InboxV2.tsx`:**
+    *   Add a utility function to detect call links (e.g., `calendly.com`, `cal.com`) and podcast links in the `composerText`.
+    *   In the `onSend` handler, intercept the send action if a call link is detected.
+    *   **Stage Gating:** If `escalationLevel` is 1, block the send and show a warning modal: "Select escalation stage before offering call."
+    *   **Guardrail Checklist:** If `escalationLevel` is 3 or 4, open a new `GuardrailModal` component.
+        *   The modal should present the 7 signals (timeline, cash intent, etc.).
+        *   Require ≥2 checked to proceed.
+        *   If <2, show a warning and require an override explanation (which calls `incrementGuardrailOverride`).
+*   **`sms-insights/api/routes.ts` & `sms-insights/services/inbox-send.ts`:**
+    *   Add backend validation to reject messages with call links if the escalation level is insufficient (defense in depth).
 
-### Feature 3: Double Pitch Protection
-**Roadmap:** Layer 2 — "If call link already sent and no reply received: System warns: Momentum unclear. Recommend calibrated question instead."
+### Step 5: Implement Double Pitch Protection & Auto-Snooze (Phase 2)
+*   **`sms-insights/services/inbox-store.ts`:**
+    *   Add functions to query `call_link_sends` to check for prior unreplied call links.
+    *   Add functions to create `follow_up_reminders`.
+*   **`sms-insights/api/routes.ts`:**
+    *   Create endpoints for checking guardrail status and managing reminders.
+*   **`frontend/src/v2/pages/InboxV2.tsx`:**
+    *   Before sending a call link, query the backend to check for double pitches. Show a warning if detected.
+    *   After successfully sending a podcast or call link, automatically trigger the snooze mutation (48-72hr for podcast, 3-4 days for call).
 
-**Logic:**
-- Scan `detail.messages` for outbound messages containing call link patterns
-- Find the most recent outbound call-link message
-- Check if any inbound message exists AFTER that outbound message
-- If no inbound reply since last call link → show warning banner
-
-**Frontend only** — no backend changes needed.
-
----
-
-### Feature 4: Guardrail Checklist Modal
-**Roadmap:** Layer 2 — "When agent selects Level 3 or Level 4 and attempts to send a call link, system prompts agent to confirm at least two of the following..."
-
-**7 checklist items:**
-1. Timeline within 6 months
-2. Fully cash intent
-3. Revenue ambition stated
-4. Clear frustration expressed
-5. Operational complexity present
-6. Strong engagement signal
-7. Direct "how to" question asked
-
-**Logic:**
-- Triggered when: escalation level ≥ 3 AND composer text contains call link AND user clicks Send
-- Modal shows checklist
-- If ≥ 2 checked → allow send
-- If < 2 checked → show "Guardrails insufficient. Podcast-first escalation recommended."
-- Override: requires note text → stored via escalation override endpoint with `guardrail_override_count` increment
-
-**DB change:** `ALTER TABLE conversation_state ADD COLUMN IF NOT EXISTS guardrail_override_count INT NOT NULL DEFAULT 0`
-
-**Backend:** Increment `guardrail_override_count` in `updateConversationState` when override note submitted
-
-**Frontend:** Guardrail modal component (inline in InboxV2.tsx)
-
----
-
-### Feature 5: Podcast / Call Auto-Snooze Triggers
-**Roadmap:** Layer 2 — "If agent sends podcast link: Auto-create 48–72 hour follow-up reminder. If call link sent: Auto-create 3–4 day light nudge reminder."
-
-**Logic (post-send):**
-- After successful send, analyze sent message text
-- If contains podcast link → auto-call snooze endpoint with `snoozedUntil = now + 60hrs`
-- If contains call link → auto-call snooze endpoint with `snoozedUntil = now + 84hrs` (3.5 days)
-- Show flash: "📅 Follow-up reminder set for [date]"
-- Also update `cadenceStatus` via escalation override: `podcast_sent` or `call_offered`
-
-**Podcast link patterns:** `ptbizinsider.com`, `spotify.com`, `podcasts.apple.com`, `anchor.fm`, `buzzsprout.com`
-
-**Frontend only** — uses existing snooze + escalation override endpoints.
-
----
-
-### Feature 6: Call Outcome Tagging
-**Roadmap:** Layer 2/3 — "After discovery call, agent must tag outcome: Not a fit / Too early / Budget / Joined / Ghosted"
-
-**DB change:** `ALTER TABLE conversation_state ADD COLUMN IF NOT EXISTS call_outcome TEXT`
-
-**Backend:**
-- `updateCallOutcome(conversationId, outcome: string)` in inbox-store.ts
-- `POST /api/v2/inbox/conversations/:id/call-outcome` in routes.ts
-
-**Frontend:**
-- Call outcome dropdown in modal header (visible when status = closed OR escalation level ≥ 3)
-- Options: Not a fit / Too early / Budget / Joined / Ghosted
+### Step 6: UX & Analytics Improvements (Code Quality & Maintainability)
+*   **`frontend/src/v2/pages/InsightsV2.tsx`:**
+    *   Close KPI Definitions panel by default.
+    *   Format Daily Stats dates to human-readable format.
+    *   Add "Booking Rate" metric.
+    *   Add visual charts (e.g., `V2StatBar`) for Sets Breakdown and Call Sources.
+*   **`frontend/src/v2/pages/SequencesV2.tsx`:**
+    *   Add "Booking Rate" column.
+    *   Visually flag underperformers and top performers.
+*   **`frontend/src/v2/pages/RepV2.tsx`:**
+    *   Add "Booking Rate" metric.
+*   **`frontend/src/v2/pages/RunsV2.tsx`:**
+    *   Add "Reply Rate" column to the run list.
 
 ---
 
-### Feature 7: Stage-to-Call Conversion Dashboard (Layer 3)
-**Roadmap:** Layer 3 — "Conversion rate by stage: Level 1→Call, Level 2→Call, Level 3→Call, Level 4→Call"
+## 3. Dependent Files to be Edited
 
-**Backend query:** Count conversations by escalation level that have `cadence_status = 'call_offered'` or `call_outcome IS NOT NULL`
-
-**New endpoint:** `GET /api/v2/inbox/analytics/stage-conversion`
-
-**Frontend:** New analytics panel in the right column of InboxV2 (below Inbox Health)
-
----
-
-### Feature 8: Objection Frequency Dashboard (Layer 3)
-**Roadmap:** Layer 3 — "Which objections appear most: Money / Time / Spouse / Risk / Marketing doubt / Scaling friction"
-
-**Backend query:** Unnest `objection_tags` array, count by tag
-
-**New endpoint:** `GET /api/v2/inbox/analytics/objection-frequency`
-
-**Frontend:** Bar chart / frequency list in analytics panel
+1.  `sms-insights/api/v2-contract.ts` (Types)
+2.  `frontend/src/api/v2-types.ts` (Types)
+3.  `sms-insights/api/routes.ts` (API Handlers & Mapping)
+4.  `frontend/src/v2/pages/InboxV2.tsx` (UI & Logic)
+5.  `frontend/src/api/v2Queries.ts` (React Query Hooks)
+6.  `sms-insights/services/inbox-store.ts` (DB Queries)
+7.  `sms-insights/services/inbox-send.ts` (Send Logic)
+8.  `frontend/src/v2/pages/InsightsV2.tsx` (UX Improvements)
+9.  `frontend/src/v2/pages/SequencesV2.tsx` (UX Improvements)
+10. `frontend/src/v2/pages/RepV2.tsx` (UX Improvements)
+11. `frontend/src/v2/pages/RunsV2.tsx` (UX Improvements)
 
 ---
 
-## IMPLEMENTATION ORDER
+## 4. Follow-up Steps
 
-### Step 1: DB Migration
-File: `sms-insights/scripts/migrate-phase3-tables.ts`
-
-```sql
-ALTER TABLE conversation_state 
-  ADD COLUMN IF NOT EXISTS objection_tags TEXT[] NOT NULL DEFAULT '{}',
-  ADD COLUMN IF NOT EXISTS guardrail_override_count INT NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS call_outcome TEXT;
-```
-
-### Step 2: Backend — inbox-store.ts
-Add:
-- `updateObjectionTags(conversationId, tags)`
-- `updateCallOutcome(conversationId, outcome)`
-- `getStageConversionAnalytics()`
-- `getObjectionFrequencyAnalytics()`
-
-### Step 3: Backend — routes.ts
-Add handlers + routes:
-- `POST /api/v2/inbox/conversations/:id/objection-tags`
-- `POST /api/v2/inbox/conversations/:id/call-outcome`
-- `GET /api/v2/inbox/analytics/stage-conversion`
-- `GET /api/v2/inbox/analytics/objection-frequency`
-
-### Step 4: Frontend — v2-types.ts
-Add to `InboxConversationV2`:
-- `objectionTags: string[]`
-- `callOutcome: string | null`
-- `guardrailOverrideCount: number`
-
-### Step 5: Frontend — v2Queries.ts
-Add hooks:
-- `useV2UpdateObjectionTags()`
-- `useV2UpdateCallOutcome()`
-- `useV2StageConversionAnalytics()`
-- `useV2ObjectionFrequencyAnalytics()`
-
-### Step 6: Frontend — InboxV2.tsx
-Add:
-- Objection tag panel (sidebar)
-- Stage gating logic (call link detection + send block)
-- Double pitch protection banner
-- Guardrail checklist modal
-- Auto-snooze triggers (post-send)
-- Call outcome dropdown (modal header)
-- Analytics panels (stage conversion + objection frequency)
-
-### Step 7: Frontend — v2.css
-Add CSS for:
-- `.V2Inbox__objectionTags` — tag chip grid
-- `.V2Inbox__objectionChip` — individual tag chip (toggle)
-- `.V2Inbox__objectionChip--active` — selected state
-- `.V2Inbox__podcastSuggestion` — podcast episode suggestion box
-- `.V2Inbox__guardrailModal` — guardrail checklist overlay
-- `.V2Inbox__guardrailChecklist` — checklist items
-- `.V2Inbox__doublePitchWarning` — double pitch protection banner
-- `.V2Inbox__callOutcomeRow` — call outcome dropdown row
-- `.V2Inbox__analyticsChart` — bar chart for objection frequency
-
----
-
-## DB CONNECTION
-```
-postgresql://postgres:WglVXtUmBjZIhCtOTLcLbeWpxsganAsi@crossover.proxy.rlwy.net:56263/railway
-```
-
-## BACKEND START
-```bash
-cd sms-insights && node --import tsx app.ts
-# Port 3001, ALLOW_DUMMY_AUTH_TOKEN=true
-```
-
-## FRONTEND START
-```bash
-cd frontend && npm run dev
-# Port 5173
+1.  Run `tsc --noEmit --skipLibCheck` in both `frontend` and `sms-insights` to ensure type safety after updating the API contracts.
+2.  Test the bug fixes on the local development server.
+3.  Run the Phase 2 database migration.
+4.  Implement and test the Phase 2 features (Stage Gating, Guardrails, Double Pitch Protection).
+5.  Implement and test the UX & Analytics improvements.
+6.  Commit and push the changes.

@@ -67,6 +67,7 @@ const CALL_LINK_PATTERNS = [
   'hubspot.com/meetings',
   'tidycal.com',
   'savvycal.com',
+  'physicaltherapybiz.com/call-booked',
 ];
 
 const PODCAST_LINK_PATTERNS = [
@@ -75,6 +76,8 @@ const PODCAST_LINK_PATTERNS = [
   'podcasts.apple.com',
   'anchor.fm',
   'buzzsprout.com',
+  'physicaltherapybiz.com/blog',
+  'drdannymatta.com',
 ];
 
 const containsCallLink = (text: string): boolean => {

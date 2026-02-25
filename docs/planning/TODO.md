@@ -36,3 +36,7 @@ Phase 2 Implementation TODO
 ## Follow-up
 - [x] Run `tsc --noEmit --skipLibCheck` in both `frontend` and `sms-insights`. Both pass with zero errors.
 - [x] All Phase 2 implementation steps complete.
+
+## Post-Phase 2 Bug Fixes (URL Detection)
+- [x] Add `physicaltherapybiz.com/call-booked` to `CALL_LINK_PATTERNS` in `frontend/src/v2/pages/InboxV2.tsx` and `sms-insights/services/inbox-send.ts` so Phase 2 gating triggers for actual production call links.
+- [x] Add `physicaltherapybiz.com/blog` and `drdannymatta.com` to `PODCAST_LINK_PATTERNS` in `frontend/src/v2/pages/InboxV2.tsx` so auto-snooze triggers for actual production podcast links.

@@ -74,6 +74,7 @@ const CALL_LINK_PATTERNS = [
   'hubspot.com/meetings',
   'tidycal.com',
   'savvycal.com',
+  'physicaltherapybiz.com/call-booked',
 ];
 
 const containsCallLink = (text: string): boolean => {

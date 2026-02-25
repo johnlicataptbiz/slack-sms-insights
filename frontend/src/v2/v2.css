@@ -163,7 +163,6 @@
   grid-template-columns: 200px 1fr;
   min-height: calc(100vh - var(--v2-topbar-height));
   overflow-x: clip;
-  transition: grid-template-columns 220ms ease;
 }
 
 .V2Shell__body.is-collapsed {
@@ -176,7 +175,7 @@
     linear-gradient(180deg, rgba(8, 18, 35, 0.96), rgba(9, 18, 31, 0.94)),
     radial-gradient(700px 420px at 12% -18%, rgba(17, 184, 214, 0.35), transparent 50%);
   padding: var(--v2-space-5);
-  transition: padding 220ms ease, transform 260ms ease;
+  transition: width 220ms ease, padding 220ms ease, transform 260ms ease;
 }
 
 .V2Shell__sidebar.is-collapsed {
@@ -662,22 +661,6 @@
   background: rgba(255, 255, 255, 0.92);
 }
 
-.V2AuditItem header {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  flex-wrap: wrap;
-  margin-bottom: 0.25rem;
-}
-
-.V2AuditItem header strong {
-  font-size: 0.82rem;
-}
-
-.V2AuditItem header span {
-  font-size: 0.75rem;
-  color: var(--v2-muted);
-}
 
 .V2AuditItem p {
   margin: 0.2rem 0 0;
@@ -795,7 +778,7 @@
 }
 
 .V2RunList__summary {
-color: var(--v2-text);
+  color: var(--v2-text);
   margin: 0.5rem 0 0;
   font-size: 0.8rem;
   line-height: 1.45;
@@ -2112,12 +2095,32 @@ color: var(--v2-text);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .V2Page,
-  .V2MetricCard,
-  .V2Shell__navItem,
-  .V2Shell__sidebar {
-    animation: none !important;
-    transition: none !important;
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@supports not (color: color-mix(in srgb, red 50%, blue 50%)) {
+  .V2Control select:focus,
+  .V2Control input:focus,
+  .V2Control textarea:focus {
+    border-color: var(--v2-accent);
+    box-shadow: 0 0 0 4px rgba(145, 237, 248, 0.5);
+  }
+
+  .V2Inbox__outcomeChip.is-active {
+    border-color: var(--v2-accent);
+    background: rgba(17, 184, 214, 0.12);
+    color: var(--v2-accent-strong);
+  }
+
+  .V2Inbox__contactAvatar {
+    background: rgba(17, 184, 214, 0.25);
+    border-color: rgba(17, 184, 214, 0.48);
+    color: var(--v2-accent-strong);
   }
 }
 
@@ -2843,12 +2846,6 @@ color: var(--v2-text);
   border-top: 1px dashed color-mix(in srgb, var(--v2-border) 70%, white 30%);
 }
 
-/* Chat-style composer modal — kept for back-compat but no longer applied */
-.V2Inbox__composerModal--chat {
-  width: min(600px, 92vw);
-  max-height: min(700px, 90vh);
-  border-radius: 16px;
-}
 
 .V2Inbox__composerMeta {
   margin: 0;
@@ -3559,15 +3556,15 @@ color: var(--v2-text);
 }
 
 /* Button States */
-.V2Inbox__button--sending {
+.V2Inbox__button.V2Inbox__button--sending {
   position: relative;
-  color: transparent !important;
+  color: transparent;
 }
 
-.V2Inbox__button--success {
-  background: linear-gradient(180deg, rgba(19, 185, 129, 0.25), rgba(255, 255, 255, 0.98)) !important;
-  border-color: rgba(19, 185, 129, 0.5) !important;
-  color: var(--v2-positive) !important;
+.V2Inbox__button.V2Inbox__button--success {
+  background: linear-gradient(180deg, rgba(19, 185, 129, 0.25), rgba(255, 255, 255, 0.98));
+  border-color: rgba(19, 185, 129, 0.5);
+  color: var(--v2-positive);
 }
 
 .V2Inbox__buttonSpinner {
@@ -3593,6 +3590,11 @@ color: var(--v2-text);
   }
 }
 
+@keyframes v2-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.4; }
+}
+
 /* Optimistic Message */
 .V2Inbox__chatMessage--sending {
   opacity: 0.7;
@@ -3610,7 +3612,6 @@ color: var(--v2-text);
 }
 
 .V2Inbox__sendingIndicator {
-
   display: inline-block;
   margin-top: 0.35rem;
   font-size: 0.72rem;
@@ -4693,22 +4694,9 @@ color: var(--v2-text);
   border-color: rgba(17, 184, 214, 0.5);
 }
 
-/* Sequence attribution summary bar */
-.V2Sequences__attributionBar {
-  margin-bottom: 0.5rem;
-}
 
 /* Improved audit item */
-.V2AuditItem header strong {
-  color: var(--v2-text);
-}
 
-.V2AuditItem header span {
-  background: rgba(7, 19, 36, 0.06);
-  padding: 0.15rem 0.45rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-}
 
 /* ============================================================
    SCOREBOARD V2 — NEW PANELS
@@ -4840,13 +4828,16 @@ color: var(--v2-text);
    SEQUENCES V2 — TABLE ENHANCEMENTS
    ============================================================ */
 
-.V2Table--sequences .V2Table__col--label {
-  min-width: 200px;
-  max-width: 280px;
+/* Tighter cell padding for the sequences table to prevent horizontal scroll */
+.V2Table--sequences th,
+.V2Table--sequences td {
+  padding: 0.42rem 0.5rem;
+  font-size: 0.82rem;
 }
 
-.V2Table--sequences .V2Table__col--leadMagnet {
-  min-width: 120px;
+.V2Table--sequences .V2Table__col--label {
+  min-width: 180px;
+  max-width: 260px;
 }
 
 .V2Table--sequences .V2Table__col--version {
@@ -4866,13 +4857,13 @@ color: var(--v2-text);
   text-align: center;
 }
 
-.V2Table .is-sortable {
+.V2Table th.is-sortable {
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
 
-.V2Table .is-sortable:hover {
+.V2Table th.is-sortable:hover {
   color: var(--v2-text);
 }
 

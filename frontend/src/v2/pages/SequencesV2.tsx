@@ -12,7 +12,6 @@ type Sort =
   | 'messagesSent'
   | 'replyRatePct'
   | 'canonicalBookedCalls'
-  | 'canonicalBookedAfterSmsReply'
   | 'optOutRatePct'
   | 'uniqueContacted'
   | 'bookingRatePct';
@@ -41,7 +40,9 @@ const fmtMins = (n: number | null): string => {
 
 const shorten = (text: string, max: number): string => {
   if (text.length <= max) return text;
-  return `${text.slice(0, max)}…`;
+  const truncated = text.slice(0, max);
+  const lastSpace = truncated.lastIndexOf(' ');
+  return `${lastSpace > max * 0.7 ? truncated.slice(0, lastSpace) : truncated}…`;
 };
 
 /**
@@ -73,7 +74,8 @@ const fmtDay = (iso: string | null) => {
   return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const fmtDateTime = (value: string) => {
+const fmtDateTime = (value: string | null): string => {
+  if (!value) return '—';
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return value;
   return dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
@@ -86,11 +88,23 @@ const maskPhone = (value: string | null) => {
   return `***${digits.slice(-4)}`;
 };
 
-const bucketLabel = (value: 'jack' | 'brandon' | 'selfBooked') => {
-  if (value === 'jack') return 'Jack';
-  if (value === 'brandon') return 'Brandon';
-  return 'Self-booked';
+const BUCKET_LABELS: Record<'jack' | 'brandon' | 'selfBooked', string> = {
+  jack: 'Jack',
+  brandon: 'Brandon',
+  selfBooked: 'Self-booked',
 };
+
+// ─── JSX Helpers ─────────────────────────────────────────────────────────────
+
+const renderVersion = (label: string, version: string): React.ReactNode => {
+  const vDisplay = extractVersionDisplay(label);
+  if (vDisplay) return <span className="V2Badge V2Badge--version">{vDisplay}</span>;
+  if (version && version !== 'Legacy') return <span className="V2Badge V2Badge--version">{version}</span>;
+  return <span className="V2Table__dim">—</span>;
+};
+
+const toAuditId = (label: string) =>
+  `audit-${label.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -99,7 +113,6 @@ type AuditRow = SalesMetricsV2['sequences'][0]['bookedAuditRows'][0];
 type MergedSeqRow = {
   label: string;
   // metadata from scoreboard (window-independent)
-  leadMagnet: string;
   version: string;
   // all numeric fields exclusively from sales-metrics (respects mode toggle)
   firstSeenAt: string | null;
@@ -120,6 +133,8 @@ type MergedSeqRow = {
   uniqueContacted: number;
   uniqueReplied: number;
   bookingRatePct: number;
+  // pre-computed derived fields
+  smsReplyPct: number | null;
 };
 
 type HealthFlag = {
@@ -157,14 +172,13 @@ export default function SequencesV2() {
   }, [scoreboard?.sequences]);
 
   // Merge: numeric fields exclusively from sales-metrics (time-range consistent).
-  // Scoreboard used only for window-independent metadata: leadMagnet, version, uniqueContacted, uniqueReplied, bookingRatePct.
+  // Scoreboard used only for window-independent metadata: version, uniqueContacted, uniqueReplied, bookingRatePct.
   const mergedRows = useMemo((): MergedSeqRow[] => {
     const smSeqs = salesMetrics?.sequences ?? [];
     return smSeqs.map((seq) => {
       const sb = scoreboardByLabel.get(seq.label);
       return {
         label: seq.label,
-        leadMagnet: sb?.leadMagnet && sb.leadMagnet !== seq.label ? sb.leadMagnet : '',
         version: sb?.version ?? '',
         firstSeenAt: seq.firstSeenAt,
         messagesSent: seq.messagesSent,
@@ -183,6 +197,10 @@ export default function SequencesV2() {
         uniqueContacted: sb?.uniqueContacted ?? 0,
         uniqueReplied: sb?.uniqueReplied ?? 0,
         bookingRatePct: sb?.bookingRatePct ?? 0,
+        smsReplyPct:
+          seq.canonicalBookedCalls > 0
+            ? (seq.canonicalBookedAfterSmsReply / seq.canonicalBookedCalls) * 100
+            : null,
       };
     });
   }, [salesMetrics?.sequences, scoreboardByLabel]);
@@ -200,8 +218,6 @@ export default function SequencesV2() {
           return dir * (a.replyRatePct - b.replyRatePct);
         case 'canonicalBookedCalls':
           return dir * (a.canonicalBookedCalls - b.canonicalBookedCalls);
-        case 'canonicalBookedAfterSmsReply':
-          return dir * (a.canonicalBookedAfterSmsReply - b.canonicalBookedAfterSmsReply);
         case 'optOutRatePct':
           return dir * (a.optOutRatePct - b.optOutRatePct);
         case 'uniqueContacted':
@@ -252,7 +268,8 @@ export default function SequencesV2() {
             { label: 'Sent', value: fmtInt(row.messagesSent) },
           ],
         });
-      } else if (row.replyRatePct < 5 && row.messagesSent >= 30) {
+      }
+      if (row.replyRatePct < 5 && row.messagesSent >= 30) {
         flags.push({
           sequence: row.label,
           label: '↓ Low Reply Rate',
@@ -264,7 +281,8 @@ export default function SequencesV2() {
             { label: 'Sent', value: fmtInt(row.messagesSent) },
           ],
         });
-      } else if (row.canonicalBookedCalls === 0 && row.messagesSent > 100) {
+      }
+      if (row.canonicalBookedCalls === 0 && row.messagesSent > 100) {
         flags.push({
           sequence: row.label,
           label: '○ Zero Bookings',
@@ -395,9 +413,9 @@ export default function SequencesV2() {
           caption="Sequences flagged for attention based on opt-out rate, reply rate, or booking performance."
         >
           <div className="V2RiskFlags">
-            {healthWatchlist.map((flag, i) => (
+            {healthWatchlist.map((flag) => (
               <div
-                key={`${flag.sequence}-${i}`}
+                key={`${flag.sequence}-${flag.label}`}
                 className={`V2RiskFlag V2RiskFlag--${flag.severity}`}
               >
                 <h3 className="V2RiskFlag__title">{flag.label}</h3>
@@ -432,12 +450,12 @@ export default function SequencesV2() {
               <thead>
                 <tr>
                   <th className="V2Table__col--label">Sequence</th>
-                  <th className="V2Table__col--leadMagnet">Lead Magnet</th>
                   <th className="V2Table__col--version">Version</th>
                   <th className="V2Table__col--date">First Seen</th>
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('messagesSent')}
+                    aria-sort={sort === 'messagesSent' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
                     Sent{sortArrow('messagesSent')}
                   </th>
@@ -445,6 +463,7 @@ export default function SequencesV2() {
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('uniqueContacted')}
                     title="Unique people reached by this sequence · weekly window"
+                    aria-sort={sort === 'uniqueContacted' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
                     Contacts{sortArrow('uniqueContacted')}
                   </th>
@@ -452,12 +471,14 @@ export default function SequencesV2() {
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('replyRatePct')}
+                    aria-sort={sort === 'replyRatePct' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
                     Reply Rate{sortArrow('replyRatePct')}
                   </th>
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('canonicalBookedCalls')}
+                    aria-sort={sort === 'canonicalBookedCalls' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
                     Booked{sortArrow('canonicalBookedCalls')}
                   </th>
@@ -465,25 +486,14 @@ export default function SequencesV2() {
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('bookingRatePct')}
                     title="Booked calls ÷ unique contacts · weekly window"
+                    aria-sort={sort === 'bookingRatePct' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
                     Booking Rate{sortArrow('bookingRatePct')}
                   </th>
                   <th
                     className="is-right is-sortable"
-                    onClick={() => handleSortClick('canonicalBookedAfterSmsReply')}
-                    title="Booked calls where the contact had replied to an SMS before booking"
-                  >
-                    SMS-Linked{sortArrow('canonicalBookedAfterSmsReply')}
-                  </th>
-                  <th
-                    className="is-right"
-                    title="% of bookings that had a prior SMS reply"
-                  >
-                    SMS-Linked %
-                  </th>
-                  <th
-                    className="is-right is-sortable"
                     onClick={() => handleSortClick('optOutRatePct')}
+                    aria-sort={sort === 'optOutRatePct' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   >
                     Opt-Out Rate{sortArrow('optOutRatePct')}
                   </th>
@@ -495,11 +505,7 @@ export default function SequencesV2() {
                 {sortedRows.map((row) => {
                   const expanded = expandedLabels.has(row.label);
                   const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
-                  const isHighBooking = row.canonicalBookedCalls > 0 && !row.isManual;
-                  const smsReplyPct =
-                    row.canonicalBookedCalls > 0
-                      ? (row.canonicalBookedAfterSmsReply / row.canonicalBookedCalls) * 100
-                      : null;
+                  const isHighBooking = row.canonicalBookedCalls >= 2 && !row.isManual;
                   const rowClass = [
                     'V2Table__row',
                     row.isManual ? 'V2Table__row--manual' : '',
@@ -517,22 +523,8 @@ export default function SequencesV2() {
                             {row.label}
                           </span>
                         </td>
-                        <td className="V2Table__col--leadMagnet">
-                          {row.isManual ? (
-                            <span className="V2Badge V2Badge--muted">manual</span>
-                          ) : row.leadMagnet ? (
-                            <span className="V2Table__leadMagnetText">{row.leadMagnet}</span>
-                          ) : (
-                            <span className="V2Table__dim">—</span>
-                          )}
-                        </td>
                         <td className="V2Table__col--version">
-                          {(() => {
-                            const vDisplay = extractVersionDisplay(row.label);
-                            if (vDisplay) return <span className="V2Badge V2Badge--version">{vDisplay}</span>;
-                            if (row.version && row.version !== 'Legacy') return <span className="V2Badge V2Badge--version">{row.version}</span>;
-                            return <span className="V2Table__dim">—</span>;
-                          })()}
+                          {renderVersion(row.label, row.version)}
                         </td>
                         <td className="V2Table__col--date V2Table__dim">
                           {fmtDay(row.firstSeenAt)}
@@ -583,14 +575,6 @@ export default function SequencesV2() {
                             ? fmtPct(row.bookingRatePct)
                             : <span className="V2Table__dim">—</span>}
                         </td>
-                        <td className="is-right V2Table__dim">
-                          {fmtInt(row.canonicalBookedAfterSmsReply)}
-                        </td>
-                        <td className="is-right V2Table__dim">
-                          {smsReplyPct !== null
-                            ? fmtPct(smsReplyPct)
-                            : <span className="V2Table__dim">—</span>}
-                        </td>
                         <td className={`is-right${isHighOptOut ? ' V2Table__cell--warn' : ''}`}>
                           {fmtPct(row.optOutRatePct)}
                         </td>
@@ -601,6 +585,7 @@ export default function SequencesV2() {
                             className="V2Table__expandBtn"
                             onClick={() => toggleExpanded(row.label)}
                             aria-expanded={expanded}
+                            aria-controls={toAuditId(row.label)}
                             title={expanded ? 'Collapse audit' : 'Expand audit'}
                           >
                             {expanded ? '▲' : '▼'}
@@ -609,8 +594,8 @@ export default function SequencesV2() {
                       </tr>
 
                       {expanded && (
-                        <tr className="V2Table__auditRow">
-                          <td colSpan={15}>
+                        <tr id={toAuditId(row.label)} className="V2Table__auditRow">
+                          <td colSpan={12}>
                             <div className="V2SeqAudit">
                               {/* Booking breakdown summary */}
                               <div className="V2SeqAudit__summary">
@@ -631,9 +616,9 @@ export default function SequencesV2() {
                                   <span className="V2SeqAudit__summaryLabel">SMS-Linked</span>
                                   <span className="V2SeqAudit__summaryValue">
                                     {fmtInt(row.canonicalBookedAfterSmsReply)}
-                                    {row.canonicalBookedCalls > 0 && smsReplyPct !== null && (
+                                    {row.canonicalBookedCalls > 0 && row.smsReplyPct !== null && (
                                       <span className="V2SeqAudit__breakdown">
-                                        {' '}({fmtPct(smsReplyPct)} of bookings)
+                                        {' '}({fmtPct(row.smsReplyPct)} of bookings)
                                       </span>
                                     )}
                                   </span>
@@ -675,7 +660,7 @@ export default function SequencesV2() {
                                                   : 'self'
                                             }`}
                                           >
-                                            {bucketLabel(audit.bucket)}
+                                            {BUCKET_LABELS[audit.bucket]}
                                           </span>
                                           {audit.rep && (
                                             <span className="V2Badge V2Badge--muted" title="Rep">

@@ -1,30 +1,9 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { ApiError } from '../api/client';
-import { useSalesMetrics, useSequenceHistory } from '../api/queries';
+import { useSalesMetrics } from '../api/queries';
 import { dayKeyInTimeZone, shiftIsoDay } from '../utils/runDay';
 import '../styles/DataPages.css';
 import '../styles/Sequences.css';
-import { Line } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend
-);
 
 const BUSINESS_TIME_ZONE = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
@@ -65,7 +44,6 @@ type SequenceKpiRow = {
 };
 
 const formatPct = (value: number): string => `${value.toFixed(1)}%`;
-const formatNumber = (value: number): string => value.toLocaleString();
 const dayLabelFormatter = new Intl.DateTimeFormat('en-US', {
   timeZone: BUSINESS_TIME_ZONE,
   weekday: 'short',
@@ -119,7 +97,6 @@ export default function SequencesDeepDive() {
   const [includeManual, setIncludeManual] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('messagesSent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [selectedSequence, setSelectedSequence] = useState<string | null>(null);
 
   const activeDay = selectedDay || previousDay;
   const canStepForward = mode === 'day' && Boolean(activeDay && today && activeDay < today);
@@ -331,234 +308,146 @@ export default function SequencesDeepDive() {
         </div>
       ) : (
         <>
-      <section className="DataPanel">
-        <h2 className="DataPanel__title">KPI Snapshot</h2>
-        <div className="DataGrid">
-          <div className="DataCard DataCard--accent">
-            <div className="DataCard__label">Active sequences</div>
-            <div className="DataCard__value">{summary.sequences}</div>
-          </div>
-          <div className="DataCard">
-            <div className="DataCard__label">Messages sent</div>
-            <div className="DataCard__value">{summary.totalSent.toLocaleString()}</div>
-          </div>
-          <div className="DataCard">
-            <div className="DataCard__label">People who replied</div>
-            <div className="DataCard__value">{summary.totalReplies.toLocaleString()}</div>
-            <p className="DataCard__meta">{formatPct(summary.weightedReplyRatePct)} reply rate (people)</p>
-          </div>
-          <div className="DataCard">
-            <div className="DataCard__label">Booked calls (Slack)</div>
-            <div className="DataCard__value">{summary.totalSlackBooked.toLocaleString()}</div>
-            <p className="DataCard__meta">Call-level attribution shown per sequence in the table</p>
-          </div>
-          <div className="DataCard">
-            <div className="DataCard__label">SMS booking hints (diagnostic)</div>
-            <div className="DataCard__value">{summary.totalSignals.toLocaleString()}</div>
-            <p className="DataCard__meta">Diagnostic only (not the canonical booked KPI)</p>
-          </div>
-          <div className="DataCard">
-            <div className="DataCard__label">Opt-outs</div>
-            <div className="DataCard__value">{summary.totalOptOuts.toLocaleString()}</div>
-            <p className="DataCard__meta">{formatPct(summary.weightedOptOutRatePct)} opt-out rate</p>
-          </div>
-          <div className="DataCard">
-            <div className="DataCard__label">High-risk sequences (opt-out)</div>
-            <div className="DataCard__value">{summary.highRiskCount}</div>
-          </div>
-        </div>
-      </section>
-
-      <section className="DataPanel">
-        <h2 className="DataPanel__title">Sequence Performance Comparison</h2>
-        <div className="SequencesChart">
-          <Bar
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'top' as const },
-                title: { display: true, text: 'Sequence Performance Metrics' },
-              },
-            }}
-            data={{
-              labels: rows.map(row => row.label),
-              datasets: [
-                {
-                  label: 'Reply Rate (%)',
-                  data: rows.map(row => row.replyRatePct),
-                  backgroundColor: 'rgba(53, 162, 235, 0.5)',
-                },
-                {
-                  label: 'Booking Rate (%)',
-                  data: rows.map(row => row.canonicalBookedCalls > 0 ? (row.canonicalBookedCalls / row.uniqueContacted) * 100 : 0),
-                  backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                },
-                {
-                  label: 'Opt-out Rate (%)',
-                  data: rows.map(row => row.optOutRatePct),
-                  backgroundColor: 'rgba(255, 99, 132, 0.5)',
-                },
-              ],
-            }}
-          />
-        </div>
-      </section>
-
-      <section className="DataPanel">
-        <h2 className="DataPanel__title">Reply Rate Trend</h2>
-        <div className="SequencesChart">
-          <Line
-            options={{
-              responsive: true,
-              plugins: {
-                legend: { position: 'top' as const },
-                title: { display: true, text: 'Reply Rate Over Time' },
-              },
-            }}
-            data={{
-              labels: data?.trendByDay?.map(day => day.day) || [],
-              datasets: [
-                {
-                  label: 'Reply Rate (%)',
-                  data: data?.trendByDay?.map(day => day.replyRatePct) || [],
-                  borderColor: 'rgb(53, 162, 235)',
-                  backgroundColor: 'rgba(53, 162, 235, 0.5)',
-                },
-              ],
-            }}
-          />
-        </div>
-      </section>
-
-
           <section className="DataPanel">
-            <h2 className="DataPanel__title">Sequence Comparison</h2>
-            <div className="SequencesChart">
-              <Bar
-                options={{
-                  responsive: true,
-                  plugins: {
-                    legend: { position: 'top' },
-                    title: { display: true, text: 'Reply Rate Comparison' },
-                  },
-                }}
-                data={{
-                  labels: rows.map(row => row.label),
-                  datasets: [
-                    {
-                      label: 'Reply Rate (%)',
-                      data: rows.map(row => row.replyRatePct),
-                      backgroundColor: 'rgba(53, 162, 235, 0.5)',
-                    },
-                  ],
-                }}
-              />
+            <h2 className="DataPanel__title">KPI Snapshot</h2>
+            <div className="DataGrid">
+              <div className="DataCard DataCard--accent">
+                <div className="DataCard__label">Active sequences</div>
+                <div className="DataCard__value">{summary.sequences}</div>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">Messages sent</div>
+                <div className="DataCard__value">{summary.totalSent.toLocaleString()}</div>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">People who replied</div>
+                <div className="DataCard__value">{summary.totalReplies.toLocaleString()}</div>
+                <p className="DataCard__meta">{formatPct(summary.weightedReplyRatePct)} reply rate (people)</p>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">Booked calls (Slack)</div>
+                <div className="DataCard__value">{summary.totalSlackBooked.toLocaleString()}</div>
+                <p className="DataCard__meta">Call-level attribution shown per sequence in the table</p>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">SMS booking hints (diagnostic)</div>
+                <div className="DataCard__value">{summary.totalSignals.toLocaleString()}</div>
+                <p className="DataCard__meta">Diagnostic only (not the canonical booked KPI)</p>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">Opt-outs</div>
+                <div className="DataCard__value">{summary.totalOptOuts.toLocaleString()}</div>
+                <p className="DataCard__meta">{formatPct(summary.weightedOptOutRatePct)} opt-out rate</p>
+              </div>
+              <div className="DataCard">
+                <div className="DataCard__label">High-risk sequences (opt-out)</div>
+                <div className="DataCard__value">{summary.highRiskCount}</div>
+              </div>
             </div>
           </section>
 
-      <section className="DataPanel">
-        <h2 className="DataPanel__title">Comprehensive Sequence Table</h2>
-        <div className="DataTableWrap">
-          <table className="DataTable SequencesTable">
-            <thead>
-              <tr>
-                <th>
-                  <button className="SequencesSortButton" onClick={() => onSort('label')}>
-                    Sequence{sortIndicator('label')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('messagesSent')}>
-                    Messages sent{sortIndicator('messagesSent')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('repliesReceived')}>
-                    People replied{sortIndicator('repliesReceived')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('replyRatePct')}>
-                    Reply rate {sortIndicator('replyRatePct')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('slackBookedCalls')}>
-                    Booked (Slack){sortIndicator('slackBookedCalls')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('bookingSignalsSms')}>
-                    SMS booking hints{sortIndicator('bookingSignalsSms')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('optOuts')}>
-                    Opt-outs{sortIndicator('optOuts')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('optOutRatePct')}>
-                    Opt-out rate {sortIndicator('optOutRatePct')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('volumeSharePct')}>
-                    Share of messages{sortIndicator('volumeSharePct')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('signalSharePct')}>
-                    Share of booked calls{sortIndicator('signalSharePct')}
-                  </button>
-                </th>
-                <th className="is-right">
-                  <button className="SequencesSortButton" onClick={() => onSort('healthScore')}>
-                    Health Score{sortIndicator('healthScore')}
-                  </button>
-                </th>
-                <th className="is-right">Risk</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="SequencesTable__empty">
-                    No sequences match the current filter.
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr key={row.label} className={`SequencesTable__row SequencesTable__row--${row.riskLevel}`}>
-                    <td className="SequencesTable__name">{row.label}</td>
-                    <td className="is-right">{row.messagesSent.toLocaleString()}</td>
-                    <td className="is-right">{row.repliesReceived.toLocaleString()}</td>
-                    <td className="is-right">{formatPct(row.replyRatePct)}</td>
-                    <td className="is-right">
-                      {row.slackBookedCalls.toLocaleString()}
-                      {row.slackBookedCalls > 0 ? (
-                        <span className="SequencesCellMeta">
-                          Jack {row.slackBookedJack} / Brandon {row.slackBookedBrandon} / Self {row.slackBookedSelf}
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="is-right">{row.bookingSignalsSms.toLocaleString()}</td>
-                    <td className="is-right">{row.optOuts.toLocaleString()}</td>
-                    <td className="is-right">{formatPct(row.optOutRatePct)}</td>
-                    <td className="is-right">{formatPct(row.volumeSharePct)}</td>
-                    <td className="is-right">{formatPct(row.signalSharePct)}</td>
-                    <td className="is-right">{row.healthScore.toFixed(1)}</td>
-                    <td className="is-right">
-                      <span className={`SequencesRisk SequencesRisk--${row.riskLevel}`}>{row.riskLevel}</span>
-                    </td>
+          <section className="DataPanel">
+            <h2 className="DataPanel__title">Comprehensive Sequence Table</h2>
+            <div className="DataTableWrap">
+              <table className="DataTable SequencesTable">
+                <thead>
+                  <tr>
+                    <th>
+                      <button className="SequencesSortButton" onClick={() => onSort('label')}>
+                        Sequence{sortIndicator('label')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('messagesSent')}>
+                        Messages sent{sortIndicator('messagesSent')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('repliesReceived')}>
+                        People replied{sortIndicator('repliesReceived')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('replyRatePct')}>
+                        Reply rate {sortIndicator('replyRatePct')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('slackBookedCalls')}>
+                        Booked (Slack){sortIndicator('slackBookedCalls')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('bookingSignalsSms')}>
+                        SMS booking hints{sortIndicator('bookingSignalsSms')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('optOuts')}>
+                        Opt-outs{sortIndicator('optOuts')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('optOutRatePct')}>
+                        Opt-out rate {sortIndicator('optOutRatePct')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('volumeSharePct')}>
+                        Share of messages{sortIndicator('volumeSharePct')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('signalSharePct')}>
+                        Share of booked calls{sortIndicator('signalSharePct')}
+                      </button>
+                    </th>
+                    <th className="is-right">
+                      <button className="SequencesSortButton" onClick={() => onSort('healthScore')}>
+                        Health Score{sortIndicator('healthScore')}
+                      </button>
+                    </th>
+                    <th className="is-right">Risk</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
+                </thead>
+                <tbody>
+                  {rows.length === 0 ? (
+                    <tr>
+                      <td colSpan={12} className="SequencesTable__empty">
+                        No sequences match the current filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    rows.map((row) => (
+                      <tr key={row.label} className={`SequencesTable__row SequencesTable__row--${row.riskLevel}`}>
+                        <td className="SequencesTable__name">{row.label}</td>
+                        <td className="is-right">{row.messagesSent.toLocaleString()}</td>
+                        <td className="is-right">{row.repliesReceived.toLocaleString()}</td>
+                        <td className="is-right">{formatPct(row.replyRatePct)}</td>
+                        <td className="is-right">
+                          {row.slackBookedCalls.toLocaleString()}
+                          {row.slackBookedCalls > 0 ? (
+                            <span className="SequencesCellMeta">
+                              Jack {row.slackBookedJack} / Brandon {row.slackBookedBrandon} / Self {row.slackBookedSelf}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className="is-right">{row.bookingSignalsSms.toLocaleString()}</td>
+                        <td className="is-right">{row.optOuts.toLocaleString()}</td>
+                        <td className="is-right">{formatPct(row.optOutRatePct)}</td>
+                        <td className="is-right">{formatPct(row.volumeSharePct)}</td>
+                        <td className="is-right">{formatPct(row.signalSharePct)}</td>
+                        <td className="is-right">{row.healthScore.toFixed(1)}</td>
+                        <td className="is-right">
+                          <span className={`SequencesRisk SequencesRisk--${row.riskLevel}`}>{row.riskLevel}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
         </>
       )}
     </div>

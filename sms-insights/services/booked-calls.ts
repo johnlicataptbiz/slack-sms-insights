@@ -369,23 +369,30 @@ export const getBookedCallSequenceFromSmsEvents = async (
     const bookingTs = new Date(call.eventTs).getTime();
     if (!Number.isFinite(bookingTs)) continue;
 
+    const entry = { bookedCallId: call.bookedCallId, bookingTs };
+
+    // Email is primary — always add to email map when available (email → profile → phone is most accurate).
+    if (call.contactEmail) {
+      const emailKey = call.contactEmail;
+      const list = emailKeyToEntries.get(emailKey) || [];
+      list.push(entry);
+      emailKeyToEntries.set(emailKey, list);
+    }
+
+    // Phone is always added as a fallback (used when email lookup yields no result).
     const phoneKey = normalizePhoneKey(call.contactPhone);
     if (phoneKey) {
       const list = phoneKeyToEntries.get(phoneKey) || [];
-      list.push({ bookedCallId: call.bookedCallId, bookingTs });
+      list.push(entry);
       phoneKeyToEntries.set(phoneKey, list);
-    } else if (call.contactEmail) {
-      // Email path: resolve phone via inbox_contact_profiles
-      const emailKey = call.contactEmail;
-      const list = emailKeyToEntries.get(emailKey) || [];
-      list.push({ bookedCallId: call.bookedCallId, bookingTs });
-      emailKeyToEntries.set(emailKey, list);
-    } else {
-      // Name match only when no phone or email is available
+    }
+
+    // Name match only when neither email nor phone is available.
+    if (!call.contactEmail && !phoneKey) {
       const nameKey = normalizeContactNameKey(call.contactName);
       if (nameKey) {
         const list = nameKeyToEntries.get(nameKey) || [];
-        list.push({ bookedCallId: call.bookedCallId, bookingTs });
+        list.push(entry);
         nameKeyToEntries.set(nameKey, list);
       }
     }
@@ -425,50 +432,8 @@ export const getBookedCallSequenceFromSmsEvents = async (
   };
 
   try {
-    // --- Phone-based lookup ---
-    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
-    if (phoneKeyToEntries.size > 0) {
-      const phoneKeys = [...phoneKeyToEntries.keys()];
-      const { rows } = await pool.query<{ phone_key: string; sequence: string; event_ts: string }>(
-        `
-        SELECT
-          RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
-          TRIM(sequence) AS sequence,
-          event_ts
-        FROM sms_events
-        WHERE direction = 'outbound'
-          AND contact_phone IS NOT NULL
-          AND sequence IS NOT NULL AND TRIM(sequence) != ''
-          AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
-          AND event_ts >= $2::timestamptz
-          AND event_ts <= $3::timestamptz
-        ORDER BY event_ts ASC
-        `,
-        [phoneKeys, fromIso, toIso],
-      );
-      for (const row of rows) {
-        const ts = new Date(row.event_ts).getTime();
-        if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
-        const list = outboundByPhone.get(row.phone_key) || [];
-        list.push({ sequence: row.sequence, ts });
-        outboundByPhone.set(row.phone_key, list);
-      }
-      for (const [phoneKey, entries] of phoneKeyToEntries) {
-        const outbounds = outboundByPhone.get(phoneKey);
-        if (!outbounds || outbounds.length === 0) continue;
-        for (const { bookedCallId, bookingTs } of entries) {
-          const best = resolveBest(outbounds, bookingTs);
-          if (best) {
-            results.set(bookedCallId, {
-              sequenceLabel: best.sequence,
-              latestOutboundAt: new Date(best.ts).toISOString(),
-            });
-          }
-        }
-      }
-    }
-
-    // --- Email-based lookup (via inbox_contact_profiles: email → phone → sms_events) ---
+    // --- Email-based lookup (PRIMARY — email → inbox_contact_profiles → phone → sms_events) ---
+    // Runs first so email-derived results take priority over direct phone match.
     if (emailKeyToEntries.size > 0) {
       const emailKeys = [...emailKeyToEntries.keys()];
       // Step 1: resolve email → phone via inbox_contact_profiles
@@ -525,7 +490,6 @@ export const getBookedCallSequenceFromSmsEvents = async (
           const outbounds = outboundByEmailPhone.get(phoneKey);
           if (!outbounds || outbounds.length === 0) continue;
           for (const { bookedCallId, bookingTs } of entries) {
-            if (results.has(bookedCallId)) continue;
             const best = resolveBest(outbounds, bookingTs);
             if (best) {
               results.set(bookedCallId, {
@@ -533,6 +497,51 @@ export const getBookedCallSequenceFromSmsEvents = async (
                 latestOutboundAt: new Date(best.ts).toISOString(),
               });
             }
+          }
+        }
+      }
+    }
+
+    // --- Phone-based lookup (FALLBACK — direct contactPhone → sms_events) ---
+    // Runs second; skips calls already resolved by email lookup above.
+    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
+    if (phoneKeyToEntries.size > 0) {
+      const phoneKeys = [...phoneKeyToEntries.keys()];
+      const { rows } = await pool.query<{ phone_key: string; sequence: string; event_ts: string }>(
+        `
+        SELECT
+          RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
+          TRIM(sequence) AS sequence,
+          event_ts
+        FROM sms_events
+        WHERE direction = 'outbound'
+          AND contact_phone IS NOT NULL
+          AND sequence IS NOT NULL AND TRIM(sequence) != ''
+          AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
+          AND event_ts >= $2::timestamptz
+          AND event_ts <= $3::timestamptz
+        ORDER BY event_ts ASC
+        `,
+        [phoneKeys, fromIso, toIso],
+      );
+      for (const row of rows) {
+        const ts = new Date(row.event_ts).getTime();
+        if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
+        const list = outboundByPhone.get(row.phone_key) || [];
+        list.push({ sequence: row.sequence, ts });
+        outboundByPhone.set(row.phone_key, list);
+      }
+      for (const [phoneKey, entries] of phoneKeyToEntries) {
+        const outbounds = outboundByPhone.get(phoneKey);
+        if (!outbounds || outbounds.length === 0) continue;
+        for (const { bookedCallId, bookingTs } of entries) {
+          if (results.has(bookedCallId)) continue; // email result already resolved — skip
+          const best = resolveBest(outbounds, bookingTs);
+          if (best) {
+            results.set(bookedCallId, {
+              sequenceLabel: best.sequence,
+              latestOutboundAt: new Date(best.ts).toISOString(),
+            });
           }
         }
       }

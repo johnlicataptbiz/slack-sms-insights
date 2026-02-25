@@ -36,11 +36,11 @@ type V2TermDefinition = {
 
 export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
   callsBookedSlack: {
-    label: 'Calls Booked',
+    label: 'Calls Booked (Team)',
     definition: 'Total confirmed calls scheduled from our outreach efforts.',
   },
   callsBookedCreditSlack: {
-    label: 'Calls Booked',
+    label: 'Calls Booked (Setter)',
     definition: 'Calls this setter booked, credited from Slack booking records.',
   },
   smsBookingHintsDiagnostic: {

@@ -44,6 +44,16 @@ const shorten = (text: string, max: number): string => {
   return `${text.slice(0, max)}…`;
 };
 
+/**
+ * Extract a display version string (e.g. "v1.2") from a sequence label.
+ * Used in the Version column so we show the actual version number instead of
+ * the internal "Legacy" classification tag.
+ */
+const extractVersionDisplay = (label: string): string => {
+  const match = label.match(/\b(v\d+(?:\.\d+)+)\b/i);
+  return match?.[1] ?? '';
+};
+
 const fmtDay = (iso: string | null) => {
   if (!iso) return '—';
   const value = iso.trim();
@@ -517,11 +527,12 @@ export default function SequencesV2() {
                           )}
                         </td>
                         <td className="V2Table__col--version">
-                          {row.version ? (
-                            <span className="V2Badge V2Badge--version">{row.version}</span>
-                          ) : (
-                            <span className="V2Table__dim">—</span>
-                          )}
+                          {(() => {
+                            const vDisplay = extractVersionDisplay(row.label);
+                            if (vDisplay) return <span className="V2Badge V2Badge--version">{vDisplay}</span>;
+                            if (row.version && row.version !== 'Legacy') return <span className="V2Badge V2Badge--version">{row.version}</span>;
+                            return <span className="V2Table__dim">—</span>;
+                          })()}
                         </td>
                         <td className="V2Table__col--date V2Table__dim">
                           {fmtDay(row.firstSeenAt)}

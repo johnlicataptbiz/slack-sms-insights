@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import { ApiError, client } from './api/client';
@@ -67,8 +67,7 @@ const ModeSync = () => {
 };
 
 const DefaultRoute = () => {
-  const mode = useMemo(resolveUiMode, []);
-  return <Navigate to={mode === 'v2' ? '/v2/insights' : '/legacy'} replace />;
+  return <Navigate to="/v2/insights" replace />;
 };
 
 const PostAuthRedirect = () => {

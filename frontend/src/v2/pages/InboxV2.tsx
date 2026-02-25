@@ -205,9 +205,9 @@ const escalationToneForLevel = (level: 1 | 2 | 3 | 4): StateTone => {
 
 const escalationLevelSubtitle = (level: 1 | 2 | 3 | 4): string => {
   if (level === 1) return 'Awareness';
-  if (level === 2) return 'Objection bridge';
-  if (level === 3) return 'Call first';
-  return 'Scaling hybrid';
+  if (level === 2) return 'Objection Bridge';
+  if (level === 3) return 'Call First';
+  return 'Scaling Hybrid';
 };
 
 export default function InboxV2() {
@@ -440,13 +440,13 @@ export default function InboxV2() {
       setDraftPrefillDoneForConversation(selectedConversationId);
       if (result.data.generationMode === 'contextual_fallback') {
         const firstWarning = result.data.generationWarnings[0] || 'AI generation unavailable';
-        setFlashMessage(`Draft generated in contextual fallback mode. ${firstWarning}`);
+        setFlashMessage(`Draft generated in fallback mode. ${firstWarning}`);
         return;
       }
       if (result.data.lint.passed) {
-        setFlashMessage('Draft generated and passed strict lint.');
+        setFlashMessage('Draft generated and passed quality check.');
       } else {
-        setFlashMessage('Draft generated with lint issues. Review before sending.');
+        setFlashMessage('Draft generated with quality issues. Review before sending.');
       }
     } catch (error) {
       setFlashMessage(`Draft generation failed: ${String((error as Error)?.message || error)}`);
@@ -464,7 +464,7 @@ export default function InboxV2() {
 
     // Phase 2: Stage Gating
     if (containsCallLink(messageText) && escalationLevel <= 1) {
-      setFlashMessage('Stage Gating: Select escalation stage (L2+) before offering a call link.');
+      setFlashMessage('Set the escalation stage to L2 or higher before sending a call link.');
       return;
     }
 
@@ -530,12 +530,12 @@ export default function InboxV2() {
           const snoozeUntil = new Date();
           snoozeUntil.setHours(snoozeUntil.getHours() + 72); // 72 hours
           await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: snoozeUntil.toISOString() });
-          setFlashMessage('Podcast sent. Auto-snoozed for 72 hours.');
+          setFlashMessage('Podcast link sent. Snoozed for 72 hours.');
         } else if (containsCallLink(messageText)) {
           const snoozeUntil = new Date();
           snoozeUntil.setHours(snoozeUntil.getHours() + 96); // 96 hours (4 days)
           await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: snoozeUntil.toISOString() });
-          setFlashMessage('Call link sent. Auto-snoozed for 4 days.');
+          setFlashMessage('Call link sent. Snoozed for 4 days.');
         }
 
         setTimeout(() => {
@@ -585,7 +585,7 @@ export default function InboxV2() {
     setComposerText('');
     setSelectedDraftId(null);
     setDraftPrefillDoneForConversation(selectedConversationId);
-    setFlashMessage('Draft cleared. You can regenerate or type a new message.');
+    setFlashMessage('Draft cleared.');
   };
 
   const onSaveQualification = async () => {
@@ -600,7 +600,7 @@ export default function InboxV2() {
         revenueMix: qualificationState.revenueMix,
         coachingInterest: qualificationState.coachingInterest,
       });
-      setFlashMessage('Qualification state updated.');
+      setFlashMessage('Qualification saved.');
     } catch (error) {
       setFlashMessage(`Qualification update failed: ${String((error as Error)?.message || error)}`);
     }
@@ -616,7 +616,7 @@ export default function InboxV2() {
         level: escalationLevel,
         reason: escalationReason,
       });
-      setFlashMessage('Escalation override saved.');
+      setFlashMessage('Stage saved.');
     } catch (error) {
       setFlashMessage(`Escalation update failed: ${String((error as Error)?.message || error)}`);
     }
@@ -671,7 +671,7 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     try {
       await incrementGuardrailOverrideMutation.mutateAsync(selectedConversationId);
-      setFlashMessage('Guardrail override recorded.');
+      setFlashMessage('Override recorded.');
     } catch (error) {
       setFlashMessage(`Guardrail override failed: ${String((error as Error)?.message || error)}`);
     }
@@ -778,7 +778,7 @@ export default function InboxV2() {
     
     if (!canPassGuardrails) {
       if (!canOverrideGuardrails) {
-        setFlashMessage('Guardrail insufficient. Check at least 1 signal to override.');
+        setFlashMessage('Not enough signals. Check at least 1 to override.');
         return;
       }
       // Log override
@@ -829,7 +829,7 @@ export default function InboxV2() {
           </svg>
           <input
             type="text"
-            placeholder="Search conversations..."
+            placeholder="Search conversations…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -868,7 +868,7 @@ export default function InboxV2() {
             onChange={(e) => setNeedsReplyOnly(e.target.checked)}
           />
           <span className="V2Inbox__toggleSlider" />
-          <span>Needs reply</span>
+          <span>Needs Reply</span>
         </label>
       </div>
 
@@ -897,7 +897,7 @@ export default function InboxV2() {
               ))}
             </div>
           ) : listQuery.isError ? (
-            <V2State kind="error">Failed to load inbox: {String((listQuery.error as Error)?.message || listQuery.error)}</V2State>
+            <V2State kind="error">Failed to load conversations: {String((listQuery.error as Error)?.message || listQuery.error)}</V2State>
           ) : conversations.length === 0 ? (
             <div className="V2Inbox__emptyState">
               <div className="V2Inbox__emptyIcon">📭</div>
@@ -995,7 +995,7 @@ export default function InboxV2() {
                 <span className="V2Inbox__statValue" style={{ color: unreadCount > 0 ? '#f59d0d' : '#13b981' }}>
                   {unreadCount}
                 </span>
-                <span className="V2Inbox__statLabel">Unread</span>
+                <span className="V2Inbox__statLabel">Needs Reply</span>
               </div>
               <div className="V2Inbox__statCard">
                 <span className="V2Inbox__statValue" style={{ color: urgentCount > 0 ? '#ef4c62' : '#13b981' }}>
@@ -1016,7 +1016,7 @@ export default function InboxV2() {
             {unassignedCount > 0 && (
               <div className="V2Inbox__alertBanner">
                 <span className="V2Inbox__alertIcon">⚠️</span>
-                <span>{unassignedCount} unassigned conversations need owners</span>
+                <span>{unassignedCount} conversations need an owner</span>
               </div>
             )}
 
@@ -1029,7 +1029,7 @@ export default function InboxV2() {
                       <span className="V2Inbox__workloadAvatar" style={{ background: '#11b8d6' }}>J</span>
                       Jack
                     </span>
-                    <span>{jackCount} conv.</span>
+                    <span>{jackCount} convos</span>
                   </div>
                   <div className="V2Inbox__workloadBar">
                     <div 
@@ -1047,7 +1047,7 @@ export default function InboxV2() {
                       <span className="V2Inbox__workloadAvatar" style={{ background: '#13b981' }}>B</span>
                       Brandon
                     </span>
-                    <span>{brandonCount} conv.</span>
+                    <span>{brandonCount} convos</span>
                   </div>
                   <div className="V2Inbox__workloadBar">
                     <div 
@@ -1066,7 +1066,7 @@ export default function InboxV2() {
                         <span className="V2Inbox__workloadAvatar" style={{ background: '#56607a' }}>?</span>
                         Unassigned
                       </span>
-                      <span>{unassignedCount} conv.</span>
+                      <span>{unassignedCount} convos</span>
                     </div>
                     <div className="V2Inbox__workloadBar">
                       <div 
@@ -1084,7 +1084,7 @@ export default function InboxV2() {
 
             {/* Phase 3: Stage → Call Conversion */}
             <div className="V2Inbox__analyticsSection">
-              <h4 className="V2Inbox__analyticsSectionTitle">Stage → Call Conversion</h4>
+              <h4 className="V2Inbox__analyticsSectionTitle">Stage-to-Call Conversion</h4>
               {stageConversionQuery.isLoading ? (
                 <p className="V2Inbox__analyticsHint">Loading…</p>
               ) : stageConversionQuery.isError ? (
@@ -1168,9 +1168,9 @@ export default function InboxV2() {
       {isGuardrailModalOpen && (
         <div className="V2Inbox__composerBackdrop" style={{ zIndex: 1000 }}>
           <div className="V2Panel" style={{ width: '400px', margin: '10vh auto', background: 'var(--v2-surface)', padding: '1.5rem' }}>
-            <h3 style={{ marginBottom: '1rem' }}>Guardrail Checklist</h3>
+            <h3 style={{ marginBottom: '1rem' }}>Buying Signal Checklist</h3>
             <p style={{ fontSize: '0.85rem', color: 'var(--v2-muted)', marginBottom: '1rem' }}>
-              You are offering a call link at L{escalationLevel}. Please confirm at least 2 buying signals are present.
+              You're sending a call link at L{escalationLevel}. Confirm at least 2 buying signals before proceeding.
             </p>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.5rem' }}>
@@ -1189,7 +1189,7 @@ export default function InboxV2() {
             {!canPassGuardrails && (
               <div style={{ marginBottom: '1.5rem', padding: '0.75rem', background: 'rgba(239, 76, 98, 0.1)', borderRadius: '4px', border: '1px solid var(--v2-critical)' }}>
                 <p style={{ fontSize: '0.8rem', color: 'var(--v2-critical)' }}>
-                  ⚠ Guardrail insufficient. Podcast-first escalation recommended.
+                  ⚠ Not enough signals. Consider sending a podcast episode first.
                 </p>
               </div>
             )}
@@ -1220,7 +1220,7 @@ export default function InboxV2() {
                   className="V2Inbox__button V2Inbox__button--primary"
                   onClick={onConfirmGuardrails}
                   disabled={!canOverrideGuardrails}
-                  title={!canOverrideGuardrails ? 'Check at least 1 signal to override' : 'Override guardrail and send'}
+                  title={!canOverrideGuardrails ? 'Check at least 1 signal to override' : 'Override and send'}
                 >
                   Override &amp; Send
                 </button>
@@ -1237,7 +1237,7 @@ export default function InboxV2() {
             className="V2Inbox__composerModal"
             role="dialog"
             aria-modal="true"
-            aria-label="Conversation and SMS composer"
+            aria-label="Conversation and message composer"
             onClick={(event) => event.stopPropagation()}
           >
             <header className="V2Inbox__composerModalHeader">
@@ -1246,7 +1246,7 @@ export default function InboxV2() {
                   <>
                     <h3>{detail.contactCard.name || detail.contactCard.phone || detail.contactCard.contactKey}</h3>
                     <p className="V2Inbox__composerMeta">
-                      {detail.contactCard.phone} · Owner: {detail.conversation.ownerLabel || 'Unassigned'} · Esc L{detail.conversation.escalation.level}
+                      {detail.contactCard.phone} · Owner: {detail.conversation.ownerLabel || 'Unassigned'} · Stage: L{detail.conversation.escalation.level}
                     </p>
                     <div className="V2Inbox__statusRow">
                       <span className={`V2Inbox__statusBadge V2Inbox__statusBadge--${detail.conversation.status}`}>
@@ -1258,7 +1258,7 @@ export default function InboxV2() {
                           className="V2Inbox__button V2Inbox__button--small"
                           onClick={() => onUpdateStatus('closed')}
                           disabled={statusMutation.isPending}
-                          title="Mark conversation as resolved"
+                          title="Mark as closed"
                         >
                           Close
                         </button>
@@ -1269,7 +1269,7 @@ export default function InboxV2() {
                           className="V2Inbox__button V2Inbox__button--small"
                           onClick={() => onUpdateStatus('open')}
                           disabled={statusMutation.isPending}
-                          title="Reopen this conversation"
+                          title="Reopen conversation"
                         >
                           Reopen
                         </button>
@@ -1299,7 +1299,7 @@ export default function InboxV2() {
                     </div>
                     {/* Assignment + Snooze row */}
                     <div className="V2Inbox__statusRow V2Inbox__statusRow--meta">
-                      <span className="V2Inbox__metaLabel">Assign:</span>
+                      <span className="V2Inbox__metaLabel">Assign to:</span>
                       <input
                         type="text"
                         className="V2Inbox__assignInput"
@@ -1354,7 +1354,7 @@ export default function InboxV2() {
                   className="V2Inbox__button V2Inbox__button--small"
                   onClick={() => void detailQuery.refetch()}
                   disabled={detailQuery.isFetching}
-                  title="Refresh conversation from database"
+                  title="Refresh messages"
                 >
                   {detailQuery.isFetching ? '↻ Syncing…' : '↻ Refresh'}
                 </button>
@@ -1366,12 +1366,12 @@ export default function InboxV2() {
 
             <div className="V2Inbox__composerModalBody">
               {!selectedConversationId ? (
-                <V2State kind="empty">Select a conversation to view and reply.</V2State>
+                <V2State kind="empty">Select a conversation to open it.</V2State>
               ) : detailQuery.isLoading ? (
-                <V2State kind="loading">Loading conversation...</V2State>
+                <V2State kind="loading">Loading messages…</V2State>
               ) : detailQuery.isError || !detail ? (
                 <V2State kind="error">
-                  Failed to load conversation: {String((detailQuery.error as Error)?.message || detailQuery.error)}
+                  Failed to load messages: {String((detailQuery.error as Error)?.message || detailQuery.error)}
                 </V2State>
               ) : (
                 <div className="V2Inbox__composerGrid">
@@ -1398,7 +1398,7 @@ export default function InboxV2() {
                             <span className="V2Inbox__chatSpeaker">{speaker}</span>
                             <time className="V2Inbox__chatTime">{fmtDateTime(message.createdAt)}</time>
                           </div>
-                          <p className="V2Inbox__chatBody">{message.body || '(empty message)'}</p>
+                          <p className="V2Inbox__chatBody">{message.body || '(empty)'}</p>
                         </article>
                       );
                     })}
@@ -1412,7 +1412,7 @@ export default function InboxV2() {
                         </div>
                         <p className="V2Inbox__chatBody">{justSentMessage.text}</p>
                         <span className="V2Inbox__sendingIndicator">
-                          {!justSentMessage.confirmed ? 'Sending...' : '✓ Sent'}
+                          {!justSentMessage.confirmed ? 'Sending…' : '✓ Sent'}
                         </span>
                       </article>
                     )}
@@ -1435,12 +1435,12 @@ export default function InboxV2() {
                         fontSize: '0.8rem',
                         color: '#f59d0d',
                       }}>
-                        <span>⚠ Call link already sent — no reply yet. Consider a calibrated question instead.</span>
+                        <span>⚠ Call link already sent — no reply yet. Try a follow-up question instead.</span>
                         <button
                           type="button"
                           style={{ background: 'none', border: 'none', color: '#f59d0d', cursor: 'pointer', fontSize: '0.8rem', padding: '0 0.25rem' }}
                           onClick={() => setShowDoublePitchWarning(false)}
-                          title="Dismiss warning and send anyway"
+                          title="Dismiss and send anyway"
                         >
                           Send anyway ✕
                         </button>
@@ -1461,7 +1461,7 @@ export default function InboxV2() {
                             }
                           }
                         }}
-                        placeholder="Type your message..."
+                        placeholder="Type your message…"
                         rows={3}
                       />
                       <div className="V2Inbox__chatActions">
@@ -1520,7 +1520,7 @@ export default function InboxV2() {
                             onChange={(event) => setSelectedLineKey(event.target.value)}
                             title="Select send line"
                           >
-                            <option value="">Line...</option>
+                            <option value="">Line…</option>
                             {lineOptions.map((option) => (
                               <option key={option.key} value={option.key}>
                                 {formatSendLineLabel(option)}
@@ -1542,7 +1542,7 @@ export default function InboxV2() {
                                 }
                               }
                             }}
-                            title="Use a previous draft"
+                            title="Use a saved draft"
                           >
                             <option value="">Drafts ({detail.drafts.length})</option>
                             {detail.drafts.slice(0, 5).map((draft) => (
@@ -1586,7 +1586,7 @@ export default function InboxV2() {
                                   </div>
                                 ))
                               ) : (
-                                <p className="V2Inbox__templateEmpty">No templates yet.</p>
+                                <p className="V2Inbox__templateEmpty">No templates saved yet.</p>
                               )}
                               <div className="V2Inbox__templateCreate">
                                 <input
@@ -1601,7 +1601,7 @@ export default function InboxV2() {
                                   value={newTemplateBody}
                                   onChange={(e) => setNewTemplateBody(e.target.value)}
                                   rows={2}
-                                  placeholder="Body… use {{name}} for contact name"
+                                  placeholder="Message body… use {{name}} for contact name"
                                 />
                                 <button
                                   type="button"
@@ -1620,7 +1620,7 @@ export default function InboxV2() {
                           className="V2Inbox__chatClear"
                           onClick={onClearDraft}
                           disabled={!selectedDraftId && composerText.length === 0}
-                          title="Clear draft"
+                          title="Clear message"
                         >
                           Clear
                         </button>
@@ -1636,7 +1636,7 @@ export default function InboxV2() {
                     <div className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${qualificationTone}`}>
                       <p className="V2Panel__title">Qualification</p>
                       <div className="V2Inbox__stateTop">
-                        <span className="V2Inbox__stateBadge">{qualificationProgressLive}/4 fields</span>
+                        <span className="V2Inbox__stateBadge">{qualificationProgressLive} of 4 fields</span>
                         <span className="V2Inbox__stateHint">{qualificationProgressPct}% complete</span>
                       </div>
                       <div className="V2Inbox__stateMeter">
@@ -1707,7 +1707,7 @@ export default function InboxV2() {
 
                     {/* Escalation Panel */}
                     <div className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${escalationTone}`}>
-                      <p className="V2Panel__title">Escalation</p>
+                      <p className="V2Panel__title">Escalation Stage</p>
                       <div className="V2Inbox__stateTop">
                         <span className="V2Inbox__stateBadge">L{escalationLevel} · {escalationLevelSubtitle(escalationLevel)}</span>
                         <span className="V2Inbox__stateHint">{escalationProgressPct}%</span>
@@ -1728,12 +1728,12 @@ export default function InboxV2() {
                         ))}
                       </div>
                       <label className="V2Control" style={{ marginTop: '0.5rem' }}>
-                        <span>Reason / Note</span>
+                        <span>Override Reason</span>
                         <textarea
                           value={escalationReason}
                           onChange={(e) => setEscalationReason(e.target.value)}
                           rows={2}
-                          placeholder="Optional override reason…"
+                          placeholder="Why are you overriding? (optional)"
                         />
                       </label>
                       <button
@@ -1743,7 +1743,7 @@ export default function InboxV2() {
                         onClick={onOverrideEscalation}
                         disabled={escalationMutation.isPending}
                       >
-                        {escalationMutation.isPending ? 'Saving…' : 'Save Escalation'}
+                        {escalationMutation.isPending ? 'Saving…' : 'Save Stage'}
                       </button>
                     </div>
 
@@ -1788,9 +1788,9 @@ export default function InboxV2() {
 
                     {/* Whisper Notes Panel */}
                     <div className="V2Panel V2Inbox__sidePanel">
-                      <p className="V2Panel__title">Whisper Notes</p>
+                      <p className="V2Panel__title">Internal Notes</p>
                       <p className="V2Panel__caption" style={{ fontSize: '0.75rem', marginBottom: '0.5rem', color: 'var(--v2-muted)' }}>
-                        Internal only — not visible to lead
+                        Not visible to the lead
                       </p>
                       <div className="V2Inbox__notesList">
                         {notesQuery.isLoading && (
@@ -1817,7 +1817,7 @@ export default function InboxV2() {
                           value={noteText}
                           onChange={(e) => setNoteText(e.target.value)}
                           rows={2}
-                          placeholder="Add internal note… (⌘↵ to save)"
+                          placeholder="Add a note… (⌘↵ to save)"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void onAddNote();
                           }}
@@ -1903,9 +1903,9 @@ export default function InboxV2() {
                           className="V2Inbox__button V2Inbox__button--small V2Inbox__button--danger"
                           onClick={onIncrementGuardrailOverride}
                           disabled={incrementGuardrailOverrideMutation.isPending}
-                          title="Record that a guardrail was manually overridden for this conversation"
+                          title="Record that a guardrail was overridden for this conversation"
                         >
-                          {incrementGuardrailOverrideMutation.isPending ? '…' : '⚠ Log Guardrail Override'}
+                          {incrementGuardrailOverrideMutation.isPending ? '…' : '⚠ Log Override'}
                         </button>
                         <p style={{ fontSize: '0.68rem', color: 'var(--v2-muted)', marginTop: '0.25rem' }}>
                           Overrides: {detail?.conversation.guardrailOverrideCount ?? 0}

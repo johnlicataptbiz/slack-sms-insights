@@ -182,7 +182,7 @@ export function InsightsV2() {
           trend={sparklines ? calculateTrend(sparklines.replyRate) : undefined}
         />
         <V2MetricCard
-          label="Opt-outs"
+          label="Opt-Outs"
           value={fmtInt(payload.totals.optOuts)}
           meta={`of ${fmtInt(payload.totals.messagesSent)} messages`}
           tone={payload.totals.optOuts >= 10 ? 'critical' : 'default'}
@@ -190,7 +190,7 @@ export function InsightsV2() {
           trend={sparklines ? calculateTrend(sparklines.optOuts) : undefined}
         />
         <V2MetricCard
-          label="Self Bookings"
+          label="Self-Booked"
           value={fmtInt(payload.bookedCredit.selfBooked)}
           meta="From website & ads"
           tone="accent"
@@ -229,7 +229,7 @@ export function InsightsV2() {
                 <em>{fmtInt(brandonRep?.outboundConversations ?? 0)} conversations</em>
               </article>
               <article>
-                <span>Self Bookings</span>
+                <span>Self-Booked</span>
                 <strong>{fmtInt(payload.bookedCredit.selfBooked)}</strong>
                 <em>From website & ads</em>
               </article>
@@ -260,9 +260,9 @@ export function InsightsV2() {
             </div>
 
             <div className="V2WeeklySummary__meta">
-              <span>Source: {payload.provenance.canonicalBookedSource}</span>
-              <span>Synced: {fmtDateTime(weekly?.sources?.monday?.lastSyncAt ?? null)}</span>
-              <span>Window: {new Date(payload.timeRange.from).toLocaleDateString()} → {new Date(payload.timeRange.to).toLocaleDateString()}</span>
+              <span>Source: Slack booking records</span>
+              <span>Last synced: {fmtDateTime(weekly?.sources?.monday?.lastSyncAt ?? null)}</span>
+              <span>Period: {new Date(payload.timeRange.from).toLocaleDateString()} – {new Date(payload.timeRange.to).toLocaleDateString()}</span>
             </div>
 
             <div className="V2WeeklySummary__extras">
@@ -286,7 +286,7 @@ export function InsightsV2() {
         </V2Panel>
 
         <div className="V2Grid">
-          <V2Panel title="Sets Breakdown" caption="Jack's sets vs Brandon's sets vs self bookings.">
+          <V2Panel title="Sets Breakdown" caption="Jack's sets vs Brandon's sets vs self-booked.">
             <div className="V2SplitStat">
               <div>
                 <span>Jack's Sets</span>
@@ -297,25 +297,25 @@ export function InsightsV2() {
                 <strong>{fmtInt(payload.bookedCredit.brandon)}</strong>
               </div>
               <div>
-                <span>Self Bookings</span>
+                <span>Self-Booked</span>
                 <strong>{fmtInt(payload.bookedCredit.selfBooked)}</strong>
               </div>
             </div>
           </V2Panel>
 
-          <V2Panel title="Call Sources" caption="Where your booked calls came from.">
+          <V2Panel title="Where Calls Came From" caption="Where your booked discovery calls came from.">
             <V2StatBar
               segments={[
-                { label: 'SMS Linked', value: breakdown.bookedSmsLinkedStrict, color: 'var(--v2-accent)' },
+                { label: 'Booked via SMS', value: breakdown.bookedSmsLinkedStrict, color: 'var(--v2-accent)' },
                 { label: 'Self Booked', value: breakdown.bookedSelf, color: 'var(--v2-positive)' },
                 { label: 'Other', value: breakdown.bookedNonSmsOrUnknownExcludingSelf, color: 'var(--v2-muted)' },
               ]}
               total={breakdown.bookedTotalAllChannels}
             />
             <div style={{ marginTop: '0.75rem', fontSize: '0.78rem', color: 'var(--v2-muted)' }}>
-              Source: {payload.provenance.canonicalBookedSource} • 
-              Coverage: {breakdown.bookedAttribution
-                ? `${breakdown.bookedAttribution.matchedCalls}/${breakdown.bookedAttribution.totalCalls} calls`
+              Source: Slack booking records •
+              {breakdown.bookedAttribution
+                ? `Matched ${breakdown.bookedAttribution.matchedCalls} of ${breakdown.bookedAttribution.totalCalls} calls to a source`
                 : 'n/a'}
             </div>
           </V2Panel>
@@ -323,7 +323,7 @@ export function InsightsV2() {
       </div>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="List Health" caption="Watch for opt-out spikes.">
+        <V2Panel title="Opt-Out Watch" caption="Watch for opt-out spikes.">
           <div className="V2TableWrap">
             <table className="V2Table">
               <thead>
@@ -331,7 +331,7 @@ export function InsightsV2() {
                   <th>Sequence</th>
                   <th className="is-right">Sent</th>
                   <th className="is-right">Replies</th>
-                  <th className="is-right">Opt-out rate</th>
+                  <th className="is-right">Opt-Out Rate</th>
                 </tr>
               </thead>
               <tbody>

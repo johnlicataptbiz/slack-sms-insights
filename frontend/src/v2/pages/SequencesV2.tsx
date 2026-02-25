@@ -17,6 +17,15 @@ type Sort =
   | 'uniqueContacted'
   | 'bookingRatePct';
 
+// ─── SMS Reply Reason Labels ─────────────────────────────────────────────────
+
+const SMS_REPLY_REASON_LABELS: Record<string, string> = {
+  matched_reply_before_booking: 'SMS reply matched before booking',
+  no_contact_phone: 'No contact phone on file',
+  no_reply_before_booking: 'No SMS reply before booking',
+  invalid_booking_timestamp: 'Invalid booking timestamp',
+};
+
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -347,33 +356,33 @@ export default function SequencesV2() {
         <V2MetricCard
           label="Unique Contacts"
           value={fmtInt(kpis.totalUniqueContacted)}
-          meta="weekly scoreboard window"
+          meta="weekly window"
         />
         <V2MetricCard
           label="Booked Calls"
           value={fmtInt(kpis.totalBooked)}
           tone={kpis.totalBooked > 0 ? 'positive' : 'default'}
-          meta="Slack-attributed (canonical)"
+          meta="Slack-verified bookings"
         />
         <V2MetricCard
           label="Avg Reply Rate"
           value={fmtPct(kpis.avgReplyRate)}
           tone={kpis.avgReplyRate >= 10 ? 'positive' : 'default'}
-          meta="messages-sent basis"
+          meta="based on messages sent"
         />
         <V2MetricCard
-          label="SMS-Reply Booking %"
+          label="Booked via SMS Reply %"
           value={fmtPct(kpis.smsReplyBookingPct)}
           tone={kpis.smsReplyBookingPct >= 50 ? 'positive' : 'default'}
-          meta="bookings with prior SMS reply"
+          meta="of bookings had a prior SMS reply"
         />
       </section>
 
       {/* ── Health Watchlist ── */}
       {healthWatchlist.length > 0 && (
         <V2Panel
-          title="⚠ Sequence Health Watchlist"
-          caption="Sequences flagged for attention based on opt-out rate, reply rate, or booking performance"
+          title="⚠ Sequence Health Alerts"
+          caption="Sequences flagged for attention based on opt-out rate, reply rate, or booking performance."
         >
           <div className="V2RiskFlags">
             {healthWatchlist.map((flag, i) => (
@@ -403,7 +412,7 @@ export default function SequencesV2() {
       {/* ── Sequence Performance Table ── */}
       <V2Panel
         title="Sequence Performance"
-        caption={`${sortedRows.length} sequences · all numbers from ${mode} rolling window · Booked = Slack-attributed canonical · Unique/Booking Rate from weekly scoreboard · click headers to sort`}
+        caption={`${sortedRows.length} sequences · all numbers from ${mode} rolling window · Booked = Slack-verified · Unique/Booking Rate from weekly window · click headers to sort`}
       >
         {sortedRows.length === 0 ? (
           <V2State kind="empty">No sequence data for this window.</V2State>
@@ -414,7 +423,7 @@ export default function SequencesV2() {
                 <tr>
                   <th className="V2Table__col--label">Sequence</th>
                   <th className="V2Table__col--leadMagnet">Lead Magnet</th>
-                  <th className="V2Table__col--version">Ver.</th>
+                  <th className="V2Table__col--version">Version</th>
                   <th className="V2Table__col--date">First Seen</th>
                   <th
                     className="is-right is-sortable"
@@ -425,7 +434,7 @@ export default function SequencesV2() {
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('uniqueContacted')}
-                    title="Unique people reached by this sequence · weekly scoreboard window"
+                    title="Unique people reached by this sequence · weekly window"
                   >
                     Contacts{sortArrow('uniqueContacted')}
                   </th>
@@ -445,7 +454,7 @@ export default function SequencesV2() {
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('bookingRatePct')}
-                    title="Booked calls ÷ unique contacts · weekly scoreboard window"
+                    title="Booked calls ÷ unique contacts · weekly window"
                   >
                     Booking Rate{sortArrow('bookingRatePct')}
                   </th>
@@ -454,13 +463,13 @@ export default function SequencesV2() {
                     onClick={() => handleSortClick('canonicalBookedAfterSmsReply')}
                     title="Booked calls where the contact had replied to an SMS before booking"
                   >
-                    w/ SMS Reply{sortArrow('canonicalBookedAfterSmsReply')}
+                    SMS-Linked{sortArrow('canonicalBookedAfterSmsReply')}
                   </th>
                   <th
                     className="is-right"
                     title="% of bookings that had a prior SMS reply"
                   >
-                    SMS Reply %
+                    SMS-Linked %
                   </th>
                   <th
                     className="is-right is-sortable"
@@ -595,7 +604,7 @@ export default function SequencesV2() {
                               {/* Booking breakdown summary */}
                               <div className="V2SeqAudit__summary">
                                 <div className="V2SeqAudit__summaryItem">
-                                  <span className="V2SeqAudit__summaryLabel">Booked (Slack)</span>
+                                  <span className="V2SeqAudit__summaryLabel">Booked (Slack-verified)</span>
                                   <span className="V2SeqAudit__summaryValue">
                                     {fmtInt(row.canonicalBookedCalls)}
                                     {row.canonicalBookedCalls > 0 && (
@@ -608,7 +617,7 @@ export default function SequencesV2() {
                                   </span>
                                 </div>
                                 <div className="V2SeqAudit__summaryItem">
-                                  <span className="V2SeqAudit__summaryLabel">w/ SMS Reply</span>
+                                  <span className="V2SeqAudit__summaryLabel">SMS-Linked</span>
                                   <span className="V2SeqAudit__summaryValue">
                                     {fmtInt(row.canonicalBookedAfterSmsReply)}
                                     {row.canonicalBookedCalls > 0 && smsReplyPct !== null && (
@@ -620,8 +629,8 @@ export default function SequencesV2() {
                                 </div>
                                 <div className="V2SeqAudit__summaryItem V2SeqAudit__summaryItem--diagnostic">
                                   <span className="V2SeqAudit__summaryLabel">
-                                    SMS Booking Signals
-                                    <span className="V2SeqAudit__hint"> (diagnostic, not canonical)</span>
+                                    Booking Signals
+                                    <span className="V2SeqAudit__hint"> (for reference only)</span>
                                   </span>
                                   <span className="V2SeqAudit__summaryValue V2SeqAudit__summaryValue--muted">
                                     {fmtInt(row.diagnosticSmsBookingSignals)}
@@ -632,7 +641,7 @@ export default function SequencesV2() {
                               {/* Per-booking audit rows */}
                               {row.bookedAuditRows.length === 0 ? (
                                 <V2State kind="empty">
-                                  No Slack booked-call audit rows for this sequence in this window.
+                                  No booking records found for this sequence in this window.
                                 </V2State>
                               ) : (
                                 <div className="V2AuditList">
@@ -682,14 +691,14 @@ export default function SequencesV2() {
                                           )}
                                         </header>
                                         <p className="V2AuditItem__meta">
-                                          First conversion:{' '}
+                                          Lead source:{' '}
                                           <em>{audit.firstConversion || 'n/a'}</em> · Contact:{' '}
                                           {audit.contactName || 'n/a'} · Phone:{' '}
                                           {maskPhone(audit.contactPhone)}
                                         </p>
                                         <p className="V2AuditItem__reason">
                                           Reason:{' '}
-                                          {audit.strictSmsReplyReason.replace(/_/g, ' ')}
+                                          {SMS_REPLY_REASON_LABELS[audit.strictSmsReplyReason] ?? audit.strictSmsReplyReason.replace(/_/g, ' ')}
                                           {audit.latestReplyAt
                                             ? ` · Latest SMS reply: ${fmtDateTime(audit.latestReplyAt)}`
                                             : ''}
@@ -721,7 +730,7 @@ export default function SequencesV2() {
       {leadMagnetRows.length > 0 && (
         <V2Panel
           title="Lead Magnet Comparison"
-          caption="Legacy vs v2 sequences by lead magnet · weekly scoreboard window"
+          caption="Legacy vs v2 sequences by lead magnet · weekly window"
         >
           <div className="V2TableWrap">
             <table className="V2Table">
@@ -807,18 +816,16 @@ export default function SequencesV2() {
                 <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.selfBooked)}</span>
               </div>
               <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
-                <span className="V2SeqAttribution__label">Sequence-Initiated</span>
+                <span className="V2SeqAttribution__label">From Sequences</span>
                 <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
               </div>
               <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">Manual-Initiated</span>
+                <span className="V2SeqAttribution__label">From Direct Outreach</span>
                 <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
               </div>
             </div>
             <p className="V2SeqAttribution__note">
-              Attribution model: sequence-initiated conversation. A sequence gets credit when it
-              triggered the first outbound contact with a lead, even if manual follow-ups preceded
-              the booking.
+              A sequence gets credit when it started the first outbound contact with a lead, even if manual follow-ups came before the booking.
             </p>
           </div>
         </V2Panel>
@@ -827,8 +834,8 @@ export default function SequencesV2() {
       {/* ── Compliance Panel ── */}
       {compliance && (
         <V2Panel
-          title="Compliance Overview"
-          caption="Opt-out rates and top opt-out sequences · weekly scoreboard window"
+          title="Opt-Out Health"
+          caption="Opt-out rates and top opt-out sequences · weekly window"
         >
           <div className="V2SeqCompliance">
             <div className="V2SeqCompliance__rates">
@@ -851,7 +858,7 @@ export default function SequencesV2() {
             </div>
             {compliance.topOptOutSequences.length > 0 && (
               <div className="V2SeqCompliance__topList">
-                <p className="V2SeqCompliance__topTitle">Top Opt-Out Sequences</p>
+                <p className="V2SeqCompliance__topTitle">Highest Opt-Out Sequences</p>
                 <div className="V2TableWrap">
                   <table className="V2Table">
                     <thead>
@@ -884,7 +891,7 @@ export default function SequencesV2() {
       {timing && (
         <V2Panel
           title="Reply Timing"
-          caption="Median time to first reply and reply rate by day of week · weekly scoreboard window"
+          caption="Median time to first reply and reply rate by day of week · weekly window"
         >
           <div className="V2SeqTiming">
             {timing.medianTimeToFirstReplyMinutes !== null && (

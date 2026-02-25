@@ -1,47 +1,108 @@
-Phase 2 Implementation TODO
+# Plain Language Pass + Default Route Fix
 
-## Step 1: Fix API Contract & Mapping (Bugs #3, #5, #6)
-- [x] Update `InboxConversationV2` in `sms-insights/api/v2-contract.ts` to include `objectionTags`, `callOutcome`, and `guardrailOverrideCount`.
-- [x] Update `InboxConversationV2` in `frontend/src/api/v2-types.ts` to include `objectionTags`, `callOutcome`, and `guardrailOverrideCount`.
-- [x] Update `toInboxConversationV2` in `sms-insights/api/routes.ts` to map these fields from the DB row.
-- [x] Fix `handleGetInboxConversationDetailV2` mergedRow to explicitly forward `state_objection_tags`, `state_call_outcome`, `state_guardrail_override_count` from `ensuredState` so the detail endpoint returns correct values.
+## Status: IN PROGRESS
 
-## Step 2: Fix Frontend State Management (Bugs #2, #3, #4, #5, #6)
-- [x] Fix Bug #2: `onInsertTemplate` in `frontend/src/v2/pages/InboxV2.tsx` replaces text (not appends). Confirmed correct.
-- [x] Fix Bugs #3, #5, #6: Removed `(detail.conversation as any).nextFollowupDueAt` cast — now uses `detail.conversation.escalation.nextFollowupDueAt`.
-- [x] Fix Bug #4: `useV2OverrideEscalation` in `frontend/src/api/v2Queries.ts` already invalidates `['v2', 'inbox', 'conversation', variables.conversationId]`. Confirmed correct.
+### Routing Fix
+- [ ] `frontend/src/App.tsx` — DefaultRoute always → /v2/insights (ignore localStorage)
 
-## Step 3: Implement Phase 2 Database Tables
-- [x] Run `sms-insights/scripts/migrate-phase2-tables.ts`. Tables `conversation_notes` and `message_templates` created successfully.
+### Language Pass — copy.ts
+- [ ] `callsBookedCreditSlack` label: "Setter Credit" → "Calls Booked"
+- [ ] `smsBookingHintsDiagnostic` label: "Booking Hints" → "Booking Signals"
+- [ ] `outboundConversations` label: "Outbound Messages" → "Conversations Started"
+- [ ] `optOuts` label: "Unsubscribes" → "Opt-Outs"
+- [ ] `optOutRate` label: "Unsubscribe Rate" → "Opt-Out Rate"
+- [ ] `sequenceMatchCoverage` label: "Sequence Coverage" → "Sequence-Attributed Bookings"
+- [ ] Update all 6 definitions
 
-## Step 4: Implement Stage Gating & Guardrails (Phase 2)
-- [x] `containsCallLink` and `containsPodcastLink` utility functions present in `InboxV2.tsx`.
-- [x] Stage Gating: Block send if `escalationLevel <= 1` and message contains a call link.
-- [x] Guardrail Checklist Modal: Shown when `escalationLevel >= 3` and call link detected. Requires ≥2 checked for "Send Anyway". "Override & Send" requires ≥1 checked.
-- [x] Guardrail checklist labels updated to spec: Timeline, Cash Intent, Revenue Ambition, Frustration, Complexity, Engagement, How-To Question.
-- [x] Double Pitch Protection: Yellow warning banner above composer (replaces `window.confirm`). Detects prior outbound call link with no inbound reply since. "Send anyway ✕" button to dismiss.
+### Language Pass — InsightsV2.tsx
+- [ ] "Opt-outs" → "Opt-Outs"
+- [ ] "Self Bookings" → "Self-Booked" (3 places)
+- [ ] "Call Sources" → "Where Calls Came From"
+- [ ] "SMS Linked" → "Booked via SMS"
+- [ ] "Other" → "Other / Unknown"
+- [ ] Source: raw string → "Slack booking records"
+- [ ] Coverage: → "Matched N of M calls to a source"
+- [ ] "List Health" → "Opt-Out Watch"
+- [ ] "Opt-out rate" column → "Opt-Out Rate"
+- [ ] "Synced:" → "Last synced:"
+- [ ] "Window:" → "Period:"
 
-## Step 5: Auto-Snooze after podcast/call link send
-- [x] Podcast link send → auto-snooze 72 hours.
-- [x] Call link send → auto-snooze 96 hours (4 days).
+### Language Pass — RunsV2.tsx
+- [ ] "Total Runs" → "Daily Reports"
+- [ ] "across all runs" → "across all reports"
+- [ ] "Run Timeline" → "Report History"
+- [ ] "Showing N runs" → "Showing N reports"
+- [ ] buildRunViewModel titles: "Daily Auto-Run"→"Daily Auto-Report", "Manual Pull"→"Manual Report", "Test Pull"→"Test Report"
+- [ ] modeLabels: "6:00 AM auto run"→"6:00 AM auto-report", "Manual trigger"→"Manual report", "Test trigger"→"Test report"
+- [ ] "Run Details" → "Report Details"
+- [ ] "Run Error" → "Report Error"
+- [ ] "Booked (Report)" → "Booked (from report)"
+- [ ] "Booked (Slack)" → "Booked (Slack-verified)"
+- [ ] "Snapshot Summary" → "Summary"
+- [ ] "Run Metadata" → "Report Info"
+- [ ] "Timestamp" → "Generated at"
+- [ ] "Duration" → "Processing time"
+- [ ] "Top Sequence Volume" → "Top Sequences"
+- [ ] "Setter Breakdown" → "Setter Performance"
+- [ ] "Outbound Convos" → "Conversations"
+- [ ] "No structured summary stored for this run." → "No summary available for this report."
+- [ ] "No parsed sequence rows were found for this run." → "No sequence data found for this report."
+- [ ] "No parsed setter rows were found for this run." → "No setter data found for this report."
+- [ ] "Show stored raw report text" → "Show full report text"
+- [ ] "Loading raw report text…" → "Loading report text…"
+- [ ] "No stored report text" → "No report text available"
+- [ ] "Back to run timeline" → "Back to report history"
+- [ ] "Automated Daily Run" → "Automated Daily Report"
+- [ ] "Manual / On-Demand Run" → "Manual / On-Demand Report"
+- [ ] "Loading daily runs…" → "Loading reports…"
+- [ ] "Failed to load runs:" → "Failed to load reports:"
+- [ ] "Select a run to inspect details." → "Select a report to view details."
+- [ ] Stale banner text update
+- [ ] "Range (days)" → "Show last (days)"
+- [ ] "Report day X" → "Report date: X"
+- [ ] "Report day not detected" → "Date not detected"
+- [ ] Saved view meta line update
 
-## Step 6: UX Improvements
-- [x] `InsightsV2.tsx`: Daily Stats day labels formatted from ISO (2026-02-19) to human-readable (Feb 19).
-- [x] `InsightsV2.tsx`: Booking Rate metric card added: `(canonicalBookedCalls / peopleContacted * 100).toFixed(1) + '%'`.
-- [x] `InsightsV2.tsx`: 'This Week' panel Window timestamps formatted via `toLocaleDateString()`.
-- [x] `SequencesV2.tsx`: Booking Rate column added after 'Booked': `(canonicalBookedCalls / messagesSent * 100).toFixed(1) + '%'`. Shows '—' if `messagesSent === 0`.
-- [x] `SequencesV2.tsx`: Tooltip on 'w/ SMS Reply' column header: 'Booked calls where the contact had replied to an SMS before booking'.
-- [x] `RepV2.tsx`: Booking Rate metric card added: `(booked / outbound * 100).toFixed(1) + '%'`, shows 'n/a' if `outbound === 0`.
+### Language Pass — RepV2.tsx
+- [ ] Subtitle "Deltas compare against" → "Changes vs."
+- [ ] "Setter Jack" / "Setter Brandon" → "Jack" / "Brandon"
+- [ ] "Booked Call Credit" → "Calls Booked"
+- [ ] "Low reply efficiency on active volume" → "Low reply rate on high volume"
+- [ ] "No prior-day data to calculate deltas yet." → "No prior-day data to compare yet."
+- [ ] "No at-risk flags for this setter on this day." → "No issues flagged for today."
+- [ ] "Team Performance" → "Team Totals"
+- [ ] "How to Read This Card" → "How to Read This Page"
+- [ ] "How today compared to yesterday." → "Changes from yesterday to today."
+- [ ] "No prior-day baseline yet" → "No prior-day data yet"
+- [ ] How to Read bullet points — simplify 3 lines
+- [ ] "Loading setter scorecard…" → "Loading scorecard…"
+- [ ] "Failed to load setter scorecard:" → "Failed to load scorecard:"
 
-## Follow-up
-- [x] Run `tsc --noEmit --skipLibCheck` in both `frontend` and `sms-insights`. Both pass with zero errors.
-- [x] All Phase 2 implementation steps complete.
+### Language Pass — SequencesV2.tsx
+- [ ] "Ver." → "Version"
+- [ ] "w/ SMS Reply" column → "SMS-Linked"
+- [ ] "SMS Reply %" column → "SMS-Linked %"
+- [ ] "SMS-Reply Booking %" KPI → "Booked via SMS Reply %"
+- [ ] "bookings with prior SMS reply" → "of bookings had a prior SMS reply"
+- [ ] "Slack-attributed (canonical)" → "Slack-verified bookings"
+- [ ] "messages-sent basis" → "based on messages sent"
+- [ ] "weekly scoreboard window" → "weekly window"
+- [ ] "Sequence Health Watchlist" → "Sequence Health Alerts"
+- [ ] Watchlist caption → simplified
+- [ ] Performance table caption → simplified
+- [ ] "Sequence-Initiated" → "From Sequences"
+- [ ] "Manual-Initiated" → "From Direct Outreach"
+- [ ] Attribution note → simplified
+- [ ] "Compliance Overview" → "Opt-Out Health"
+- [ ] Compliance caption → simplified
+- [ ] "Top Opt-Out Sequences" → "Highest Opt-Out Sequences"
+- [ ] Audit: "Booked (Slack)" → "Booked (Slack-verified)"
+- [ ] Audit: "w/ SMS Reply" → "SMS-Linked"
+- [ ] Audit: "SMS Booking Signals" → "Booking Signals"
+- [ ] Audit: "(diagnostic, not canonical)" → "(for reference only)"
+- [ ] Audit: "No Slack booked-call audit rows…" → "No booking records found…"
+- [ ] Audit: "First conversion:" → "Lead source:"
+- [ ] Audit: Humanize strictSmsReplyReason values
 
-## Post-Phase 2 Bug Fixes (URL Detection)
-- [x] Add `physicaltherapybiz.com/call-booked` to `CALL_LINK_PATTERNS` in `frontend/src/v2/pages/InboxV2.tsx` and `sms-insights/services/inbox-send.ts` so Phase 2 gating triggers for actual production call links.
-- [x] Add `physicaltherapybiz.com/blog` and `drdannymatta.com` to `PODCAST_LINK_PATTERNS` in `frontend/src/v2/pages/InboxV2.tsx` so auto-snooze triggers for actual production podcast links.
-
-## Post-Phase 2 Bug Fixes (Daily Runs Booked Calls Parsing)
-- [x] Fix `frontend/src/utils/reportParser.ts` to use `currentRep.bookings` from the `*Core Metrics*` section instead of summing sequence lines, which undercounts manual/direct bookings.
-- [x] Fix `sms-insights/services/daily-report-summary.ts` to only sum bookings from the `*Core Metrics*` section, preventing double-counting of bookings listed in the `*Top Performing Sequence*` section.
-- [x] Regenerate `summary_text` for all existing `daily_runs` in the database to reflect the corrected booking counts.
+### Commit
+- [ ] git add + commit + push

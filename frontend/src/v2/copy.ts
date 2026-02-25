@@ -40,12 +40,12 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
     definition: 'Total confirmed calls scheduled from our outreach efforts.',
   },
   callsBookedCreditSlack: {
-    label: 'Setter Credit',
-    definition: 'How many calls each team member booked.',
+    label: 'Calls Booked',
+    definition: 'Calls this setter booked, credited from Slack booking records.',
   },
   smsBookingHintsDiagnostic: {
-    label: 'Booking Hints',
-    definition: 'Tips our system spots for booking more calls.',
+    label: 'Booking Signals',
+    definition: 'Conversations our system flagged as likely bookings — for reference only, not added to your booked total.',
   },
   peopleContacted: {
     label: 'Leads Reached',
@@ -56,16 +56,16 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
     definition: 'What percent of people wrote back.',
   },
   outboundConversations: {
-    label: 'Outbound Messages',
-    definition: 'Texts we sent to potential clients.',
+    label: 'Conversations Started',
+    definition: 'Unique leads we started a conversation with.',
   },
   optOuts: {
-    label: 'Unsubscribes',
-    definition: 'People who asked to stop receiving messages.',
+    label: 'Opt-Outs',
+    definition: 'People who replied STOP or asked to be removed from our list.',
   },
   optOutRate: {
-    label: 'Unsubscribe Rate',
-    definition: 'Percent of people who opted out after hearing from us.',
+    label: 'Opt-Out Rate',
+    definition: 'Percent of people reached who opted out.',
   },
   manualReplyRate: {
     label: 'Direct Reply Rate',
@@ -73,15 +73,15 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
   },
   sequenceReplyRate: {
     label: 'Sequence Reply Rate',
-    definition: 'Reply rate from automated follow-ups.',
+    definition: 'Reply rate from automated sequence follow-ups.',
   },
   selfBooked: {
     label: 'Self-Booked',
-    definition: 'Calls booked without setter help.',
+    definition: 'Discovery calls booked without setter help.',
   },
   sequenceMatchCoverage: {
-    label: 'Sequence Coverage',
-    definition: 'How many booked calls came from our outreach sequences.',
+    label: 'Sequence-Attributed Bookings',
+    definition: 'Booked calls where a sequence started the first conversation.',
   },
 };
 

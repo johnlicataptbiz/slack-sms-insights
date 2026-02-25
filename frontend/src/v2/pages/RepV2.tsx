@@ -113,7 +113,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     if (metrics.replyRate > 0 && metrics.replyRate < 5 && metrics.outbound >= 20) {
       flags.push({
         level: 'warning',
-        title: 'Low reply efficiency on active volume',
+        title: 'Low reply rate on high volume',
         detail: `Reply rate is ${fmtPct(metrics.replyRate)} on ${fmtInt(metrics.outbound)} outbound conversations.`,
       });
     }
@@ -128,50 +128,50 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     return flags;
   }, [deltas, metrics.booked, metrics.optOutRate, metrics.outbound, metrics.replyRate, prevDay]);
 
-  if (isLoading) return <V2State kind="loading">Loading setter scorecard…</V2State>;
-  if (isError || !payload) return <V2State kind="error">Failed to load setter scorecard: {String((error as Error)?.message || error)}</V2State>;
+  if (isLoading) return <V2State kind="loading">Loading scorecard…</V2State>;
+  if (isError || !payload) return <V2State kind="error">Failed to load scorecard: {String((error as Error)?.message || error)}</V2State>;
 
   return (
     <div className="V2Page">
       <V2PageHeader
         title={`${name} Scorecard`}
-        subtitle={`Daily activity summary for business day ${day || 'current'} (${BUSINESS_TZ}). Deltas compare against ${prevDay || 'prior day'}.`}
+        subtitle={`Daily activity summary for business day ${day || 'current'} (${BUSINESS_TZ}). Changes vs. ${prevDay || 'prior day'}.`}
       />
 
       <section className="V2MetricsGrid">
         <V2MetricCard
           label={<V2Term term="callsBookedCreditSlack" />}
           value={fmtInt(metrics.booked)}
-          meta={deltas ? `${fmtDeltaInt(deltas.booked)} vs prior day` : 'No prior-day baseline yet'}
+          meta={deltas ? `${fmtDeltaInt(deltas.booked)} vs prior day` : 'No prior-day data yet'}
           tone="positive"
         />
         <V2MetricCard
           label={<V2Term term="outboundConversations" />}
           value={fmtInt(metrics.outbound)}
-          meta={deltas ? `${fmtDeltaInt(deltas.outbound)} vs prior day` : 'No prior-day baseline yet'}
+          meta={deltas ? `${fmtDeltaInt(deltas.outbound)} vs prior day` : 'No prior-day data yet'}
         />
         <V2MetricCard
           label={<V2Term term="replyRatePeople" />}
           value={fmtPct(metrics.replyRate)}
-          meta={deltas ? `${fmtDeltaPct(deltas.replyRate)} vs prior day` : 'No prior-day baseline yet'}
+          meta={deltas ? `${fmtDeltaPct(deltas.replyRate)} vs prior day` : 'No prior-day data yet'}
           tone="accent"
         />
         <V2MetricCard
           label={<V2Term term="optOuts" />}
           value={fmtInt(metrics.optOuts)}
-          meta={deltas ? `${fmtDeltaInt(deltas.optOuts)} vs prior day` : 'No prior-day baseline yet'}
+          meta={deltas ? `${fmtDeltaInt(deltas.optOuts)} vs prior day` : 'No prior-day data yet'}
           tone={metrics.optOuts > 0 ? 'critical' : 'default'}
         />
         <V2MetricCard
           label={<V2Term term="optOutRate" />}
           value={fmtPct(metrics.optOutRate)}
-          meta={deltas ? `${fmtDeltaPct(deltas.optOutRate)} vs prior day` : 'No prior-day baseline yet'}
+          meta={deltas ? `${fmtDeltaPct(deltas.optOutRate)} vs prior day` : 'No prior-day data yet'}
           tone={metrics.optOutRate >= 3 ? 'critical' : 'default'}
         />
         <V2MetricCard
           label={<V2Term term="smsBookingHintsDiagnostic" />}
           value={fmtInt(metrics.hints)}
-          meta={deltas ? `${fmtDeltaInt(deltas.hints)} vs prior day` : 'No prior-day baseline yet'}
+          meta={deltas ? `${fmtDeltaInt(deltas.hints)} vs prior day` : 'No prior-day data yet'}
         />
         <V2MetricCard
           label="Booking Rate"
@@ -182,11 +182,11 @@ export default function RepV2({ rep }: { rep: RepKey }) {
       </section>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Day by Day" caption={`How today compared to yesterday.`}>
+        <V2Panel title="Day by Day" caption="Changes from yesterday to today.">
           {deltas ? (
             <div className="V2DeltaList">
               <div>
-                <span>Booked Call Credit</span>
+                <span>Calls Booked</span>
                 <strong>{fmtDeltaInt(deltas.booked)}</strong>
               </div>
               <div>
@@ -203,7 +203,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
               </div>
             </div>
           ) : (
-            <V2State kind="empty">No prior-day data to calculate deltas yet.</V2State>
+            <V2State kind="empty">No prior-day data to compare yet.</V2State>
           )}
         </V2Panel>
 
@@ -218,20 +218,20 @@ export default function RepV2({ rep }: { rep: RepKey }) {
               ))}
             </div>
           ) : (
-            <V2State kind="empty">No at-risk flags for this setter on this day.</V2State>
+            <V2State kind="empty">No issues flagged for today.</V2State>
           )}
         </V2Panel>
       </div>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Team Performance" caption="How the team performed.">
+        <V2Panel title="Team Totals" caption="How the team performed.">
           <div className="V2SplitStat">
             <div>
-              <span>Setter Jack</span>
+              <span>Jack</span>
               <strong>{fmtInt(payload.bookedCredit.jack)}</strong>
             </div>
             <div>
-              <span>Setter Brandon</span>
+              <span>Brandon</span>
               <strong>{fmtInt(payload.bookedCredit.brandon)}</strong>
             </div>
             <div>
@@ -241,11 +241,11 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           </div>
         </V2Panel>
 
-        <V2Panel title="How to Read This Card" caption="This page is a daily summary, not a ranking.">
+        <V2Panel title="How to Read This Page" caption="This page is a daily summary, not a ranking.">
           <ul className="V2BulletList">
-            <li>Calls Booked KPI is sourced from Slack booked-call records.</li>
-            <li>SMS Booking Hints are diagnostic-only and never added to booked-call totals.</li>
-            <li>Use Sequence Performance and Insights attribution panels to diagnose root cause.</li>
+            <li>Calls Booked comes from Slack booking records.</li>
+            <li>Booking Signals are for reference only — they don't count toward booked-call totals.</li>
+            <li>Use the Sequences and Performance pages to dig into root cause.</li>
           </ul>
         </V2Panel>
       </div>

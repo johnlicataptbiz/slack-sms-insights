@@ -278,13 +278,13 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
     run.reportType === 'daily' && isDailySnapshot
       ? 'Daily Setter Snapshot'
       : run.reportType === 'daily'
-        ? 'Daily Auto-Run'
+        ? 'Daily Auto-Report'
         : run.reportType === 'manual'
-          ? 'Manual Pull'
-          : 'Test Pull';
+          ? 'Manual Report'
+          : 'Test Report';
   const title = run.status === 'error' ? `${titleBase} (Failed)` : titleBase;
 
-  const modeLabel = run.reportType === 'daily' ? '6:00 AM auto run' : run.reportType === 'manual' ? 'Manual trigger' : 'Test trigger';
+  const modeLabel = run.reportType === 'daily' ? '6:00 AM auto-report' : run.reportType === 'manual' ? 'Manual report' : 'Test report';
   const subtitleParts = [timeRangeLabel, modeLabel].filter((part): part is string => Boolean(part));
 
   const metricPreview =
@@ -532,8 +532,8 @@ export default function RunsV2() {
     return url.toString();
   };
 
-  if (isLoading) return <V2State kind="loading">Loading daily runs…</V2State>;
-  if (isError || !runsData) return <V2State kind="error">Failed to load runs: {String((error as Error)?.message || error)}</V2State>;
+  if (isLoading) return <V2State kind="loading">Loading reports…</V2State>;
+  if (isError || !runsData) return <V2State kind="error">Failed to load reports: {String((error as Error)?.message || error)}</V2State>;
 
   return (
     <div className="V2Page">
@@ -543,7 +543,7 @@ export default function RunsV2() {
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">
-              <span>Range (days)</span>
+              <span>Show last (days)</span>
               <select
                 value={daysBack}
                 onChange={(e) => {
@@ -588,7 +588,7 @@ export default function RunsV2() {
           <span className="V2StalenessBanner__icon">⚠️</span>
           <p className="V2StalenessBanner__text">
             No daily run recorded for today yet.{' '}
-            <span>The 6 AM CT cron may not have fired — check Railway logs or trigger a manual run.</span>
+            <span>The morning auto-report hasn't run yet. Check back later or trigger a manual report.</span>
           </p>
           <button
             type="button"
@@ -603,20 +603,20 @@ export default function RunsV2() {
 
       <section className="V2MetricsGrid">
         <V2MetricCard
-          label="Total Runs"
+          label="Daily Reports"
           value={String(aggregateStats.totalRuns)}
           meta={`Last ${daysBack} day${daysBack === 1 ? '' : 's'}`}
         />
         <V2MetricCard
           label="Messages Sent"
           value={aggregateStats.totalMessagesSent > 0 ? formatCount(aggregateStats.totalMessagesSent) : '—'}
-          meta="across all runs"
+          meta="across all reports"
         />
         <V2MetricCard
           label="Booked Calls"
           value={aggregateStats.totalBooked > 0 ? formatCount(aggregateStats.totalBooked) : '—'}
           tone="positive"
-          meta="across all runs"
+          meta="across all reports"
         />
         <V2MetricCard
           label="Avg Reply Rate"
@@ -628,7 +628,7 @@ export default function RunsV2() {
 
       <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
         {!isRunDetailFocused ? (
-          <V2Panel title="Run Timeline" caption={`Showing ${runsData.data.items.length} runs`} className="V2RunsLayout__timeline">
+          <V2Panel title="Report History" caption={`Showing ${runsData.data.items.length} reports`} className="V2RunsLayout__timeline">
             <div className="V2RunList">
               {runsData.data.items.map((run, index) => {
                 const runView = viewByRunId.get(run.id) || buildRunViewModel(run);
@@ -666,7 +666,7 @@ export default function RunsV2() {
                         <span>Booked Calls {formatCount(runView.booked)}</span>
                         <span>Opt-outs {formatCount(runView.optOuts)}</span>
                       </div>
-                      <p className="V2RunList__summary">{runView.summaryPreview || 'No structured summary stored for this run.'}</p>
+                      <p className="V2RunList__summary">{runView.summaryPreview || 'No summary available for this report.'}</p>
                     </div>
                   </button>
                 );
@@ -675,20 +675,20 @@ export default function RunsV2() {
           </V2Panel>
         ) : null}
 
-        <V2Panel title="Run Details" caption="The summary and raw output." className="V2RunsLayout__detail">
+        <V2Panel title="Report Details" caption="The summary and raw output." className="V2RunsLayout__detail">
           {selected && selectedView ? (
             <div className="V2RunDetail">
               {isRunDetailFocused ? (
                 <div className="V2RunDetail__topActions">
                   <button type="button" className="V2RunDetail__backButton" onClick={() => setIsRunDetailFocused(false)}>
-                    <span aria-hidden="true">←</span> Back to run timeline
+                    <span aria-hidden="true">←</span> Back to report history
                   </button>
                 </div>
               ) : null}
 
               <header className="V2RunDetail__hero">
                 <div>
-                  <p className="V2RunDetail__eyebrow">{selected.reportType === 'daily' ? 'Automated Daily Run' : 'Manual / On-Demand Run'}</p>
+                  <p className="V2RunDetail__eyebrow">{selected.reportType === 'daily' ? 'Automated Daily Report' : 'Manual / On-Demand Report'}</p>
                   <h3>{selectedView.title}</h3>
                   <p>{selectedView.subtitle}</p>
                 </div>
@@ -700,7 +700,7 @@ export default function RunsV2() {
 
               {selected.status === 'error' && selected.errorMessage ? (
                 <div className="V2RunDetail__error">
-                  <strong>Run Error</strong>
+                  <strong>Report Error</strong>
                   <p>{selected.errorMessage}</p>
                 </div>
               ) : null}
@@ -714,13 +714,13 @@ export default function RunsV2() {
                   tone="accent"
                 />
                 <V2MetricCard
-                  label="Booked (Report)"
+                  label="Booked (from report)"
                   value={formatCount(selectedView.booked)}
                   tone={(selectedView.booked ?? 0) > 0 ? 'positive' : 'default'}
                   meta="From run report text"
                 />
                 <V2MetricCard
-                  label="Booked (Slack)"
+                  label="Booked (Slack-verified)"
                   value={
                     selectedBookedMetricsQuery.isLoading
                       ? 'Loading…'
@@ -728,7 +728,7 @@ export default function RunsV2() {
                         ? 'Error'
                         : formatCount(selectedSlackBookedTotal)
                   }
-                  meta={selectedReportDay ? `Report day ${selectedReportDay}` : 'Report day not detected'}
+                  meta={selectedReportDay ? `Report date: ${selectedReportDay}` : 'Date not detected'}
                   tone={(selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'}
                 />
                 <V2MetricCard
@@ -762,7 +762,7 @@ export default function RunsV2() {
 
               <div className="V2Grid V2Grid--2">
                 <section className="V2RunDetail__section">
-                  <h4>Snapshot Summary</h4>
+                  <h4>Summary</h4>
                   {selectedView.summaryLines.length ? (
                     <ul className="V2BulletList">
                       {selectedView.summaryLines.map((line, index) => (
@@ -770,18 +770,18 @@ export default function RunsV2() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="V2RunDetail__muted">No structured summary stored for this run.</p>
+                    <p className="V2RunDetail__muted">No summary available for this report.</p>
                   )}
                 </section>
 
                 <section className="V2RunDetail__section">
-                  <h4>Run Metadata</h4>
+                  <h4>Report Info</h4>
                   <dl className="V2RunDetail__meta">
                     <dt>ID</dt>
                     <dd>{selected.id}</dd>
                     <dt>Channel</dt>
                     <dd>{channelLabel(selected)}</dd>
-                    <dt>Timestamp</dt>
+                    <dt>Generated at</dt>
                     <dd>{formatDateTime(selected.timestamp)}</dd>
                     <dt>Report Day</dt>
                     <dd>{runDateLabel(selected)}</dd>
@@ -792,7 +792,7 @@ export default function RunsV2() {
               </div>
 
               <section className="V2RunDetail__section">
-                <h4>Top Sequence Volume</h4>
+                <h4>Top Sequences</h4>
                 {selectedView.topSequences.length ? (
                   <div className="V2TableWrap">
                     <table className="V2Table">
@@ -823,19 +823,19 @@ export default function RunsV2() {
                     </table>
                   </div>
                 ) : (
-                  <p className="V2RunDetail__muted">No parsed sequence rows were found for this run.</p>
+                  <p className="V2RunDetail__muted">No sequence data found for this report.</p>
                 )}
               </section>
 
               <section className="V2RunDetail__section">
-                <h4>Setter Breakdown</h4>
+                <h4>Setter Performance</h4>
                 {selectedView.repRows.length ? (
                   <div className="V2TableWrap">
                     <table className="V2Table">
                       <thead>
                         <tr>
                           <th>Setter</th>
-                          <th className="is-right">Outbound Convos</th>
+                          <th className="is-right">Conversations</th>
                           <th className="is-right">Booked Calls</th>
                           <th className="is-right">Opt-Outs</th>
                           <th>Top Sequence</th>
@@ -855,17 +855,17 @@ export default function RunsV2() {
                     </table>
                   </div>
                 ) : (
-                  <p className="V2RunDetail__muted">No parsed setter rows were found for this run.</p>
+                  <p className="V2RunDetail__muted">No setter data found for this report.</p>
                 )}
               </section>
 
               <details className="V2RunDetail__raw">
-                <summary>Show stored raw report text</summary>
-                <pre>{selectedRunQuery.isLoading ? 'Loading raw report text…' : selected.fullReport || 'No stored report text'}</pre>
+                <summary>Show full report text</summary>
+                <pre>{selectedRunQuery.isLoading ? 'Loading report text…' : selected.fullReport || 'No report text available'}</pre>
               </details>
             </div>
           ) : (
-            <V2State kind="empty">Select a run to inspect details.</V2State>
+            <V2State kind="empty">Select a report to view details.</V2State>
           )}
         </V2Panel>
       </div>
@@ -894,7 +894,7 @@ export default function RunsV2() {
                     <div>
                       <h3>{view.name}</h3>
                       <p>
-                        Range {view.range}d | Channel {view.channelId || 'All'} | Run {view.runId ? view.runId.slice(0, 8) : 'none'}
+                        Last {view.range} days | Channel: {view.channelId || 'All'} | Report: {view.runId ? view.runId.slice(0, 8) : 'none'}
                       </p>
                     </div>
                     <div className="V2SavedViews__actions">

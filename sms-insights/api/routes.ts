@@ -25,19 +25,33 @@ import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../servi
 import { generateDraftSuggestion } from '../services/inbox-draft-engine.js';
 import { sendInboxMessage } from '../services/inbox-send.js';
 import {
+  assignConversation,
+  deleteMessageTemplate,
   ensureConversationState,
   getDraftSuggestionById,
   getInboxConversationById,
+  getObjectionFrequencyAnalytics,
+  getStageConversionAnalytics,
   getSendAttemptVolumeCounts,
+  incrementGuardrailOverride,
+  insertConversationNote,
   insertDraftSuggestion,
+  insertMessageTemplate,
   insertSendAttempt,
+  listConversationNotes,
   listDraftSuggestionsForConversation,
   listInboxConversations,
+  listMessageTemplates,
   listMessagesForConversation,
   listMondayTrailForContactKey,
+  snoozeConversation,
+  updateCallOutcome,
   updateConversationState,
+  updateConversationStatus,
   updateDraftSuggestionFeedback,
+  updateObjectionTags,
   upsertConversionExample,
+  VALID_CALL_OUTCOMES,
 } from '../services/inbox-store.js';
 import {
   getMetricsOverview,
@@ -2698,6 +2712,42 @@ const handlePostInboxEscalationOverrideV2: RequestHandler = async (req, res, log
   sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
 };
 
+const handlePostInboxStatusV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  let body: { status?: string } = {};
+  try {
+    body = (await parseJsonBody(req)) as { status?: string };
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+
+  const status = body.status;
+  if (status !== 'open' && status !== 'closed' && status !== 'dnc') {
+    return sendJson(res, 400, { error: 'status must be one of: open, closed, dnc' }, origin);
+  }
+
+  const updated = await updateConversationStatus(conversationId, status, logger);
+  if (!updated) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  sendJson(
+    res,
+    200,
+    toEnvelope({ data: { id: updated.id, status: updated.status }, timeZone: DEFAULT_BUSINESS_TIMEZONE }),
+    origin,
+  );
+};
+
 const handlePostInboxDraftFeedbackV2: RequestHandler = async (req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
@@ -2785,8 +2835,327 @@ const handlePostInboxDraftFeedbackV2: RequestHandler = async (req, res, logger, 
   );
 };
 
+// ── Phase 2: Notes ───────────────────────────────────────────────────────────
+
+const handleGetInboxNotesV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  const notes = await listConversationNotes(conversationId, logger);
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: { notes: notes.map((n) => ({ id: n.id, author: n.author, text: n.text, createdAt: n.created_at })) },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+const handlePostInboxNoteV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  let body: { author?: string; text?: string } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+  if (!body.author || !body.text?.trim()) {
+    return sendJson(res, 400, { error: 'author and text are required' }, origin);
+  }
+  const note = await insertConversationNote(conversationId, body.author, body.text.trim(), logger);
+  sendJson(
+    res,
+    201,
+    toEnvelope({
+      data: { id: note.id, author: note.author, text: note.text, createdAt: note.created_at },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+// ── Phase 2: Snooze ───────────────────────────────────────────────────────────
+
+const handlePostInboxSnoozeV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  let body: { snoozedUntil?: string | null } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+  const snoozedUntil = body.snoozedUntil ?? null;
+  if (snoozedUntil !== null && isNaN(new Date(snoozedUntil).getTime())) {
+    return sendJson(res, 400, { error: 'snoozedUntil must be a valid ISO timestamp or null' }, origin);
+  }
+  const updated = await snoozeConversation(conversationId, snoozedUntil, logger);
+  if (!updated) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: { id: updated.id, nextFollowupDueAt: updated.next_followup_due_at },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+// ── Phase 2: Assign ───────────────────────────────────────────────────────────
+
+const handlePostInboxAssignV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  let body: { ownerLabel?: string | null } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+  const updated = await assignConversation(conversationId, body.ownerLabel ?? null, logger);
+  if (!updated) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: { id: updated.id, ownerLabel: updated.owner_label },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+// ── Phase 2: Templates ────────────────────────────────────────────────────────
+
+const handleGetInboxTemplatesV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const templates = await listMessageTemplates(logger);
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: {
+        templates: templates.map((t) => ({
+          id: t.id,
+          name: t.name,
+          body: t.body,
+          createdBy: t.created_by,
+          createdAt: t.created_at,
+          updatedAt: t.updated_at,
+        })),
+      },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+const handlePostInboxTemplateV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  let body: { name?: string; body?: string; createdBy?: string } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+  if (!body.name?.trim() || !body.body?.trim()) {
+    return sendJson(res, 400, { error: 'name and body are required' }, origin);
+  }
+  const template = await insertMessageTemplate(
+    body.name.trim(),
+    body.body.trim(),
+    body.createdBy?.trim() ?? 'unknown',
+    logger,
+  );
+  sendJson(
+    res,
+    201,
+    toEnvelope({
+      data: { id: template.id, name: template.name, body: template.body, createdBy: template.created_by, createdAt: template.created_at },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+// ─── Phase 3: Objection Tags ──────────────────────────────────────────────────
+
+const handlePostObjectionTagsV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  let body: { tags?: unknown } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+  const { tags } = body;
+  if (!Array.isArray(tags) || tags.some((t) => typeof t !== 'string')) {
+    return sendJson(res, 400, { error: 'tags must be an array of strings' }, origin);
+  }
+  try {
+    const result = await updateObjectionTags(conversationId, tags as string[], logger);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: { conversationId: result.conversation_id, objectionTags: result.objection_tags },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+};
+
+// ─── Phase 3: Call Outcome ────────────────────────────────────────────────────
+
+const handlePostCallOutcomeV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  let body: { outcome?: unknown } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+  const { outcome } = body;
+  if (outcome !== null && outcome !== undefined && !VALID_CALL_OUTCOMES.includes(outcome as never)) {
+    return sendJson(res, 400, { error: `outcome must be one of: ${VALID_CALL_OUTCOMES.join(', ')} or null` }, origin);
+  }
+  try {
+    const result = await updateCallOutcome(conversationId, (outcome as string | null) ?? null, logger);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: { conversationId: result.conversation_id, callOutcome: result.call_outcome },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+};
+
+// ─── Phase 3: Guardrail Override ─────────────────────────────────────────────
+
+const handlePostGuardrailOverrideV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+  try {
+    const result = await incrementGuardrailOverride(conversationId, logger);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: { conversationId: result.conversation_id, guardrailOverrideCount: result.guardrail_override_count },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+};
+
+// ─── Phase 3: Analytics ───────────────────────────────────────────────────────
+
+const handleGetStageConversionV2: RequestHandler = async (_req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const rows = await getStageConversionAnalytics(logger);
+  sendJson(res, 200, toEnvelope({ data: rows, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleGetObjectionFrequencyV2: RequestHandler = async (_req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const rows = await getObjectionFrequencyAnalytics(logger);
+  sendJson(res, 200, toEnvelope({ data: rows, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const parts = url.pathname.split('/').filter(Boolean);
+  // /api/v2/inbox/templates/:id → parts[4]
+  const templateId = parts[4];
+  if (!templateId) {
+    return sendJson(res, 400, { error: 'Missing template ID' }, origin);
+  }
+  const deleted = await deleteMessageTemplate(templateId, logger);
+  if (!deleted) {
+    return sendJson(res, 404, { error: 'Template not found' }, origin);
+  }
+  sendJson(
+    res,
+    200,
+    toEnvelope({ data: { id: templateId, deleted: true }, timeZone: DEFAULT_BUSINESS_TIMEZONE }),
+    origin,
+  );
+};
+
 type ApiRoute = {
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'DELETE';
   path: string;
   public?: boolean;
   csrf?: boolean;
@@ -2852,9 +3221,54 @@ const apiRoutes: ApiRoute[] = [
   },
   {
     method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/status',
+    handler: handlePostInboxStatusV2,
+  },
+  {
+    method: 'POST',
     path: '/api/v2/inbox/drafts/:id/feedback',
     handler: handlePostInboxDraftFeedbackV2,
   },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/conversations/:id/notes',
+    handler: handleGetInboxNotesV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/notes',
+    handler: handlePostInboxNoteV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/snooze',
+    handler: handlePostInboxSnoozeV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/assign',
+    handler: handlePostInboxAssignV2,
+  },
+  { method: 'GET', path: '/api/v2/inbox/templates', handler: handleGetInboxTemplatesV2 },
+  { method: 'POST', path: '/api/v2/inbox/templates', handler: handlePostInboxTemplateV2 },
+  { method: 'DELETE', path: '/api/v2/inbox/templates/:id', handler: handleDeleteInboxTemplateV2 },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/objection-tags',
+    handler: handlePostObjectionTagsV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/call-outcome',
+    handler: handlePostCallOutcomeV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/guardrail-override',
+    handler: handlePostGuardrailOverrideV2,
+  },
+  { method: 'GET', path: '/api/v2/inbox/analytics/stage-conversion', handler: handleGetStageConversionV2 },
+  { method: 'GET', path: '/api/v2/inbox/analytics/objection-frequency', handler: handleGetObjectionFrequencyV2 },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },

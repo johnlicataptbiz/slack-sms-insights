@@ -146,14 +146,14 @@ cat frontend/.env | grep VITE_API_URL
 ## 📚 Next Steps
 
 - Read [LOCAL_DEV.md](LOCAL_DEV.md) for detailed setup
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow
-- Check [API.md](API.md) for API documentation
-- Review [TODO.md](TODO.md) for implementation tasks
+- Read [CONTRIBUTING.md](../development/CONTRIBUTING.md) for development workflow
+- Check [API.md](../architecture/API.md) for API documentation
+- Review [TODO.md](../planning/TODO.md) for implementation tasks
 
 ## 🆘 Need Help?
 
-1. Check [IMPROVEMENTS_SUMMARY.md](IMPROVEMENTS_SUMMARY.md) for known issues
-2. Review [CODE_IMPROVEMENTS.md](CODE_IMPROVEMENTS.md) for code quality tips
+1. Check [IMPROVEMENTS_SUMMARY.md](../development/IMPROVEMENTS_SUMMARY.md) for known issues
+2. Review [CODE_IMPROVEMENTS.md](../development/CODE_IMPROVEMENTS.md) for code quality tips
 3. Open an issue with:
    - Error message
    - Steps to reproduce

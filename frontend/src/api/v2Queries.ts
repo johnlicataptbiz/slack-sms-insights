@@ -17,11 +17,13 @@ import {
 } from './v2Guards';
 import type {
   ApiEnvelope,
+  CallOutcomeV2,
   ChannelsV2,
   DraftSuggestionV2,
   InboxSendConfigV2,
   InboxConversationDetailV2,
   InboxConversationListV2,
+  ObjectionFrequencyRowV2,
   QualificationStateV2,
   RunV2,
   RunsListV2,
@@ -29,6 +31,7 @@ import type {
   SalesMetricsV2,
   ScoreboardV2,
   SendMessageResultV2,
+  StageConversionRowV2,
   WeeklyManagerSummaryV2,
 } from './v2-types';
 
@@ -461,6 +464,22 @@ export const useV2InboxSendConfig = () => {
   });
 };
 
+export const useV2UpdateConversationStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; status: 'open' | 'closed' | 'dnc' }) => {
+      return client.post<ApiEnvelope<{ id: string; status: 'open' | 'closed' | 'dnc' }>>(
+        `/api/v2/inbox/conversations/${params.conversationId}/status`,
+        { status: params.status },
+      );
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
 export const useV2SetDefaultSendLine = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -506,5 +525,224 @@ export const useV2Scoreboard = (params: { weekStart?: string; tz?: string }) => 
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchOnWindowFocus: false,
+  });
+};
+
+// ─── Phase 2: Whisper Notes ───────────────────────────────────────────────────
+
+export type ConversationNote = {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: string;
+};
+
+export const useV2ConversationNotes = (conversationId: string | null) => {
+  return useQuery({
+    queryKey: ['v2', 'inbox', 'notes', conversationId],
+    enabled: !!conversationId,
+    queryFn: async () => {
+      const res = await client.get<ApiEnvelope<{ notes: ConversationNote[] }>>(
+        `/api/v2/inbox/conversations/${conversationId}/notes`,
+      );
+      return (res as ApiEnvelope<{ notes: ConversationNote[] }>).data.notes;
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+};
+
+export const useV2AddConversationNote = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; author: string; text: string }) => {
+      return client.post<ApiEnvelope<ConversationNote>>(
+        `/api/v2/inbox/conversations/${params.conversationId}/notes`,
+        { author: params.author, text: params.text },
+      );
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'notes', variables.conversationId] });
+    },
+  });
+};
+
+// ─── Phase 2: Snooze ─────────────────────────────────────────────────────────
+
+export const useV2SnoozeConversation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; snoozedUntil: string | null }) => {
+      return client.post<ApiEnvelope<{ id: string; nextFollowupDueAt: string | null }>>(
+        `/api/v2/inbox/conversations/${params.conversationId}/snooze`,
+        { snoozedUntil: params.snoozedUntil },
+      );
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+// ─── Phase 2: Assignment ─────────────────────────────────────────────────────
+
+export const useV2AssignConversation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; ownerLabel: string | null }) => {
+      return client.post<ApiEnvelope<{ id: string; ownerLabel: string | null }>>(
+        `/api/v2/inbox/conversations/${params.conversationId}/assign`,
+        { ownerLabel: params.ownerLabel },
+      );
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+// ─── Phase 2: Template Library ───────────────────────────────────────────────
+
+export type MessageTemplate = {
+  id: string;
+  name: string;
+  body: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const useV2InboxTemplates = () => {
+  return useQuery({
+    queryKey: ['v2', 'inbox', 'templates'],
+    queryFn: async () => {
+      const res = await client.get<ApiEnvelope<{ templates: MessageTemplate[] }>>(
+        '/api/v2/inbox/templates',
+      );
+      return (res as ApiEnvelope<{ templates: MessageTemplate[] }>).data.templates;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+};
+
+export const useV2CreateTemplate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { name: string; body: string; createdBy?: string }) => {
+      return client.post<ApiEnvelope<MessageTemplate>>('/api/v2/inbox/templates', {
+        name: params.name,
+        body: params.body,
+        createdBy: params.createdBy,
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'templates'] });
+    },
+  });
+};
+
+export const useV2DeleteTemplate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (templateId: string) => {
+      return client.delete<ApiEnvelope<{ id: string; deleted: boolean }>>(
+        `/api/v2/inbox/templates/${templateId}`,
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'templates'] });
+    },
+  });
+};
+
+// ─── Phase 3: Analytics Queries ───────────────────────────────────────────────
+
+export const useV2StageConversion = () =>
+  useQuery({
+    queryKey: ['v2', 'inbox', 'analytics', 'stage-conversion'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<StageConversionRowV2[]>>(
+        '/api/v2/inbox/analytics/stage-conversion',
+      );
+      return (response as ApiEnvelope<StageConversionRowV2[]>).data;
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+export const useV2ObjectionFrequency = () =>
+  useQuery({
+    queryKey: ['v2', 'inbox', 'analytics', 'objection-frequency'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<ObjectionFrequencyRowV2[]>>(
+        '/api/v2/inbox/analytics/objection-frequency',
+      );
+      return (response as ApiEnvelope<ObjectionFrequencyRowV2[]>).data;
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+// ─── Phase 3: Conversation-Level Mutations ────────────────────────────────────
+
+export const useV2UpdateObjectionTags = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; tags: string[] }) => {
+      return client.post<ApiEnvelope<{ conversationId: string; objectionTags: string[] }>>(
+        `/api/v2/inbox/conversations/${params.conversationId}/objection-tags`,
+        { tags: params.tags },
+      );
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'analytics', 'objection-frequency'],
+      });
+    },
+  });
+};
+
+export const useV2UpdateCallOutcome = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; outcome: CallOutcomeV2 | null }) => {
+      return client.post<ApiEnvelope<{ conversationId: string; callOutcome: string | null }>>(
+        `/api/v2/inbox/conversations/${params.conversationId}/call-outcome`,
+        { outcome: params.outcome },
+      );
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'analytics', 'stage-conversion'],
+      });
+    },
+  });
+};
+
+export const useV2IncrementGuardrailOverride = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (conversationId: string) => {
+      return client.post<ApiEnvelope<{ conversationId: string; guardrailOverrideCount: number }>>(
+        `/api/v2/inbox/conversations/${conversationId}/guardrail-override`,
+        {},
+      );
+    },
+    onSuccess: (_data, conversationId) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', conversationId],
+      });
+    },
   });
 };

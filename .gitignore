@@ -17,3 +17,4 @@ frontend/node_modules/
 output/
 .cocoindex_code/
 *.cpuprofile.txt
+.blackboxcli/

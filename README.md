@@ -66,7 +66,7 @@ PT Biz SMS Insights is a comprehensive analytics platform that:
 
 ## 🚀 Getting Started
 
-For a comprehensive guide to setting up your local development environment, see the **[Onboarding Document](ONBOARDING.md)**.
+For a comprehensive guide to setting up your local development environment, see the **[Onboarding Document](docs/setup/ONBOARDING.md)**.
 
 ## 📁 Project Structure
 
@@ -110,12 +110,12 @@ SlackCLI/
 
 ## 📚 Documentation
 
-- **[Onboarding Guide](ONBOARDING.md)** - Comprehensive setup and development guide.
-- **[Local Development](LOCAL_DEV.md)** - Detailed setup instructions
-- **[Deployment](DEPLOYMENT.md)** - Production deployment guide
-- **[API Reference](API.md)** - API endpoint documentation
-- **[Contributing](CONTRIBUTING.md)** - Development workflow
-- **[Architecture](DASHBOARD_OVERVIEW.md)** - System architecture details
+- **[Onboarding Guide](docs/setup/ONBOARDING.md)** - Comprehensive setup and development guide.
+- **[Local Development](docs/setup/LOCAL_DEV.md)** - Detailed setup instructions
+- **[Deployment](docs/setup/DEPLOYMENT.md)** - Production deployment guide
+- **[API Reference](docs/architecture/API.md)** - API endpoint documentation
+- **[Contributing](docs/development/CONTRIBUTING.md)** - Development workflow
+- **[Architecture](docs/architecture/DASHBOARD_OVERVIEW.md)** - System architecture details
 
 ## 🔧 Key Technologies
 
@@ -210,7 +210,7 @@ cd frontend
 vercel --prod
 ```
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+See [DEPLOYMENT.md](docs/setup/DEPLOYMENT.md) for detailed instructions.
 
 ## 🧪 Development
 
@@ -263,7 +263,7 @@ npx tsx scripts/backfill-slack-events.ts
 - Verify Slack app redirect URIs
 - Check `DASHBOARD_AUTH_REDIRECT_URI` matches
 
-See [LOCAL_DEV.md](LOCAL_DEV.md) for more troubleshooting.
+See [LOCAL_DEV.md](docs/setup/LOCAL_DEV.md) for more troubleshooting.
 
 ## 📈 Monitoring
 
@@ -279,7 +279,7 @@ See [LOCAL_DEV.md](LOCAL_DEV.md) for more troubleshooting.
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+See [CONTRIBUTING.md](docs/development/CONTRIBUTING.md) for detailed guidelines.
 
 ## 📝 License
 

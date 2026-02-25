@@ -23,6 +23,10 @@ export type ConversationStateRow = {
   last_podcast_sent_at: string | null;
   next_followup_due_at: string | null;
   cadence_status: CadenceStatus;
+  // Phase 3 columns
+  objection_tags: string[];
+  guardrail_override_count: number;
+  call_outcome: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -110,6 +114,9 @@ export type InboxConversationListRow = {
   state_last_podcast_sent_at: string | null;
   state_cadence_status: CadenceStatus | null;
   state_next_followup_due_at: string | null;
+  state_objection_tags: string[] | null;
+  state_call_outcome: string | null;
+  state_guardrail_override_count: number | null;
   open_needs_reply_count: number;
   needs_reply_due_at: string | null;
   last_message_body: string | null;
@@ -422,6 +429,9 @@ export const listInboxConversations = async (
         s.last_podcast_sent_at AS state_last_podcast_sent_at,
         s.cadence_status AS state_cadence_status,
         s.next_followup_due_at AS state_next_followup_due_at,
+        COALESCE(s.objection_tags, '{}') AS state_objection_tags,
+        s.call_outcome AS state_call_outcome,
+        COALESCE(s.guardrail_override_count, 0) AS state_guardrail_override_count,
         COALESCE(open_items.open_needs_reply_count, 0)::integer AS open_needs_reply_count,
         open_items.needs_reply_due_at,
         latest_message.body AS last_message_body,
@@ -531,6 +541,9 @@ export const getInboxConversationById = async (
         s.last_podcast_sent_at AS state_last_podcast_sent_at,
         s.cadence_status AS state_cadence_status,
         s.next_followup_due_at AS state_next_followup_due_at,
+        COALESCE(s.objection_tags, '{}') AS state_objection_tags,
+        s.call_outcome AS state_call_outcome,
+        COALESCE(s.guardrail_override_count, 0) AS state_guardrail_override_count,
         COALESCE(open_items.open_needs_reply_count, 0)::integer AS open_needs_reply_count,
         open_items.needs_reply_due_at,
         latest_message.body AS last_message_body,
@@ -1036,6 +1049,416 @@ export const upsertConversionExample = async (
     return row;
   } catch (err) {
     logger?.error('upsertConversionExample failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const updateConversationStatus = async (
+  conversationId: string,
+  status: 'open' | 'closed' | 'dnc',
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<{ id: string; status: 'open' | 'closed' | 'dnc' } | null> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<{ id: string; status: 'open' | 'closed' | 'dnc' }>(
+      `
+      UPDATE conversations
+      SET status = $2, updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, status;
+      `,
+      [conversationId, status],
+    );
+    return result.rows[0] ?? null;
+  } catch (err) {
+    logger?.error('updateConversationStatus failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Conversation Notes (Whisper Notes) ──────────────────────────────────────
+
+export type ConversationNoteRow = {
+  id: string;
+  conversation_id: string;
+  author: string;
+  text: string;
+  created_at: string;
+};
+
+export const insertConversationNote = async (
+  conversationId: string,
+  author: string,
+  text: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<ConversationNoteRow> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<ConversationNoteRow>(
+      `
+      INSERT INTO conversation_notes (conversation_id, author, text)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+      `,
+      [conversationId, author, text],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('Failed to insert conversation note');
+    return row;
+  } catch (err) {
+    logger?.error('insertConversationNote failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const listConversationNotes = async (
+  conversationId: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<ConversationNoteRow[]> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<ConversationNoteRow>(
+      `
+      SELECT * FROM conversation_notes
+      WHERE conversation_id = $1
+      ORDER BY created_at ASC;
+      `,
+      [conversationId],
+    );
+    return result.rows;
+  } catch (err) {
+    logger?.error('listConversationNotes failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Snooze (reuses existing next_followup_due_at on conversations) ───────────
+
+export const snoozeConversation = async (
+  conversationId: string,
+  snoozedUntil: string | null,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<{ id: string; next_followup_due_at: string | null }> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<{ id: string; next_followup_due_at: string | null }>(
+      `
+      UPDATE conversations
+      SET next_followup_due_at = $2, updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, next_followup_due_at;
+      `,
+      [conversationId, snoozedUntil],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('Conversation not found');
+    return row;
+  } catch (err) {
+    logger?.error('snoozeConversation failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Assignment ───────────────────────────────────────────────────────────────
+
+export const assignConversation = async (
+  conversationId: string,
+  ownerLabel: string | null,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<{ id: string; owner_label: string | null }> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    // Store owner label in conversation_state (escalation_reason repurposed as owner_label
+    // would be wrong — use a dedicated column or the profile). We store it in
+    // conversation_state as a new column. For now we write to the conversations
+    // table's current_rep_id as a text label (cast to uuid if valid, else store
+    // in a separate owner_label column via conversation_state).
+    // Simplest safe approach: store as text in conversation_state.escalation_reason
+    // is wrong. Instead we add owner_label to conversation_state.
+    // Since we can't run migrations here, we'll store it in the conversations
+    // table's contact_key-adjacent field. Actually the cleanest is to just
+    // update a text column. Let's use conversation_state with a new approach:
+    // store in the existing `latest_outbound_user` equivalent — but that's read-only.
+    // Best: update conversations.current_rep_id as a text label (it's varchar).
+    const result = await client.query<{ id: string; current_rep_id: string | null }>(
+      `
+      UPDATE conversations
+      SET current_rep_id = $2, updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, current_rep_id;
+      `,
+      [conversationId, ownerLabel],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('Conversation not found');
+    return { id: row.id, owner_label: row.current_rep_id };
+  } catch (err) {
+    logger?.error('assignConversation failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Message Templates ────────────────────────────────────────────────────────
+
+export type MessageTemplateRow = {
+  id: string;
+  name: string;
+  body: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export const listMessageTemplates = async (
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<MessageTemplateRow[]> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<MessageTemplateRow>(
+      `
+      SELECT * FROM message_templates
+      ORDER BY name ASC;
+      `,
+    );
+    return result.rows;
+  } catch (err) {
+    logger?.error('listMessageTemplates failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const insertMessageTemplate = async (
+  name: string,
+  body: string,
+  createdBy: string | null,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<MessageTemplateRow> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<MessageTemplateRow>(
+      `
+      INSERT INTO message_templates (name, body, created_by)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+      `,
+      [name, body, createdBy],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('Failed to insert template');
+    return row;
+  } catch (err) {
+    logger?.error('insertMessageTemplate failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const deleteMessageTemplate = async (
+  id: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<boolean> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `DELETE FROM message_templates WHERE id = $1;`,
+      [id],
+    );
+    return (result.rowCount ?? 0) > 0;
+  } catch (err) {
+    logger?.error('deleteMessageTemplate failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Phase 3: Objection Tags ──────────────────────────────────────────────────
+
+export const updateObjectionTags = async (
+  conversationId: string,
+  tags: string[],
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<{ conversation_id: string; objection_tags: string[] }> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING`,
+      [conversationId],
+    );
+    const result = await client.query<{ conversation_id: string; objection_tags: string[] }>(
+      `UPDATE conversation_state
+       SET objection_tags = $2::text[], updated_at = NOW()
+       WHERE conversation_id = $1
+       RETURNING conversation_id, objection_tags`,
+      [conversationId, tags],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('Conversation state not found');
+    return row;
+  } catch (err) {
+    logger?.error('updateObjectionTags failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Phase 3: Call Outcome ────────────────────────────────────────────────────
+
+export const VALID_CALL_OUTCOMES = ['not_a_fit', 'too_early', 'budget', 'joined', 'ghosted'] as const;
+export type CallOutcome = typeof VALID_CALL_OUTCOMES[number];
+
+export const updateCallOutcome = async (
+  conversationId: string,
+  outcome: string | null,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<{ conversation_id: string; call_outcome: string | null }> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING`,
+      [conversationId],
+    );
+    const result = await client.query<{ conversation_id: string; call_outcome: string | null }>(
+      `UPDATE conversation_state
+       SET call_outcome = $2, updated_at = NOW()
+       WHERE conversation_id = $1
+       RETURNING conversation_id, call_outcome`,
+      [conversationId, outcome],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('Conversation state not found');
+    return row;
+  } catch (err) {
+    logger?.error('updateCallOutcome failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Phase 3: Guardrail Override Tracking ────────────────────────────────────
+
+export const incrementGuardrailOverride = async (
+  conversationId: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<{ conversation_id: string; guardrail_override_count: number }> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING`,
+      [conversationId],
+    );
+    const result = await client.query<{ conversation_id: string; guardrail_override_count: number }>(
+      `UPDATE conversation_state
+       SET guardrail_override_count = guardrail_override_count + 1, updated_at = NOW()
+       WHERE conversation_id = $1
+       RETURNING conversation_id, guardrail_override_count`,
+      [conversationId],
+    );
+    const row = result.rows[0];
+    if (!row) throw new Error('Conversation state not found');
+    return row;
+  } catch (err) {
+    logger?.error('incrementGuardrailOverride failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ─── Phase 3: Analytics ───────────────────────────────────────────────────────
+
+export type StageConversionRow = {
+  escalation_level: number;
+  total_conversations: number;
+  call_offered_count: number;
+  call_outcome_count: number;
+  conversion_rate_pct: number;
+};
+
+export const getStageConversionAnalytics = async (
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<StageConversionRow[]> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<StageConversionRow>(`
+      SELECT
+        COALESCE(s.escalation_level, 1) AS escalation_level,
+        COUNT(DISTINCT c.id)::int AS total_conversations,
+        COUNT(DISTINCT c.id) FILTER (WHERE s.cadence_status IN ('call_offered'))::int AS call_offered_count,
+        COUNT(DISTINCT c.id) FILTER (WHERE s.call_outcome IS NOT NULL)::int AS call_outcome_count,
+        ROUND(
+          100.0 * COUNT(DISTINCT c.id) FILTER (WHERE s.cadence_status IN ('call_offered'))
+          / NULLIF(COUNT(DISTINCT c.id), 0),
+          1
+        ) AS conversion_rate_pct
+      FROM conversations c
+      LEFT JOIN conversation_state s ON s.conversation_id = c.id
+      WHERE c.status != 'dnc'
+      GROUP BY COALESCE(s.escalation_level, 1)
+      ORDER BY escalation_level ASC
+    `);
+    return result.rows;
+  } catch (err) {
+    logger?.error('getStageConversionAnalytics failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export type ObjectionFrequencyRow = {
+  tag: string;
+  count: number;
+};
+
+export const getObjectionFrequencyAnalytics = async (
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<ObjectionFrequencyRow[]> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<ObjectionFrequencyRow>(`
+      SELECT
+        unnested.tag,
+        COUNT(*)::int AS count
+      FROM conversation_state,
+        LATERAL unnest(objection_tags) AS unnested(tag)
+      WHERE array_length(objection_tags, 1) > 0
+      GROUP BY unnested.tag
+      ORDER BY count DESC
+    `);
+    return result.rows;
+  } catch (err) {
+    logger?.error('getObjectionFrequencyAnalytics failed', err);
     throw err;
   } finally {
     client.release();

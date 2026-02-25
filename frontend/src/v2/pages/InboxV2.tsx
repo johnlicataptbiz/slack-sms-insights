@@ -1,16 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react'
 
 import {
+  useV2AddConversationNote,
+  useV2AssignConversation,
+  useV2ConversationNotes,
+  useV2CreateTemplate,
+  useV2DeleteTemplate,
   useV2GenerateDraft,
   useV2InboxConversationDetail,
   useV2InboxConversations,
   useV2InboxSendConfig,
+  useV2InboxTemplates,
+  useV2IncrementGuardrailOverride,
+  useV2ObjectionFrequency,
   useV2OverrideEscalation,
   useV2SendInboxMessage,
   useV2SetDefaultSendLine,
+  useV2SnoozeConversation,
+  useV2StageConversion,
+  useV2UpdateCallOutcome,
+  useV2UpdateConversationStatus,
+  useV2UpdateObjectionTags,
   useV2UpdateQualification,
 } from '../../api/v2Queries';
-import type { QualificationStateV2 } from '../../api/v2-types';
+import { CALL_OUTCOME_LABELS } from '../../api/v2-types';
+import type { CallOutcomeV2, QualificationStateV2 } from '../../api/v2-types';
 import { V2State } from '../components/V2Primitives';
 
 const fmtDateTime = (value: string | null) => {
@@ -42,6 +56,51 @@ const shorten = (value: string | null, max = 100): string => {
   return `${value.slice(0, max)}...`;
 };
 
+
+// ---------------------------------------------------------------------------
+// SMS segment counter
+// GSM-7: 160 chars single / 153 chars per segment in multi-part
+// Unicode (UCS-2): 70 chars single / 67 chars per segment in multi-part
+// ---------------------------------------------------------------------------
+const getSmsSegmentInfo = (text: string) => {
+  const len = text.length;
+  if (len === 0) return { segments: 0, charsRemaining: 160, isUnicode: false };
+  // Detect characters outside the GSM-7 basic + extended set
+  const isUnicode = /[^\u0000-\u00FF\u20AC]/.test(text);
+  const singleLimit = isUnicode ? 70 : 160;
+  const multiLimit = isUnicode ? 67 : 153;
+  const segments = len <= singleLimit ? 1 : Math.ceil(len / multiLimit);
+  const charsRemaining = segments === 1 ? singleLimit - len : segments * multiLimit - len;
+  return { segments, charsRemaining, isUnicode };
+};
+
+// ---------------------------------------------------------------------------
+// Aloware / carrier error code → human-readable tooltip
+// ---------------------------------------------------------------------------
+const ALOWARE_ERROR_MAP: Record<string, string> = {
+  landline: 'Landline — this number cannot receive SMS',
+  voip: 'VoIP number — delivery not guaranteed',
+  invalid: 'Invalid number — check formatting',
+  blocked: 'Blocked by carrier — number may be on DNC list',
+  dnc: 'Do Not Contact — number is on the DNC list',
+  'opt-out': 'Opted out — contact has unsubscribed',
+  unsubscribed: 'Opted out — contact has unsubscribed',
+  spam: 'Flagged as spam by carrier',
+  carrier: 'Carrier violation — message content may be blocked',
+  duplicate: 'Duplicate — identical message sent recently',
+  'rate-limit': 'Rate limited — too many messages sent too quickly',
+  'no-line': 'No send line configured',
+  disabled: 'Sending disabled for this contact',
+};
+
+const humanizeAlowareError = (reason: string | null | undefined): string => {
+  if (!reason) return 'Unknown error';
+  const lower = reason.toLowerCase();
+  for (const [key, label] of Object.entries(ALOWARE_ERROR_MAP)) {
+    if (lower.includes(key)) return label;
+  }
+  return reason;
+};
 
 const formatSendLineLabel = (params: {
   label?: string | null;
@@ -145,6 +204,19 @@ export default function InboxV2() {
   const [escalationLevel, setEscalationLevel] = useState<1 | 2 | 3 | 4>(1);
   const [escalationReason, setEscalationReason] = useState('');
 
+  // Phase 2 — Team Collaboration
+  const [noteText, setNoteText] = useState('');
+  const [snoozeDate, setSnoozeDate] = useState('');
+  const [assignLabel, setAssignLabel] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateBody, setNewTemplateBody] = useState('');
+
+  // Phase 3 state
+  const [objectionTagInput, setObjectionTagInput] = useState('');
+  const [localObjectionTags, setLocalObjectionTags] = useState<string[]>([]);
+  const [localCallOutcome, setLocalCallOutcome] = useState<CallOutcomeV2 | null>(null);
+
   const qualificationProgressLive = computeQualificationProgress(qualificationState);
   const qualificationTone = qualificationToneForProgress(qualificationProgressLive);
   const qualificationProgressPct = Math.round((qualificationProgressLive / 4) * 100);
@@ -185,6 +257,13 @@ export default function InboxV2() {
   const inboxHealth = Math.max(0, Math.min(100, 100 - (urgentCount * 10) - (unassignedCount * 5)));
 
   useEffect(() => {
+    // Do NOT auto-switch while the composer modal is open.
+    // When needsReplyOnly is true, a conversation drops out of the filtered list
+    // the moment you reply to it — without this guard the effect would immediately
+    // snap selectedConversationId to conversations[0] (a completely different
+    // contact) while the user is still looking at the modal they just sent from.
+    if (isComposerModalOpen) return;
+
     if (!selectedConversationId && conversations.length > 0) {
       setSelectedConversationId(conversations[0]?.id || null);
       return;
@@ -193,7 +272,7 @@ export default function InboxV2() {
     if (selectedConversationId && !conversations.some((row) => row.id === selectedConversationId)) {
       setSelectedConversationId(conversations[0]?.id || null);
     }
-  }, [conversations, selectedConversationId]);
+  }, [conversations, selectedConversationId, isComposerModalOpen]);
 
   const detailQuery = useV2InboxConversationDetail(selectedConversationId);
 
@@ -203,6 +282,23 @@ export default function InboxV2() {
   const setDefaultLineMutation = useV2SetDefaultSendLine();
   const qualificationMutation = useV2UpdateQualification();
   const escalationMutation = useV2OverrideEscalation();
+  const statusMutation = useV2UpdateConversationStatus();
+
+  // Phase 2 hooks
+  const notesQuery = useV2ConversationNotes(selectedConversationId);
+  const addNoteMutation = useV2AddConversationNote();
+  const snoozeMutation = useV2SnoozeConversation();
+  const assignMutation = useV2AssignConversation();
+  const templatesQuery = useV2InboxTemplates();
+  const createTemplateMutation = useV2CreateTemplate();
+  const deleteTemplateMutation = useV2DeleteTemplate();
+
+  // Phase 3 hooks
+  const stageConversionQuery = useV2StageConversion();
+  const objectionFrequencyQuery = useV2ObjectionFrequency();
+  const updateObjectionTagsMutation = useV2UpdateObjectionTags();
+  const updateCallOutcomeMutation = useV2UpdateCallOutcome();
+  const incrementGuardrailOverrideMutation = useV2IncrementGuardrailOverride();
 
   const detail = detailQuery.data?.data || null;
   const sendConfig = sendConfigQuery.data?.data || null;
@@ -239,10 +335,16 @@ export default function InboxV2() {
     setQualificationState(detail.conversation.qualification);
     setEscalationLevel(detail.conversation.escalation.level);
     setEscalationReason(detail.conversation.escalation.reason || '');
+    setAssignLabel(detail.conversation.ownerLabel || '');
+    setLocalObjectionTags(((detail.conversation as any).objectionTags as string[]) ?? []);
+    setLocalCallOutcome(((detail.conversation as any).callOutcome as CallOutcomeV2 | null) ?? null);
   }, [detail]);
 
   useEffect(() => {
     setDraftPrefillDoneForConversation(null);
+    // Clear the optimistic sent-message bubble so it doesn't bleed into the
+    // next conversation's thread when the user switches contacts.
+    setJustSentMessage(null);
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -346,7 +448,7 @@ export default function InboxV2() {
         }, 2000);
       } else {
         setSendStatus('error');
-        setFlashMessage(`Send blocked: ${result.data.reason} · ${lineSummary}`);
+        setFlashMessage(`Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`);
       }
     } catch (error) {
       setSendStatus('error');
@@ -422,6 +524,136 @@ export default function InboxV2() {
       setFlashMessage('Escalation override saved.');
     } catch (error) {
       setFlashMessage(`Escalation update failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onUpdateStatus = async (status: 'open' | 'closed' | 'dnc') => {
+    if (!selectedConversationId) return;
+    try {
+      await statusMutation.mutateAsync({ conversationId: selectedConversationId, status });
+    } catch (error) {
+      setFlashMessage(`Status update failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  // ── Phase 3 handlers ──────────────────────────────────────────────────────
+
+  const onAddObjectionTag = async () => {
+    const tag = objectionTagInput.trim();
+    if (!tag || !selectedConversationId) return;
+    const next = localObjectionTags.includes(tag) ? localObjectionTags : [...localObjectionTags, tag];
+    setLocalObjectionTags(next);
+    setObjectionTagInput('');
+    try {
+      await updateObjectionTagsMutation.mutateAsync({ conversationId: selectedConversationId, tags: next });
+    } catch (error) {
+      setFlashMessage(`Objection tag update failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onRemoveObjectionTag = async (tag: string) => {
+    if (!selectedConversationId) return;
+    const next = localObjectionTags.filter((t) => t !== tag);
+    setLocalObjectionTags(next);
+    try {
+      await updateObjectionTagsMutation.mutateAsync({ conversationId: selectedConversationId, tags: next });
+    } catch (error) {
+      setFlashMessage(`Objection tag update failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onSetCallOutcome = async (outcome: CallOutcomeV2 | null) => {
+    if (!selectedConversationId) return;
+    setLocalCallOutcome(outcome);
+    try {
+      await updateCallOutcomeMutation.mutateAsync({ conversationId: selectedConversationId, outcome });
+    } catch (error) {
+      setFlashMessage(`Call outcome update failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onIncrementGuardrailOverride = async () => {
+    if (!selectedConversationId) return;
+    try {
+      await incrementGuardrailOverrideMutation.mutateAsync(selectedConversationId);
+      setFlashMessage('Guardrail override recorded.');
+    } catch (error) {
+      setFlashMessage(`Guardrail override failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  // ── Phase 2 handlers ──────────────────────────────────────────────────────
+
+  const onAddNote = async () => {
+    if (!selectedConversationId || noteText.trim().length === 0) return;
+    try {
+      await addNoteMutation.mutateAsync({ conversationId: selectedConversationId, author: 'agent', text: noteText.trim() });
+      setNoteText('');
+    } catch (error) {
+      setFlashMessage(`Note failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onSnooze = async () => {
+    if (!selectedConversationId || !snoozeDate) return;
+    try {
+      await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: snoozeDate });
+      setSnoozeDate('');
+      setFlashMessage('Conversation snoozed.');
+    } catch (error) {
+      setFlashMessage(`Snooze failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onClearSnooze = async () => {
+    if (!selectedConversationId) return;
+    try {
+      await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: null });
+      setFlashMessage('Snooze cleared.');
+    } catch (error) {
+      setFlashMessage(`Clear snooze failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onAssign = async () => {
+    if (!selectedConversationId) return;
+    try {
+      await assignMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        ownerLabel: assignLabel.trim() || null,
+      });
+      setFlashMessage(`Assigned to: ${assignLabel.trim() || 'Unassigned'}`);
+    } catch (error) {
+      setFlashMessage(`Assign failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onInsertTemplate = (body: string) => {
+    const name = detail?.contactCard.name || '';
+    const filled = body.replace(/\{\{name\}\}/gi, name);
+    setComposerText((prev) => (prev ? `${prev}\n${filled}` : filled));
+    setShowTemplates(false);
+  };
+
+  const onCreateTemplate = async () => {
+    if (!newTemplateName.trim() || !newTemplateBody.trim()) return;
+    try {
+      await createTemplateMutation.mutateAsync({
+        name: newTemplateName.trim(),
+        body: newTemplateBody.trim(),
+      });
+      setNewTemplateName('');
+      setNewTemplateBody('');
+    } catch (error) {
+      setFlashMessage(`Template save failed: ${String((error as Error)?.message || error)}`);
+    }
+  };
+
+  const onDeleteTemplate = async (id: string) => {
+    try {
+      await deleteTemplateMutation.mutateAsync(id);
+    } catch (error) {
+      setFlashMessage(`Template delete failed: ${String((error as Error)?.message || error)}`);
     }
   };
 
@@ -717,6 +949,85 @@ export default function InboxV2() {
                 )}
               </div>
             </div>
+
+            {/* Phase 3: Stage → Call Conversion */}
+            <div className="V2Inbox__analyticsSection">
+              <h4 className="V2Inbox__analyticsSectionTitle">Stage → Call Conversion</h4>
+              {stageConversionQuery.isLoading ? (
+                <p className="V2Inbox__analyticsHint">Loading…</p>
+              ) : stageConversionQuery.isError ? (
+                <p className="V2Inbox__analyticsHint">Failed to load</p>
+              ) : !stageConversionQuery.data || stageConversionQuery.data.length === 0 ? (
+                <p className="V2Inbox__analyticsHint">No conversion data yet</p>
+              ) : (
+                <table className="V2Inbox__conversionTable">
+                  <thead>
+                    <tr>
+                      <th>Stage</th>
+                      <th>Total</th>
+                      <th>Offered</th>
+                      <th>Outcome</th>
+                      <th>Rate</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stageConversionQuery.data.map((row) => (
+                      <tr key={row.escalation_level}>
+                        <td>L{row.escalation_level}</td>
+                        <td>{row.total_conversations}</td>
+                        <td>{row.call_offered_count}</td>
+                        <td>{row.call_outcome_count}</td>
+                        <td>
+                          <span
+                            className="V2Inbox__conversionRate"
+                            style={{
+                              color: Number(row.conversion_rate_pct) >= 50
+                                ? 'var(--v2-positive)'
+                                : Number(row.conversion_rate_pct) >= 25
+                                  ? 'var(--v2-warning)'
+                                  : 'var(--v2-critical)',
+                            }}
+                          >
+                            {Number(row.conversion_rate_pct).toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Phase 3: Objection Frequency */}
+            <div className="V2Inbox__analyticsSection">
+              <h4 className="V2Inbox__analyticsSectionTitle">Top Objections</h4>
+              {objectionFrequencyQuery.isLoading ? (
+                <p className="V2Inbox__analyticsHint">Loading…</p>
+              ) : objectionFrequencyQuery.isError ? (
+                <p className="V2Inbox__analyticsHint">Failed to load</p>
+              ) : !objectionFrequencyQuery.data || objectionFrequencyQuery.data.length === 0 ? (
+                <p className="V2Inbox__analyticsHint">No objection tags recorded yet</p>
+              ) : (
+                <div className="V2Inbox__objectionBars">
+                  {(() => {
+                    const maxCount = Math.max(...objectionFrequencyQuery.data!.map((r) => r.count), 1);
+                    return objectionFrequencyQuery.data!.slice(0, 8).map((row) => (
+                      <div key={row.tag} className="V2Inbox__objectionRow">
+                        <span className="V2Inbox__objectionTag">{row.tag}</span>
+                        <div className="V2Inbox__objectionBarWrap">
+                          <div
+                            className="V2Inbox__objectionBar"
+                            style={{ width: `${(row.count / maxCount) * 100}%` }}
+                          />
+                        </div>
+                        <span className="V2Inbox__objectionCount">{row.count}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       </section>
@@ -739,6 +1050,101 @@ export default function InboxV2() {
                     <p className="V2Inbox__composerMeta">
                       {detail.contactCard.phone} · Owner: {detail.conversation.ownerLabel || 'Unassigned'} · Esc L{detail.conversation.escalation.level}
                     </p>
+                    <div className="V2Inbox__statusRow">
+                      <span className={`V2Inbox__statusBadge V2Inbox__statusBadge--${detail.conversation.status}`}>
+                        {detail.conversation.status === 'open' ? '● Open' : detail.conversation.status === 'closed' ? '✓ Closed' : '⊘ DNC'}
+                      </span>
+                      {detail.conversation.status !== 'closed' && (
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small"
+                          onClick={() => onUpdateStatus('closed')}
+                          disabled={statusMutation.isPending}
+                          title="Mark conversation as resolved"
+                        >
+                          Close
+                        </button>
+                      )}
+                      {detail.conversation.status === 'closed' && (
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small"
+                          onClick={() => onUpdateStatus('open')}
+                          disabled={statusMutation.isPending}
+                          title="Reopen this conversation"
+                        >
+                          Reopen
+                        </button>
+                      )}
+                      {detail.conversation.status !== 'dnc' && (
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small V2Inbox__button--danger"
+                          onClick={() => onUpdateStatus('dnc')}
+                          disabled={statusMutation.isPending}
+                          title="Mark as Do Not Contact — removes from active inbox"
+                        >
+                          DNC
+                        </button>
+                      )}
+                      {detail.conversation.status === 'dnc' && (
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small"
+                          onClick={() => onUpdateStatus('open')}
+                          disabled={statusMutation.isPending}
+                          title="Remove DNC flag and reopen"
+                        >
+                          Remove DNC
+                        </button>
+                      )}
+                    </div>
+                    {/* Assignment + Snooze row */}
+                    <div className="V2Inbox__statusRow V2Inbox__statusRow--meta">
+                      <span className="V2Inbox__metaLabel">Assign:</span>
+                      <input
+                        type="text"
+                        className="V2Inbox__assignInput"
+                        value={assignLabel}
+                        onChange={(e) => setAssignLabel(e.target.value)}
+                        placeholder="Rep name…"
+                        onKeyDown={(e) => { if (e.key === 'Enter') void onAssign(); }}
+                      />
+                      <button
+                        type="button"
+                        className="V2Inbox__button V2Inbox__button--small"
+                        onClick={onAssign}
+                        disabled={assignMutation.isPending}
+                      >
+                        {assignMutation.isPending ? '…' : 'Assign'}
+                      </button>
+                      <span className="V2Inbox__metaLabel">Snooze:</span>
+                      <input
+                        type="datetime-local"
+                        className="V2Inbox__snoozeInput"
+                        value={snoozeDate}
+                        onChange={(e) => setSnoozeDate(e.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="V2Inbox__button V2Inbox__button--small"
+                        onClick={onSnooze}
+                        disabled={snoozeMutation.isPending || !snoozeDate}
+                      >
+                        {snoozeMutation.isPending ? '…' : 'Snooze'}
+                      </button>
+                      {(detail.conversation as any).nextFollowupDueAt && (
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small"
+                          onClick={onClearSnooze}
+                          disabled={snoozeMutation.isPending}
+                          title="Clear snooze"
+                        >
+                          ✕ Snooze
+                        </button>
+                      )}
+                    </div>
                   </>
                 ) : (
                   <h3>Conversation</h3>
@@ -867,7 +1273,21 @@ export default function InboxV2() {
                     </div>
 
                     <div className="V2Inbox__chatFooter">
-                      <span className="V2Inbox__chatCount">{composerText.trim().length} chars</span>
+                      {(() => {
+                        const { segments, charsRemaining, isUnicode } = getSmsSegmentInfo(composerText);
+                        const warn = segments >= 2;
+                        const danger = segments >= 4;
+                        return (
+                          <span
+                            className={`V2Inbox__chatCount${danger ? ' V2Inbox__chatCount--danger' : warn ? ' V2Inbox__chatCount--warn' : ''}`}
+                            title={isUnicode ? 'Message contains Unicode characters — reduced segment size (70/67 chars)' : 'GSM-7 encoding — 160 chars single / 153 per segment'}
+                          >
+                            {composerText.length === 0
+                              ? '160 chars left'
+                              : `${charsRemaining} left · ${segments} SMS${isUnicode ? ' ⚠ unicode' : ''}`}
+                          </span>
+                        );
+                      })()}
                       <div className="V2Inbox__chatTools">
                         {lineOptions.length > 0 && (
                           <select 
@@ -908,6 +1328,69 @@ export default function InboxV2() {
                             ))}
                           </select>
                         )}
+                        {/* Templates */}
+                        <div className="V2Inbox__templateWrapper">
+                          <button
+                            type="button"
+                            className="V2Inbox__button V2Inbox__button--small"
+                            onClick={() => setShowTemplates((prev) => !prev)}
+                            title="Insert template"
+                          >
+                            Templates
+                          </button>
+                          {showTemplates && (
+                            <div className="V2Inbox__templateDropdown">
+                              {templatesQuery.data && templatesQuery.data.length > 0 ? (
+                                templatesQuery.data.map((tpl) => (
+                                  <div key={tpl.id} className="V2Inbox__templateItem">
+                                    <button
+                                      type="button"
+                                      className="V2Inbox__templateInsert"
+                                      onClick={() => onInsertTemplate(tpl.body)}
+                                      title={tpl.body}
+                                    >
+                                      {tpl.name}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="V2Inbox__templateDelete"
+                                      onClick={() => void onDeleteTemplate(tpl.id)}
+                                      title="Delete template"
+                                    >
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))
+                              ) : (
+                                <p className="V2Inbox__templateEmpty">No templates yet.</p>
+                              )}
+                              <div className="V2Inbox__templateCreate">
+                                <input
+                                  type="text"
+                                  className="V2Inbox__templateNameInput"
+                                  value={newTemplateName}
+                                  onChange={(e) => setNewTemplateName(e.target.value)}
+                                  placeholder="Template name…"
+                                />
+                                <textarea
+                                  className="V2Inbox__templateBodyInput"
+                                  value={newTemplateBody}
+                                  onChange={(e) => setNewTemplateBody(e.target.value)}
+                                  rows={2}
+                                  placeholder="Body… use {{name}} for contact name"
+                                />
+                                <button
+                                  type="button"
+                                  className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                                  onClick={onCreateTemplate}
+                                  disabled={createTemplateMutation.isPending || !newTemplateName.trim() || !newTemplateBody.trim()}
+                                >
+                                  {createTemplateMutation.isPending ? 'Saving…' : '+ Save Template'}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                         <button
                           type="button"
                           className="V2Inbox__chatClear"
@@ -1078,6 +1561,133 @@ export default function InboxV2() {
                         </div>
                       </div>
                     )}
+
+                    {/* Whisper Notes Panel */}
+                    <div className="V2Panel V2Inbox__sidePanel">
+                      <p className="V2Panel__title">Whisper Notes</p>
+                      <p className="V2Panel__caption" style={{ fontSize: '0.75rem', marginBottom: '0.5rem', color: 'var(--v2-muted)' }}>
+                        Internal only — not visible to lead
+                      </p>
+                      <div className="V2Inbox__notesList">
+                        {notesQuery.isLoading && (
+                          <p style={{ fontSize: '0.75rem', color: 'var(--v2-muted)' }}>Loading…</p>
+                        )}
+                        {notesQuery.data && notesQuery.data.length === 0 && (
+                          <p style={{ fontSize: '0.75rem', color: 'var(--v2-muted)' }}>No notes yet.</p>
+                        )}
+                        {notesQuery.data?.map((note) => (
+                          <div key={note.id} className="V2Inbox__noteItem">
+                            <div className="V2Inbox__noteHeader">
+                              <span className="V2Inbox__noteAuthor">{note.author}</span>
+                              <span className="V2Inbox__noteTime">
+                                {new Date(note.createdAt).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="V2Inbox__noteBody">{note.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="V2Inbox__noteComposer">
+                        <textarea
+                          className="V2Inbox__noteInput"
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          rows={2}
+                          placeholder="Add internal note… (⌘↵ to save)"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void onAddNote();
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                          onClick={onAddNote}
+                          disabled={addNoteMutation.isPending || noteText.trim().length === 0}
+                        >
+                          {addNoteMutation.isPending ? 'Saving…' : '+ Note'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Phase 3: Call Outcome & Objections Panel */}
+                    <div className="V2Panel V2Inbox__sidePanel">
+                      <p className="V2Panel__title">Call Outcome &amp; Objections</p>
+
+                      {/* Call Outcome chips */}
+                      <p className="V2Panel__caption" style={{ fontSize: '0.72rem', marginBottom: '0.4rem' }}>Call Outcome</p>
+                      <div className="V2Inbox__outcomeChips">
+                        {(['not_a_fit', 'too_early', 'budget', 'joined', 'ghosted'] as CallOutcomeV2[]).map((outcome) => (
+                          <button
+                            key={outcome}
+                            type="button"
+                            className={`V2Inbox__outcomeChip${localCallOutcome === outcome ? ' is-active' : ''}`}
+                            data-outcome={outcome}
+                            onClick={() => void onSetCallOutcome(localCallOutcome === outcome ? null : outcome)}
+                            disabled={updateCallOutcomeMutation.isPending}
+                            title={CALL_OUTCOME_LABELS[outcome]}
+                          >
+                            {CALL_OUTCOME_LABELS[outcome]}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Objection Tags */}
+                      <p className="V2Panel__caption" style={{ fontSize: '0.72rem', marginTop: '0.75rem', marginBottom: '0.4rem' }}>Objection Tags</p>
+                      <div className="V2Inbox__objectionTagChips">
+                        {localObjectionTags.length === 0 && (
+                          <span style={{ fontSize: '0.72rem', color: 'var(--v2-muted)' }}>No tags yet</span>
+                        )}
+                        {localObjectionTags.map((tag) => (
+                          <span key={tag} className="V2Inbox__objectionTagChip">
+                            {tag}
+                            <button
+                              type="button"
+                              className="V2Inbox__objectionTagRemove"
+                              onClick={() => void onRemoveObjectionTag(tag)}
+                              disabled={updateObjectionTagsMutation.isPending}
+                              title="Remove tag"
+                            >
+                              ✕
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="V2Inbox__objectionTagInput">
+                        <input
+                          type="text"
+                          className="V2Inbox__assignInput"
+                          value={objectionTagInput}
+                          onChange={(e) => setObjectionTagInput(e.target.value)}
+                          placeholder="Add tag… (e.g. price, timing)"
+                          title="Add objection tag"
+                          onKeyDown={(e) => { if (e.key === 'Enter') void onAddObjectionTag(); }}
+                        />
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small"
+                          onClick={onAddObjectionTag}
+                          disabled={updateObjectionTagsMutation.isPending || !objectionTagInput.trim()}
+                        >
+                          + Tag
+                        </button>
+                      </div>
+
+                      {/* Guardrail Override */}
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <button
+                          type="button"
+                          className="V2Inbox__button V2Inbox__button--small V2Inbox__button--danger"
+                          onClick={onIncrementGuardrailOverride}
+                          disabled={incrementGuardrailOverrideMutation.isPending}
+                          title="Record that a guardrail was manually overridden for this conversation"
+                        >
+                          {incrementGuardrailOverrideMutation.isPending ? '…' : '⚠ Log Guardrail Override'}
+                        </button>
+                        <p style={{ fontSize: '0.68rem', color: 'var(--v2-muted)', marginTop: '0.25rem' }}>
+                          Overrides: {((detail?.conversation as any)?.guardrailOverrideCount as number | undefined) ?? 0}
+                        </p>
+                      </div>
+                    </div>
 
                   </div>
                 </div>

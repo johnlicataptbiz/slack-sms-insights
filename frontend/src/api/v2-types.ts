@@ -486,3 +486,36 @@ export type ScoreboardV2 = {
     monthlyBookingTotal: number;
   };
 };
+
+// ─── Phase 3: Inbox Analytics Types ──────────────────────────────────────────
+
+export type CallOutcomeV2 = 'not_a_fit' | 'too_early' | 'budget' | 'joined' | 'ghosted';
+
+export const CALL_OUTCOME_LABELS: Record<CallOutcomeV2, string> = {
+  not_a_fit: 'Not a Fit',
+  too_early: 'Too Early',
+  budget: 'Budget',
+  joined: 'Joined ✓',
+  ghosted: 'Ghosted',
+};
+
+export const CALL_OUTCOME_COLORS: Record<CallOutcomeV2, string> = {
+  not_a_fit: 'var(--v2-critical)',
+  too_early: 'var(--v2-warning)',
+  budget: 'var(--v2-warning)',
+  joined: 'var(--v2-positive)',
+  ghosted: 'var(--v2-muted)',
+};
+
+export type StageConversionRowV2 = {
+  escalation_level: number;
+  total_conversations: number;
+  call_offered_count: number;
+  call_outcome_count: number;
+  conversion_rate_pct: number;
+};
+
+export type ObjectionFrequencyRowV2 = {
+  tag: string;
+  count: number;
+};

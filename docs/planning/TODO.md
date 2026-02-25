@@ -40,3 +40,8 @@ Phase 2 Implementation TODO
 ## Post-Phase 2 Bug Fixes (URL Detection)
 - [x] Add `physicaltherapybiz.com/call-booked` to `CALL_LINK_PATTERNS` in `frontend/src/v2/pages/InboxV2.tsx` and `sms-insights/services/inbox-send.ts` so Phase 2 gating triggers for actual production call links.
 - [x] Add `physicaltherapybiz.com/blog` and `drdannymatta.com` to `PODCAST_LINK_PATTERNS` in `frontend/src/v2/pages/InboxV2.tsx` so auto-snooze triggers for actual production podcast links.
+
+## Post-Phase 2 Bug Fixes (Daily Runs Booked Calls Parsing)
+- [x] Fix `frontend/src/utils/reportParser.ts` to use `currentRep.bookings` from the `*Core Metrics*` section instead of summing sequence lines, which undercounts manual/direct bookings.
+- [x] Fix `sms-insights/services/daily-report-summary.ts` to only sum bookings from the `*Core Metrics*` section, preventing double-counting of bookings listed in the `*Top Performing Sequence*` section.
+- [x] Regenerate `summary_text` for all existing `daily_runs` in the database to reflect the corrected booking counts.

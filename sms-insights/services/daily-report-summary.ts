@@ -42,6 +42,30 @@ const sumFromPatterns = (input: string, patterns: RegExp[]): number => {
   return 0;
 };
 
+const sumCoreMetrics = (report: string, pattern: RegExp): { sum: number; foundCoreMetrics: boolean } => {
+  let sum = 0;
+  let inCoreMetrics = false;
+  let foundCoreMetrics = false;
+  for (const line of report.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('*Core Metrics*')) {
+      inCoreMetrics = true;
+      foundCoreMetrics = true;
+      continue;
+    }
+    if (trimmed.startsWith('*') && trimmed !== '*Core Metrics*') {
+      inCoreMetrics = false;
+    }
+    if (inCoreMetrics) {
+      const match = trimmed.match(pattern);
+      if (match) {
+        sum += Number.parseInt(match[1] || '0', 10);
+      }
+    }
+  }
+  return { sum, foundCoreMetrics };
+};
+
 const aggregateSequenceRows = (report: string): SequenceRow[] => {
   const byLabel = new Map<string, SequenceRow>();
   for (const rawLine of report.split('\n')) {
@@ -103,9 +127,14 @@ export const extractDailySnapshotReportDate = (report: string): string | null =>
 };
 
 export const buildDailyReportSummary = (report: string): string => {
-  const booked = sumFromPatterns(report, BOOKINGS_PATTERNS);
-  const optOuts = sumFromPatterns(report, OPTOUTS_PATTERNS);
-  const outboundConversations = sumFromPatterns(report, OUTBOUND_CONVERSATIONS_PATTERNS);
+  const bookingsCore = sumCoreMetrics(report, /- Book(?:ings?|ed):\s*(\d+)/i);
+  const booked = bookingsCore.foundCoreMetrics ? bookingsCore.sum : sumFromPatterns(report, BOOKINGS_PATTERNS);
+  
+  const optOutsCore = sumCoreMetrics(report, /- Opt[-\s]?Outs?:\s*(\d+)/i);
+  const optOuts = optOutsCore.foundCoreMetrics ? optOutsCore.sum : sumFromPatterns(report, OPTOUTS_PATTERNS);
+  
+  const outboundCore = sumCoreMetrics(report, /- Outbound Conversations:\s*(\d+)/i);
+  const outboundConversations = outboundCore.foundCoreMetrics ? outboundCore.sum : sumFromPatterns(report, OUTBOUND_CONVERSATIONS_PATTERNS);
   const sequences = aggregateSequenceRows(report);
   const dateLabel = report.match(DATE_PATTERN)?.[1]?.trim();
   const timeRange = report.match(TIME_RANGE_PATTERN)?.[1]?.trim();
@@ -152,8 +181,11 @@ export const buildDailyReportSummary = (report: string): string => {
 type SlackBlock = Record<string, unknown>;
 
 export const buildDailyReportBlocks = (report: string): SlackBlock[] => {
-  const booked = sumFromPatterns(report, BOOKINGS_PATTERNS);
-  const optOuts = sumFromPatterns(report, OPTOUTS_PATTERNS);
+  const bookingsCore = sumCoreMetrics(report, /- Book(?:ings?|ed):\s*(\d+)/i);
+  const booked = bookingsCore.foundCoreMetrics ? bookingsCore.sum : sumFromPatterns(report, BOOKINGS_PATTERNS);
+  
+  const optOutsCore = sumCoreMetrics(report, /- Opt[-\s]?Outs?:\s*(\d+)/i);
+  const optOuts = optOutsCore.foundCoreMetrics ? optOutsCore.sum : sumFromPatterns(report, OPTOUTS_PATTERNS);
   const sequences = aggregateSequenceRows(report);
 
   const messagesSent = sequences.reduce((sum, row) => sum + row.messagesSent, 0);

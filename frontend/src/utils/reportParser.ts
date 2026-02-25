@@ -40,10 +40,18 @@ export function parseReport(reportText: string): ParsedReport {
   const lines = reportText.split('\n').map((line) => line.trim());
   const reps: RepMetrics[] = [];
   let currentRep: RepMetrics | null = null;
+  let currentSection: string | null = null;
 
   const date = reportText.match(DATE_PATTERN)?.[1]?.trim();
 
   for (const line of lines) {
+    if (line.startsWith('*Core Metrics*')) {
+      currentSection = 'Core Metrics';
+      continue;
+    } else if (line.startsWith('*') && line !== '*Core Metrics*') {
+      currentSection = null;
+    }
+
     // Check for Rep header
     const repMatch = line.match(REP_PATTERN);
     if (repMatch) {
@@ -71,16 +79,18 @@ export function parseReport(reportText: string): ParsedReport {
         continue;
       }
 
-      const bookingsMatch = line.match(BOOKINGS_PATTERN);
-      if (bookingsMatch) {
-        currentRep.bookings = Number.parseInt(bookingsMatch[1] || '0', 10);
-        continue;
-      }
+      if (currentSection === 'Core Metrics') {
+        const bookingsMatch = line.match(BOOKINGS_PATTERN);
+        if (bookingsMatch) {
+          currentRep.bookings = Number.parseInt(bookingsMatch[1] || '0', 10);
+          continue;
+        }
 
-      const optOutsMatch = line.match(OPT_OUTS_PATTERN);
-      if (optOutsMatch) {
-        currentRep.optOuts = Number.parseInt(optOutsMatch[1] || '0', 10);
-        continue;
+        const optOutsMatch = line.match(OPT_OUTS_PATTERN);
+        if (optOutsMatch) {
+          currentRep.optOuts = Number.parseInt(optOutsMatch[1] || '0', 10);
+          continue;
+        }
       }
     }
 
@@ -131,12 +141,12 @@ export function parseReport(reportText: string): ParsedReport {
   const totalMessagesSent = allSequences.reduce((sum, s) => sum + s.messagesSent, 0);
   const totalRepliesReceived = allSequences.reduce((sum, s) => sum + s.repliesReceived, 0);
 
-  // Prefer sequence-level totals for "Bookings" and "Opt-Outs" because the raw report's
-  // rep-level "Core Metrics" can be inconsistent with the per-sequence breakdown.
-  // Example: rep core metrics may show "Bookings: 8" while the top sequence shows 3;
-  // the dashboard should reflect the true total across sequences (3+1+0+2+2+... = 8).
-  const totalBooked = allSequences.reduce((sum, s) => sum + s.booked, 0);
-  const totalOptOuts = allSequences.reduce((sum, s) => sum + s.optOuts, 0);
+  // Use rep-level "Core Metrics" for total bookings and opt-outs because sequence-level
+  // totals only include bookings/opt-outs attributed to sequences that had outbound messages
+  // sent in the current daily window. Manual/direct bookings or bookings from sequences
+  // sent on previous days will only appear in the core metrics.
+  const totalBooked = reps.reduce((sum, r) => sum + r.bookings, 0);
+  const totalOptOuts = reps.reduce((sum, r) => sum + r.optOuts, 0);
 
   const parsed: ParsedReport = {
     title: 'Daily SMS Snapshot',

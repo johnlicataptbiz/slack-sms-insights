@@ -425,11 +425,11 @@ export default function SequencesV2() {
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('uniqueContacted')}
-                    title="Unique contacts reached · weekly scoreboard window"
+                    title="Unique people reached by this sequence · weekly scoreboard window"
                   >
-                    Unique{sortArrow('uniqueContacted')}
+                    Contacts{sortArrow('uniqueContacted')}
                   </th>
-                  <th className="is-right">Replied</th>
+                  <th className="is-right" title="Total reply messages received">Replied</th>
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('replyRatePct')}
@@ -729,12 +729,12 @@ export default function SequencesV2() {
                 <tr>
                   <th>Lead Magnet</th>
                   <th className="is-right">Legacy Sent</th>
-                  <th className="is-right">Legacy Unique</th>
+                  <th className="is-right">Legacy Contacts</th>
                   <th className="is-right">Legacy Reply Rate</th>
                   <th className="is-right">Legacy Booked</th>
                   <th className="is-right">Legacy Booking Rate</th>
                   <th className="is-right">v2 Sent</th>
-                  <th className="is-right">v2 Unique</th>
+                  <th className="is-right">v2 Contacts</th>
                   <th className="is-right">v2 Reply Rate</th>
                   <th className="is-right">v2 Booked</th>
                   <th className="is-right">v2 Booking Rate</th>

@@ -5161,3 +5161,254 @@ color: var(--v2-text);
   background: rgba(7, 19, 36, 0.03);
   border: 1px solid rgba(7, 19, 36, 0.07);
 }
+
+/* ============================================================
+   SEQUENCES V2 — RISK FLAG BEM CLASSES
+   ============================================================ */
+
+.V2RiskFlag__title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-family: var(--v2-font-display);
+  font-weight: 700;
+}
+
+.V2RiskFlag__seq {
+  margin: 0.2rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--v2-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.V2RiskFlag__detail {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--v2-muted);
+  line-height: 1.4;
+}
+
+/* ============================================================
+   SEQUENCES V2 — REP SPLIT BADGES (Booked cell)
+   ============================================================ */
+
+.V2SeqRepSplit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+.V2SeqRepSplit__badges {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.V2SeqRepSplit__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.12rem 0.38rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.V2SeqRepSplit__badge--jack {
+  background: rgba(17, 184, 214, 0.12);
+  border-color: rgba(17, 184, 214, 0.3);
+  color: var(--v2-accent-strong);
+}
+
+.V2SeqRepSplit__badge--brandon {
+  background: rgba(19, 185, 129, 0.12);
+  border-color: rgba(19, 185, 129, 0.3);
+  color: var(--v2-positive);
+}
+
+.V2SeqRepSplit__badge--self {
+  background: rgba(245, 157, 13, 0.1);
+  border-color: rgba(245, 157, 13, 0.28);
+  color: color-mix(in srgb, #f59d0d 80%, var(--v2-base-800) 20%);
+}
+
+/* ============================================================
+   SEQUENCES V2 — AUDIT ITEM TEXT
+   ============================================================ */
+
+.V2AuditItem__text {
+  margin: 0.2rem 0 0;
+  font-size: 0.78rem;
+  color: var(--v2-text);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.V2AuditItem__textLabel {
+  font-weight: 700;
+  color: var(--v2-muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-right: 0.25rem;
+}
+
+/* ============================================================
+   SEQUENCES V2 — COMPLIANCE PANEL
+   ============================================================ */
+
+.V2SeqCompliance {
+  display: grid;
+  gap: 1rem;
+}
+
+.V2SeqCompliance__rates {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.V2SeqCompliance__rate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--v2-radius-sm);
+  border: 1px solid rgba(7, 19, 36, 0.1);
+  background: rgba(245, 250, 255, 0.85);
+  min-width: 160px;
+}
+
+.V2SeqCompliance__rateLabel {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--v2-muted);
+  font-weight: 700;
+}
+
+.V2SeqCompliance__rateValue {
+  font-family: var(--v2-font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--v2-text);
+  line-height: 1;
+}
+
+.V2SeqCompliance__rateValue--warn {
+  color: var(--v2-critical);
+}
+
+.V2SeqCompliance__topList {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.V2SeqCompliance__topTitle {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--v2-muted);
+}
+
+/* ============================================================
+   SEQUENCES V2 — TIMING PANEL
+   ============================================================ */
+
+.V2SeqTiming {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.V2SeqTiming__median {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--v2-radius-sm);
+  border: 1px solid rgba(17, 184, 214, 0.2);
+  background: rgba(17, 184, 214, 0.06);
+}
+
+.V2SeqTiming__medianLabel {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--v2-muted);
+  flex: 1;
+}
+
+.V2SeqTiming__medianValue {
+  font-family: var(--v2-font-display);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--v2-accent-strong);
+  line-height: 1;
+}
+
+.V2SeqTiming__chart {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.V2SeqTiming__chartTitle {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--v2-muted);
+}
+
+.V2SeqTiming__row {
+  display: grid;
+  grid-template-columns: 80px 1fr 52px 72px;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.V2SeqTiming__day {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--v2-text);
+  white-space: nowrap;
+}
+
+.V2SeqTiming__barWrap {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(7, 19, 36, 0.08);
+  overflow: hidden;
+}
+
+.V2SeqTiming__bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--v2-accent), var(--v2-accent-strong));
+  min-width: 4px;
+  transition: width 400ms ease;
+}
+
+.V2SeqTiming__pct {
+  font-family: var(--v2-font-mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--v2-text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.V2SeqTiming__vol {
+  font-size: 0.72rem;
+  color: var(--v2-muted);
+  white-space: nowrap;
+}

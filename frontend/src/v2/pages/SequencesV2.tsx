@@ -13,12 +13,27 @@ type Sort =
   | 'replyRatePct'
   | 'canonicalBookedCalls'
   | 'canonicalBookedAfterSmsReply'
-  | 'optOutRatePct';
+  | 'optOutRatePct'
+  | 'uniqueContacted'
+  | 'bookingRatePct';
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtInt = (n: number) => n.toLocaleString();
+
+const fmtMins = (n: number | null): string => {
+  if (n === null) return '—';
+  if (n < 60) return `${Math.round(n)}m`;
+  const h = Math.floor(n / 60);
+  const m = Math.round(n % 60);
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+};
+
+const shorten = (text: string, max: number): string => {
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}…`;
+};
 
 const fmtDay = (iso: string | null) => {
   if (!iso) return '—';
@@ -82,6 +97,18 @@ type MergedSeqRow = {
   bookedAuditRows: AuditRow[];
   diagnosticSmsBookingSignals: number;
   isManual: boolean;
+  // from scoreboard (weekly window — metadata only, noted in UI)
+  uniqueContacted: number;
+  uniqueReplied: number;
+  bookingRatePct: number;
+};
+
+type HealthFlag = {
+  sequence: string;
+  label: string;
+  detail: string;
+  severity: 'critical' | 'warning' | 'info';
+  stats: Array<{ label: string; value: string; variant?: 'critical' | 'warning' }>;
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -101,7 +128,7 @@ export default function SequencesV2() {
   const salesMetrics = salesMetricsQuery.data?.data;
   const scoreboard = scoreboardQuery.data?.data;
 
-  // Build scoreboard lookup by label for leadMagnet / version / uniqueContacted
+  // Build scoreboard lookup by label for leadMagnet / version / uniqueContacted / bookingRatePct
   const scoreboardByLabel = useMemo(() => {
     const map = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
     for (const seq of scoreboard?.sequences ?? []) {
@@ -111,7 +138,7 @@ export default function SequencesV2() {
   }, [scoreboard?.sequences]);
 
   // Merge: numeric fields exclusively from sales-metrics (time-range consistent).
-  // Scoreboard is used only for window-independent metadata: leadMagnet, version.
+  // Scoreboard used only for window-independent metadata: leadMagnet, version, uniqueContacted, uniqueReplied, bookingRatePct.
   const mergedRows = useMemo((): MergedSeqRow[] => {
     const smSeqs = salesMetrics?.sequences ?? [];
     return smSeqs.map((seq) => {
@@ -134,6 +161,9 @@ export default function SequencesV2() {
         bookedAuditRows: seq.bookedAuditRows,
         diagnosticSmsBookingSignals: seq.diagnosticSmsBookingSignals,
         isManual: seq.label === MANUAL_LABEL,
+        uniqueContacted: sb?.uniqueContacted ?? 0,
+        uniqueReplied: sb?.uniqueReplied ?? 0,
+        bookingRatePct: sb?.bookingRatePct ?? 0,
       };
     });
   }, [salesMetrics?.sequences, scoreboardByLabel]);
@@ -155,6 +185,10 @@ export default function SequencesV2() {
           return dir * (a.canonicalBookedAfterSmsReply - b.canonicalBookedAfterSmsReply);
         case 'optOutRatePct':
           return dir * (a.optOutRatePct - b.optOutRatePct);
+        case 'uniqueContacted':
+          return dir * (a.uniqueContacted - b.uniqueContacted);
+        case 'bookingRatePct':
+          return dir * (a.bookingRatePct - b.bookingRatePct);
         default:
           return 0;
       }
@@ -167,13 +201,65 @@ export default function SequencesV2() {
     const totalMessages = mergedRows.reduce((s, r) => s + r.messagesSent, 0);
     const totalReplied = mergedRows.reduce((s, r) => s + r.repliesReceived, 0);
     const totalBooked = mergedRows.reduce((s, r) => s + r.canonicalBookedCalls, 0);
+    const totalBookedAfterSmsReply = mergedRows.reduce((s, r) => s + r.canonicalBookedAfterSmsReply, 0);
+    const totalUniqueContacted = mergedRows.reduce((s, r) => s + r.uniqueContacted, 0);
     const avgReplyRate = totalMessages > 0 ? (totalReplied / totalMessages) * 100 : 0;
+    const smsReplyBookingPct = totalBooked > 0 ? (totalBookedAfterSmsReply / totalBooked) * 100 : 0;
     return {
       activeSequences: activeRows.length,
       totalMessages,
       totalBooked,
+      totalUniqueContacted,
       avgReplyRate,
+      smsReplyBookingPct,
     };
+  }, [mergedRows]);
+
+  // Health watchlist — flag sequences needing attention
+  const healthWatchlist = useMemo((): HealthFlag[] => {
+    const flags: HealthFlag[] = [];
+    for (const row of mergedRows) {
+      if (row.isManual) continue;
+      if (row.messagesSent < 5) continue;
+      if (row.optOutRatePct >= 5 && row.messagesSent >= 10) {
+        flags.push({
+          sequence: row.label,
+          label: '⚠ High Opt-Out Rate',
+          detail: `${fmtPct(row.optOutRatePct)} opt-out rate on ${fmtInt(row.messagesSent)} messages. Review messaging tone and targeting.`,
+          severity: 'critical',
+          stats: [
+            { label: 'Opt-Out Rate', value: fmtPct(row.optOutRatePct), variant: 'critical' },
+            { label: 'Opt-Outs', value: fmtInt(row.optOuts) },
+            { label: 'Sent', value: fmtInt(row.messagesSent) },
+          ],
+        });
+      } else if (row.replyRatePct < 5 && row.messagesSent >= 30) {
+        flags.push({
+          sequence: row.label,
+          label: '↓ Low Reply Rate',
+          detail: `Only ${fmtPct(row.replyRatePct)} reply rate on ${fmtInt(row.messagesSent)} messages. Consider refreshing copy or targeting.`,
+          severity: 'warning',
+          stats: [
+            { label: 'Reply Rate', value: fmtPct(row.replyRatePct), variant: 'warning' },
+            { label: 'Replied', value: fmtInt(row.repliesReceived) },
+            { label: 'Sent', value: fmtInt(row.messagesSent) },
+          ],
+        });
+      } else if (row.canonicalBookedCalls === 0 && row.messagesSent > 100) {
+        flags.push({
+          sequence: row.label,
+          label: '○ Zero Bookings',
+          detail: `${fmtInt(row.messagesSent)} messages sent with no attributed bookings in this window.`,
+          severity: 'info',
+          stats: [
+            { label: 'Sent', value: fmtInt(row.messagesSent) },
+            { label: 'Reply Rate', value: fmtPct(row.replyRatePct) },
+            { label: 'Booked', value: '0' },
+          ],
+        });
+      }
+    }
+    return flags;
   }, [mergedRows]);
 
   const toggleExpanded = (label: string) => {
@@ -199,6 +285,8 @@ export default function SequencesV2() {
 
   const leadMagnetRows: ScoreboardLeadMagnetRow[] = scoreboard?.leadMagnetComparison ?? [];
   const monthlyBookings = scoreboard?.monthly.bookings;
+  const compliance = scoreboard?.compliance;
+  const timing = scoreboard?.timing;
 
   if (isLoading) {
     return (
@@ -257,6 +345,11 @@ export default function SequencesV2() {
           meta="all sequences"
         />
         <V2MetricCard
+          label="Unique Contacts"
+          value={fmtInt(kpis.totalUniqueContacted)}
+          meta="weekly scoreboard window"
+        />
+        <V2MetricCard
           label="Booked Calls"
           value={fmtInt(kpis.totalBooked)}
           tone={kpis.totalBooked > 0 ? 'positive' : 'default'}
@@ -268,12 +361,49 @@ export default function SequencesV2() {
           tone={kpis.avgReplyRate >= 10 ? 'positive' : 'default'}
           meta="messages-sent basis"
         />
+        <V2MetricCard
+          label="SMS-Reply Booking %"
+          value={fmtPct(kpis.smsReplyBookingPct)}
+          tone={kpis.smsReplyBookingPct >= 50 ? 'positive' : 'default'}
+          meta="bookings with prior SMS reply"
+        />
       </section>
+
+      {/* ── Health Watchlist ── */}
+      {healthWatchlist.length > 0 && (
+        <V2Panel
+          title="⚠ Sequence Health Watchlist"
+          caption="Sequences flagged for attention based on opt-out rate, reply rate, or booking performance"
+        >
+          <div className="V2RiskFlags">
+            {healthWatchlist.map((flag, i) => (
+              <div
+                key={`${flag.sequence}-${i}`}
+                className={`V2RiskFlag V2RiskFlag--${flag.severity}`}
+              >
+                <h3 className="V2RiskFlag__title">{flag.label}</h3>
+                <p className="V2RiskFlag__seq">{flag.sequence}</p>
+                <p className="V2RiskFlag__detail">{flag.detail}</p>
+                <div className="V2Watchlist__stats">
+                  {flag.stats.map((stat) => (
+                    <span
+                      key={stat.label}
+                      className={`V2Watchlist__stat${stat.variant ? ` V2Watchlist__stat--${stat.variant}` : ''}`}
+                    >
+                      {stat.label}: {stat.value}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </V2Panel>
+      )}
 
       {/* ── Sequence Performance Table ── */}
       <V2Panel
         title="Sequence Performance"
-        caption={`${sortedRows.length} sequences · all numbers from ${mode} rolling window · Booked = Slack-attributed canonical · click headers to sort`}
+        caption={`${sortedRows.length} sequences · all numbers from ${mode} rolling window · Booked = Slack-attributed canonical · Unique/Booking Rate from weekly scoreboard · click headers to sort`}
       >
         {sortedRows.length === 0 ? (
           <V2State kind="empty">No sequence data for this window.</V2State>
@@ -292,6 +422,13 @@ export default function SequencesV2() {
                   >
                     Sent{sortArrow('messagesSent')}
                   </th>
+                  <th
+                    className="is-right is-sortable"
+                    onClick={() => handleSortClick('uniqueContacted')}
+                    title="Unique contacts reached · weekly scoreboard window"
+                  >
+                    Unique{sortArrow('uniqueContacted')}
+                  </th>
                   <th className="is-right">Replied</th>
                   <th
                     className="is-right is-sortable"
@@ -305,13 +442,25 @@ export default function SequencesV2() {
                   >
                     Booked{sortArrow('canonicalBookedCalls')}
                   </th>
-                  <th className="is-right">Booking Rate</th>
+                  <th
+                    className="is-right is-sortable"
+                    onClick={() => handleSortClick('bookingRatePct')}
+                    title="Booked calls ÷ unique contacts · weekly scoreboard window"
+                  >
+                    Booking Rate{sortArrow('bookingRatePct')}
+                  </th>
                   <th
                     className="is-right is-sortable"
                     onClick={() => handleSortClick('canonicalBookedAfterSmsReply')}
                     title="Booked calls where the contact had replied to an SMS before booking"
                   >
                     w/ SMS Reply{sortArrow('canonicalBookedAfterSmsReply')}
+                  </th>
+                  <th
+                    className="is-right"
+                    title="% of bookings that had a prior SMS reply"
+                  >
+                    SMS Reply %
                   </th>
                   <th
                     className="is-right is-sortable"
@@ -328,6 +477,10 @@ export default function SequencesV2() {
                   const expanded = expandedLabels.has(row.label);
                   const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
                   const isHighBooking = row.canonicalBookedCalls > 0 && !row.isManual;
+                  const smsReplyPct =
+                    row.canonicalBookedCalls > 0
+                      ? (row.canonicalBookedAfterSmsReply / row.canonicalBookedCalls) * 100
+                      : null;
                   const rowClass = [
                     'V2Table__row',
                     row.isManual ? 'V2Table__row--manual' : '',
@@ -365,18 +518,58 @@ export default function SequencesV2() {
                           {fmtDay(row.firstSeenAt)}
                         </td>
                         <td className="is-right">{fmtInt(row.messagesSent)}</td>
+                        <td className="is-right V2Table__dim">
+                          {row.uniqueContacted > 0
+                            ? fmtInt(row.uniqueContacted)
+                            : <span className="V2Table__dim">—</span>}
+                        </td>
                         <td className="is-right">{fmtInt(row.repliesReceived)}</td>
                         <td className="is-right">{fmtPct(row.replyRatePct)}</td>
                         <td className="is-right">
-                          <strong>{fmtInt(row.canonicalBookedCalls)}</strong>
+                          <div className="V2SeqRepSplit">
+                            <strong>{fmtInt(row.canonicalBookedCalls)}</strong>
+                            {row.canonicalBookedCalls > 0 && (
+                              <div className="V2SeqRepSplit__badges">
+                                {row.canonicalBookedJack > 0 && (
+                                  <span
+                                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--jack"
+                                    title={`Jack: ${row.canonicalBookedJack}`}
+                                  >
+                                    J·{row.canonicalBookedJack}
+                                  </span>
+                                )}
+                                {row.canonicalBookedBrandon > 0 && (
+                                  <span
+                                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--brandon"
+                                    title={`Brandon: ${row.canonicalBookedBrandon}`}
+                                  >
+                                    B·{row.canonicalBookedBrandon}
+                                  </span>
+                                )}
+                                {row.canonicalBookedSelf > 0 && (
+                                  <span
+                                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--self"
+                                    title={`Self-booked: ${row.canonicalBookedSelf}`}
+                                  >
+                                    S·{row.canonicalBookedSelf}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </td>
-                        <td className="is-right">
-                          {row.messagesSent === 0
-                            ? <span className="V2Table__dim">—</span>
-                            : `${((row.canonicalBookedCalls / row.messagesSent) * 100).toFixed(1)}%`}
+                        <td className="is-right V2Table__dim">
+                          {row.bookingRatePct > 0
+                            ? fmtPct(row.bookingRatePct)
+                            : <span className="V2Table__dim">—</span>}
                         </td>
                         <td className="is-right V2Table__dim">
                           {fmtInt(row.canonicalBookedAfterSmsReply)}
+                        </td>
+                        <td className="is-right V2Table__dim">
+                          {smsReplyPct !== null
+                            ? fmtPct(smsReplyPct)
+                            : <span className="V2Table__dim">—</span>}
                         </td>
                         <td className={`is-right${isHighOptOut ? ' V2Table__cell--warn' : ''}`}>
                           {fmtPct(row.optOutRatePct)}
@@ -397,7 +590,7 @@ export default function SequencesV2() {
 
                       {expanded && (
                         <tr className="V2Table__auditRow">
-                          <td colSpan={14}>
+                          <td colSpan={15}>
                             <div className="V2SeqAudit">
                               {/* Booking breakdown summary */}
                               <div className="V2SeqAudit__summary">
@@ -418,6 +611,11 @@ export default function SequencesV2() {
                                   <span className="V2SeqAudit__summaryLabel">w/ SMS Reply</span>
                                   <span className="V2SeqAudit__summaryValue">
                                     {fmtInt(row.canonicalBookedAfterSmsReply)}
+                                    {row.canonicalBookedCalls > 0 && smsReplyPct !== null && (
+                                      <span className="V2SeqAudit__breakdown">
+                                        {' '}({fmtPct(smsReplyPct)} of bookings)
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
                                 <div className="V2SeqAudit__summaryItem V2SeqAudit__summaryItem--diagnostic">
@@ -459,13 +657,26 @@ export default function SequencesV2() {
                                           >
                                             {bucketLabel(audit.bucket)}
                                           </span>
+                                          {audit.rep && (
+                                            <span className="V2Badge V2Badge--muted" title="Rep">
+                                              {audit.rep}
+                                            </span>
+                                          )}
+                                          {audit.line && (
+                                            <span className="V2Badge V2Badge--muted" title="Line">
+                                              {audit.line}
+                                            </span>
+                                          )}
                                           <span
                                             className={`V2Badge V2Badge--${audit.strictSmsReplyLinked ? 'positive' : 'muted'}`}
                                           >
                                             SMS reply: {audit.strictSmsReplyLinked ? 'yes' : 'no'}
                                           </span>
                                           {audit.convertedViaSequence && (
-                                            <span className="V2Badge V2Badge--via" title={`Contact was actively enrolled in this sequence at booking time`}>
+                                            <span
+                                              className="V2Badge V2Badge--via"
+                                              title="Contact was actively enrolled in this sequence at booking time"
+                                            >
                                               via {audit.convertedViaSequence}
                                             </span>
                                           )}
@@ -483,6 +694,12 @@ export default function SequencesV2() {
                                             ? ` · Latest SMS reply: ${fmtDateTime(audit.latestReplyAt)}`
                                             : ''}
                                         </p>
+                                        {audit.text && (
+                                          <p className="V2AuditItem__text">
+                                            <span className="V2AuditItem__textLabel">Message: </span>
+                                            {shorten(audit.text, 120)}
+                                          </p>
+                                        )}
                                       </article>
                                     ))}
                                 </div>
@@ -512,11 +729,15 @@ export default function SequencesV2() {
                 <tr>
                   <th>Lead Magnet</th>
                   <th className="is-right">Legacy Sent</th>
+                  <th className="is-right">Legacy Unique</th>
                   <th className="is-right">Legacy Reply Rate</th>
                   <th className="is-right">Legacy Booked</th>
+                  <th className="is-right">Legacy Booking Rate</th>
                   <th className="is-right">v2 Sent</th>
+                  <th className="is-right">v2 Unique</th>
                   <th className="is-right">v2 Reply Rate</th>
                   <th className="is-right">v2 Booked</th>
+                  <th className="is-right">v2 Booking Rate</th>
                 </tr>
               </thead>
               <tbody>
@@ -526,20 +747,32 @@ export default function SequencesV2() {
                     <td className="is-right">
                       {row.legacy ? fmtInt(row.legacy.messagesSent) : <span className="V2Table__dim">—</span>}
                     </td>
+                    <td className="is-right V2Table__dim">
+                      {row.legacy ? fmtInt(row.legacy.uniqueContacted) : <span className="V2Table__dim">—</span>}
+                    </td>
                     <td className="is-right">
                       {row.legacy ? fmtPct(row.legacy.replyRatePct) : <span className="V2Table__dim">—</span>}
                     </td>
                     <td className="is-right">
                       {row.legacy ? fmtInt(row.legacy.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
                     </td>
+                    <td className="is-right V2Table__dim">
+                      {row.legacy ? fmtPct(row.legacy.bookingRatePct) : <span className="V2Table__dim">—</span>}
+                    </td>
                     <td className="is-right">
                       {row.v2 ? fmtInt(row.v2.messagesSent) : <span className="V2Table__dim">—</span>}
+                    </td>
+                    <td className="is-right V2Table__dim">
+                      {row.v2 ? fmtInt(row.v2.uniqueContacted) : <span className="V2Table__dim">—</span>}
                     </td>
                     <td className="is-right">
                       {row.v2 ? fmtPct(row.v2.replyRatePct) : <span className="V2Table__dim">—</span>}
                     </td>
                     <td className="is-right">
                       {row.v2 ? fmtInt(row.v2.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
+                    </td>
+                    <td className="is-right V2Table__dim">
+                      {row.v2 ? fmtPct(row.v2.bookingRatePct) : <span className="V2Table__dim">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -587,6 +820,103 @@ export default function SequencesV2() {
               triggered the first outbound contact with a lead, even if manual follow-ups preceded
               the booking.
             </p>
+          </div>
+        </V2Panel>
+      )}
+
+      {/* ── Compliance Panel ── */}
+      {compliance && (
+        <V2Panel
+          title="Compliance Overview"
+          caption="Opt-out rates and top opt-out sequences · weekly scoreboard window"
+        >
+          <div className="V2SeqCompliance">
+            <div className="V2SeqCompliance__rates">
+              <div className="V2SeqCompliance__rate">
+                <span className="V2SeqCompliance__rateLabel">Weekly Opt-Out Rate</span>
+                <span
+                  className={`V2SeqCompliance__rateValue${compliance.optOutRateWeeklyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
+                >
+                  {fmtPct(compliance.optOutRateWeeklyPct)}
+                </span>
+              </div>
+              <div className="V2SeqCompliance__rate">
+                <span className="V2SeqCompliance__rateLabel">Monthly Opt-Out Rate</span>
+                <span
+                  className={`V2SeqCompliance__rateValue${compliance.optOutRateMonthlyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
+                >
+                  {fmtPct(compliance.optOutRateMonthlyPct)}
+                </span>
+              </div>
+            </div>
+            {compliance.topOptOutSequences.length > 0 && (
+              <div className="V2SeqCompliance__topList">
+                <p className="V2SeqCompliance__topTitle">Top Opt-Out Sequences</p>
+                <div className="V2TableWrap">
+                  <table className="V2Table">
+                    <thead>
+                      <tr>
+                        <th>Sequence</th>
+                        <th className="is-right">Opt-Outs</th>
+                        <th className="is-right">Opt-Out Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {compliance.topOptOutSequences.map((seq) => (
+                        <tr key={seq.label}>
+                          <td>{seq.label}</td>
+                          <td className="is-right">{fmtInt(seq.optOuts)}</td>
+                          <td className={`is-right${seq.optOutRatePct >= 5 ? ' V2Table__cell--warn' : ''}`}>
+                            {fmtPct(seq.optOutRatePct)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </V2Panel>
+      )}
+
+      {/* ── Timing Panel ── */}
+      {timing && (
+        <V2Panel
+          title="Reply Timing"
+          caption="Median time to first reply and reply rate by day of week · weekly scoreboard window"
+        >
+          <div className="V2SeqTiming">
+            {timing.medianTimeToFirstReplyMinutes !== null && (
+              <div className="V2SeqTiming__median">
+                <span className="V2SeqTiming__medianLabel">Median Time to First Reply</span>
+                <span className="V2SeqTiming__medianValue">
+                  {fmtMins(timing.medianTimeToFirstReplyMinutes)}
+                </span>
+              </div>
+            )}
+            {timing.replyRateByDayOfWeek.length > 0 && (
+              <div className="V2SeqTiming__chart">
+                <p className="V2SeqTiming__chartTitle">Reply Rate by Day of Week</p>
+                {timing.replyRateByDayOfWeek.map((day) => {
+                  const barPct = Math.min(day.replyRatePct, 100);
+                  return (
+                    <div key={day.dayOfWeek} className="V2SeqTiming__row">
+                      <span className="V2SeqTiming__day">{day.dayOfWeek}</span>
+                      <div className="V2SeqTiming__barWrap">
+                        <div
+                          className="V2SeqTiming__bar"
+                          style={{ width: `${barPct}%` }}
+                          title={`${fmtPct(day.replyRatePct)} reply rate · ${fmtInt(day.outboundCount)} sent · ${fmtInt(day.replyCount)} replied`}
+                        />
+                      </div>
+                      <span className="V2SeqTiming__pct">{fmtPct(day.replyRatePct)}</span>
+                      <span className="V2SeqTiming__vol">{fmtInt(day.outboundCount)} sent</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </V2Panel>
       )}

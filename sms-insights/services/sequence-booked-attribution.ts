@@ -260,24 +260,25 @@ export const attributeSlackBookedCallsToSequences = (
     const smsLink = smsReplyLinks.get(sourceKey);
     const strictLinked = smsLink?.hasPriorReply === true;
 
-    // Primary: exact phone-number match from sms_events outbound events.
-    // Fallback: fuzzy firstConversion text match against known sequence candidates.
+    // Primary: fuzzy firstConversion text match — credits the lead magnet that generated the lead.
+    // Fallback: exact phone-number match from sms_events — used when fuzzy fails (e.g. CPFM Check In
+    // has no firstConversion text, so fuzzy returns null; SMS lookup gives the exact sequence).
     const smsLookup = smsSequenceLookup.get(call.bookedCallId);
+    const fuzzyResolved = resolveSequenceLabel(call.firstConversion, candidates);
     let resolvedLabel: string | null = null;
     let isManual = false;
     let attributionSource: 'sms_phone_match' | 'fuzzy_text_match' = 'fuzzy_text_match';
 
-    if (smsLookup) {
-      // The sequence label from sms_events is the ground truth — use it directly.
+    if (fuzzyResolved.label) {
+      // Fuzzy match succeeded — credit the lead magnet (firstConversion).
+      resolvedLabel = fuzzyResolved.label;
+      isManual = fuzzyResolved.manual;
+      attributionSource = 'fuzzy_text_match';
+    } else if (smsLookup) {
+      // Fuzzy failed — fall back to SMS phone match for exact sequence attribution.
       resolvedLabel = smsLookup.sequenceLabel;
       isManual = resolvedLabel === MANUAL_SEQUENCE_LABEL;
       attributionSource = 'sms_phone_match';
-    } else {
-      // No phone match — fall back to fuzzy firstConversion text matching.
-      const resolved = resolveSequenceLabel(call.firstConversion, candidates);
-      resolvedLabel = resolved.label;
-      isManual = resolved.manual;
-      attributionSource = 'fuzzy_text_match';
     }
 
     if (!resolvedLabel) {

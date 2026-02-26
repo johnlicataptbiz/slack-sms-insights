@@ -129,12 +129,14 @@ export const extractDailySnapshotReportDate = (report: string): string | null =>
 export const buildDailyReportSummary = (report: string): string => {
   const bookingsCore = sumCoreMetrics(report, /- Book(?:ings?|ed):\s*(\d+)/i);
   const booked = bookingsCore.foundCoreMetrics ? bookingsCore.sum : sumFromPatterns(report, BOOKINGS_PATTERNS);
-  
+
   const optOutsCore = sumCoreMetrics(report, /- Opt[-\s]?Outs?:\s*(\d+)/i);
   const optOuts = optOutsCore.foundCoreMetrics ? optOutsCore.sum : sumFromPatterns(report, OPTOUTS_PATTERNS);
-  
+
   const outboundCore = sumCoreMetrics(report, /- Outbound Conversations:\s*(\d+)/i);
-  const outboundConversations = outboundCore.foundCoreMetrics ? outboundCore.sum : sumFromPatterns(report, OUTBOUND_CONVERSATIONS_PATTERNS);
+  const outboundConversations = outboundCore.foundCoreMetrics
+    ? outboundCore.sum
+    : sumFromPatterns(report, OUTBOUND_CONVERSATIONS_PATTERNS);
   const sequences = aggregateSequenceRows(report);
   const dateLabel = report.match(DATE_PATTERN)?.[1]?.trim();
   const timeRange = report.match(TIME_RANGE_PATTERN)?.[1]?.trim();
@@ -183,7 +185,7 @@ type SlackBlock = Record<string, unknown>;
 export const buildDailyReportBlocks = (report: string): SlackBlock[] => {
   const bookingsCore = sumCoreMetrics(report, /- Book(?:ings?|ed):\s*(\d+)/i);
   const booked = bookingsCore.foundCoreMetrics ? bookingsCore.sum : sumFromPatterns(report, BOOKINGS_PATTERNS);
-  
+
   const optOutsCore = sumCoreMetrics(report, /- Opt[-\s]?Outs?:\s*(\d+)/i);
   const optOuts = optOutsCore.foundCoreMetrics ? optOutsCore.sum : sumFromPatterns(report, OPTOUTS_PATTERNS);
   const sequences = aggregateSequenceRows(report);

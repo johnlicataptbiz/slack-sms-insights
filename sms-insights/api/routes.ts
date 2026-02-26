@@ -3,16 +3,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
 import {
-  listRunsSchema,
-  getRunSchema,
-  createRunSchema,
-  salesMetricsSchema,
-  workItemsQuerySchema,
-  validateQuery,
-  validateBody,
-  formatValidationErrors,
-} from './validation.js';
-import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
@@ -31,8 +21,8 @@ import {
   getDraftSuggestionById,
   getInboxConversationById,
   getObjectionFrequencyAnalytics,
-  getStageConversionAnalytics,
   getSendAttemptVolumeCounts,
+  getStageConversionAnalytics,
   incrementGuardrailOverride,
   insertConversationNote,
   insertDraftSuggestion,
@@ -41,8 +31,8 @@ import {
   listConversationNotes,
   listDraftSuggestionsForConversation,
   listInboxConversations,
-  listMessageTemplates,
   listMessagesForConversation,
+  listMessageTemplates,
   listMondayTrailForContactKey,
   snoozeConversation,
   updateCallOutcome,
@@ -63,6 +53,7 @@ import { syncQualificationFromConversationText } from '../services/qualification
 import { subscribeRealtimeEvents } from '../services/realtime.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
+import { getScoreboardData } from '../services/scoreboard.js';
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
 import {
@@ -78,10 +69,13 @@ import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time
 
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
-import { getScoreboardData } from '../services/scoreboard.js';
-
-import { assignWorkItem, decodeWorkItemCursor, listOpenWorkItems, resolveWorkItem, type WorkItemCursor } from '../services/work-items.js';
-
+import {
+  assignWorkItem,
+  decodeWorkItemCursor,
+  listOpenWorkItems,
+  resolveWorkItem,
+  type WorkItemCursor,
+} from '../services/work-items.js';
 import {
   toChannelsV2,
   toEnvelope,
@@ -90,6 +84,16 @@ import {
   toSalesMetricsV2,
   toWeeklyManagerSummaryV2,
 } from './v2-contract.js';
+import {
+  createRunSchema,
+  formatValidationErrors,
+  getRunSchema,
+  listRunsSchema,
+  salesMetricsSchema,
+  validateBody,
+  validateQuery,
+  workItemsQuerySchema,
+} from './validation.js';
 
 type ApiRequest = IncomingMessage & {
   body?: unknown;
@@ -130,6 +134,35 @@ type RateLimitResult = {
 };
 
 const rateLimitState = new Map<string, number[]>();
+
+// TTL-based cleanup for rate limit state to prevent unbounded memory growth
+// Runs every 5 minutes and removes entries older than the max window (1 hour)
+const RATE_LIMIT_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const RATE_LIMIT_MAX_WINDOW_MS = 60 * 60 * 1000; // 1 hour (max window we use)
+
+const cleanupRateLimitState = (): void => {
+  const now = Date.now();
+  const cutoff = now - RATE_LIMIT_MAX_WINDOW_MS;
+  let cleaned = 0;
+
+  for (const [key, timestamps] of rateLimitState.entries()) {
+    const active = timestamps.filter((ts) => ts > cutoff);
+    if (active.length === 0) {
+      rateLimitState.delete(key);
+      cleaned++;
+    } else if (active.length !== timestamps.length) {
+      rateLimitState.set(key, active);
+    }
+  }
+
+  if (cleaned > 0) {
+    // Use console.warn since logger isn't available at module level
+    console.warn(`[RateLimit] Cleaned ${cleaned} stale entries, ${rateLimitState.size} active keys remaining`);
+  }
+};
+
+// Start periodic cleanup
+setInterval(cleanupRateLimitState, RATE_LIMIT_CLEANUP_INTERVAL_MS);
 
 const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
   if (!value) return fallback;
@@ -742,7 +775,7 @@ const handleOauthCallback: RequestHandler = async (req, res, logger) => {
 
 const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  
+
   const queryParams = {
     daysBack: url.searchParams.get('daysBack') || undefined,
     channelId: url.searchParams.get('channelId') || undefined,
@@ -752,13 +785,18 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
     legacyOnly: url.searchParams.get('legacyOnly') === 'true',
     includeLegacy: url.searchParams.get('includeLegacy') === 'true',
   };
-  
+
   const validation = validateQuery(listRunsSchema, queryParams);
   if (!validation.success) {
-    sendJson(res, 400, { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) }, origin);
+    sendJson(
+      res,
+      400,
+      { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) },
+      origin,
+    );
     return;
   }
-  
+
   const { channelId, limit, offset, daysBack, raw } = validation.data;
   const legacyMode = queryParams.legacyOnly ? 'only' : queryParams.includeLegacy ? 'include' : 'exclude';
 
@@ -779,7 +817,7 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
 
 const handleGetRunById: RequestHandler = async (req, res, logger, origin) => {
   const id = req.url?.split('/').pop();
-  
+
   const validation = validateQuery(getRunSchema, { id: id || '' });
   if (!validation.success) {
     sendJson(res, 400, { error: 'Invalid run ID', details: formatValidationErrors(validation.error) }, origin);
@@ -814,7 +852,8 @@ const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
     return;
   }
 
-  const { channelId, channelName, reportType, status, errorMessage, summaryText, fullReport, durationMs } = validation.data;
+  const { channelId, channelName, reportType, status, errorMessage, summaryText, fullReport, durationMs } =
+    validation.data;
 
   try {
     const runId = await logDailyRun(
@@ -1220,7 +1259,7 @@ const buildSalesMetricsPayload = async (params: {
 
 const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  
+
   const queryParams = {
     from: url.searchParams.get('from') || undefined,
     to: url.searchParams.get('to') || undefined,
@@ -1228,13 +1267,18 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
     range: url.searchParams.get('range') || undefined,
     tz: url.searchParams.get('tz') || undefined,
   };
-  
+
   const validation = validateQuery(salesMetricsSchema, queryParams);
   if (!validation.success) {
-    sendJson(res, 400, { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) }, origin);
+    sendJson(
+      res,
+      400,
+      { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) },
+      origin,
+    );
     return;
   }
-  
+
   let resolved: ReturnType<typeof resolveMetricsRange>;
   try {
     resolved = resolveMetricsRange(validation.data);
@@ -1454,7 +1498,7 @@ const handleGetStream: RequestHandler = async (req, res, _logger, origin) => {
 
 const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  
+
   const queryParams = {
     type: url.searchParams.get('type') || undefined,
     repId: url.searchParams.get('repId') || undefined,
@@ -1465,13 +1509,18 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
     offset: url.searchParams.get('offset') || undefined,
     cursor: url.searchParams.get('cursor') || undefined,
   };
-  
+
   const validation = validateQuery(workItemsQuerySchema, queryParams);
   if (!validation.success) {
-    sendJson(res, 400, { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) }, origin);
+    sendJson(
+      res,
+      400,
+      { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) },
+      origin,
+    );
     return;
   }
-  
+
   const { type, repId, severity, overdueOnly, dueBefore, limit, offset, cursor } = validation.data;
   const authUser = getVerifiedSlackUser(req);
   const meRepId = (authUser.user_id || authUser.user || '').trim() || undefined;
@@ -2237,7 +2286,8 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
     state_next_followup_due_at: ensuredState.next_followup_due_at,
     state_objection_tags: ensuredState.objection_tags ?? conversation.state_objection_tags ?? [],
     state_call_outcome: ensuredState.call_outcome ?? conversation.state_call_outcome ?? null,
-    state_guardrail_override_count: ensuredState.guardrail_override_count ?? conversation.state_guardrail_override_count ?? 0,
+    state_guardrail_override_count:
+      ensuredState.guardrail_override_count ?? conversation.state_guardrail_override_count ?? 0,
   };
 
   const payload = {
@@ -2914,7 +2964,7 @@ const handlePostInboxSnoozeV2: RequestHandler = async (req, res, logger, origin)
     return;
   }
   const snoozedUntil = body.snoozedUntil ?? null;
-  if (snoozedUntil !== null && isNaN(new Date(snoozedUntil).getTime())) {
+  if (snoozedUntil !== null && Number.isNaN(new Date(snoozedUntil).getTime())) {
     return sendJson(res, 400, { error: 'snoozedUntil must be a valid ISO timestamp or null' }, origin);
   }
   const updated = await snoozeConversation(conversationId, snoozedUntil, logger);
@@ -2966,7 +3016,7 @@ const handlePostInboxAssignV2: RequestHandler = async (req, res, logger, origin)
 
 // ── Phase 2: Templates ────────────────────────────────────────────────────────
 
-const handleGetInboxTemplatesV2: RequestHandler = async (req, res, logger, origin) => {
+const handleGetInboxTemplatesV2: RequestHandler = async (_req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
   }
@@ -3015,7 +3065,13 @@ const handlePostInboxTemplateV2: RequestHandler = async (req, res, logger, origi
     res,
     201,
     toEnvelope({
-      data: { id: template.id, name: template.name, body: template.body, createdBy: template.created_by, createdAt: template.created_at },
+      data: {
+        id: template.id,
+        name: template.name,
+        body: template.body,
+        createdBy: template.created_by,
+        createdAt: template.created_at,
+      },
       timeZone: DEFAULT_BUSINESS_TIMEZONE,
     }),
     origin,

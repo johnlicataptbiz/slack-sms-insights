@@ -310,9 +310,7 @@ export const attributeSlackBookedCallsToSequences = (
       // Set when firstConversion fuzzy-matched to Sequence A but SMS lookup shows the contact
       // was actively in a different Sequence B at booking time (e.g., a follow-up sequence).
       convertedViaSequence:
-        attributionSource === 'fuzzy_text_match' &&
-        smsLookup &&
-        smsLookup.sequenceLabel !== resolvedLabel
+        attributionSource === 'fuzzy_text_match' && smsLookup && smsLookup.sequenceLabel !== resolvedLabel
           ? smsLookup.sequenceLabel
           : null,
     });

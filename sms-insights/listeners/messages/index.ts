@@ -4,6 +4,8 @@ import { isAlowareChannel } from '../../services/aloware-policy.js';
 import { upsertConversationFromEvent } from '../../services/conversation-projector.js';
 import { enrichContactProfileFromAloware } from '../../services/inbox-contact-enrichment.js';
 import { upsertInboxContactProfile } from '../../services/inbox-contact-profiles.js';
+import { updateConversationStatus } from '../../services/inbox-store.js';
+import { detectOptOutIntent } from '../../services/lead-watcher.js';
 import { insertSmsEvent } from '../../services/sms-event-store.js';
 import { resolveNeedsReplyOnOutbound, upsertNeedsReplyWorkItem } from '../../services/work-item-engine.js';
 
@@ -94,6 +96,15 @@ const register = (app: App) => {
 
     if (eventRow.direction === 'inbound') {
       await upsertNeedsReplyWorkItem(conversation, eventRow, logger);
+
+      // Check for opt-out intent and auto-mark as DNC
+      if (eventRow.body) {
+        const optOut = detectOptOutIntent(eventRow.body);
+        if (optOut.isOptOut) {
+          logger.info(`Opt-out detected for conversation ${conversation.id}: matched "${optOut.matchedPattern}"`);
+          await updateConversationStatus(conversation.id, 'dnc', logger);
+        }
+      }
     } else if (eventRow.direction === 'outbound') {
       await resolveNeedsReplyOnOutbound(conversation.id, eventRow, logger);
     }

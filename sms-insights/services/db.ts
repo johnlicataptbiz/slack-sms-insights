@@ -533,6 +533,44 @@ export const initializeSchema = async (): Promise<void> => {
       ON work_items (conversation_id)
       WHERE type = 'needs_reply' AND resolved_at IS NULL;
     `);
+
+    // ─── Performance indexes for array/JSONB queries ─────────────────────────────
+
+    // GIN index for objection_tags array containment queries (e.g., "find all with 'price' objection")
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversation_state_objection_tags_gin
+      ON conversation_state USING GIN(objection_tags);
+    `);
+
+    // Index for escalation_level filtering (common query for stage gating)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversation_state_escalation_level
+      ON conversation_state (escalation_level);
+    `);
+
+    // Index for cadence_status filtering
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversation_state_cadence_status
+      ON conversation_state (cadence_status);
+    `);
+
+    // Index for coaching_interest filtering (lead qualification queries)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversation_state_coaching_interest
+      ON conversation_state (qualification_coaching_interest);
+    `);
+
+    // Index for conversation status filtering (open/closed/dnc)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversations_status
+      ON conversations (status);
+    `);
+
+    // Index for contact_key lookups (frequently used in conversation resolution)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conversations_contact_key
+      ON conversations (contact_key);
+    `);
   } finally {
     client.release();
   }

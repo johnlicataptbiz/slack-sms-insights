@@ -5,6 +5,7 @@ import type { ConversationRow } from './conversation-projector.js';
 import { upsertConversationFromEvent } from './conversation-projector.js';
 import type { InboxContactProfileRow } from './inbox-contact-profiles.js';
 import {
+  getConversationState,
   getSendAttemptByIdempotency,
   type InsertSendAttemptInput,
   insertSendAttempt,
@@ -115,17 +116,64 @@ const createSendAttemptRecord = async (
   );
 };
 
+// Minimum escalation level required to send call links
+// Level 1-2: Not qualified enough, should not send call links
+// Level 3-4: Qualified leads, can send call links
+const MIN_ESCALATION_FOR_CALL_LINK = 3;
+
+const isStageGatingEnabled = (): boolean => {
+  const value = (process.env.STAGE_GATING_ENABLED || 'true').trim().toLowerCase();
+  return value === 'true' || value === '1';
+};
+
 export const sendInboxMessage = async (
   context: SendContext,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SendInboxMessageResult> => {
   // Phase 2: Stage Gating (Backend Validation)
-  // We need to check the conversation state to see the escalation level.
-  // The context.conversation is from the `conversations` table, not `conversation_state`.
-  // We will rely on the frontend for the primary block, but we could add a DB query here if needed.
-  // For now, we'll just check if it's a call link and log it.
-  if (containsCallLink(context.body)) {
-    logger?.info(`Call link detected in outbound message for conversation ${context.conversation.id}`);
+  // Check if message contains a call link and validate escalation level
+  if (containsCallLink(context.body) && isStageGatingEnabled()) {
+    const state = await getConversationState(context.conversation.id, logger);
+    const escalationLevel = state?.escalation_level ?? 1;
+
+    if (escalationLevel < MIN_ESCALATION_FOR_CALL_LINK) {
+      logger?.warn(
+        `Blocking call link send: conversation ${context.conversation.id} has escalation level ${escalationLevel} (min required: ${MIN_ESCALATION_FOR_CALL_LINK})`,
+      );
+
+      const sendAttempt = await createSendAttemptRecord(
+        {
+          conversationId: context.conversation.id,
+          messageBody: context.body,
+          senderIdentity: context.senderIdentity || context.senderUserId || null,
+          lineId: context.lineId != null ? String(context.lineId) : null,
+          fromNumber: context.fromNumber ?? null,
+          allowlistDecision: false,
+          dncDecision: false,
+          idempotencyKey: context.idempotencyKey ?? null,
+          requestPayload: {
+            to: context.profile?.phone || context.conversation.contact_phone,
+            escalationLevel,
+            blockedReason: 'stage_gating',
+          },
+          responsePayload: null,
+          errorMessage: `Call links require escalation level ${MIN_ESCALATION_FOR_CALL_LINK}+ (current: ${escalationLevel})`,
+        },
+        'blocked',
+        logger,
+      );
+
+      return {
+        status: 'blocked',
+        reason: `stage_gating: escalation level ${escalationLevel} < ${MIN_ESCALATION_FOR_CALL_LINK}`,
+        sendAttempt,
+        outboundEvent: null,
+      };
+    }
+
+    logger?.info(
+      `Call link allowed for conversation ${context.conversation.id} with escalation level ${escalationLevel}`,
+    );
   }
 
   const toNumber = normalizeDigits(context.profile?.phone || context.conversation.contact_phone || '');

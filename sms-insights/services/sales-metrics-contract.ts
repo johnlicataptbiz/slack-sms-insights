@@ -1,5 +1,5 @@
-import type { RepLeaderboardRow, SalesMetricsSummary, SalesTrendPoint, TopSequenceRow } from './sales-metrics.js';
 import type { BookedCallsSummary } from './booked-calls.js';
+import type { RepLeaderboardRow, SalesMetricsSummary, SalesTrendPoint, TopSequenceRow } from './sales-metrics.js';
 
 export type CanonicalSalesMetricsSlice = {
   totals: SalesMetricsSummary['totals'];

@@ -9,6 +9,6 @@
     "outDir": "./dist",
     "strict": true
   },
-  "include": ["app.ts", "listeners/**/*.ts", "services/**/*.ts", "api/**/*.ts", "scripts/**/*.ts", "types/**/*.ts"],
-  "exclude": ["tests/**", "dist/**", "node_modules/**"]
+  "include": ["app.ts", "listeners/**/*.ts", "services/**/*.ts", "api/**/*.ts", "types/**/*.ts"],
+  "exclude": ["tests/**", "dist/**", "node_modules/**", "scripts/**"]
 }

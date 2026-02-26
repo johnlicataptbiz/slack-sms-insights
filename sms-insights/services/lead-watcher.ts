@@ -37,6 +37,40 @@ const INTEREST_SIGNAL_PATTERNS = [
 const NEGATIVE_SIGNAL_PATTERN =
   /\b(not interested|unsubscribe|stop|wrong number|remove me|delete me|don'?t contact|no thanks|not now|leave me alone|fuck off)\b/i;
 
+// Strict opt-out patterns that should trigger automatic DNC marking
+const OPT_OUT_PATTERNS = [
+  /\bstop\b/i,
+  /\bunsubscribe\b/i,
+  /\bremove\s*me\b/i,
+  /\bdelete\s*me\b/i,
+  /\bdon'?t\s*(text|contact|message|call|bother)\s*me\b/i,
+  /\btake\s*me\s*off\b/i,
+  /\bopt\s*out\b/i,
+  /\bcancel\b/i,
+  /\bquit\b/i,
+  /\bend\b/i,
+  /\bstopall\b/i,
+];
+
+export const detectOptOutIntent = (body: string): { isOptOut: boolean; matchedPattern: string | null } => {
+  const normalizedBody = body.replace(/\s+/g, ' ').trim();
+  if (!normalizedBody) {
+    return { isOptOut: false, matchedPattern: null };
+  }
+
+  for (const pattern of OPT_OUT_PATTERNS) {
+    if (pattern.test(normalizedBody)) {
+      const match = normalizedBody.match(pattern);
+      return {
+        isOptOut: true,
+        matchedPattern: match?.[0] || pattern.source,
+      };
+    }
+  }
+
+  return { isOptOut: false, matchedPattern: null };
+};
+
 const LOW_SIGNAL_ONLY_PATTERN =
   /^(thanks!?|thank you!?|yes!?|yep!?|ok!?|okay!?|awesome!?|sounds good!?|great!?|perfect!?|got it!?)$/i;
 

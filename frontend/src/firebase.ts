@@ -1,6 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 
+// Firebase API keys are designed to be public and embedded in client-side code.
+// Security is enforced through Firebase Console > Project Settings > Your Apps:
+// - Add domain restrictions under "Authorized domains" 
+// - Enable "Restrict key usage" in Google Cloud Console for this API key
+// - Recommended allowed domains: ptbizsms.com, www.ptbizsms.com, localhost (for dev)
 const firebaseConfig = {
   apiKey: 'AIzaSyBLaIFv578OpjGkNXcssrqqk1_M_TtFFBo',
   authDomain: 'aloware-sms-updates.firebaseapp.com',

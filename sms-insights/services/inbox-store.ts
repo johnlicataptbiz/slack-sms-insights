@@ -1282,10 +1282,7 @@ export const deleteMessageTemplate = async (
   const pool = getDbOrThrow();
   const client = await pool.connect();
   try {
-    const result = await client.query(
-      `DELETE FROM message_templates WHERE id = $1;`,
-      [id],
-    );
+    const result = await client.query('DELETE FROM message_templates WHERE id = $1;', [id]);
     return (result.rowCount ?? 0) > 0;
   } catch (err) {
     logger?.error('deleteMessageTemplate failed', err);
@@ -1306,7 +1303,7 @@ export const updateObjectionTags = async (
   const client = await pool.connect();
   try {
     await client.query(
-      `INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING`,
+      'INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING',
       [conversationId],
     );
     const result = await client.query<{ conversation_id: string; objection_tags: string[] }>(
@@ -1330,7 +1327,7 @@ export const updateObjectionTags = async (
 // ─── Phase 3: Call Outcome ────────────────────────────────────────────────────
 
 export const VALID_CALL_OUTCOMES = ['not_a_fit', 'too_early', 'budget', 'joined', 'ghosted'] as const;
-export type CallOutcome = typeof VALID_CALL_OUTCOMES[number];
+export type CallOutcome = (typeof VALID_CALL_OUTCOMES)[number];
 
 export const updateCallOutcome = async (
   conversationId: string,
@@ -1341,7 +1338,7 @@ export const updateCallOutcome = async (
   const client = await pool.connect();
   try {
     await client.query(
-      `INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING`,
+      'INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING',
       [conversationId],
     );
     const result = await client.query<{ conversation_id: string; call_outcome: string | null }>(
@@ -1372,7 +1369,7 @@ export const incrementGuardrailOverride = async (
   const client = await pool.connect();
   try {
     await client.query(
-      `INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING`,
+      'INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING',
       [conversationId],
     );
     const result = await client.query<{ conversation_id: string; guardrail_override_count: number }>(

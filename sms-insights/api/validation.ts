@@ -83,7 +83,10 @@ export const createRunSchema = z.object({
  */
 export const salesMetricsSchema = z.object({
   /** Single-day mode: YYYY-MM-DD in the given tz (e.g. 2026-02-23) */
-  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD').optional(),
+  day: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD')
+    .optional(),
   /** Explicit range start — ISO 8601 */
   from: z.string().optional(),
   /** Explicit range end — ISO 8601 */
@@ -139,7 +142,7 @@ export type WorkItemsQueryInput = z.infer<typeof workItemsQuerySchema>;
 
 /**
  * Validate request query parameters
- * 
+ *
  * @example
  * const result = validateQuery(listRunsSchema, req.query);
  * if (!result.success) {
@@ -149,20 +152,20 @@ export type WorkItemsQueryInput = z.infer<typeof workItemsQuerySchema>;
  */
 export function validateQuery<T extends z.ZodTypeAny>(
   schema: T,
-  query: unknown
+  query: unknown,
 ): { success: true; data: z.infer<T> } | { success: false; error: z.ZodError['issues'] } {
   const result = schema.safeParse(query);
-  
+
   if (result.success) {
     return { success: true, data: result.data };
   }
-  
+
   return { success: false, error: result.error.issues };
 }
 
 /**
  * Validate request body
- * 
+ *
  * @example
  * const result = validateBody(createRunSchema, req.body);
  * if (!result.success) {
@@ -171,14 +174,14 @@ export function validateQuery<T extends z.ZodTypeAny>(
  */
 export function validateBody<T extends z.ZodTypeAny>(
   schema: T,
-  body: unknown
+  body: unknown,
 ): { success: true; data: z.infer<T> } | { success: false; error: z.ZodError['issues'] } {
   const result = schema.safeParse(body);
-  
+
   if (result.success) {
     return { success: true, data: result.data };
   }
-  
+
   return { success: false, error: result.error.issues };
 }
 
@@ -187,14 +190,14 @@ export function validateBody<T extends z.ZodTypeAny>(
  */
 export function validateParams<T extends z.ZodTypeAny>(
   schema: T,
-  params: unknown
+  params: unknown,
 ): { success: true; data: z.infer<T> } | { success: false; error: z.ZodError['issues'] } {
   const result = schema.safeParse(params);
-  
+
   if (result.success) {
     return { success: true, data: result.data };
   }
-  
+
   return { success: false, error: result.error.issues };
 }
 
@@ -223,11 +226,11 @@ export function formatValidationErrors(errors: z.ZodError['issues']): Array<{
 export function createErrorMessage(errors: z.ZodError['issues']): string {
   if (errors.length === 0) return 'Invalid input';
   if (errors.length === 1) return errors[0].message;
-  
+
   const fields = errors.map((e: z.ZodIssue) => e.path.join('.')).filter(Boolean);
   if (fields.length > 0) {
     return `Invalid input for: ${fields.join(', ')}`;
   }
-  
+
   return 'Multiple validation errors occurred';
 }

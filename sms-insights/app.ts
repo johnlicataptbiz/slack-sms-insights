@@ -97,7 +97,7 @@ app.error(async (error) => {
 
     // Start HTTP server with API + static file serving
     const port = Number.parseInt(process.env.PORT || '3000', 10);
-    
+
     // Compression middleware wrapper
     const compressionMiddleware = compression();
     const server = createServer((req, res) => {
@@ -105,34 +105,34 @@ app.error(async (error) => {
       compressionMiddleware(req, res, () => {
         // Continue with request handling
         void (async () => {
-      const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
+          const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
 
-      // Handle API routes
-      if (pathname.startsWith('/api/')) {
-        const handled = await handleApiRoute(req, res, pathname, app.logger);
-        if (handled) {
-          return;
-        }
-      }
+          // Handle API routes
+          if (pathname.startsWith('/api/')) {
+            const handled = await handleApiRoute(req, res, pathname, app.logger);
+            if (handled) {
+              return;
+            }
+          }
 
-      // Serve frontend
-      if (frontendIndex && !pathname.startsWith('/api/')) {
-        res.writeHead(200, {
-          ...responseSecurityHeaders,
-          'Content-Type': 'text/html',
-          'Content-Security-Policy':
-            "default-src 'self'; img-src 'self' https: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://slack.com https://*.slack.com;",
-        });
-        res.end(frontendIndex);
-        return;
-      }
+          // Serve frontend
+          if (frontendIndex && !pathname.startsWith('/api/')) {
+            res.writeHead(200, {
+              ...responseSecurityHeaders,
+              'Content-Type': 'text/html',
+              'Content-Security-Policy':
+                "default-src 'self'; img-src 'self' https: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://slack.com https://*.slack.com;",
+            });
+            res.end(frontendIndex);
+            return;
+          }
 
-      // Fallback health check
-      res.writeHead(200, {
-        ...responseSecurityHeaders,
-        'Content-Type': 'text/plain',
-      });
-      res.end('Health check: OK');
+          // Fallback health check
+          res.writeHead(200, {
+            ...responseSecurityHeaders,
+            'Content-Type': 'text/plain',
+          });
+          res.end('Health check: OK');
         })();
       });
     });

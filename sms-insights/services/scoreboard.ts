@@ -1,12 +1,8 @@
 import type { Logger } from '@slack/bolt';
-import {
-  getBookedCallAttributionSources,
-  getBookedCallSmsReplyLinks,
-  getBookedCallsSummary,
-} from './booked-calls.js';
+import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallsSummary } from './booked-calls.js';
 import { getPool } from './db.js';
-import { buildCanonicalSalesMetricsSlice } from './sales-metrics-contract.js';
 import { getSalesMetricsSummary } from './sales-metrics.js';
+import { buildCanonicalSalesMetricsSlice } from './sales-metrics-contract.js';
 import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone, resolveTimeZone } from './time-range.js';
 
@@ -258,9 +254,7 @@ const resolveMonthWindow = (
   const { year, month } = parseIsoDay(dayKey);
   const monthFrom = zonedToUtc(year, month, 1, 0, tz);
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate(); // last day of month
-  const monthTo = new Date(
-    zonedToUtc(year, month, lastDay, 23, tz).getTime() + 59 * 60 * 1000 + 59 * 1000 + 999,
-  );
+  const monthTo = new Date(zonedToUtc(year, month, lastDay, 23, tz).getTime() + 59 * 60 * 1000 + 59 * 1000 + 999);
   const monthStartKey = `${year}-${String(month).padStart(2, '0')}-01`;
   const monthEndKey = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
   return { monthFrom, monthTo, monthStartKey, monthEndKey };
@@ -676,10 +670,8 @@ export const getScoreboardData = async (
   const leadMagnetComparison = buildLeadMagnetComparison(sequenceRows);
 
   // Compliance
-  const weeklyOptOutRate =
-    weeklyVolume.total > 0 ? (weeklyCanonical.totals.optOuts / weeklyVolume.total) * 100 : 0;
-  const monthlyOptOutRate =
-    monthlyVolume.total > 0 ? (monthlyCanonical.totals.optOuts / monthlyVolume.total) * 100 : 0;
+  const weeklyOptOutRate = weeklyVolume.total > 0 ? (weeklyCanonical.totals.optOuts / weeklyVolume.total) * 100 : 0;
+  const monthlyOptOutRate = monthlyVolume.total > 0 ? (monthlyCanonical.totals.optOuts / monthlyVolume.total) * 100 : 0;
   const topOptOutSequences = sequenceRows
     .filter((r) => r.optOuts > 0)
     .sort((a, b) => b.optOutRatePct - a.optOutRatePct || b.optOuts - a.optOuts)

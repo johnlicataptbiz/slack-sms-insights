@@ -11,7 +11,6 @@ type VolumeMode = 'all' | 'sequence' | 'manual';
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtPctMaybe = (n: number | null | undefined) => (typeof n === 'number' ? fmtPct(n) : 'n/a');
-const fmtCurrency = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const fmtDateTime = (value: string | null) => {
   if (!value) return 'n/a';
   const date = new Date(value);
@@ -40,13 +39,6 @@ const calculateTrend = (data: number[]): 'up' | 'down' | 'flat' => {
   if (change > 0.01) return 'up';
   if (change < -0.01) return 'down';
   return 'flat';
-};
-
-// ROI Configuration (can be made configurable later)
-const ROI_CONFIG = {
-  costPerMessage: 0.015, // $0.015 per SMS
-  revenuePerBooking: 3500, // Average revenue per booked call that converts
-  conversionRate: 0.15, // 15% of booked calls convert to paying clients
 };
 
 // Calculate Setter Efficiency Score (0-100)
@@ -119,14 +111,14 @@ export function InsightsV2() {
 
     if (volumeMode === 'sequence') {
       return {
-        replyRate: days.map((d) => d.replyRatePct), // TODO: Add sequence-specific reply rate to API
+        replyRate: days.map((d) => d.replyRatePct),
         bookedCalls: days.map((d) => d.canonicalBookedCalls),
         messagesSent: days.map((d) => d.sequenceMessagesSent),
         optOuts: days.map((d) => d.optOuts),
       };
     } else if (volumeMode === 'manual') {
       return {
-        replyRate: days.map((d) => d.replyRatePct), // TODO: Add manual-specific reply rate to API
+        replyRate: days.map((d) => d.replyRatePct),
         bookedCalls: days.map((d) => d.canonicalBookedCalls),
         messagesSent: days.map((d) => d.manualMessagesSent),
         optOuts: days.map((d) => d.optOuts),
@@ -172,26 +164,6 @@ export function InsightsV2() {
     };
   }, [payload, volumeMode]);
 
-  // Calculate ROI metrics
-  const roiMetrics = useMemo(() => {
-    if (!payload) return null;
-
-    const totalCost = payload.totals.messagesSent * ROI_CONFIG.costPerMessage;
-    const totalBookings = payload.totals.canonicalBookedCalls;
-    const expectedConversions = totalBookings * ROI_CONFIG.conversionRate;
-    const projectedRevenue = expectedConversions * ROI_CONFIG.revenuePerBooking;
-    const roi = totalCost > 0 ? ((projectedRevenue - totalCost) / totalCost) * 100 : 0;
-    const costPerBooking = totalBookings > 0 ? totalCost / totalBookings : 0;
-
-    return {
-      totalCost,
-      projectedRevenue,
-      roi,
-      costPerBooking,
-      expectedConversions,
-    };
-  }, [payload]);
-
   // Calculate setter efficiency scores
   const setterScores = useMemo(() => {
     if (!payload) return null;
@@ -228,35 +200,6 @@ export function InsightsV2() {
           : 0,
       },
     };
-  }, [payload]);
-
-  // Calculate sequence ROI for top sequences
-  const sequenceROI = useMemo(() => {
-    if (!payload) return [];
-
-    return payload.sequences
-      .filter((s) => s.label !== 'No sequence (manual/direct)')
-      .map((s) => {
-        const cost = s.messagesSent * ROI_CONFIG.costPerMessage;
-        const expectedConversions = s.canonicalBookedCalls * ROI_CONFIG.conversionRate;
-        const projectedRevenue = expectedConversions * ROI_CONFIG.revenuePerBooking;
-        const roi = cost > 0 ? ((projectedRevenue - cost) / cost) * 100 : 0;
-        const costPerBooking = s.canonicalBookedCalls > 0 ? cost / s.canonicalBookedCalls : 0;
-
-        return {
-          label: s.label,
-          sent: s.messagesSent,
-          booked: s.canonicalBookedCalls,
-          cost,
-          projectedRevenue,
-          roi,
-          costPerBooking,
-          replyRate: s.replyRatePct,
-          optOutRate: s.optOutRatePct,
-        };
-      })
-      .sort((a, b) => b.roi - a.roi)
-      .slice(0, 8);
   }, [payload]);
 
   if (isLoading) {
@@ -414,116 +357,39 @@ export function InsightsV2() {
         </V2Panel>
       )}
 
-      {/* ROI Dashboard */}
-      <div className="V2Grid V2Grid--2">
-        <V2Panel title="ROI Calculator" caption="Estimated return on SMS investment">
-          <div className="V2ROI">
-            <div className="V2ROI__main">
-              <div className="V2ROI__metric">
-                <span className="V2ROI__label">Total SMS Cost</span>
-                <span className="V2ROI__value">{fmtCurrency(roiMetrics?.totalCost ?? 0)}</span>
-              </div>
-              <div className="V2ROI__arrow">→</div>
-              <div className="V2ROI__metric">
-                <span className="V2ROI__label">Projected Revenue</span>
-                <span className="V2ROI__value V2ROI__value--positive">{fmtCurrency(roiMetrics?.projectedRevenue ?? 0)}</span>
-              </div>
-              <div className="V2ROI__arrow">→</div>
-              <div className="V2ROI__metric V2ROI__metric--highlight">
-                <span className="V2ROI__label">ROI</span>
-                <span className="V2ROI__value V2ROI__value--large">{fmtPct(roiMetrics?.roi ?? 0)}</span>
-              </div>
+      {/* Setter Efficiency */}
+      <V2Panel title="Setter Efficiency" caption="Performance score based on bookings, opt-outs, and volume">
+        <div className="V2SetterEfficiency">
+          <div className="V2SetterEfficiency__card">
+            <div className="V2SetterEfficiency__header">
+              <span className="V2SetterEfficiency__name">Jack</span>
+              <span className="V2SetterEfficiency__score" data-score={setterScores?.jack.score ?? 0}>
+                {(setterScores?.jack.score ?? 0).toFixed(0)}
+              </span>
             </div>
-            <div className="V2ROI__details">
-              <div className="V2ROI__detail">
-                <span>Cost per Booking</span>
-                <strong>{fmtCurrency(roiMetrics?.costPerBooking ?? 0)}</strong>
-              </div>
-              <div className="V2ROI__detail">
-                <span>Expected Conversions</span>
-                <strong>{(roiMetrics?.expectedConversions ?? 0).toFixed(1)}</strong>
-              </div>
-              <div className="V2ROI__detail">
-                <span>Conversion Rate</span>
-                <strong>{fmtPct(ROI_CONFIG.conversionRate * 100)}</strong>
-              </div>
-              <div className="V2ROI__detail">
-                <span>Revenue per Close</span>
-                <strong>{fmtCurrency(ROI_CONFIG.revenuePerBooking)}</strong>
-              </div>
+            <V2ProgressBar value={setterScores?.jack.score ?? 0} max={100} />
+            <div className="V2SetterEfficiency__stats">
+              <div><span>Bookings</span><strong>{setterScores?.jack.bookings ?? 0}</strong></div>
+              <div><span>Booking Rate</span><strong>{fmtPct(setterScores?.jack.bookingRate ?? 0)}</strong></div>
+              <div><span>Reply Rate</span><strong>{fmtPct(setterScores?.jack.replyRate ?? 0)}</strong></div>
+              <div><span>Opt-Outs</span><strong>{setterScores?.jack.optOuts ?? 0}</strong></div>
             </div>
           </div>
-        </V2Panel>
-
-        <V2Panel title="Setter Efficiency" caption="Performance score based on bookings, opt-outs, and volume">
-          <div className="V2SetterEfficiency">
-            <div className="V2SetterEfficiency__card">
-              <div className="V2SetterEfficiency__header">
-                <span className="V2SetterEfficiency__name">Jack</span>
-                <span className="V2SetterEfficiency__score" data-score={setterScores?.jack.score ?? 0}>
-                  {(setterScores?.jack.score ?? 0).toFixed(0)}
-                </span>
-              </div>
-              <V2ProgressBar value={setterScores?.jack.score ?? 0} max={100} />
-              <div className="V2SetterEfficiency__stats">
-                <div><span>Bookings</span><strong>{setterScores?.jack.bookings ?? 0}</strong></div>
-                <div><span>Booking Rate</span><strong>{fmtPct(setterScores?.jack.bookingRate ?? 0)}</strong></div>
-                <div><span>Reply Rate</span><strong>{fmtPct(setterScores?.jack.replyRate ?? 0)}</strong></div>
-                <div><span>Opt-Outs</span><strong>{setterScores?.jack.optOuts ?? 0}</strong></div>
-              </div>
+          <div className="V2SetterEfficiency__card">
+            <div className="V2SetterEfficiency__header">
+              <span className="V2SetterEfficiency__name">Brandon</span>
+              <span className="V2SetterEfficiency__score" data-score={setterScores?.brandon.score ?? 0}>
+                {(setterScores?.brandon.score ?? 0).toFixed(0)}
+              </span>
             </div>
-            <div className="V2SetterEfficiency__card">
-              <div className="V2SetterEfficiency__header">
-                <span className="V2SetterEfficiency__name">Brandon</span>
-                <span className="V2SetterEfficiency__score" data-score={setterScores?.brandon.score ?? 0}>
-                  {(setterScores?.brandon.score ?? 0).toFixed(0)}
-                </span>
-              </div>
-              <V2ProgressBar value={setterScores?.brandon.score ?? 0} max={100} />
-              <div className="V2SetterEfficiency__stats">
-                <div><span>Bookings</span><strong>{setterScores?.brandon.bookings ?? 0}</strong></div>
-                <div><span>Booking Rate</span><strong>{fmtPct(setterScores?.brandon.bookingRate ?? 0)}</strong></div>
-                <div><span>Reply Rate</span><strong>{fmtPct(setterScores?.brandon.replyRate ?? 0)}</strong></div>
-                <div><span>Opt-Outs</span><strong>{setterScores?.brandon.optOuts ?? 0}</strong></div>
-              </div>
+            <V2ProgressBar value={setterScores?.brandon.score ?? 0} max={100} />
+            <div className="V2SetterEfficiency__stats">
+              <div><span>Bookings</span><strong>{setterScores?.brandon.bookings ?? 0}</strong></div>
+              <div><span>Booking Rate</span><strong>{fmtPct(setterScores?.brandon.bookingRate ?? 0)}</strong></div>
+              <div><span>Reply Rate</span><strong>{fmtPct(setterScores?.brandon.replyRate ?? 0)}</strong></div>
+              <div><span>Opt-Outs</span><strong>{setterScores?.brandon.optOuts ?? 0}</strong></div>
             </div>
           </div>
-        </V2Panel>
-      </div>
-
-      {/* Sequence ROI Table */}
-      <V2Panel title="Sequence ROI" caption="Return on investment by sequence">
-        <div className="V2TableWrap">
-          <table className="V2Table V2Table--striped">
-            <thead>
-              <tr>
-                <th>Sequence</th>
-                <th className="is-right">Sent</th>
-                <th className="is-right">Booked</th>
-                <th className="is-right">Cost</th>
-                <th className="is-right">Proj. Revenue</th>
-                <th className="is-right">ROI</th>
-                <th className="is-right">Cost/Booking</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sequenceROI.map((row) => (
-                <tr key={row.label}>
-                  <td>{row.label}</td>
-                  <td className="is-right">{fmtInt(row.sent)}</td>
-                  <td className="is-right">{fmtInt(row.booked)}</td>
-                  <td className="is-right">{fmtCurrency(row.cost)}</td>
-                  <td className="is-right">{fmtCurrency(row.projectedRevenue)}</td>
-                  <td className="is-right">
-                    <span className={`V2RoiTag ${row.roi > 500 ? 'V2RoiTag--excellent' : row.roi > 100 ? 'V2RoiTag--good' : 'V2RoiTag--poor'}`}>
-                      {fmtPct(row.roi)}
-                    </span>
-                  </td>
-                  <td className="is-right">{row.booked > 0 ? fmtCurrency(row.costPerBooking) : 'n/a'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </V2Panel>
 

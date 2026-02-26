@@ -1016,98 +1016,6 @@
   margin-left: auto;
 }
 
-/* ─── ROI Calculator Component ───────────────────────────────────────────── */
-.V2ROI {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.V2ROI__main {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 1rem;
-  padding: 1rem;
-  background: var(--glass-bg);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-}
-
-.V2ROI__metric {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.V2ROI__metric--highlight {
-  padding: 1rem 1.5rem;
-  background: linear-gradient(135deg, rgba(17, 184, 214, 0.1), rgba(19, 185, 129, 0.1));
-  border-radius: 12px;
-  border: 1px solid rgba(17, 184, 214, 0.2);
-}
-
-.V2ROI__label {
-  font-size: 0.75rem;
-  color: var(--v2-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.V2ROI__value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  font-family: var(--v2-font-display);
-  color: var(--v2-text);
-}
-
-.V2ROI__value--positive {
-  color: var(--v2-positive);
-}
-
-.V2ROI__value--large {
-  font-size: 2rem;
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.V2ROI__arrow {
-  font-size: 1.25rem;
-  color: var(--v2-muted);
-}
-
-.V2ROI__details {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-}
-
-.V2ROI__detail {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.5);
-  border-radius: 8px;
-  text-align: center;
-}
-
-.V2ROI__detail span {
-  font-size: 0.7rem;
-  color: var(--v2-muted);
-  text-transform: uppercase;
-}
-
-.V2ROI__detail strong {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--v2-text);
-}
-
 /* ─── Setter Efficiency Component ────────────────────────────────────────── */
 .V2SetterEfficiency {
   display: grid;
@@ -1179,30 +1087,6 @@
   color: var(--v2-text);
 }
 
-/* ─── ROI Tags ───────────────────────────────────────────────────────────── */
-.V2RoiTag {
-  display: inline-block;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.V2RoiTag--excellent {
-  background: linear-gradient(135deg, rgba(19, 185, 129, 0.2), rgba(19, 185, 129, 0.1));
-  color: var(--v2-positive);
-}
-
-.V2RoiTag--good {
-  background: linear-gradient(135deg, rgba(17, 184, 214, 0.2), rgba(17, 184, 214, 0.1));
-  color: var(--v2-accent);
-}
-
-.V2RoiTag--poor {
-  background: linear-gradient(135deg, rgba(239, 76, 98, 0.2), rgba(239, 76, 98, 0.1));
-  color: var(--v2-critical);
-}
-
 /* ─── Striped Tables ─────────────────────────────────────────────────────── */
 .V2Table--striped tbody tr:nth-child(even) {
   background: rgba(17, 184, 214, 0.02);
@@ -1238,19 +1122,6 @@
 
 /* ─── Responsive Adjustments ─────────────────────────────────────────────── */
 @media (max-width: 768px) {
-  .V2ROI__main {
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-
-  .V2ROI__arrow {
-    transform: rotate(90deg);
-  }
-
-  .V2ROI__details {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .V2SetterEfficiency {
     grid-template-columns: 1fr;
   }

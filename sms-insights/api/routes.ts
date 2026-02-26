@@ -3209,7 +3209,7 @@ const handleGetLinePerformanceV2: RequestHandler = async (req, res, _logger, ori
   const rangeParam = url.searchParams.get('range') || '7d';
   const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
 
-  const { from, to } = resolveMetricsRange(rangeParam, timeZone);
+  const { from, to } = resolveMetricsRange({ range: rangeParam, tz: timeZone });
   const data = await getLinePerformanceAnalytics({ from, to, timeZone });
   sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
 };
@@ -3224,7 +3224,7 @@ const handleGetDraftAIPerformanceV2: RequestHandler = async (req, res, _logger, 
   const rangeParam = url.searchParams.get('range') || '30d';
   const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
 
-  const { from, to } = resolveMetricsRange(rangeParam, timeZone);
+  const { from, to } = resolveMetricsRange({ range: rangeParam, tz: timeZone });
   const data = await getDraftAIPerformanceAnalytics({ from, to });
   sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
 };
@@ -3234,7 +3234,7 @@ const handleGetFollowupSLAV2: RequestHandler = async (req, res, _logger, origin)
   const rangeParam = url.searchParams.get('range') || '7d';
   const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
 
-  const { from, to } = resolveMetricsRange(rangeParam, timeZone);
+  const { from, to } = resolveMetricsRange({ range: rangeParam, tz: timeZone });
   const data = await getFollowUpSLAAnalytics({ from, to });
   sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
 };

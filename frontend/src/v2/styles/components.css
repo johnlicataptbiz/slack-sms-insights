@@ -1,0 +1,811 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PT Biz v2 New Component Styles
+   Issues #10-41: Error Boundaries, Skeletons, Export, Search, DatePicker, etc.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Issue #10: Error Boundary ─────────────────────────────────────────────── */
+.V2ErrorBoundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  text-align: center;
+  min-height: 300px;
+  background: var(--glass-bg);
+  border-radius: 16px;
+  border: 1px solid var(--glass-border);
+  margin: 1rem;
+}
+
+.V2ErrorBoundary__icon {
+  color: var(--v2-critical);
+  margin-bottom: 1.5rem;
+}
+
+.V2ErrorBoundary__title {
+  font-family: var(--v2-font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--v2-text);
+  margin: 0 0 0.5rem;
+}
+
+.V2ErrorBoundary__message {
+  font-family: var(--v2-font-ui);
+  font-size: 0.9rem;
+  color: var(--v2-muted);
+  max-width: 400px;
+  margin: 0 0 1.5rem;
+}
+
+.V2ErrorBoundary__details {
+  width: 100%;
+  max-width: 600px;
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.V2ErrorBoundary__details summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--v2-muted);
+  margin-bottom: 0.5rem;
+}
+
+.V2ErrorBoundary__details pre {
+  font-family: var(--v2-font-mono);
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 200px;
+}
+
+.V2ErrorBoundary__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.V2ErrorBoundary__btn {
+  font-family: var(--v2-font-ui);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2ErrorBoundary__btn--primary {
+  background: var(--gradient-primary);
+  color: white;
+}
+
+.V2ErrorBoundary__btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(17, 184, 214, 0.3);
+}
+
+.V2ErrorBoundary__btn--secondary {
+  background: transparent;
+  color: var(--v2-muted);
+  border: 1px solid var(--v2-divider);
+}
+
+.V2ErrorBoundary__btn--secondary:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* ─── Issue #11: Skeleton Loaders ───────────────────────────────────────────── */
+.V2Skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.09) 50%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.V2Skeleton__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.V2Skeleton__card {
+  background: var(--glass-bg);
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.V2Skeleton__cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.V2Skeleton__cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.V2Skeleton__value {
+  margin: 0.5rem 0;
+}
+
+.V2Skeleton__metricCard {
+  background: var(--glass-bg);
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.V2Skeleton__metricHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.V2Skeleton__metricValue {
+  margin: 0.25rem 0 0.5rem;
+}
+
+.V2Skeleton__table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.V2Skeleton__tableHeader {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--v2-divider);
+}
+
+.V2Skeleton__tableBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.V2Skeleton__tableRow {
+  display: flex;
+  gap: 1rem;
+  padding: 0.625rem 0;
+}
+
+.V2Skeleton__inbox {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1rem;
+  min-height: 500px;
+}
+
+.V2Skeleton__inboxList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--glass-bg);
+  border-radius: 12px;
+}
+
+.V2Skeleton__inboxItem {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem;
+}
+
+.V2Skeleton__inboxItemContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.V2Skeleton__inboxDetail {
+  background: var(--glass-bg);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.V2Skeleton__inboxHeader {
+  display: flex;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--v2-divider);
+  margin-bottom: 1rem;
+}
+
+.V2Skeleton__inboxHeaderText {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.V2Skeleton__inboxMessages {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.V2Skeleton__message {
+  max-width: 70%;
+}
+
+.V2Skeleton__message--in {
+  align-self: flex-start;
+}
+
+.V2Skeleton__message--out {
+  align-self: flex-end;
+}
+
+.V2Skeleton__dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.V2Skeleton__dashboardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.V2Skeleton__dashboardActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.V2Skeleton__metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.V2Skeleton__panelsGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.V2Skeleton__panel {
+  background: var(--glass-bg);
+  border-radius: 16px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.V2Skeleton__panel--wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 768px) {
+  .V2Skeleton__panelsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .V2Skeleton__panel--wide {
+    grid-column: span 1;
+  }
+}
+
+/* ─── Issue #17: Export Button ──────────────────────────────────────────────── */
+.V2ExportButton {
+  position: relative;
+  display: inline-block;
+}
+
+.V2ExportButton__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--v2-accent-strong);
+  background: rgba(17, 184, 214, 0.08);
+  border: 1px solid rgba(17, 184, 214, 0.25);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2ExportButton__trigger:hover {
+  background: rgba(17, 184, 214, 0.14);
+  border-color: rgba(17, 184, 214, 0.4);
+}
+
+.V2ExportButton__trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.V2ExportButton__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(17, 184, 214, 0.3);
+  border-top-color: var(--v2-accent-strong);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.V2ExportButton__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-elevated);
+  padding: 0.375rem;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  backdrop-filter: blur(var(--glass-blur-strong));
+}
+
+.V2ExportButton__option {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.8125rem;
+  color: var(--v2-text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+}
+
+.V2ExportButton__option:hover {
+  background: rgba(17, 184, 214, 0.1);
+}
+
+.V2ExportButton__optionIcon {
+  font-size: 1rem;
+}
+
+/* ─── Issue #18: Date Range Picker ──────────────────────────────────────────── */
+.V2DateRangePicker {
+  position: relative;
+  display: inline-block;
+}
+
+.V2DateRangePicker__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--v2-text);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2DateRangePicker__trigger:hover {
+  background: var(--glass-bg-strong);
+  border-color: rgba(17, 184, 214, 0.3);
+}
+
+.V2DateRangePicker__trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.V2DateRangePicker__label {
+  color: var(--v2-text);
+}
+
+.V2DateRangePicker__dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 280px;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-elevated);
+  padding: 0.75rem;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  backdrop-filter: blur(var(--glass-blur-strong));
+}
+
+.V2DateRangePicker__presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-bottom: 0.75rem;
+}
+
+.V2DateRangePicker__preset {
+  padding: 0.375rem 0.75rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--v2-muted);
+  background: transparent;
+  border: 1px solid var(--v2-divider);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.V2DateRangePicker__preset:hover {
+  color: var(--v2-accent-strong);
+  border-color: rgba(17, 184, 214, 0.3);
+}
+
+.V2DateRangePicker__preset--active {
+  color: white;
+  background: var(--gradient-primary);
+  border-color: transparent;
+}
+
+.V2DateRangePicker__custom {
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--v2-divider);
+}
+
+.V2DateRangePicker__inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.V2DateRangePicker__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.V2DateRangePicker__field label {
+  font-family: var(--v2-font-ui);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--v2-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.V2DateRangePicker__field input {
+  padding: 0.5rem 0.625rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.8125rem;
+  color: var(--v2-text);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--v2-divider);
+  border-radius: 6px;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.V2DateRangePicker__field input:focus {
+  border-color: var(--v2-accent-strong);
+  box-shadow: 0 0 0 3px rgba(17, 184, 214, 0.15);
+}
+
+.V2DateRangePicker__apply {
+  width: 100%;
+  padding: 0.625rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: white;
+  background: var(--gradient-primary);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2DateRangePicker__apply:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(17, 184, 214, 0.3);
+}
+
+/* ─── Issue #19: Search Input ───────────────────────────────────────────────── */
+.V2SearchInput {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+}
+
+.V2SearchInput__wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.V2SearchInput__icon {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--v2-muted);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+}
+
+.V2SearchInput__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--v2-accent-strong);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.V2SearchInput__input {
+  width: 100%;
+  padding: 0.625rem 2.25rem 0.625rem 2.5rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.875rem;
+  color: var(--v2-text);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  outline: none;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2SearchInput__input::placeholder {
+  color: var(--v2-muted);
+}
+
+.V2SearchInput__input:focus {
+  background: var(--glass-bg-strong);
+  border-color: var(--v2-accent-strong);
+  box-shadow: 0 0 0 3px rgba(17, 184, 214, 0.15);
+}
+
+.V2SearchInput__clear {
+  position: absolute;
+  right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--v2-muted);
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.V2SearchInput__clear:hover {
+  color: var(--v2-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.V2SearchInput__suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-elevated);
+  list-style: none;
+  margin: 0;
+  padding: 0.375rem;
+  z-index: 1000;
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  backdrop-filter: blur(var(--glass-blur-strong));
+}
+
+.V2SearchInput__suggestion {
+  padding: 0.625rem 0.875rem;
+  font-family: var(--v2-font-ui);
+  font-size: 0.8125rem;
+  color: var(--v2-text);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.V2SearchInput__suggestion:hover,
+.V2SearchInput__suggestion--selected {
+  background: rgba(17, 184, 214, 0.1);
+}
+
+/* ─── Issues #38-41: Accessibility Enhancements ─────────────────────────────── */
+
+/* Focus visible for all interactive elements */
+:focus-visible {
+  outline: 2px solid var(--v2-accent-strong);
+  outline-offset: 2px;
+}
+
+/* Skip to main content link */
+.V2SkipLink {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  padding: 1rem 1.5rem;
+  background: var(--gradient-primary);
+  color: white;
+  font-family: var(--v2-font-ui);
+  font-weight: 600;
+  border-radius: 8px;
+  z-index: 10000;
+  transition: top 0.2s ease;
+}
+
+.V2SkipLink:focus {
+  top: 16px;
+}
+
+/* Higher contrast for text */
+.V2Table__dim {
+  color: var(--v2-text-secondary, #6b7280);
+}
+
+/* Screen reader only text */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  :root {
+    --v2-text: #000000;
+    --v2-muted: #4a4a4a;
+    --v2-divider: #808080;
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --glass-border: #808080;
+  }
+
+  .V2Shell {
+    background: #f5f5f5;
+  }
+
+  .V2SearchInput__input,
+  .V2DateRangePicker__trigger,
+  .V2ExportButton__trigger {
+    border-width: 2px;
+  }
+}
+
+/* Touch targets for mobile (min 44x44px) */
+@media (pointer: coarse) {
+  .V2SearchInput__clear,
+  .V2DateRangePicker__preset,
+  .V2ExportButton__option {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Keyboard focus indicator improvements */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--v2-accent-strong);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 6px rgba(17, 184, 214, 0.2);
+}
+
+/* Ensure color is not the only indicator */
+.V2RiskAlert::before,
+.V2Tag--positive::before,
+.V2Tag--warning::before,
+.V2Tag--critical::before {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  border-radius: 50%;
+  margin-right: 0.375em;
+  background: currentColor;
+}
+
+.V2Tag--positive::before { background: var(--v2-positive); }
+.V2Tag--warning::before { background: var(--v2-warning); }
+.V2Tag--critical::before { background: var(--v2-critical); }
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+  .V2Skeleton__inbox {
+    grid-template-columns: 1fr;
+  }
+
+  .V2DateRangePicker__dropdown {
+    left: auto;
+    right: 0;
+    min-width: 100vw;
+    max-width: 100vw;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .V2ExportButton__dropdown {
+    left: 0;
+    right: auto;
+  }
+}
+
+/* Print styles */
+@media print {
+  .V2Shell__sidebar,
+  .V2Shell__topbar,
+  .V2ExportButton,
+  .V2DateRangePicker,
+  .V2SearchInput {
+    display: none !important;
+  }
+
+  .V2Shell__main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .V2Panel {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+}

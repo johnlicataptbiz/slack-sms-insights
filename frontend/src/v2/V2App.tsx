@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { V2Panel, V2State } from './components/V2Primitives';
 import V2Shell from './layout/V2Shell';
 import InboxV2 from './pages/InboxV2';
@@ -9,8 +10,9 @@ import InsightsV2 from './pages/InsightsV2';
 import RepV2 from './pages/RepV2';
 import RunsV2 from './pages/RunsV2';
 import SequencesV2 from './pages/SequencesV2';
-import { pageVariants, easing } from './utils/motion';
+import { easing } from './utils/motion';
 import './v2.css';
+import './styles/components.css';
 
 // Enhanced page transition variants
 const enhancedPageVariants = {
@@ -56,6 +58,21 @@ const V2NotFound = () => (
   </motion.div>
 );
 
+// Error fallback component
+const PageErrorFallback = () => (
+  <motion.div
+    className="V2Page"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+  >
+    <V2Panel title="Something went wrong" caption="An error occurred while loading this page.">
+      <V2State kind="error">
+        Please try refreshing the page or contact support if the issue persists.
+      </V2State>
+    </V2Panel>
+  </motion.div>
+);
+
 function AnimatedRoutes() {
   const location = useLocation();
   return (
@@ -69,12 +86,54 @@ function AnimatedRoutes() {
         style={{ display: 'contents' }}
       >
         <Routes location={location}>
-          <Route path="insights" element={<InsightsV2 />} />
-          <Route path="inbox" element={<InboxV2 />} />
-          <Route path="runs" element={<RunsV2 />} />
-          <Route path="rep/jack" element={<RepV2 rep="jack" />} />
-          <Route path="rep/brandon" element={<RepV2 rep="brandon" />} />
-          <Route path="sequences" element={<SequencesV2 />} />
+          <Route
+            path="insights"
+            element={
+              <ErrorBoundary fallback={<PageErrorFallback />}>
+                <InsightsV2 />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="inbox"
+            element={
+              <ErrorBoundary fallback={<PageErrorFallback />}>
+                <InboxV2 />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="runs"
+            element={
+              <ErrorBoundary fallback={<PageErrorFallback />}>
+                <RunsV2 />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="rep/jack"
+            element={
+              <ErrorBoundary fallback={<PageErrorFallback />}>
+                <RepV2 rep="jack" />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="rep/brandon"
+            element={
+              <ErrorBoundary fallback={<PageErrorFallback />}>
+                <RepV2 rep="brandon" />
+              </ErrorBoundary>
+            }
+          />
+          <Route
+            path="sequences"
+            element={
+              <ErrorBoundary fallback={<PageErrorFallback />}>
+                <SequencesV2 />
+              </ErrorBoundary>
+            }
+          />
           <Route path="attribution" element={<Navigate to="/v2/sequences" replace />} />
           <Route path="" element={<Navigate to="insights" replace />} />
           <Route path="*" element={<V2NotFound />} />
@@ -86,10 +145,18 @@ function AnimatedRoutes() {
 
 export default function V2App() {
   return (
-    <>
+    <ErrorBoundary>
+      {/* Skip to main content link for accessibility */}
+      <a href="#main-content" className="V2SkipLink">
+        Skip to main content
+      </a>
+
       <V2Shell>
-        <AnimatedRoutes />
+        <main id="main-content" role="main">
+          <AnimatedRoutes />
+        </main>
       </V2Shell>
+
       {/* Sonner toast container — themed to match v2 design system */}
       <Toaster
         position="bottom-right"
@@ -106,6 +173,6 @@ export default function V2App() {
           },
         }}
       />
-    </>
+    </ErrorBoundary>
   );
 }

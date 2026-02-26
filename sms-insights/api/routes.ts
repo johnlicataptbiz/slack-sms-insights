@@ -74,6 +74,18 @@ import {
   getLinePerformanceAnalytics,
   getQualificationFunnelAnalytics,
 } from '../services/advanced-analytics.js';
+import {
+  autoAssignWorkItems,
+  bulkInferQualification,
+  deduplicateLines,
+  getGoals,
+  getLineActivityBalance,
+  getResponseTimeStats,
+  getTimeToBookingStats,
+  getTrendAlerts,
+  logAuditEvent,
+  getAuditLogs,
+} from '../services/comprehensive-fixes.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 import {
   assignWorkItem,
@@ -3239,6 +3251,66 @@ const handleGetFollowupSLAV2: RequestHandler = async (req, res, _logger, origin)
   sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
 };
 
+// ─── Phase 4: Extended Analytics & Fixes ─────────────────────────────────────
+
+const handleGetGoalsV2: RequestHandler = async (_req, res, _logger, origin) => {
+  const data = await getGoals();
+  sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleGetTrendAlertsV2: RequestHandler = async (_req, res, _logger, origin) => {
+  const data = await getTrendAlerts();
+  sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleGetTimeToBookingV2: RequestHandler = async (_req, res, _logger, origin) => {
+  const data = await getTimeToBookingStats();
+  sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleGetResponseTimeV2: RequestHandler = async (req, res, _logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const rangeParam = url.searchParams.get('range') || '7d';
+  const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
+
+  const { from, to } = resolveMetricsRange({ range: rangeParam, tz: timeZone });
+  const data = await getResponseTimeStats({ from, to });
+  sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
+};
+
+const handleGetLineBalanceV2: RequestHandler = async (_req, res, _logger, origin) => {
+  const data = await getLineActivityBalance();
+  sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostAutoAssignV2: RequestHandler = async (_req, res, _logger, origin) => {
+  const result = await autoAssignWorkItems();
+  sendJson(res, 200, toEnvelope({ data: result, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostBulkInferQualificationV2: RequestHandler = async (req, res, _logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+  const result = await bulkInferQualification(limit);
+  sendJson(res, 200, toEnvelope({ data: result, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handlePostDeduplicateLinesV2: RequestHandler = async (_req, res, _logger, origin) => {
+  const result = await deduplicateLines();
+  sendJson(res, 200, toEnvelope({ data: result, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleGetAuditLogsV2: RequestHandler = async (req, res, _logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const action = url.searchParams.get('action') || undefined;
+  const resourceType = url.searchParams.get('resourceType') || undefined;
+  const userId = url.searchParams.get('userId') || undefined;
+  const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+
+  const data = await getAuditLogs({ action, resourceType, userId, limit });
+  sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
 const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
@@ -3381,6 +3453,15 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/analytics/qualification-funnel', handler: handleGetQualificationFunnelV2 },
   { method: 'GET', path: '/api/v2/analytics/draft-ai-performance', handler: handleGetDraftAIPerformanceV2 },
   { method: 'GET', path: '/api/v2/analytics/followup-sla', handler: handleGetFollowupSLAV2 },
+  { method: 'GET', path: '/api/v2/analytics/goals', handler: handleGetGoalsV2 },
+  { method: 'GET', path: '/api/v2/analytics/trend-alerts', handler: handleGetTrendAlertsV2 },
+  { method: 'GET', path: '/api/v2/analytics/time-to-booking', handler: handleGetTimeToBookingV2 },
+  { method: 'GET', path: '/api/v2/analytics/response-time', handler: handleGetResponseTimeV2 },
+  { method: 'GET', path: '/api/v2/analytics/line-balance', handler: handleGetLineBalanceV2 },
+  { method: 'POST', path: '/api/v2/admin/auto-assign', handler: handlePostAutoAssignV2 },
+  { method: 'POST', path: '/api/v2/admin/bulk-infer-qualification', handler: handlePostBulkInferQualificationV2 },
+  { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },
+  { method: 'GET', path: '/api/v2/admin/audit-logs', handler: handleGetAuditLogsV2 },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },

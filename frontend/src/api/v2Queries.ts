@@ -907,3 +907,181 @@ export const useV2FollowUpSLA = (params: { range: 'today' | '7d' | '30d'; tz?: s
     refetchOnWindowFocus: false,
   });
 };
+
+// ─── Issue #27: Goals Analytics ─────────────────────────────────────────────────
+export type Goal = {
+  id: string;
+  name: string;
+  target: number;
+  current: number;
+  unit: string;
+  period: 'daily' | 'weekly' | 'monthly';
+  progressPct: number;
+  isOnTrack: boolean;
+};
+
+export const useV2Goals = () => {
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'goals'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<Goal[]>>('/api/v2/analytics/goals');
+      return response as ApiEnvelope<Goal[]>;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+  });
+};
+
+// ─── Issue #28: Trend Alerts ────────────────────────────────────────────────────
+export type TrendAlert = {
+  id: string;
+  severity: 'info' | 'warning' | 'critical';
+  metric: string;
+  message: string;
+  value: number;
+  threshold: number;
+  detectedAt: string;
+};
+
+export const useV2TrendAlerts = () => {
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'trend-alerts'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<TrendAlert[]>>('/api/v2/analytics/trend-alerts');
+      return response as ApiEnvelope<TrendAlert[]>;
+    },
+    staleTime: 30 * 1000,
+    gcTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 60 * 1000,
+  });
+};
+
+// ─── Issue #23: Time to Booking ─────────────────────────────────────────────────
+export type TimeToBookingStats = {
+  avgDays: number;
+  medianDays: number;
+  minDays: number;
+  maxDays: number;
+  bySequence: Array<{
+    sequence: string;
+    avgDays: number;
+    bookings: number;
+  }>;
+};
+
+export const useV2TimeToBooking = () => {
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'time-to-booking'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<TimeToBookingStats>>('/api/v2/analytics/time-to-booking');
+      return response as ApiEnvelope<TimeToBookingStats>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+// ─── Issue #25: Response Time Stats ─────────────────────────────────────────────
+export type ResponseTimeStats = {
+  avgMinutes: number;
+  medianMinutes: number;
+  p95Minutes: number;
+  byRep: Array<{
+    rep: string;
+    avgMinutes: number;
+    responses: number;
+  }>;
+  byHour: Array<{
+    hour: number;
+    avgMinutes: number;
+  }>;
+};
+
+export const useV2ResponseTime = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'response-time', params],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<ResponseTimeStats>>(
+        `/api/v2/analytics/response-time?${searchParams.toString()}`
+      );
+      return response as ApiEnvelope<ResponseTimeStats>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+// ─── Issue #5: Line Activity Balance ────────────────────────────────────────────
+export type LineActivityBalance = {
+  lines: Array<{
+    line: string;
+    messagesSent: number;
+    share: number;
+    isImbalanced: boolean;
+  }>;
+  alert: string | null;
+};
+
+export const useV2LineBalance = () => {
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'line-balance'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<LineActivityBalance>>('/api/v2/analytics/line-balance');
+      return response as ApiEnvelope<LineActivityBalance>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+// ─── Admin Mutations ────────────────────────────────────────────────────────────
+export const useV2AutoAssign = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await client.post('/api/v2/admin/auto-assign', {});
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'analytics', 'followup-sla'] });
+    },
+  });
+};
+
+export const useV2BulkInferQualification = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (limit = 100) => {
+      const response = await client.post(`/api/v2/admin/bulk-infer-qualification?limit=${limit}`, {});
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'analytics', 'qualification-funnel'] });
+    },
+  });
+};
+
+export const useV2DeduplicateLines = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const response = await client.post('/api/v2/admin/deduplicate-lines', {});
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'analytics', 'line-performance'] });
+    },
+  });
+};

@@ -1,9 +1,11 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { client } from '../../api/client';
 import { uiModeStorageKey } from '../../uiMode';
 import { V2_TERM_DEFINITIONS, V2_TERM_GROUPS, v2Copy } from '../copy';
+import { springs, easing, listContainerVariants, listItemVariants } from '../utils/motion';
 
 type NavItem = {
   to: string;
@@ -14,11 +16,11 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { to: '/v2/insights', label: v2Copy.nav.insights, shortLabel: 'Insights', icon: '◉' },
-  { to: '/v2/inbox', label: v2Copy.nav.inbox, shortLabel: 'Inbox', icon: 'I' },
+  { to: '/v2/inbox', label: v2Copy.nav.inbox, shortLabel: 'Inbox', icon: '✉' },
   { to: '/v2/runs', label: v2Copy.nav.runs, shortLabel: 'Runs', icon: '◌' },
   { to: '/v2/rep/jack', label: v2Copy.nav.setterJack, shortLabel: 'Jack', icon: 'J' },
   { to: '/v2/rep/brandon', label: v2Copy.nav.setterBrandon, shortLabel: 'Brandon', icon: 'B' },
-  { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: 'S' },
+  { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: '⟐' },
 ];
 
 const brandLogoUrl =
@@ -35,6 +37,58 @@ const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: st
     return;
   }
   navigate(to);
+};
+
+// Nav item animation variants
+const navItemVariants = {
+  initial: { opacity: 0, x: -20 },
+  animate: { opacity: 1, x: 0 },
+  hover: { x: 6, scale: 1.02 },
+  tap: { scale: 0.97 },
+};
+
+// Sidebar animation variants
+const sidebarVariants = {
+  hidden: { x: -260, opacity: 0 },
+  visible: {
+    x: 0,
+    opacity: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 400,
+      damping: 30,
+      staggerChildren: 0.05,
+    },
+  },
+};
+
+// Drawer animation variants
+const drawerVariants = {
+  hidden: { x: '100%', opacity: 0 },
+  visible: {
+    x: 0,
+    opacity: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 300,
+      damping: 30,
+    },
+  },
+  exit: {
+    x: '100%',
+    opacity: 0,
+    transition: {
+      duration: 0.25,
+      ease: easing.smooth,
+    },
+  },
+};
+
+// Backdrop animation
+const backdropVariants = {
+  hidden: { opacity: 0 },
+  visible: { opacity: 1 },
+  exit: { opacity: 0 },
 };
 
 export default function V2Shell({ children }: { children: ReactNode }) {
@@ -93,115 +147,251 @@ export default function V2Shell({ children }: { children: ReactNode }) {
 
   return (
     <div className="V2Shell">
-      <header className="V2Shell__topbar">
+      {/* Top Bar */}
+      <motion.header
+        className="V2Shell__topbar"
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.4, ease: easing.smooth }}
+      >
         <div className="V2Shell__topStart">
           {isMobileViewport ? (
-            <button
+            <motion.button
               className="V2Shell__menuButton"
               type="button"
               aria-label="Toggle navigation"
               aria-expanded={isMenuOpen}
               onClick={handleSidebarToggle}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              <span />
-              <span />
-            </button>
+              <motion.span
+                animate={{
+                  rotate: isMenuOpen ? 45 : 0,
+                  y: isMenuOpen ? 8 : 0,
+                }}
+                transition={{ duration: 0.2 }}
+              />
+              <motion.span
+                animate={{
+                  rotate: isMenuOpen ? -45 : 0,
+                  y: isMenuOpen ? -8 : 0,
+                }}
+                transition={{ duration: 0.2 }}
+              />
+            </motion.button>
           ) : null}
 
-          <div className="V2Shell__brand" onClick={() => navigateWithTransition(navigate, '/v2/insights')}>
+          <motion.div
+            className="V2Shell__brand"
+            onClick={() => navigateWithTransition(navigate, '/v2/insights')}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
             <img className="V2Shell__brandLogo" src={brandLogoUrl} alt="PT Biz logo" />
-          </div>
+          </motion.div>
         </div>
 
         <div className="V2Shell__topActions">
-          <button
+          <motion.button
             className="V2Shell__defsButton"
             type="button"
             aria-expanded={isDefinitionsOpen}
             aria-controls="v2-kpi-definitions"
             onClick={() => setIsDefinitionsOpen((v) => !v)}
+            whileHover={{
+              scale: 1.05,
+              boxShadow: '0 4px 15px rgba(17, 184, 214, 0.25)',
+            }}
+            whileTap={{ scale: 0.95 }}
           >
             {v2Copy.actions.kpiDefinitions}
-          </button>
-          <button
+          </motion.button>
+          <motion.button
             className="V2Shell__modeButton"
             type="button"
             onClick={() => {
               localStorage.setItem(uiModeStorageKey, 'legacy');
               navigate('/legacy?ui=legacy');
             }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
             {v2Copy.actions.legacyUi}
-          </button>
-          <button className="V2Shell__modeButton" type="button" onClick={() => void handleLogout()}>
+          </motion.button>
+          <motion.button
+            className="V2Shell__modeButton"
+            type="button"
+            onClick={() => void handleLogout()}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
             Sign out
-          </button>
+          </motion.button>
         </div>
-      </header>
+      </motion.header>
 
       <div className={`V2Shell__body ${isDesktopCollapsed ? 'is-collapsed' : ''}`}>
-        <aside className={`V2Shell__sidebar ${isMenuOpen ? 'is-open' : ''} ${isDesktopCollapsed ? 'is-collapsed' : ''}`}>
+        {/* Sidebar */}
+        <motion.aside
+          className={`V2Shell__sidebar ${isMenuOpen ? 'is-open' : ''} ${isDesktopCollapsed ? 'is-collapsed' : ''}`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
           <nav className="V2Shell__nav" aria-label="V2 primary navigation">
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) => `V2Shell__navItem ${isActive ? 'is-active' : ''}`}
-              >
-                <span className="V2Shell__navIcon">{item.icon}</span>
-                <span className="V2Shell__navLabel">{item.label}</span>
-                <span className="V2Shell__navLabelShort">{item.shortLabel}</span>
-              </NavLink>
-            ))}
+            <motion.div
+              variants={listContainerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              {navItems.map((item, index) => {
+                const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+                return (
+                  <motion.div
+                    key={item.to}
+                    variants={listItemVariants}
+                    custom={index}
+                    whileHover="hover"
+                    whileTap="tap"
+                  >
+                    <NavLink
+                      to={item.to}
+                      className={({ isActive }) => `V2Shell__navItem ${isActive ? 'is-active' : ''}`}
+                    >
+                      <motion.span
+                        className="V2Shell__navIcon"
+                        animate={{
+                          scale: isActive ? 1.1 : 1,
+                          backgroundColor: isActive ? 'rgba(17, 184, 214, 0.3)' : 'transparent',
+                        }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {item.icon}
+                      </motion.span>
+                      <span className="V2Shell__navLabel">{item.label}</span>
+                      <span className="V2Shell__navLabelShort">{item.shortLabel}</span>
+                      {/* Active indicator */}
+                      {isActive && (
+                        <motion.div
+                          className="V2Shell__activeIndicator"
+                          layoutId="activeNav"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={springs.soft}
+                        />
+                      )}
+                    </NavLink>
+                  </motion.div>
+                );
+              })}
+            </motion.div>
           </nav>
-        </aside>
+        </motion.aside>
 
         <main className="V2Shell__content">{children}</main>
       </div>
 
-      <button className="V2Shell__defsFab" type="button" onClick={() => setIsDefinitionsOpen((v) => !v)}>
-        {v2Copy.actions.kpiDefinitions}
-      </button>
-
-      <div
-        className={`V2DefsBackdrop ${isDefinitionsOpen ? 'is-open' : ''}`}
-        onClick={() => setIsDefinitionsOpen(false)}
-        aria-hidden={!isDefinitionsOpen}
-      />
-      <aside
-        className={`V2DefsDrawer ${isDefinitionsOpen ? 'is-open' : ''}`}
-        id="v2-kpi-definitions"
-        aria-hidden={!isDefinitionsOpen}
+      {/* Floating Action Button for Definitions */}
+      <motion.button
+        className="V2Shell__defsFab"
+        type="button"
+        onClick={() => setIsDefinitionsOpen((v) => !v)}
+        initial={{ opacity: 0, scale: 0 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileHover={{
+          scale: 1.1,
+          boxShadow: '0 8px 25px rgba(17, 184, 214, 0.35)',
+        }}
+        whileTap={{ scale: 0.9 }}
+        transition={springs.bouncy}
       >
-        <header className="V2DefsDrawer__header">
-          <div>
-            <p className="V2DefsDrawer__eyebrow">Shared Vocabulary</p>
-            <h2>{v2Copy.actions.kpiDefinitions}</h2>
-          </div>
-          <button type="button" onClick={() => setIsDefinitionsOpen(false)}>
-            {v2Copy.actions.close}
-          </button>
-        </header>
-        <p className="V2DefsDrawer__summary">
-          These definitions match the daily reports and scorecards so setters and managers are speaking the same language.
-        </p>
-        {V2_TERM_GROUPS.map((group) => (
-          <section className="V2DefsDrawer__group" key={group.title}>
-            <h3>{group.title}</h3>
-            <div className="V2DefsDrawer__rows">
-              {group.keys.map((key) => {
-                const item = V2_TERM_DEFINITIONS[key];
-                return (
-                  <article className="V2DefsDrawer__row" key={key}>
-                    <h4>{item.label}</h4>
-                    <p>{item.definition}</p>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        ))}
-      </aside>
+        {v2Copy.actions.kpiDefinitions}
+      </motion.button>
+
+      {/* Definitions Drawer */}
+      <AnimatePresence>
+        {isDefinitionsOpen && (
+          <>
+            <motion.div
+              className="V2DefsBackdrop is-open"
+              variants={backdropVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              onClick={() => setIsDefinitionsOpen(false)}
+            />
+            <motion.aside
+              className="V2DefsDrawer is-open"
+              id="v2-kpi-definitions"
+              variants={drawerVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+            >
+              <motion.header
+                className="V2DefsDrawer__header"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <div>
+                  <p className="V2DefsDrawer__eyebrow">Shared Vocabulary</p>
+                  <h2>{v2Copy.actions.kpiDefinitions}</h2>
+                </div>
+                <motion.button
+                  type="button"
+                  onClick={() => setIsDefinitionsOpen(false)}
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  {v2Copy.actions.close}
+                </motion.button>
+              </motion.header>
+              <motion.p
+                className="V2DefsDrawer__summary"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.15 }}
+              >
+                These definitions match the daily reports and scorecards so setters and managers are speaking the same language.
+              </motion.p>
+              {V2_TERM_GROUPS.map((group, groupIndex) => (
+                <motion.section
+                  className="V2DefsDrawer__group"
+                  key={group.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 + groupIndex * 0.1 }}
+                >
+                  <h3>{group.title}</h3>
+                  <div className="V2DefsDrawer__rows">
+                    {group.keys.map((key, keyIndex) => {
+                      const item = V2_TERM_DEFINITIONS[key];
+                      return (
+                        <motion.article
+                          className="V2DefsDrawer__row"
+                          key={key}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.25 + groupIndex * 0.1 + keyIndex * 0.03 }}
+                          whileHover={{
+                            backgroundColor: 'rgba(17, 184, 214, 0.05)',
+                            x: 4,
+                          }}
+                        >
+                          <h4>{item.label}</h4>
+                          <p>{item.definition}</p>
+                        </motion.article>
+                      );
+                    })}
+                  </div>
+                </motion.section>
+              ))}
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

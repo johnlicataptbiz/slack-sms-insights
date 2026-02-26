@@ -1,8 +1,29 @@
-import { useId, type ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { useId, type ReactNode, useState } from 'react';
+import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
 
 import { V2_TERM_DEFINITIONS, type V2TermKey } from '../copy';
+import {
+  metricCardVariants,
+  listContainerVariants,
+  listItemVariants,
+  panelVariants,
+  alertVariants,
+  badgeVariants,
+  tooltipVariants,
+  springs,
+  easing,
+  fadeInUp,
+} from '../utils/motion';
 
+// ─── Animated Number Counter ─────────────────────────────────────────────────
+function AnimatedNumber({ value, formatFn }: { value: number; formatFn?: (n: number) => string }) {
+  const spring = useSpring(value, { stiffness: 100, damping: 20 });
+  const display = useTransform(spring, (latest) => formatFn ? formatFn(Math.round(latest)) : Math.round(latest).toString());
+
+  return <motion.span>{display}</motion.span>;
+}
+
+// ─── Sparkline ───────────────────────────────────────────────────────────────
 export function V2Sparkline({
   data,
   width = 60,
@@ -10,6 +31,7 @@ export function V2Sparkline({
   stroke = 'currentColor',
   strokeWidth = 2,
   fill = 'rgba(17, 184, 214, 0.15)',
+  animated = true,
 }: {
   data: number[];
   width?: number;
@@ -17,6 +39,7 @@ export function V2Sparkline({
   stroke?: string;
   strokeWidth?: number;
   fill?: string;
+  animated?: boolean;
 }) {
   if (data.length < 2) return null;
 
@@ -41,12 +64,32 @@ export function V2Sparkline({
       className="V2Sparkline"
       aria-hidden="true"
     >
-      <path d={areaPath} fill={fill} />
-      <path d={linePath} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" />
+      <motion.path
+        d={areaPath}
+        fill={fill}
+        initial={animated ? { opacity: 0 } : false}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      />
+      <motion.path
+        d={linePath}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={animated ? { pathLength: 0, opacity: 0 } : false}
+        animate={{ pathLength: 1, opacity: 1 }}
+        transition={{
+          pathLength: { duration: 1, ease: easing.smooth },
+          opacity: { duration: 0.3 }
+        }}
+      />
     </svg>
   );
 }
 
+// ─── Page Header ─────────────────────────────────────────────────────────────
 export function V2PageHeader({
   title,
   subtitle,
@@ -57,17 +100,52 @@ export function V2PageHeader({
   right?: ReactNode;
 }) {
   return (
-    <header className="V2PageHeader">
+    <motion.header
+      className="V2PageHeader"
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: easing.smooth }}
+    >
       <div>
-        <p className="V2PageHeader__eyebrow">PT Biz Setter Ops</p>
-        <h1>{title}</h1>
-        <p className="V2PageHeader__subtitle">{subtitle}</p>
+        <motion.p
+          className="V2PageHeader__eyebrow"
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          PT Biz Setter Ops
+        </motion.p>
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.15, ease: easing.smooth }}
+        >
+          {title}
+        </motion.h1>
+        <motion.p
+          className="V2PageHeader__subtitle"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.25 }}
+        >
+          {subtitle}
+        </motion.p>
       </div>
-      {right ? <div className="V2PageHeader__right">{right}</div> : null}
-    </header>
+      {right ? (
+        <motion.div
+          className="V2PageHeader__right"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.2 }}
+        >
+          {right}
+        </motion.div>
+      ) : null}
+    </motion.header>
   );
 }
 
+// ─── Panel ───────────────────────────────────────────────────────────────────
 export function V2Panel({
   title,
   caption,
@@ -80,14 +158,42 @@ export function V2Panel({
   className?: string;
 }) {
   return (
-    <section className={`V2Panel ${className || ''}`.trim()}>
-      {title ? <h2 className="V2Panel__title">{title}</h2> : null}
-      {caption ? <p className="V2Panel__caption">{caption}</p> : null}
+    <motion.section
+      className={`V2Panel ${className || ''}`.trim()}
+      variants={panelVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover={{
+        boxShadow: '0 12px 35px rgba(8, 12, 29, 0.12)',
+        transition: { duration: 0.2 }
+      }}
+    >
+      {title ? (
+        <motion.h2
+          className="V2Panel__title"
+          initial={{ opacity: 0, x: -10 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          {title}
+        </motion.h2>
+      ) : null}
+      {caption ? (
+        <motion.p
+          className="V2Panel__caption"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.15 }}
+        >
+          {caption}
+        </motion.p>
+      ) : null}
       {children}
-    </section>
+    </motion.section>
   );
 }
 
+// ─── Metric Card ─────────────────────────────────────────────────────────────
 export function V2MetricCard({
   label,
   value,
@@ -104,63 +210,95 @@ export function V2MetricCard({
   trend?: 'up' | 'down' | 'flat' | undefined;
 }) {
   const trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : null;
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <motion.article 
+    <motion.article
       className={`V2MetricCard ${tone ? `V2MetricCard--${tone}` : ''}`}
-      variants={{
-        hidden: { opacity: 0, y: 15 },
-        show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 400, damping: 30 } }
-      }}
+      variants={metricCardVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover="hover"
+      whileTap={{ scale: 0.98 }}
+      onHoverStart={() => setIsHovered(true)}
+      onHoverEnd={() => setIsHovered(false)}
     >
       <div className="V2MetricCard__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <p className="V2MetricCard__label">{label}</p>
+        <motion.p
+          className="V2MetricCard__label"
+          animate={{
+            color: isHovered ? 'var(--v2-accent)' : 'var(--v2-muted)',
+          }}
+          transition={{ duration: 0.2 }}
+        >
+          {label}
+        </motion.p>
         {sparkline && sparkline.length >= 2 ? (
           <V2Sparkline
             data={sparkline}
             stroke={tone === 'positive' ? '#13b981' : tone === 'critical' ? '#ef4c62' : '#11b8d6'}
             fill={tone === 'positive' ? 'rgba(19, 185, 129, 0.12)' : tone === 'critical' ? 'rgba(239, 76, 98, 0.12)' : 'rgba(17, 184, 214, 0.12)'}
+            animated={true}
           />
         ) : null}
       </div>
-      <p className="V2MetricCard__value" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+      <motion.p
+        className="V2MetricCard__value"
+        style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ delay: 0.2, ...springs.bouncy }}
+      >
         {value}
-        {trendIcon ? (
-          <span className={`V2MetricCard__trendBadge V2MetricCard__trendBadge--${trend}`}>
-            {trendIcon}
-          </span>
-        ) : null}
-      </p>
-      {meta ? <p className="V2MetricCard__meta">{meta}</p> : null}
+        <AnimatePresence>
+          {trendIcon && (
+            <motion.span
+              className={`V2MetricCard__trendBadge V2MetricCard__trendBadge--${trend}`}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={springs.bouncy}
+            >
+              {trendIcon}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.p>
+      {meta ? (
+        <motion.p
+          className="V2MetricCard__meta"
+          initial={{ opacity: 0, y: 5 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.3 }}
+        >
+          {meta}
+        </motion.p>
+      ) : null}
     </motion.article>
   );
 }
 
-export function V2AnimatedList({ 
-  children, 
-  className 
-}: { 
-  children: ReactNode; 
+// ─── Animated List ───────────────────────────────────────────────────────────
+export function V2AnimatedList({
+  children,
+  className
+}: {
+  children: ReactNode;
   className?: string;
 }) {
   return (
     <motion.div
       className={className}
+      variants={listContainerVariants}
       initial="hidden"
-      animate="show"
-      variants={{
-        hidden: { opacity: 0 },
-        show: {
-          opacity: 1,
-          transition: { staggerChildren: 0.05 }
-        }
-      }}
+      animate="visible"
     >
       {children}
     </motion.div>
   );
 }
 
+// ─── Progress Bar ────────────────────────────────────────────────────────────
 export function V2ProgressBar({
   value,
   max = 100,
@@ -176,21 +314,90 @@ export function V2ProgressBar({
 }) {
   const pct = Math.min(100, Math.max(0, (value / max) * 100));
   return (
-    <div style={{ width: '100%', height, background: bg, borderRadius: 999, overflow: 'hidden' }}>
+    <div
+      style={{
+        width: '100%',
+        height,
+        background: bg,
+        borderRadius: 999,
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
       <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: `${pct}%` }}
-        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-        style={{ height: '100%', background: color, borderRadius: 999, minWidth: pct > 0 ? 4 : 0 }}
+        initial={{ width: 0, opacity: 0 }}
+        animate={{ width: `${pct}%`, opacity: 1 }}
+        transition={{ duration: 0.8, ease: easing.smooth, delay: 0.1 }}
+        style={{
+          height: '100%',
+          background: color,
+          borderRadius: 999,
+          minWidth: pct > 0 ? 4 : 0,
+          boxShadow: `0 0 8px ${color}40`,
+        }}
+      />
+      {/* Shimmer effect */}
+      <motion.div
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+          borderRadius: 999,
+        }}
+        animate={{
+          x: ['-100%', '200%'],
+        }}
+        transition={{
+          duration: 1.5,
+          repeat: Infinity,
+          repeatDelay: 2,
+          ease: 'easeInOut',
+        }}
       />
     </div>
   );
 }
 
+// ─── State Display ───────────────────────────────────────────────────────────
 export function V2State({ kind, children }: { kind: 'loading' | 'error' | 'empty'; children: ReactNode }) {
-  return <div className={`V2State V2State--${kind}`}>{children}</div>;
+  const iconVariants = {
+    loading: {
+      rotate: 360,
+      transition: { duration: 1.5, repeat: Infinity, ease: 'linear' },
+    },
+    error: {
+      scale: [1, 1.1, 1],
+      transition: { duration: 0.5 },
+    },
+    empty: {
+      y: [0, -5, 0],
+      transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+    },
+  };
+
+  return (
+    <motion.div
+      className={`V2State V2State--${kind}`}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3 }}
+    >
+      <motion.span
+        className="V2State__icon"
+        variants={iconVariants}
+        animate={kind}
+      >
+        {kind === 'loading' ? '◌' : kind === 'error' ? '⚠' : '○'}
+      </motion.span>
+      <span className="V2State__text">{children}</span>
+    </motion.div>
+  );
 }
 
+// ─── Risk Alert ──────────────────────────────────────────────────────────────
 export function V2RiskAlert({
   title,
   count,
@@ -205,8 +412,27 @@ export function V2RiskAlert({
   if (count === 0) return null;
 
   return (
-    <div className="V2RiskAlert V2RiskAlert--critical">
-      <div className="V2RiskAlert__icon">⚠</div>
+    <motion.div
+      className="V2RiskAlert V2RiskAlert--critical"
+      variants={alertVariants}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+    >
+      <motion.div
+        className="V2RiskAlert__icon"
+        animate={{
+          scale: [1, 1.2, 1],
+          rotate: [0, -10, 10, 0],
+        }}
+        transition={{
+          duration: 0.5,
+          repeat: Infinity,
+          repeatDelay: 3,
+        }}
+      >
+        ⚠
+      </motion.div>
       <div className="V2RiskAlert__content">
         <h3 className="V2RiskAlert__title">{title}</h3>
         <p className="V2RiskAlert__text">
@@ -214,37 +440,71 @@ export function V2RiskAlert({
         </p>
       </div>
       {onAction ? (
-        <button type="button" className="V2RiskAlert__action" onClick={onAction}>
+        <motion.button
+          type="button"
+          className="V2RiskAlert__action"
+          onClick={onAction}
+          whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.2)' }}
+          whileTap={{ scale: 0.95 }}
+        >
           {actionLabel}
-        </button>
+        </motion.button>
       ) : null}
-    </div>
+    </motion.div>
   );
 }
 
+// ─── Term Tooltip ────────────────────────────────────────────────────────────
 export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) {
   const id = useId();
   const definition = V2_TERM_DEFINITIONS[term];
   const text = label ?? definition.label;
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
     <span className="V2Term">
-      <button className="V2Term__button" type="button" aria-describedby={id}>
+      <motion.button
+        className="V2Term__button"
+        type="button"
+        aria-describedby={id}
+        onHoverStart={() => setIsOpen(true)}
+        onHoverEnd={() => setIsOpen(false)}
+        whileHover={{ scale: 1.02 }}
+      >
         <span>{text}</span>
-        <span className="V2Term__badge" aria-hidden="true">
+        <motion.span
+          className="V2Term__badge"
+          aria-hidden="true"
+          animate={{
+            backgroundColor: isOpen ? 'var(--v2-accent)' : 'rgba(17, 184, 214, 0.15)',
+            color: isOpen ? '#ffffff' : 'var(--v2-accent)',
+          }}
+          transition={{ duration: 0.15 }}
+        >
           i
-        </span>
-      </button>
-      <span className="V2Term__tooltip" id={id} role="tooltip">
-        <strong>{definition.label}</strong>
-        <span>{definition.definition}</span>
-      </span>
+        </motion.span>
+      </motion.button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.span
+            className="V2Term__tooltip"
+            id={id}
+            role="tooltip"
+            variants={tooltipVariants}
+            initial="hidden"
+            animate="visible"
+            exit="hidden"
+          >
+            <strong>{definition.label}</strong>
+            <span>{definition.definition}</span>
+          </motion.span>
+        )}
+      </AnimatePresence>
     </span>
   );
 }
 
-// Visual Components for Dashboard
-
+// ─── Stat Bar ────────────────────────────────────────────────────────────────
 export function V2StatBar({
   segments,
   total,
@@ -256,71 +516,119 @@ export function V2StatBar({
     <div className="V2StatBar">
       <div className="V2StatBar__track">
         {segments.map((seg, i) => (
-          <div
+          <motion.div
             key={i}
             className="V2StatBar__segment"
-            style={{
-              width: `${total > 0 ? (seg.value / total) * 100 : 0}%`,
-              background: seg.color,
-            }}
+            style={{ background: seg.color }}
+            initial={{ width: 0 }}
+            animate={{ width: `${total > 0 ? (seg.value / total) * 100 : 0}%` }}
+            transition={{ duration: 0.8, delay: i * 0.1, ease: easing.smooth }}
             title={`${seg.label}: ${seg.value}`}
+            whileHover={{
+              scale: 1.02,
+              filter: 'brightness(1.1)',
+            }}
           />
         ))}
       </div>
-      <div className="V2StatBar__legend">
+      <motion.div
+        className="V2StatBar__legend"
+        variants={listContainerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {segments.map((seg, i) => (
-          <div key={i} className="V2StatBar__legendItem">
+          <motion.div
+            key={i}
+            className="V2StatBar__legendItem"
+            variants={listItemVariants}
+          >
             <span className="V2StatBar__dot" style={{ background: seg.color }} />
             <span className="V2StatBar__label">{seg.label}</span>
             <span className="V2StatBar__value">{seg.value}</span>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }
 
+// ─── Pipeline Visual ─────────────────────────────────────────────────────────
 export function V2PipelineVisual({
   stages,
 }: {
   stages: { label: string; value: number; color?: string }[];
 }) {
   const max = Math.max(...stages.map((s) => s.value), 1);
-  
+
   return (
-    <div className="V2PipelineVisual">
+    <motion.div
+      className="V2PipelineVisual"
+      variants={listContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {stages.map((stage, i) => (
-        <div key={i} className="V2PipelineVisual__stage">
+        <motion.div
+          key={i}
+          className="V2PipelineVisual__stage"
+          variants={listItemVariants}
+        >
           <div className="V2PipelineVisual__barWrap">
-            <div
+            <motion.div
               className="V2PipelineVisual__bar"
-              style={{
-                width: `${(stage.value / max) * 100}%`,
-                background: stage.color || 'var(--v2-accent)',
-              }}
+              style={{ background: stage.color || 'var(--v2-accent)' }}
+              initial={{ width: 0 }}
+              animate={{ width: `${(stage.value / max) * 100}%` }}
+              transition={{ duration: 0.6, delay: i * 0.1, ease: easing.smooth }}
             />
-            <span className="V2PipelineVisual__number">{stage.value}</span>
+            <motion.span
+              className="V2PipelineVisual__number"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + i * 0.1 }}
+            >
+              {stage.value}
+            </motion.span>
           </div>
           <span className="V2PipelineVisual__label">{stage.label}</span>
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
+// ─── Action List ─────────────────────────────────────────────────────────────
 export function V2ActionList({ actions }: { actions: string[] }) {
   return (
-    <ul className="V2ActionList">
+    <motion.ul
+      className="V2ActionList"
+      variants={listContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {actions.map((action, i) => (
-        <li key={i} className="V2ActionList__item">
-          <span className="V2ActionList__icon">→</span>
+        <motion.li
+          key={i}
+          className="V2ActionList__item"
+          variants={listItemVariants}
+          whileHover={{ x: 4, backgroundColor: 'rgba(17, 184, 214, 0.05)' }}
+        >
+          <motion.span
+            className="V2ActionList__icon"
+            animate={{ x: [0, 3, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}
+          >
+            →
+          </motion.span>
           <span className="V2ActionList__text">{action}</span>
-        </li>
+        </motion.li>
       ))}
-    </ul>
+    </motion.ul>
   );
 }
 
+// ─── Health Indicator ────────────────────────────────────────────────────────
 export function V2HealthIndicator({
   value,
   threshold,
@@ -331,16 +639,29 @@ export function V2HealthIndicator({
   label: string;
 }) {
   const status = value >= threshold ? 'critical' : value >= threshold / 2 ? 'warning' : 'healthy';
-  
+
   return (
-    <div className={`V2HealthIndicator V2HealthIndicator--${status}`}>
-      <div className="V2HealthIndicator__dot" />
+    <motion.div
+      className={`V2HealthIndicator V2HealthIndicator--${status}`}
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      whileHover={{ scale: 1.02 }}
+    >
+      <motion.div
+        className="V2HealthIndicator__dot"
+        animate={status === 'critical' ? {
+          scale: [1, 1.3, 1],
+          opacity: [1, 0.7, 1],
+        } : {}}
+        transition={{ duration: 1, repeat: Infinity }}
+      />
       <span className="V2HealthIndicator__label">{label}</span>
       <span className="V2HealthIndicator__value">{value.toFixed(1)}%</span>
-    </div>
+    </motion.div>
   );
 }
 
+// ─── Mini Trend ──────────────────────────────────────────────────────────────
 export function V2MiniTrend({
   day,
   sent,
@@ -355,7 +676,17 @@ export function V2MiniTrend({
   optOuts: number;
 }) {
   return (
-    <article className="V2MiniTrend">
+    <motion.article
+      className="V2MiniTrend"
+      variants={fadeInUp}
+      initial="hidden"
+      animate="visible"
+      whileHover={{
+        scale: 1.01,
+        backgroundColor: 'rgba(17, 184, 214, 0.03)',
+        transition: { duration: 0.15 }
+      }}
+    >
       <h3 className="V2MiniTrend__day">{day}</h3>
       <div className="V2MiniTrend__grid">
         <div className="V2MiniTrend__stat">
@@ -375,6 +706,92 @@ export function V2MiniTrend({
           <span className="V2MiniTrend__value V2MiniTrend__value--critical">{optOuts}</span>
         </div>
       </div>
-    </article>
+    </motion.article>
+  );
+}
+
+// ─── Skeleton Loader ─────────────────────────────────────────────────────────
+export function V2Skeleton({
+  width = '100%',
+  height = '1rem',
+  variant = 'text',
+}: {
+  width?: string | number;
+  height?: string | number;
+  variant?: 'text' | 'circular' | 'rectangular';
+}) {
+  const borderRadius = variant === 'circular' ? '50%' : variant === 'text' ? '4px' : '8px';
+
+  return (
+    <motion.div
+      style={{
+        width,
+        height,
+        borderRadius,
+        background: 'linear-gradient(90deg, rgba(17, 184, 214, 0.08), rgba(17, 184, 214, 0.15), rgba(17, 184, 214, 0.08))',
+        backgroundSize: '200% 100%',
+      }}
+      animate={{
+        backgroundPosition: ['200% 0', '-200% 0'],
+      }}
+      transition={{
+        duration: 1.5,
+        repeat: Infinity,
+        ease: 'linear',
+      }}
+    />
+  );
+}
+
+// ─── Badge ───────────────────────────────────────────────────────────────────
+export function V2Badge({
+  children,
+  variant = 'default',
+  animated = false,
+}: {
+  children: ReactNode;
+  variant?: 'default' | 'positive' | 'critical' | 'warning' | 'accent';
+  animated?: boolean;
+}) {
+  return (
+    <motion.span
+      className={`V2Badge V2Badge--${variant}`}
+      variants={animated ? badgeVariants : undefined}
+      initial={animated ? 'hidden' : false}
+      animate={animated ? 'visible' : false}
+      whileHover={{ scale: 1.05 }}
+    >
+      {children}
+    </motion.span>
+  );
+}
+
+// ─── Floating Action Button ──────────────────────────────────────────────────
+export function V2FloatingButton({
+  onClick,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  icon: ReactNode;
+  label: string;
+}) {
+  return (
+    <motion.button
+      type="button"
+      className="V2FloatingButton"
+      onClick={onClick}
+      aria-label={label}
+      initial={{ opacity: 0, scale: 0, rotate: -180 }}
+      animate={{ opacity: 1, scale: 1, rotate: 0 }}
+      whileHover={{
+        scale: 1.1,
+        boxShadow: '0 8px 25px rgba(17, 184, 214, 0.35)',
+      }}
+      whileTap={{ scale: 0.9 }}
+      transition={springs.bouncy}
+    >
+      {icon}
+    </motion.button>
   );
 }

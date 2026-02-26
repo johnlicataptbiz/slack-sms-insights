@@ -9,20 +9,51 @@ import InsightsV2 from './pages/InsightsV2';
 import RepV2 from './pages/RepV2';
 import RunsV2 from './pages/RunsV2';
 import SequencesV2 from './pages/SequencesV2';
+import { pageVariants, easing } from './utils/motion';
 import './v2.css';
 
-const pageVariants = {
-  initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
-  exit: { opacity: 0, y: -6, transition: { duration: 0.18, ease: 'easeIn' as const } },
+// Enhanced page transition variants
+const enhancedPageVariants = {
+  initial: {
+    opacity: 0,
+    y: 20,
+    scale: 0.98,
+    filter: 'blur(4px)',
+  },
+  animate: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: 'blur(0px)',
+    transition: {
+      duration: 0.4,
+      ease: easing.smooth,
+      staggerChildren: 0.08,
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: -15,
+    scale: 0.99,
+    filter: 'blur(2px)',
+    transition: {
+      duration: 0.25,
+      ease: 'easeIn',
+    },
+  },
 };
 
 const V2NotFound = () => (
-  <div className="V2Page">
+  <motion.div
+    className="V2Page"
+    initial={{ opacity: 0, scale: 0.95 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.3 }}
+  >
     <V2Panel title="Page Not Found" caption="This route does not exist in v2.">
       <V2State kind="empty">Route not found in v2 layer.</V2State>
     </V2Panel>
-  </div>
+  </motion.div>
 );
 
 function AnimatedRoutes() {
@@ -31,7 +62,7 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
         key={location.pathname}
-        variants={pageVariants}
+        variants={enhancedPageVariants}
         initial="initial"
         animate="animate"
         exit="exit"

@@ -1,0 +1,956 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   PT Biz v2 UI Enhancements - Glassmorphism, Gradients, and Polish
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Enhanced CSS Variables ─────────────────────────────────────────────── */
+:root {
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-blur: 16px;
+  --glass-blur-strong: 24px;
+
+  /* Enhanced Shadows */
+  --shadow-glow-accent: 0 0 30px rgba(17, 184, 214, 0.15);
+  --shadow-glow-positive: 0 0 30px rgba(19, 185, 129, 0.15);
+  --shadow-glow-critical: 0 0 30px rgba(239, 76, 98, 0.15);
+  --shadow-elevated: 0 20px 50px rgba(8, 12, 29, 0.12), 0 8px 20px rgba(8, 12, 29, 0.08);
+  --shadow-card: 0 4px 20px rgba(8, 12, 29, 0.06), 0 1px 3px rgba(8, 12, 29, 0.04);
+  --shadow-card-hover: 0 12px 40px rgba(8, 12, 29, 0.12), 0 4px 12px rgba(8, 12, 29, 0.06);
+
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #11b8d6 0%, #0f9fb8 50%, #13b981 100%);
+  --gradient-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 252, 255, 0.92));
+  --gradient-shimmer: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+
+  /* Animation Timing */
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --ease-snappy: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ─── Enhanced Shell ─────────────────────────────────────────────────────── */
+.V2Shell {
+  background:
+    radial-gradient(ellipse 1400px 700px at 5% -15%, rgba(17, 184, 214, 0.18), transparent 50%),
+    radial-gradient(ellipse 1000px 600px at 95% -5%, rgba(19, 185, 129, 0.12), transparent 45%),
+    radial-gradient(ellipse 800px 400px at 50% 100%, rgba(17, 184, 214, 0.08), transparent 50%),
+    linear-gradient(165deg, #f5faff 0%, #f0f7fc 40%, #eaf4fa 70%, #e6f1f8 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ─── Enhanced Top Bar ───────────────────────────────────────────────────── */
+.V2Shell__topbar {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.85) 0%,
+    rgba(248, 252, 255, 0.78) 50%,
+    rgba(255, 255, 255, 0.82) 100%
+  );
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  backdrop-filter: blur(var(--glass-blur-strong)) saturate(180%);
+  border-bottom: 1px solid rgba(17, 184, 214, 0.12);
+  box-shadow: 0 4px 30px rgba(8, 12, 29, 0.04);
+}
+
+/* ─── Enhanced Brand Logo ────────────────────────────────────────────────── */
+.V2Shell__brand {
+  position: relative;
+  transition: transform 0.3s var(--ease-smooth);
+}
+
+.V2Shell__brand::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 16px;
+  background: var(--gradient-primary);
+  opacity: 0;
+  filter: blur(20px);
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.V2Shell__brand:hover::after {
+  opacity: 0.15;
+}
+
+/* ─── Enhanced Navigation Buttons ────────────────────────────────────────── */
+.V2Shell__defsButton {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 184, 214, 0.12) 0%,
+    rgba(17, 184, 214, 0.06) 100%
+  );
+  border: 1px solid rgba(17, 184, 214, 0.35);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s var(--ease-smooth);
+}
+
+.V2Shell__defsButton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--gradient-shimmer);
+  transform: translateX(-100%);
+  transition: transform 0.5s ease;
+}
+
+.V2Shell__defsButton:hover::before {
+  transform: translateX(100%);
+}
+
+.V2Shell__defsButton:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 184, 214, 0.2) 0%,
+    rgba(17, 184, 214, 0.12) 100%
+  );
+  border-color: rgba(17, 184, 214, 0.5);
+  box-shadow: var(--shadow-glow-accent);
+}
+
+.V2Shell__modeButton {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: all 0.25s var(--ease-smooth);
+}
+
+.V2Shell__modeButton:hover {
+  background: var(--glass-bg-strong);
+  box-shadow: var(--shadow-card);
+  border-color: rgba(17, 184, 214, 0.3);
+}
+
+/* ─── Enhanced Sidebar ───────────────────────────────────────────────────── */
+.V2Shell__sidebar {
+  background:
+    linear-gradient(180deg, rgba(8, 18, 35, 0.97), rgba(9, 18, 31, 0.95)),
+    radial-gradient(ellipse 600px 400px at 0% -20%, rgba(17, 184, 214, 0.35), transparent 55%),
+    radial-gradient(ellipse 400px 300px at 100% 100%, rgba(19, 185, 129, 0.2), transparent 50%);
+  border-right: 1px solid rgba(17, 184, 214, 0.15);
+  box-shadow: 4px 0 30px rgba(8, 12, 29, 0.15);
+}
+
+/* ─── Enhanced Nav Items ─────────────────────────────────────────────────── */
+.V2Shell__navItem {
+  position: relative;
+  color: rgba(235, 244, 255, 0.75);
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.V2Shell__navItem::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 0;
+  background: var(--gradient-primary);
+  border-radius: 0 3px 3px 0;
+  transition: height 0.3s var(--ease-smooth);
+}
+
+.V2Shell__navItem:hover::before {
+  height: 50%;
+}
+
+.V2Shell__navItem.is-active::before {
+  height: 70%;
+}
+
+.V2Shell__navItem:hover {
+  color: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(
+    90deg,
+    rgba(17, 184, 214, 0.15) 0%,
+    rgba(17, 184, 214, 0.05) 100%
+  );
+  transform: translateX(4px);
+}
+
+.V2Shell__navItem.is-active {
+  color: #ffffff;
+  background: linear-gradient(
+    90deg,
+    rgba(17, 184, 214, 0.28) 0%,
+    rgba(17, 184, 214, 0.08) 100%
+  );
+  border-color: rgba(145, 237, 248, 0.4);
+  box-shadow: inset 0 0 20px rgba(17, 184, 214, 0.1);
+}
+
+/* Active Indicator Bar */
+.V2Shell__activeIndicator {
+  position: absolute;
+  left: -1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 24px;
+  background: var(--gradient-primary);
+  border-radius: 0 4px 4px 0;
+  box-shadow: var(--shadow-glow-accent);
+}
+
+.V2Shell__navIcon {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 184, 214, 0.2) 0%,
+    rgba(17, 184, 214, 0.05) 100%
+  );
+  border: 1px solid rgba(17, 184, 214, 0.25);
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.V2Shell__navItem:hover .V2Shell__navIcon {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 184, 214, 0.35) 0%,
+    rgba(17, 184, 214, 0.15) 100%
+  );
+  border-color: rgba(17, 184, 214, 0.45);
+  box-shadow: 0 0 15px rgba(17, 184, 214, 0.3);
+}
+
+/* ─── Enhanced Panels ────────────────────────────────────────────────────── */
+.V2Panel {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.V2Panel:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: rgba(17, 184, 214, 0.2);
+}
+
+.V2Panel__title {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Enhanced Metric Cards ──────────────────────────────────────────────── */
+.V2MetricCard {
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.85) 100%
+  );
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--shadow-card);
+  transition: all 0.35s var(--ease-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.V2MetricCard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-primary);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.4s var(--ease-smooth);
+}
+
+.V2MetricCard:hover::before {
+  transform: scaleX(1);
+}
+
+.V2MetricCard:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-elevated), var(--shadow-glow-accent);
+}
+
+.V2MetricCard--positive {
+  background: linear-gradient(
+    160deg,
+    rgba(19, 185, 129, 0.12) 0%,
+    rgba(255, 255, 255, 0.92) 40%
+  );
+}
+
+.V2MetricCard--positive::before {
+  background: linear-gradient(90deg, #13b981, #10d98f);
+}
+
+.V2MetricCard--positive:hover {
+  box-shadow: var(--shadow-elevated), var(--shadow-glow-positive);
+}
+
+.V2MetricCard--critical {
+  background: linear-gradient(
+    160deg,
+    rgba(239, 76, 98, 0.1) 0%,
+    rgba(255, 255, 255, 0.92) 40%
+  );
+}
+
+.V2MetricCard--critical::before {
+  background: linear-gradient(90deg, #ef4c62, #f87171);
+}
+
+.V2MetricCard--critical:hover {
+  box-shadow: var(--shadow-elevated), var(--shadow-glow-critical);
+}
+
+.V2MetricCard--accent {
+  background: linear-gradient(
+    160deg,
+    rgba(17, 184, 214, 0.1) 0%,
+    rgba(255, 255, 255, 0.92) 40%
+  );
+}
+
+.V2MetricCard__value {
+  background: linear-gradient(135deg, var(--v2-base-900) 0%, var(--v2-base-700) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.V2MetricCard__trendBadge {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s var(--ease-bounce);
+}
+
+.V2MetricCard:hover .V2MetricCard__trendBadge {
+  transform: scale(1.15);
+}
+
+/* ─── Enhanced Tables ────────────────────────────────────────────────────── */
+.V2TableWrap {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+
+.V2Table tbody tr {
+  transition: all 0.2s ease;
+}
+
+.V2Table tbody tr:hover {
+  background: linear-gradient(
+    90deg,
+    rgba(17, 184, 214, 0.04) 0%,
+    rgba(17, 184, 214, 0.02) 50%,
+    transparent 100%
+  );
+}
+
+.V2Table th {
+  background: linear-gradient(
+    180deg,
+    rgba(248, 252, 255, 0.95) 0%,
+    rgba(245, 250, 255, 0.9) 100%
+  );
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.V2Table th.is-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.V2Table th.is-sortable:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(17, 184, 214, 0.08) 0%,
+    rgba(17, 184, 214, 0.04) 100%
+  );
+  color: var(--v2-accent-strong);
+}
+
+/* ─── Enhanced Risk Alert ────────────────────────────────────────────────── */
+.V2RiskAlert {
+  background: linear-gradient(
+    135deg,
+    rgba(239, 76, 98, 0.15) 0%,
+    rgba(239, 76, 98, 0.08) 100%
+  );
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(239, 76, 98, 0.35);
+  box-shadow: var(--shadow-glow-critical), 0 4px 20px rgba(239, 76, 98, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.V2RiskAlert::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #ef4c62, #f87171);
+}
+
+.V2RiskAlert__icon {
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 5px rgba(239, 76, 98, 0.5));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 15px rgba(239, 76, 98, 0.8));
+    transform: scale(1.1);
+  }
+}
+
+.V2RiskAlert__action {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  transition: all 0.25s var(--ease-smooth);
+}
+
+.V2RiskAlert__action:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* ─── Enhanced Definitions Drawer ────────────────────────────────────────── */
+.V2DefsBackdrop {
+  background: rgba(8, 18, 35, 0.4);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.V2DefsDrawer {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(248, 252, 255, 0.95) 100%
+  );
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  backdrop-filter: blur(var(--glass-blur-strong));
+  box-shadow: -20px 0 60px rgba(8, 12, 29, 0.15);
+  border-left: 1px solid rgba(17, 184, 214, 0.15);
+}
+
+.V2DefsDrawer__row {
+  background: var(--glass-bg);
+  border: 1px solid rgba(17, 184, 214, 0.1);
+  border-radius: var(--v2-radius-sm);
+  padding: var(--v2-space-3);
+  transition: all 0.25s var(--ease-smooth);
+}
+
+.V2DefsDrawer__row:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 184, 214, 0.06) 0%,
+    rgba(17, 184, 214, 0.02) 100%
+  );
+  border-color: rgba(17, 184, 214, 0.25);
+  transform: translateX(4px);
+}
+
+.V2DefsDrawer__row h4 {
+  color: var(--v2-accent-strong);
+}
+
+/* ─── Enhanced State Display ─────────────────────────────────────────────── */
+.V2State {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+  border-radius: var(--v2-radius-md);
+  background: var(--glass-bg);
+  border: 1px dashed rgba(17, 184, 214, 0.25);
+}
+
+.V2State__icon {
+  font-size: 1.5rem;
+}
+
+.V2State--loading {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 184, 214, 0.06) 0%,
+    rgba(17, 184, 214, 0.02) 100%
+  );
+}
+
+.V2State--loading .V2State__icon {
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.V2State--error {
+  background: linear-gradient(
+    135deg,
+    rgba(239, 76, 98, 0.06) 0%,
+    rgba(239, 76, 98, 0.02) 100%
+  );
+  border-color: rgba(239, 76, 98, 0.25);
+}
+
+.V2State--empty {
+  background: linear-gradient(
+    135deg,
+    rgba(86, 96, 122, 0.04) 0%,
+    transparent 100%
+  );
+  border-color: rgba(86, 96, 122, 0.2);
+}
+
+/* ─── Enhanced Progress Bar ──────────────────────────────────────────────── */
+.V2ProgressBar__track {
+  background: rgba(17, 184, 214, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.V2ProgressBar__fill {
+  background: var(--gradient-primary);
+  border-radius: 999px;
+  position: relative;
+}
+
+.V2ProgressBar__fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* ─── Enhanced Badges ────────────────────────────────────────────────────── */
+.V2Badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2Badge--positive {
+  background: linear-gradient(135deg, rgba(19, 185, 129, 0.2), rgba(19, 185, 129, 0.1));
+  border: 1px solid rgba(19, 185, 129, 0.35);
+  color: #0d7a54;
+}
+
+.V2Badge--critical {
+  background: linear-gradient(135deg, rgba(239, 76, 98, 0.2), rgba(239, 76, 98, 0.1));
+  border: 1px solid rgba(239, 76, 98, 0.35);
+  color: #b91c3c;
+}
+
+.V2Badge--accent {
+  background: linear-gradient(135deg, rgba(17, 184, 214, 0.2), rgba(17, 184, 214, 0.1));
+  border: 1px solid rgba(17, 184, 214, 0.35);
+  color: #0891a8;
+}
+
+.V2Badge--warning {
+  background: linear-gradient(135deg, rgba(245, 157, 13, 0.2), rgba(245, 157, 13, 0.1));
+  border: 1px solid rgba(245, 157, 13, 0.35);
+  color: #b45309;
+}
+
+/* ─── Enhanced Mini Trend Cards ──────────────────────────────────────────── */
+.V2MiniTrend {
+  background: var(--glass-bg);
+  border: 1px solid rgba(17, 184, 214, 0.1);
+  border-radius: var(--v2-radius-sm);
+  padding: var(--v2-space-3);
+  transition: all 0.25s var(--ease-smooth);
+}
+
+.V2MiniTrend:hover {
+  background: linear-gradient(
+    135deg,
+    rgba(17, 184, 214, 0.04) 0%,
+    rgba(255, 255, 255, 0.95) 100%
+  );
+  border-color: rgba(17, 184, 214, 0.25);
+  transform: translateX(4px);
+}
+
+.V2MiniTrend__day {
+  font-family: var(--v2-font-display);
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Enhanced Floating Action Button ────────────────────────────────────── */
+.V2Shell__defsFab,
+.V2FloatingButton {
+  background: linear-gradient(135deg, #11b8d6, #0f9fb8);
+  border: none;
+  color: white;
+  box-shadow: 0 8px 25px rgba(17, 184, 214, 0.35), 0 4px 10px rgba(8, 12, 29, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.V2Shell__defsFab::before,
+.V2FloatingButton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+}
+
+.V2Shell__defsFab:hover::before,
+.V2FloatingButton:hover::before {
+  animation: fab-shimmer 0.6s forwards;
+}
+
+@keyframes fab-shimmer {
+  to { transform: translateX(100%); }
+}
+
+/* ─── Enhanced Tooltips ──────────────────────────────────────────────────── */
+.V2Term__tooltip {
+  background: linear-gradient(
+    180deg,
+    rgba(12, 20, 41, 0.97) 0%,
+    rgba(8, 18, 35, 0.95) 100%
+  );
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(17, 184, 214, 0.25);
+  box-shadow: 0 12px 40px rgba(8, 12, 29, 0.35);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.V2Term__tooltip strong {
+  color: var(--v2-accent-soft);
+}
+
+/* ─── Enhanced Sparklines ────────────────────────────────────────────────── */
+.V2Sparkline {
+  filter: drop-shadow(0 2px 4px rgba(17, 184, 214, 0.2));
+}
+
+/* ─── Sonner Toast Enhancements ──────────────────────────────────────────── */
+.v2-sonner-toast {
+  background: var(--glass-bg-strong) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) !important;
+  backdrop-filter: blur(var(--glass-blur)) !important;
+  border: 1px solid rgba(17, 184, 214, 0.2) !important;
+  box-shadow: var(--shadow-elevated) !important;
+}
+
+.v2-sonner-title {
+  font-family: var(--v2-font-display) !important;
+  font-weight: 600 !important;
+}
+
+/* ─── Page Enter Animation Enhancement ───────────────────────────────────── */
+.V2Page {
+  animation: v2-page-enter 0.5s var(--ease-smooth);
+}
+
+@keyframes v2-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+/* ─── Selection Highlight ────────────────────────────────────────────────── */
+::selection {
+  background: rgba(17, 184, 214, 0.25);
+  color: var(--v2-base-900);
+}
+
+/* ─── Focus States ───────────────────────────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid var(--v2-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Scrollbar Styling ──────────────────────────────────────────────────── */
+.V2Shell ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.V2Shell ::-webkit-scrollbar-track {
+  background: rgba(17, 184, 214, 0.05);
+  border-radius: 4px;
+}
+
+.V2Shell ::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(17, 184, 214, 0.3), rgba(17, 184, 214, 0.2));
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.V2Shell ::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(17, 184, 214, 0.5), rgba(17, 184, 214, 0.35));
+}
+
+/* ─── Mobile Enhancements ────────────────────────────────────────────────── */
+@media (max-width: 1080px) {
+  .V2Shell__sidebar {
+    -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+    backdrop-filter: blur(var(--glass-blur-strong));
+    box-shadow: 4px 0 40px rgba(8, 12, 29, 0.25);
+  }
+
+  .V2Shell__defsFab {
+    display: flex !important;
+  }
+}
+
+/* ─── Enhanced Inbox Styles ──────────────────────────────────────────────── */
+.V2Inbox__sidePanel {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.V2Inbox__sidePanel:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: rgba(17, 184, 214, 0.25);
+}
+
+.V2Inbox__stateCard {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: all 0.25s var(--ease-smooth);
+}
+
+.V2Inbox__stateCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.V2Inbox__pill {
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2Inbox__pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.V2Inbox__pill.is-complete {
+  background: linear-gradient(135deg, rgba(19, 185, 129, 0.15), rgba(19, 185, 129, 0.08));
+  border-color: rgba(19, 185, 129, 0.35);
+}
+
+/* Enhanced conversation list items */
+.V2Inbox__convRow {
+  transition: all 0.2s var(--ease-smooth);
+  border-left: 3px solid transparent;
+}
+
+.V2Inbox__convRow:hover {
+  background: linear-gradient(90deg, rgba(17, 184, 214, 0.04), transparent);
+  border-left-color: var(--v2-accent);
+  transform: translateX(2px);
+}
+
+.V2Inbox__convRow.is-selected {
+  background: linear-gradient(90deg, rgba(17, 184, 214, 0.08), rgba(17, 184, 214, 0.02));
+  border-left-color: var(--v2-accent);
+}
+
+/* Enhanced message bubbles */
+.V2Inbox__msgBubble--outbound {
+  background: linear-gradient(135deg, rgba(17, 184, 214, 0.1), rgba(17, 184, 214, 0.05));
+  border-color: rgba(17, 184, 214, 0.25);
+}
+
+.V2Inbox__msgBubble--inbound {
+  background: var(--glass-bg);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Enhanced compose area */
+.V2Inbox__compose textarea:focus {
+  box-shadow: 0 0 0 3px rgba(17, 184, 214, 0.15), inset 0 0 10px rgba(17, 184, 214, 0.05);
+}
+
+/* Enhanced send button */
+.V2Inbox__sendBtn {
+  background: var(--gradient-primary);
+  border: none;
+  color: white;
+  font-weight: 700;
+  transition: all 0.25s var(--ease-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.V2Inbox__sendBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(17, 184, 214, 0.35);
+}
+
+/* Enhanced contact avatar */
+.V2Inbox__contactAvatar {
+  box-shadow: 0 4px 15px rgba(17, 184, 214, 0.25);
+  transition: all 0.3s var(--ease-bounce);
+}
+
+.V2Inbox__contactAvatar:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 25px rgba(17, 184, 214, 0.35);
+}
+
+/* Enhanced outcome chips */
+.V2Inbox__outcomeChip {
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2Inbox__outcomeChip:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+/* ─── Enhanced Sequences Table ───────────────────────────────────────────── */
+.V2SeqAudit {
+  background: linear-gradient(180deg, rgba(248, 252, 255, 0.95), rgba(255, 255, 255, 0.9));
+  border-top: 1px solid rgba(17, 184, 214, 0.1);
+}
+
+.V2AuditItem {
+  background: var(--glass-bg);
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2AuditItem:hover {
+  background: linear-gradient(135deg, rgba(17, 184, 214, 0.04), rgba(255, 255, 255, 0.95));
+  transform: translateX(4px);
+}
+
+.V2SeqRepSplit__badge {
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.V2SeqRepSplit__badge:hover {
+  transform: scale(1.1);
+}
+
+/* ─── Enhanced Risk Flags ────────────────────────────────────────────────── */
+.V2RiskFlag {
+  background: var(--glass-bg);
+  transition: all 0.25s var(--ease-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.V2RiskFlag::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--v2-critical);
+}
+
+.V2RiskFlag--critical::before {
+  background: linear-gradient(180deg, #ef4c62, #f87171);
+}
+
+.V2RiskFlag--warning::before {
+  background: linear-gradient(180deg, #f59d0d, #fbbf24);
+}
+
+.V2RiskFlag--info::before {
+  background: linear-gradient(180deg, #11b8d6, #22d3ee);
+}
+
+.V2RiskFlag:hover {
+  transform: translateX(4px);
+  box-shadow: var(--shadow-card);
+}
+
+/* ─── Enhanced Run Cards ─────────────────────────────────────────────────── */
+.V2RunList__item {
+  transition: all 0.25s var(--ease-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.V2RunList__item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.V2RunList__dateStamp {
+  transition: all 0.2s ease;
+}
+
+.V2RunList__item:hover .V2RunList__dateStamp {
+  background: rgba(17, 184, 214, 0.1);
+}
+
+/* ─── Reduced Motion ─────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

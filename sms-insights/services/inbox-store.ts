@@ -637,6 +637,14 @@ export const listMondayTrailForContactKey = async (
   const pool = getDbOrThrow();
   const client = await pool.connect();
   try {
+    const normalizedLimit = Math.max(1, Math.min(limit, 50));
+
+    // Monday snapshots may be keyed by:
+    // - contact:<id> (preferred)
+    // - phone:<digits>
+    // - name:<lead name> (fallback; matches our workflow where Monday item name matches Aloware/Slack lead name)
+    const nameKey = contactKey.startsWith('name:') ? contactKey : `name:${contactKey.replace(/^contact:|^phone:/, '')}`;
+
     const result = await client.query<{
       board_id: string;
       item_id: string;
@@ -659,10 +667,11 @@ export const listMondayTrailForContactKey = async (
         updated_at
       FROM monday_call_snapshots
       WHERE contact_key = $1
+         OR contact_key = $2
       ORDER BY updated_at DESC
-      LIMIT $2;
+      LIMIT $3;
       `,
-      [contactKey, Math.max(1, Math.min(limit, 50))],
+      [contactKey, nameKey, normalizedLimit],
     );
 
     return result.rows.map((row) => ({

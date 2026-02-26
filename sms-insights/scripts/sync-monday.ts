@@ -8,6 +8,7 @@ type CliOptions = {
   boardId: string;
   writeback: boolean;
   personal: boolean;
+  force: boolean;
   weekStart?: string;
   timeZone?: string;
 };
@@ -17,6 +18,7 @@ const parseArgs = (argv: string[]): CliOptions => {
     boardId: mondayConfig.acqBoardId,
     writeback: false,
     personal: false,
+    force: false,
   };
 
   for (const arg of argv) {
@@ -26,6 +28,10 @@ const parseArgs = (argv: string[]): CliOptions => {
     }
     if (arg === '--personal') {
       options.personal = true;
+      continue;
+    }
+    if (arg === '--force') {
+      options.force = true;
       continue;
     }
     if (arg.startsWith('--board=')) {
@@ -50,7 +56,7 @@ const main = async (): Promise<void> => {
   await initializeSchema();
 
   console.log(`Starting monday sync for board ${options.boardId}...`);
-  const result = await syncMondayBoard(options.boardId, console);
+  const result = await syncMondayBoard(options.boardId, console, { force: options.force });
   console.log('Sync result:', JSON.stringify(result, null, 2));
 
   if (options.writeback) {

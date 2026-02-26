@@ -159,8 +159,20 @@ export const normalizeBoardItem = (item: MondayBoardItem, mapping: MondayBoardMa
   const contactId = getValueByColumnId(item, mapping.contactIdColumnId)?.text?.trim() || null;
   const phone = normalizePhone(getValueByColumnId(item, mapping.phoneColumnId)?.text || null);
   const disposition = classifyDisposition(stage, outcome);
-  const isBooked = disposition === 'booked' || /\bbooked|showed|closed won\b/i.test(stage || '');
-  const contactKey = contactId ? `contact:${contactId}` : phone ? `phone:${phone}` : null;
+
+  // Business rule: items on this board represent booked calls (this is not our CRM).
+  // If mapping fails to detect booked status, default to true so we don't silently drop booked calls.
+  const isBooked = true;
+
+  // Prefer stable identifiers when available, but fall back to item name so we can still link
+  // to conversations via fuzzy matching (names should match Aloware/Slack per our workflow).
+  const contactKey = contactId
+    ? `contact:${contactId}`
+    : phone
+      ? `phone:${phone}`
+      : item.name?.trim()
+        ? `name:${item.name.trim()}`
+        : null;
 
   return {
     itemId: item.id,

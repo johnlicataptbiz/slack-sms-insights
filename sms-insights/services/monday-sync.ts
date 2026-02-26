@@ -56,6 +56,7 @@ const cutoffDate = (daysBack: number): Date => {
 export const syncMondayBoard = async (
   boardId: string,
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+  options?: { force?: boolean },
 ): Promise<MondaySyncResult> => {
   const startedAt = new Date().toISOString();
   if (!mondayConfig.syncEnabled) {
@@ -72,7 +73,8 @@ export const syncMondayBoard = async (
   }
 
   const state = await getMondaySyncState(boardId, logger);
-  const initialSync = !state?.last_sync_at;
+  const force = options?.force === true;
+  const initialSync = force ? true : !state?.last_sync_at;
   const lastSyncAt = state?.last_sync_at ? new Date(state.last_sync_at) : null;
   const backfillCutoff = cutoffDate(mondayConfig.backfillDays);
 
@@ -107,8 +109,9 @@ export const syncMondayBoard = async (
         if (!normalized) continue;
 
         // Initial run uses a bounded historical window to avoid pulling the entire board.
-        if (initialSync && normalized.updatedAt < backfillCutoff) continue;
-        if (!initialSync && lastSyncAt && normalized.updatedAt <= lastSyncAt) continue;
+        // Force mode re-upserts items regardless of updatedAt/lastSyncAt so mapping changes can be applied.
+        if (!force && initialSync && normalized.updatedAt < backfillCutoff) continue;
+        if (!force && !initialSync && lastSyncAt && normalized.updatedAt <= lastSyncAt) continue;
 
         await upsertMondayCallSnapshot(
           {

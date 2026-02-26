@@ -496,6 +496,28 @@
   font-weight: 700;
 }
 
+.V2MetricCard__trendBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 0.9rem;
+  font-weight: 800;
+  font-family: var(--v2-font-ui);
+}
+
+.V2MetricCard__trendBadge--up {
+  background: rgba(19, 185, 129, 0.15);
+  color: var(--v2-positive);
+}
+
+.V2MetricCard__trendBadge--down {
+  background: rgba(239, 76, 98, 0.15);
+  color: var(--v2-critical);
+}
+
 .V2MetricCard__meta {
   margin: 0.55rem 0 0;
   font-size: 0.78rem;
@@ -4662,6 +4684,73 @@ display: inline-block;
   .V2Inbox__analyticsPanel {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   SONNER TOAST NOTIFICATIONS
+   ============================================================ */
+
+.v2-sonner-toast {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(245, 250, 255, 0.95)) !important;
+  border: 1px solid rgba(17, 184, 214, 0.3) !important;
+  border-radius: var(--v2-radius-md) !important;
+  box-shadow: var(--v2-shadow-2) !important;
+  font-family: var(--v2-font-ui) !important;
+  padding: 1rem 1.2rem !important;
+}
+
+.v2-sonner-toast[data-type="success"] {
+  border-color: rgba(19, 185, 129, 0.4) !important;
+  background: linear-gradient(160deg, rgba(19, 185, 129, 0.08), rgba(255, 255, 255, 0.98)) !important;
+}
+
+.v2-sonner-toast[data-type="error"] {
+  border-color: rgba(239, 76, 98, 0.4) !important;
+  background: linear-gradient(160deg, rgba(239, 76, 98, 0.08), rgba(255, 255, 255, 0.98)) !important;
+}
+
+.v2-sonner-toast[data-type="warning"] {
+  border-color: rgba(245, 157, 13, 0.4) !important;
+  background: linear-gradient(160deg, rgba(245, 157, 13, 0.08), rgba(255, 255, 255, 0.98)) !important;
+}
+
+.v2-sonner-title {
+  font-family: var(--v2-font-display) !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  color: var(--v2-base-800) !important;
+}
+
+.v2-sonner-description {
+  font-size: 0.82rem !important;
+  color: var(--v2-muted) !important;
+  margin-top: 0.2rem !important;
+}
+
+.v2-sonner-action {
+  background: var(--v2-accent) !important;
+  color: white !important;
+  border-radius: 999px !important;
+  font-weight: 700 !important;
+  padding: 0.4rem 0.8rem !important;
+  transition: transform 150ms ease !important;
+}
+
+.v2-sonner-action:hover {
+  transform: translateY(-1px) !important;
+}
+
+.v2-sonner-close {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(7, 19, 36, 0.1) !important;
+  color: var(--v2-muted) !important;
+  transition: background 150ms ease, color 150ms ease !important;
+}
+
+.v2-sonner-close:hover {
+  background: rgba(239, 76, 98, 0.1) !important;
+  color: var(--v2-critical) !important;
+  border-color: rgba(239, 76, 98, 0.3) !important;
 }
 
 /* ============================================================

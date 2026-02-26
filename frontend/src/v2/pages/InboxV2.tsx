@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react';
 
 import {
   useV2AddConversationNote,
@@ -26,6 +26,7 @@ import {
 import { CALL_OUTCOME_LABELS } from '../../api/v2-types';
 import type { CallOutcomeV2, QualificationStateV2 } from '../../api/v2-types';
 import { V2State } from '../components/V2Primitives';
+import { useToast } from '../hooks/useToast';
 
 const fmtDateTime = (value: string | null) => {
   if (!value) return 'n/a';
@@ -213,6 +214,7 @@ const escalationLevelSubtitle = (level: 1 | 2 | 3 | 4): string => {
 export default function InboxV2() {
   const [statusFilter, setStatusFilter] = useState<'open' | 'closed' | 'dnc' | ''>('open');
   const [needsReplyOnly, setNeedsReplyOnly] = useState(true);
+  const toast = useToast();
   const [ownerFilter, setOwnerFilter] = useState<'all' | 'jack' | 'brandon' | 'unassigned'>('all');
   const [search, setSearch] = useState('');
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -524,18 +526,19 @@ export default function InboxV2() {
         
         setComposerText('');
         setSelectedDraftId(null);
+        toast.success('Message sent successfully');
         
         // Phase 2: Auto-Snooze
         if (containsPodcastLink(messageText)) {
           const snoozeUntil = new Date();
           snoozeUntil.setHours(snoozeUntil.getHours() + 72); // 72 hours
           await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: snoozeUntil.toISOString() });
-          setFlashMessage('Podcast link sent. Snoozed for 72 hours.');
+          toast.info('Podcast link sent. Snoozed for 72 hours.');
         } else if (containsCallLink(messageText)) {
           const snoozeUntil = new Date();
           snoozeUntil.setHours(snoozeUntil.getHours() + 96); // 96 hours (4 days)
           await snoozeMutation.mutateAsync({ conversationId: selectedConversationId, snoozedUntil: snoozeUntil.toISOString() });
-          setFlashMessage('Call link sent. Snoozed for 4 days.');
+          toast.info('Call link sent. Snoozed for 4 days.');
         }
 
         setTimeout(() => {
@@ -543,11 +546,11 @@ export default function InboxV2() {
         }, 2000);
       } else {
         setSendStatus('error');
-        setFlashMessage(`Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`);
+        toast.error(`Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`);
       }
     } catch (error) {
       setSendStatus('error');
-      setFlashMessage(`Send failed: ${String((error as Error)?.message || error)}`);
+      toast.error(`Send failed: ${String((error as Error)?.message || error)}`);
     }
   };
 
@@ -626,8 +629,9 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     try {
       await statusMutation.mutateAsync({ conversationId: selectedConversationId, status });
+      toast.success(`Conversation marked as ${status.toUpperCase()}`);
     } catch (error) {
-      setFlashMessage(`Status update failed: ${String((error as Error)?.message || error)}`);
+      toast.error(`Status update failed: ${String((error as Error)?.message || error)}`);
     }
   };
 

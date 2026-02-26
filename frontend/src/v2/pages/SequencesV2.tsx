@@ -1,8 +1,10 @@
 import { Fragment, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { useV2SalesMetrics, useV2Scoreboard } from '../../api/v2Queries';
 import type { SalesMetricsV2, ScoreboardLeadMagnetRow } from '../../api/v2-types';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
+import { useToast } from '../hooks/useToast';
 
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
@@ -152,6 +154,7 @@ export default function SequencesV2() {
   const [sort, setSort] = useState<Sort>('messagesSent');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
+  const toast = useToast();
 
   const salesMetricsQuery = useV2SalesMetrics({ range: mode, tz: BUSINESS_TZ });
   const scoreboardQuery = useV2Scoreboard({ tz: BUSINESS_TZ });
@@ -302,8 +305,13 @@ export default function SequencesV2() {
   const toggleExpanded = (label: string) => {
     setExpandedLabels((prev) => {
       const next = new Set(prev);
-      if (next.has(label)) next.delete(label);
-      else next.add(label);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+        // Fire a subtle toast when expanding to show the notification system works
+        toast.info(`Viewing audit log for ${label}`, { duration: 2000 });
+      }
       return next;
     });
   };
@@ -370,7 +378,7 @@ export default function SequencesV2() {
       />
 
       {/* ── KPI Summary ── */}
-      <section className="V2MetricsGrid">
+      <V2AnimatedList className="V2MetricsGrid">
         <V2MetricCard
           label="Active Sequences"
           value={String(kpis.activeSequences)}
@@ -404,38 +412,51 @@ export default function SequencesV2() {
           tone={kpis.smsReplyBookingPct >= 50 ? 'positive' : 'default'}
           meta="of bookings had a prior SMS reply"
         />
-      </section>
+      </V2AnimatedList>
 
       {/* ── Health Watchlist ── */}
-      {healthWatchlist.length > 0 && (
-        <V2Panel
-          title="⚠ Sequence Health Alerts"
-          caption="Sequences flagged for attention based on opt-out rate, reply rate, or booking performance."
-        >
-          <div className="V2RiskFlags">
-            {healthWatchlist.map((flag) => (
-              <div
-                key={`${flag.sequence}-${flag.label}`}
-                className={`V2RiskFlag V2RiskFlag--${flag.severity}`}
-              >
-                <h3 className="V2RiskFlag__title">{flag.label}</h3>
-                <p className="V2RiskFlag__seq">{flag.sequence}</p>
-                <p className="V2RiskFlag__detail">{flag.detail}</p>
-                <div className="V2Watchlist__stats">
-                  {flag.stats.map((stat) => (
-                    <span
-                      key={stat.label}
-                      className={`V2Watchlist__stat${stat.variant ? ` V2Watchlist__stat--${stat.variant}` : ''}`}
-                    >
-                      {stat.label}: {stat.value}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </V2Panel>
-      )}
+      <AnimatePresence>
+        {healthWatchlist.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+            animate={{ opacity: 1, height: 'auto', marginBottom: '1.5rem' }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <V2Panel
+              title="⚠ Sequence Health Alerts"
+              caption="Sequences flagged for attention based on opt-out rate, reply rate, or booking performance."
+            >
+              <V2AnimatedList className="V2RiskFlags">
+                {healthWatchlist.map((flag) => (
+                  <motion.div
+                    key={`${flag.sequence}-${flag.label}`}
+                    variants={{
+                      hidden: { opacity: 0, x: -20 },
+                      show: { opacity: 1, x: 0 }
+                    }}
+                    className={`V2RiskFlag V2RiskFlag--${flag.severity}`}
+                  >
+                    <h3 className="V2RiskFlag__title">{flag.label}</h3>
+                    <p className="V2RiskFlag__seq">{flag.sequence}</p>
+                    <p className="V2RiskFlag__detail">{flag.detail}</p>
+                    <div className="V2Watchlist__stats">
+                      {flag.stats.map((stat) => (
+                        <span
+                          key={stat.label}
+                          className={`V2Watchlist__stat${stat.variant ? ` V2Watchlist__stat--${stat.variant}` : ''}`}
+                        >
+                          {stat.label}: {stat.value}
+                        </span>
+                      ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </V2AnimatedList>
+            </V2Panel>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Sequence Performance Table ── */}
       <V2Panel
@@ -501,7 +522,14 @@ export default function SequencesV2() {
                   <th className="is-center V2Table__col--expand" />
                 </tr>
               </thead>
-              <tbody>
+              <motion.tbody
+                initial="hidden"
+                animate="show"
+                variants={{
+                  hidden: { opacity: 0 },
+                  show: { opacity: 1, transition: { staggerChildren: 0.03 } }
+                }}
+              >
                 {sortedRows.map((row) => {
                   const expanded = expandedLabels.has(row.label);
                   const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
@@ -517,7 +545,13 @@ export default function SequencesV2() {
 
                   return (
                     <Fragment key={row.label}>
-                      <tr className={rowClass}>
+                      <motion.tr 
+                        className={rowClass}
+                        variants={{
+                          hidden: { opacity: 0, y: 10 },
+                          show: { opacity: 1, y: 0 }
+                        }}
+                      >
                         <td className="V2Table__col--label">
                           <span className="V2Table__seqName" title={row.label}>
                             {row.label}
@@ -536,7 +570,19 @@ export default function SequencesV2() {
                             : <span className="V2Table__dim">—</span>}
                         </td>
                         <td className="is-right">{fmtInt(row.repliesReceived)}</td>
-                        <td className="is-right">{fmtPct(row.replyRatePct)}</td>
+                        <td className="is-right">
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                            <span>{fmtPct(row.replyRatePct)}</span>
+                            <div style={{ width: '40px' }}>
+                              <V2ProgressBar 
+                                value={row.replyRatePct} 
+                                max={25} 
+                                height={4} 
+                                color={row.replyRatePct >= 10 ? 'var(--v2-positive)' : row.replyRatePct < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)'} 
+                              />
+                            </div>
+                          </div>
+                        </td>
                         <td className="is-right">
                           <div className="V2SeqRepSplit">
                             <strong>{fmtInt(row.canonicalBookedCalls)}</strong>
@@ -576,7 +622,17 @@ export default function SequencesV2() {
                             : <span className="V2Table__dim">—</span>}
                         </td>
                         <td className={`is-right${isHighOptOut ? ' V2Table__cell--warn' : ''}`}>
-                          {fmtPct(row.optOutRatePct)}
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                            <span>{fmtPct(row.optOutRatePct)}</span>
+                            <div style={{ width: '40px' }}>
+                              <V2ProgressBar 
+                                value={row.optOutRatePct} 
+                                max={10} 
+                                height={4} 
+                                color={isHighOptOut ? 'var(--v2-critical)' : 'var(--v2-muted)'} 
+                              />
+                            </div>
+                          </div>
                         </td>
                         <td className="is-right">{fmtInt(row.optOuts)}</td>
                         <td className="is-center">
@@ -591,12 +647,26 @@ export default function SequencesV2() {
                             {expanded ? '▲' : '▼'}
                           </button>
                         </td>
-                      </tr>
+                      </motion.tr>
 
-                      {expanded && (
-                        <tr id={toAuditId(row.label)} className="V2Table__auditRow">
-                          <td colSpan={12}>
-                            <div className="V2SeqAudit">
+                      <AnimatePresence>
+                        {expanded && (
+                          <motion.tr 
+                            id={toAuditId(row.label)} 
+                            className="V2Table__auditRow"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                          >
+                            <td colSpan={12} style={{ padding: 0 }}>
+                              <motion.div 
+                                className="V2SeqAudit"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                style={{ overflow: 'hidden' }}
+                              >
                               {/* Booking breakdown summary */}
                               <div className="V2SeqAudit__summary">
                                 <div className="V2SeqAudit__summaryItem">
@@ -709,14 +779,15 @@ export default function SequencesV2() {
                                     ))}
                                 </div>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
+                              </motion.div>
+                            </td>
+                          </motion.tr>
+                        )}
+                      </AnimatePresence>
                     </Fragment>
                   );
                 })}
-              </tbody>
+              </motion.tbody>
             </table>
           </div>
         )}

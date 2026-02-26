@@ -1,4 +1,5 @@
 import { useId, type ReactNode } from 'react';
+import { motion } from 'framer-motion';
 
 import { V2_TERM_DEFINITIONS, type V2TermKey } from '../copy';
 
@@ -99,15 +100,20 @@ export function V2MetricCard({
   value: ReactNode;
   meta?: ReactNode;
   tone?: 'default' | 'positive' | 'critical' | 'accent';
-  sparkline?: number[];
-  trend?: 'up' | 'down' | 'flat';
+  sparkline?: number[] | undefined;
+  trend?: 'up' | 'down' | 'flat' | undefined;
 }) {
   const trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : null;
-  const trendClass = trend ? `V2MetricCard__trend--${trend}` : '';
 
   return (
-    <article className={`V2MetricCard ${tone ? `V2MetricCard--${tone}` : ''}`}>
-      <div className="V2MetricCard__header">
+    <motion.article 
+      className={`V2MetricCard ${tone ? `V2MetricCard--${tone}` : ''}`}
+      variants={{
+        hidden: { opacity: 0, y: 15 },
+        show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 400, damping: 30 } }
+      }}
+    >
+      <div className="V2MetricCard__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <p className="V2MetricCard__label">{label}</p>
         {sparkline && sparkline.length >= 2 ? (
           <V2Sparkline
@@ -117,12 +123,67 @@ export function V2MetricCard({
           />
         ) : null}
       </div>
-      <p className="V2MetricCard__value">
+      <p className="V2MetricCard__value" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
         {value}
-        {trendIcon ? <span className={`V2MetricCard__trend ${trendClass}`}>{trendIcon}</span> : null}
+        {trendIcon ? (
+          <span className={`V2MetricCard__trendBadge V2MetricCard__trendBadge--${trend}`}>
+            {trendIcon}
+          </span>
+        ) : null}
       </p>
       {meta ? <p className="V2MetricCard__meta">{meta}</p> : null}
-    </article>
+    </motion.article>
+  );
+}
+
+export function V2AnimatedList({ 
+  children, 
+  className 
+}: { 
+  children: ReactNode; 
+  className?: string;
+}) {
+  return (
+    <motion.div
+      className={className}
+      initial="hidden"
+      animate="show"
+      variants={{
+        hidden: { opacity: 0 },
+        show: {
+          opacity: 1,
+          transition: { staggerChildren: 0.05 }
+        }
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+export function V2ProgressBar({
+  value,
+  max = 100,
+  color = 'var(--v2-accent)',
+  bg = 'rgba(7, 19, 36, 0.08)',
+  height = 6,
+}: {
+  value: number;
+  max?: number;
+  color?: string;
+  bg?: string;
+  height?: number;
+}) {
+  const pct = Math.min(100, Math.max(0, (value / max) * 100));
+  return (
+    <div style={{ width: '100%', height, background: bg, borderRadius: 999, overflow: 'hidden' }}>
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        style={{ height: '100%', background: color, borderRadius: 999, minWidth: pct > 0 ? 4 : 0 }}
+      />
+    </div>
   );
 }
 

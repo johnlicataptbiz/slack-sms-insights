@@ -316,6 +316,7 @@ export type InboxConversationV2 = {
   objectionTags: string[];
   callOutcome: string | null;
   guardrailOverrideCount: number;
+  mondayBooked: boolean;
 };
 
 export type InboxConversationDetailV2 = {

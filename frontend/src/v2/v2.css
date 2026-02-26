@@ -4043,7 +4043,7 @@
 }
 
 .V2Inbox__dncBadge {
-  display: inline-block;
+display: inline-block;
   font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -4052,6 +4052,69 @@
   background: rgba(239, 76, 98, 0.15);
   color: var(--v2-critical);
   border: 1px solid rgba(239, 76, 98, 0.3);
+}
+
+/* Monday booked badge — list card + sidebar inline */
+.V2Inbox__mondayBadge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(0, 200, 117, 0.12);
+  color: #00c875;
+  border: 1px solid rgba(0, 200, 117, 0.3);
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+
+.V2Inbox__mondayBadge--inline {
+  font-size: 0.58rem;
+  margin-left: 0.4rem;
+}
+
+/* Monday trail panel */
+.V2Inbox__mondayTrail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.V2Inbox__mondayTrailRow {
+  background: rgba(0, 200, 117, 0.05);
+  border: 1px solid rgba(0, 200, 117, 0.15);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+}
+
+.V2Inbox__mondayTrailName {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--v2-text);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.V2Inbox__mondayTrailMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+.V2Inbox__mondayTrailStage,
+.V2Inbox__mondayTrailDate,
+.V2Inbox__mondayTrailDisp {
+  font-size: 0.68rem;
+  color: var(--v2-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  padding: 0.1rem 0.3rem;
 }
 
 .V2Inbox__cardTime {

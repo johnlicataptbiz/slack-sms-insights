@@ -263,6 +263,7 @@ export type InboxConversationV2 = {
   objectionTags: string[];
   callOutcome: CallOutcomeV2 | null;
   guardrailOverrideCount: number;
+  mondayBooked: boolean;
 };
 
 export type InboxConversationListV2 = {

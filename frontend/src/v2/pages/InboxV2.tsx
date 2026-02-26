@@ -934,6 +934,7 @@ export default function InboxV2() {
                         <span className="V2Inbox__convName">
                           {conversation.contactName || conversation.contactPhone || conversation.contactKey}
                           {conversation.dnc && <span className="V2Inbox__dncBadge">DNC</span>}
+                          {conversation.mondayBooked && <span className="V2Inbox__mondayBadge">📅 Booked</span>}
                         </span>
                       </div>
                       <span className="V2Inbox__convTime">{timeAgo(conversation.lastMessage.createdAt)}</span>
@@ -1912,6 +1913,28 @@ export default function InboxV2() {
                         </p>
                       </div>
                     </div>
+
+                    {/* Monday Booked Calls Panel */}
+                    {detail && detail.mondayTrail.length > 0 && (
+                      <div className="V2Panel V2Inbox__sidePanel">
+                        <p className="V2Panel__title">📅 Monday Booked Calls</p>
+                        <div className="V2Inbox__mondayTrail">
+                          {detail.mondayTrail.map((snap) => (
+                            <div key={snap.itemId} className="V2Inbox__mondayTrailRow">
+                              <div className="V2Inbox__mondayTrailName">
+                                {snap.itemName || '—'}
+                                {snap.isBooked && <span className="V2Inbox__mondayBadge V2Inbox__mondayBadge--inline">Booked</span>}
+                              </div>
+                              <div className="V2Inbox__mondayTrailMeta">
+                                {snap.stage && <span className="V2Inbox__mondayTrailStage">{snap.stage}</span>}
+                                {snap.callDate && <span className="V2Inbox__mondayTrailDate">{snap.callDate}</span>}
+                                {snap.disposition && <span className="V2Inbox__mondayTrailDisp">{snap.disposition}</span>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                   </div>
                 </div>

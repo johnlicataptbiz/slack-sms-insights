@@ -1685,6 +1685,7 @@ const toInboxConversationV2 = (row: {
   state_objection_tags?: string[] | null;
   state_call_outcome?: string | null;
   state_guardrail_override_count?: number | null;
+  monday_booked?: boolean | null;
 }) => {
   const ownerFromRep = repDisplayName(row.current_rep_id);
   const ownerFromUser = inferOwnerLabelFromHint(row.latest_outbound_user);
@@ -1740,6 +1741,7 @@ const toInboxConversationV2 = (row: {
     objectionTags: row.state_objection_tags || [],
     callOutcome: row.state_call_outcome || null,
     guardrailOverrideCount: row.state_guardrail_override_count || 0,
+    mondayBooked: row.monday_booked === true,
   };
 };
 

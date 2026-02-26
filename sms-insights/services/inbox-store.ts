@@ -124,6 +124,7 @@ export type InboxConversationListRow = {
   last_message_at: string | null;
   latest_outbound_user: string | null;
   latest_outbound_line: string | null;
+  monday_booked: boolean;
 };
 
 export type InboxMessageRow = {
@@ -438,7 +439,16 @@ export const listInboxConversations = async (
         latest_message.direction AS last_message_direction,
         latest_message.event_ts AS last_message_at,
         latest_outbound.aloware_user AS latest_outbound_user,
-        latest_outbound.line AS latest_outbound_line
+        latest_outbound.line AS latest_outbound_line,
+        EXISTS (
+          SELECT 1
+          FROM monday_call_snapshots m
+          WHERE m.is_booked = true
+            AND (
+              m.contact_key = c.contact_key
+              OR (p.name IS NOT NULL AND m.contact_key = 'name:' || p.name)
+            )
+        ) AS monday_booked
       FROM conversations c
       LEFT JOIN inbox_contact_profiles p
         ON p.contact_key = c.contact_key
@@ -550,7 +560,16 @@ export const getInboxConversationById = async (
         latest_message.direction AS last_message_direction,
         latest_message.event_ts AS last_message_at,
         latest_outbound.aloware_user AS latest_outbound_user,
-        latest_outbound.line AS latest_outbound_line
+        latest_outbound.line AS latest_outbound_line,
+        EXISTS (
+          SELECT 1
+          FROM monday_call_snapshots m
+          WHERE m.is_booked = true
+            AND (
+              m.contact_key = c.contact_key
+              OR (p.name IS NOT NULL AND m.contact_key = 'name:' || p.name)
+            )
+        ) AS monday_booked
       FROM conversations c
       LEFT JOIN inbox_contact_profiles p
         ON p.contact_key = c.contact_key
@@ -639,12 +658,12 @@ export const listMondayTrailForContactKey = async (
   try {
     const normalizedLimit = Math.max(1, Math.min(limit, 50));
 
-    // Monday snapshots may be keyed by:
-    // - contact:<id> (preferred)
-    // - phone:<digits>
-    // - name:<lead name> (fallback; matches our workflow where Monday item name matches Aloware/Slack lead name)
-    const nameKey = contactKey.startsWith('name:') ? contactKey : `name:${contactKey.replace(/^contact:|^phone:/, '')}`;
-
+    // Monday snapshots are keyed by:
+    // - contact:<id> or phone:<digits> (direct match)
+    // - name:<lead name> (our workflow: Monday item name = Aloware/Slack lead name)
+    //
+    // We resolve the profile name via inbox_contact_profiles so that
+    // contact:12345 → profile.name = "John Smith" → matches name:John Smith in Monday.
     const result = await client.query<{
       board_id: string;
       item_id: string;
@@ -657,21 +676,30 @@ export const listMondayTrailForContactKey = async (
     }>(
       `
       SELECT
-        board_id,
-        item_id,
-        item_name,
-        stage,
-        call_date,
-        disposition,
-        is_booked,
-        updated_at
-      FROM monday_call_snapshots
-      WHERE contact_key = $1
-         OR contact_key = $2
-      ORDER BY updated_at DESC
-      LIMIT $3;
+        m.board_id,
+        m.item_id,
+        m.item_name,
+        m.stage,
+        m.call_date,
+        m.disposition,
+        m.is_booked,
+        m.updated_at
+      FROM monday_call_snapshots m
+      WHERE m.contact_key = $1
+         OR (
+           m.contact_key = (
+             SELECT 'name:' || p.name
+             FROM inbox_contact_profiles p
+             WHERE p.contact_key = $1
+               AND p.name IS NOT NULL
+               AND p.name <> ''
+             LIMIT 1
+           )
+         )
+      ORDER BY m.updated_at DESC
+      LIMIT $2;
       `,
-      [contactKey, nameKey, normalizedLimit],
+      [contactKey, normalizedLimit],
     );
 
     return result.rows.map((row) => ({

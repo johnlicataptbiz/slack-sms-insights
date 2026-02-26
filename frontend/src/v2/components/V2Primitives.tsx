@@ -100,11 +100,10 @@ export function V2MetricCard({
   value: ReactNode;
   meta?: ReactNode;
   tone?: 'default' | 'positive' | 'critical' | 'accent';
-  sparkline?: number[];
-  trend?: 'up' | 'down' | 'flat';
+  sparkline?: number[] | undefined;
+  trend?: 'up' | 'down' | 'flat' | undefined;
 }) {
   const trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : null;
-  const trendClass = trend ? `V2MetricCard__trend--${trend}` : '';
 
   return (
     <motion.article 

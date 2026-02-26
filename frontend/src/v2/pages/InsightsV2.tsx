@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import type { SalesMetricsV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2WeeklySummary } from '../../api/v2Queries';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList } from '../components/V2Primitives';
 
 type InsightsRange = 'today' | '7d' | '30d';
 
@@ -147,17 +148,28 @@ export function InsightsV2() {
       />
 
       {/* Risk Alert Banner */}
-      <V2RiskAlert
-        title="High Opt-Out Risk Detected"
-        count={criticalRiskCount}
-        onAction={() => {
-          const element = document.querySelector('.V2Panel:has(.V2Table)');
-          element?.scrollIntoView({ behavior: 'smooth' });
-        }}
-      />
+      <AnimatePresence>
+        {criticalRiskCount > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, height: 0 }}
+            animate={{ opacity: 1, y: 0, height: 'auto' }}
+            exit={{ opacity: 0, y: -20, height: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <V2RiskAlert
+              title="High Opt-Out Risk Detected"
+              count={criticalRiskCount}
+              onAction={() => {
+                const element = document.querySelector('.V2Panel:has(.V2Table)');
+                element?.scrollIntoView({ behavior: 'smooth' });
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Metrics with Sparklines */}
-      <div className="V2MetricsGrid">
+      <V2AnimatedList className="V2MetricsGrid">
         <V2MetricCard
           label="Total Sets"
           value={fmtInt(payload.totals.canonicalBookedCalls)}
@@ -205,7 +217,7 @@ export function InsightsV2() {
           meta={`${fmtInt(payload.totals.canonicalBookedCalls)} booked / ${fmtInt(payload.totals.peopleContacted)} contacted`}
           tone={payload.totals.peopleContacted > 0 && (payload.totals.canonicalBookedCalls / payload.totals.peopleContacted) * 100 >= 5 ? 'positive' : 'default'}
         />
-      </div>
+      </V2AnimatedList>
 
       <div className="V2Grid V2Grid--2-1">
         <V2Panel

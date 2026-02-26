@@ -68,6 +68,12 @@ import { mintStreamToken, verifyStreamToken } from '../services/stream-token.js'
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
 
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
+import {
+  getDraftAIPerformanceAnalytics,
+  getFollowUpSLAAnalytics,
+  getLinePerformanceAnalytics,
+  getQualificationFunnelAnalytics,
+} from '../services/advanced-analytics.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 import {
   assignWorkItem,
@@ -3198,6 +3204,41 @@ const handleGetObjectionFrequencyV2: RequestHandler = async (_req, res, logger, 
   sendJson(res, 200, toEnvelope({ data: rows, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
 };
 
+const handleGetLinePerformanceV2: RequestHandler = async (req, res, _logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const rangeParam = url.searchParams.get('range') || '7d';
+  const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
+
+  const { from, to } = resolveMetricsRange(rangeParam, timeZone);
+  const data = await getLinePerformanceAnalytics({ from, to, timeZone });
+  sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
+};
+
+const handleGetQualificationFunnelV2: RequestHandler = async (_req, res, _logger, origin) => {
+  const data = await getQualificationFunnelAnalytics();
+  sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
+const handleGetDraftAIPerformanceV2: RequestHandler = async (req, res, _logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const rangeParam = url.searchParams.get('range') || '30d';
+  const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
+
+  const { from, to } = resolveMetricsRange(rangeParam, timeZone);
+  const data = await getDraftAIPerformanceAnalytics({ from, to });
+  sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
+};
+
+const handleGetFollowupSLAV2: RequestHandler = async (req, res, _logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const rangeParam = url.searchParams.get('range') || '7d';
+  const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
+
+  const { from, to } = resolveMetricsRange(rangeParam, timeZone);
+  const data = await getFollowUpSLAAnalytics({ from, to });
+  sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
+};
+
 const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
@@ -3336,6 +3377,10 @@ const apiRoutes: ApiRoute[] = [
   },
   { method: 'GET', path: '/api/v2/inbox/analytics/stage-conversion', handler: handleGetStageConversionV2 },
   { method: 'GET', path: '/api/v2/inbox/analytics/objection-frequency', handler: handleGetObjectionFrequencyV2 },
+  { method: 'GET', path: '/api/v2/analytics/line-performance', handler: handleGetLinePerformanceV2 },
+  { method: 'GET', path: '/api/v2/analytics/qualification-funnel', handler: handleGetQualificationFunnelV2 },
+  { method: 'GET', path: '/api/v2/analytics/draft-ai-performance', handler: handleGetDraftAIPerformanceV2 },
+  { method: 'GET', path: '/api/v2/analytics/followup-sla', handler: handleGetFollowupSLAV2 },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },

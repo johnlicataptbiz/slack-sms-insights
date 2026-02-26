@@ -3,13 +3,15 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import type { SalesMetricsV2 } from '../../api/v2-types';
 import { useV2SalesMetrics, useV2WeeklySummary } from '../../api/v2Queries';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
 
 type InsightsRange = 'today' | '7d' | '30d';
+type VolumeMode = 'all' | 'sequence' | 'manual';
 
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtPctMaybe = (n: number | null | undefined) => (typeof n === 'number' ? fmtPct(n) : 'n/a');
+const fmtCurrency = (n: number) => `$${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 const fmtDateTime = (value: string | null) => {
   if (!value) return 'n/a';
   const date = new Date(value);
@@ -40,6 +42,23 @@ const calculateTrend = (data: number[]): 'up' | 'down' | 'flat' => {
   return 'flat';
 };
 
+// ROI Configuration (can be made configurable later)
+const ROI_CONFIG = {
+  costPerMessage: 0.015, // $0.015 per SMS
+  revenuePerBooking: 3500, // Average revenue per booked call that converts
+  conversionRate: 0.15, // 15% of booked calls convert to paying clients
+};
+
+// Calculate Setter Efficiency Score (0-100)
+const calculateEfficiencyScore = (bookings: number, optOuts: number, conversations: number): number => {
+  if (conversations === 0) return 0;
+  // Weighted formula: bookings are worth +10, optOuts are worth -5
+  const rawScore = (bookings * 10) - (optOuts * 5);
+  // Normalize to 0-100 scale based on conversations
+  const normalized = (rawScore / conversations) * 10 + 50;
+  return Math.max(0, Math.min(100, normalized));
+};
+
 export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2) => {
   const bookedAttribution = payload.provenance.sequenceBookedAttribution;
   const bookedTotalAllChannels = payload.totals.canonicalBookedCalls;
@@ -59,6 +78,7 @@ export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2) => {
 
 export function InsightsV2() {
   const [range, setRange] = useState<InsightsRange>('7d');
+  const [volumeMode, setVolumeMode] = useState<VolumeMode>('all');
   const { data: payloadEnvelope, isLoading, error } = useV2SalesMetrics({ range });
   const { data: weeklyEnvelope } = useV2WeeklySummary({});
 
@@ -92,16 +112,151 @@ export function InsightsV2() {
     return highRisk.filter((s) => s.optOutRatePct >= 6).length;
   }, [highRisk]);
 
-  // Extract sparkline data from trendByDay
+  // Extract sparkline data from trendByDay based on volume mode
   const sparklines = useMemo(() => {
     if (!payload?.trendByDay?.length) return null;
     const days = payload.trendByDay;
+
+    if (volumeMode === 'sequence') {
+      return {
+        replyRate: days.map((d) => d.replyRatePct), // TODO: Add sequence-specific reply rate to API
+        bookedCalls: days.map((d) => d.canonicalBookedCalls),
+        messagesSent: days.map((d) => d.sequenceMessagesSent),
+        optOuts: days.map((d) => d.optOuts),
+      };
+    } else if (volumeMode === 'manual') {
+      return {
+        replyRate: days.map((d) => d.replyRatePct), // TODO: Add manual-specific reply rate to API
+        bookedCalls: days.map((d) => d.canonicalBookedCalls),
+        messagesSent: days.map((d) => d.manualMessagesSent),
+        optOuts: days.map((d) => d.optOuts),
+      };
+    }
+
     return {
       replyRate: days.map((d) => d.replyRatePct),
       bookedCalls: days.map((d) => d.canonicalBookedCalls),
       messagesSent: days.map((d) => d.messagesSent),
       optOuts: days.map((d) => d.optOuts),
     };
+  }, [payload, volumeMode]);
+
+  // Compute volume metrics based on mode
+  const volumeMetrics = useMemo(() => {
+    if (!payload) return null;
+
+    if (volumeMode === 'sequence') {
+      return {
+        messagesSent: payload.totals.sequenceMessagesSent,
+        peopleContacted: payload.totals.sequencePeopleContacted,
+        repliesReceived: payload.totals.sequenceRepliesReceived,
+        replyRatePct: payload.totals.sequenceReplyRatePct,
+        label: 'Sequence',
+      };
+    } else if (volumeMode === 'manual') {
+      return {
+        messagesSent: payload.totals.manualMessagesSent,
+        peopleContacted: payload.totals.manualPeopleContacted,
+        repliesReceived: payload.totals.manualRepliesReceived,
+        replyRatePct: payload.totals.manualReplyRatePct,
+        label: 'Manual',
+      };
+    }
+
+    return {
+      messagesSent: payload.totals.messagesSent,
+      peopleContacted: payload.totals.peopleContacted,
+      repliesReceived: payload.totals.repliesReceived,
+      replyRatePct: payload.totals.replyRatePct,
+      label: 'All',
+    };
+  }, [payload, volumeMode]);
+
+  // Calculate ROI metrics
+  const roiMetrics = useMemo(() => {
+    if (!payload) return null;
+
+    const totalCost = payload.totals.messagesSent * ROI_CONFIG.costPerMessage;
+    const totalBookings = payload.totals.canonicalBookedCalls;
+    const expectedConversions = totalBookings * ROI_CONFIG.conversionRate;
+    const projectedRevenue = expectedConversions * ROI_CONFIG.revenuePerBooking;
+    const roi = totalCost > 0 ? ((projectedRevenue - totalCost) / totalCost) * 100 : 0;
+    const costPerBooking = totalBookings > 0 ? totalCost / totalBookings : 0;
+
+    return {
+      totalCost,
+      projectedRevenue,
+      roi,
+      costPerBooking,
+      expectedConversions,
+    };
+  }, [payload]);
+
+  // Calculate setter efficiency scores
+  const setterScores = useMemo(() => {
+    if (!payload) return null;
+
+    const jackRep = payload.reps.find((r) => r.repName.toLowerCase().includes('jack'));
+    const brandonRep = payload.reps.find((r) => r.repName.toLowerCase().includes('brandon'));
+
+    const jackScore = jackRep
+      ? calculateEfficiencyScore(payload.bookedCredit.jack, jackRep.optOuts, jackRep.outboundConversations)
+      : 0;
+    const brandonScore = brandonRep
+      ? calculateEfficiencyScore(payload.bookedCredit.brandon, brandonRep.optOuts, brandonRep.outboundConversations)
+      : 0;
+
+    return {
+      jack: {
+        score: jackScore,
+        bookings: payload.bookedCredit.jack,
+        conversations: jackRep?.outboundConversations ?? 0,
+        optOuts: jackRep?.optOuts ?? 0,
+        replyRate: jackRep?.replyRatePct ?? 0,
+        bookingRate: jackRep && jackRep.outboundConversations > 0
+          ? (payload.bookedCredit.jack / jackRep.outboundConversations) * 100
+          : 0,
+      },
+      brandon: {
+        score: brandonScore,
+        bookings: payload.bookedCredit.brandon,
+        conversations: brandonRep?.outboundConversations ?? 0,
+        optOuts: brandonRep?.optOuts ?? 0,
+        replyRate: brandonRep?.replyRatePct ?? 0,
+        bookingRate: brandonRep && brandonRep.outboundConversations > 0
+          ? (payload.bookedCredit.brandon / brandonRep.outboundConversations) * 100
+          : 0,
+      },
+    };
+  }, [payload]);
+
+  // Calculate sequence ROI for top sequences
+  const sequenceROI = useMemo(() => {
+    if (!payload) return [];
+
+    return payload.sequences
+      .filter((s) => s.label !== 'No sequence (manual/direct)')
+      .map((s) => {
+        const cost = s.messagesSent * ROI_CONFIG.costPerMessage;
+        const expectedConversions = s.canonicalBookedCalls * ROI_CONFIG.conversionRate;
+        const projectedRevenue = expectedConversions * ROI_CONFIG.revenuePerBooking;
+        const roi = cost > 0 ? ((projectedRevenue - cost) / cost) * 100 : 0;
+        const costPerBooking = s.canonicalBookedCalls > 0 ? cost / s.canonicalBookedCalls : 0;
+
+        return {
+          label: s.label,
+          sent: s.messagesSent,
+          booked: s.canonicalBookedCalls,
+          cost,
+          projectedRevenue,
+          roi,
+          costPerBooking,
+          replyRate: s.replyRatePct,
+          optOutRate: s.optOutRatePct,
+        };
+      })
+      .sort((a, b) => b.roi - a.roi)
+      .slice(0, 8);
   }, [payload]);
 
   if (isLoading) {
@@ -136,6 +291,14 @@ export function InsightsV2() {
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">
+              <span>Volume</span>
+              <select value={volumeMode} onChange={(e) => setVolumeMode(e.target.value as VolumeMode)}>
+                <option value="all">All Messages</option>
+                <option value="sequence">Sequence Only</option>
+                <option value="manual">Manual Only</option>
+              </select>
+            </label>
+            <label className="V2Control">
               <span>Range</span>
               <select value={range} onChange={(e) => setRange(e.target.value as InsightsRange)}>
                 <option value="today">Today</option>
@@ -168,28 +331,28 @@ export function InsightsV2() {
         )}
       </AnimatePresence>
 
-      {/* Metrics with Sparklines */}
+      {/* Primary Metrics with Sparklines */}
       <V2AnimatedList className="V2MetricsGrid">
         <V2MetricCard
           label="Total Sets"
           value={fmtInt(payload.totals.canonicalBookedCalls)}
-          meta={`${fmtInt(payload.totals.repliesReceived)} replies`}
+          meta={`${fmtInt(volumeMetrics?.repliesReceived ?? 0)} replies`}
           tone="positive"
           sparkline={sparklines?.bookedCalls}
           trend={sparklines ? calculateTrend(sparklines.bookedCalls) : undefined}
         />
         <V2MetricCard
-          label="Messages Sent"
-          value={fmtInt(payload.totals.messagesSent)}
-          meta={`${fmtInt(payload.totals.peopleContacted)} people contacted`}
+          label={`${volumeMetrics?.label ?? 'All'} Messages`}
+          value={fmtInt(volumeMetrics?.messagesSent ?? 0)}
+          meta={`${fmtInt(volumeMetrics?.peopleContacted ?? 0)} people contacted`}
           sparkline={sparklines?.messagesSent}
           trend={sparklines ? calculateTrend(sparklines.messagesSent) : undefined}
         />
         <V2MetricCard
           label="Reply Rate"
-          value={fmtPctMaybe(payload.totals.replyRatePct)}
-          meta={`${fmtInt(payload.totals.repliesReceived)} replies / ${fmtInt(payload.totals.messagesSent)} sent`}
-          tone={typeof payload.totals.replyRatePct === 'number' && payload.totals.replyRatePct >= 15 ? 'positive' : 'default'}
+          value={fmtPctMaybe(volumeMetrics?.replyRatePct)}
+          meta={`${fmtInt(volumeMetrics?.repliesReceived ?? 0)} / ${fmtInt(volumeMetrics?.messagesSent ?? 0)}`}
+          tone={typeof volumeMetrics?.replyRatePct === 'number' && volumeMetrics.replyRatePct >= 15 ? 'positive' : 'default'}
           sparkline={sparklines?.replyRate}
           trend={sparklines ? calculateTrend(sparklines.replyRate) : undefined}
         />
@@ -202,22 +365,167 @@ export function InsightsV2() {
           trend={sparklines ? calculateTrend(sparklines.optOuts) : undefined}
         />
         <V2MetricCard
+          label="Booking Rate"
+          value={
+            (volumeMetrics?.peopleContacted ?? 0) > 0
+              ? `${((payload.totals.canonicalBookedCalls / (volumeMetrics?.peopleContacted ?? 1)) * 100).toFixed(1)}%`
+              : 'n/a'
+          }
+          meta={`${fmtInt(payload.totals.canonicalBookedCalls)} / ${fmtInt(volumeMetrics?.peopleContacted ?? 0)}`}
+          tone={(volumeMetrics?.peopleContacted ?? 0) > 0 && (payload.totals.canonicalBookedCalls / (volumeMetrics?.peopleContacted ?? 1)) * 100 >= 5 ? 'positive' : 'default'}
+        />
+        <V2MetricCard
           label="Self-Booked"
           value={fmtInt(payload.bookedCredit.selfBooked)}
           meta="From website & ads"
           tone="accent"
         />
-        <V2MetricCard
-          label="Booking Rate"
-          value={
-            payload.totals.peopleContacted > 0
-              ? `${((payload.totals.canonicalBookedCalls / payload.totals.peopleContacted) * 100).toFixed(1)}%`
-              : 'n/a'
-          }
-          meta={`${fmtInt(payload.totals.canonicalBookedCalls)} booked / ${fmtInt(payload.totals.peopleContacted)} contacted`}
-          tone={payload.totals.peopleContacted > 0 && (payload.totals.canonicalBookedCalls / payload.totals.peopleContacted) * 100 >= 5 ? 'positive' : 'default'}
-        />
       </V2AnimatedList>
+
+      {/* Volume Split Comparison */}
+      {volumeMode === 'all' && (
+        <V2Panel title="Volume Split" caption="Sequence vs Manual breakdown">
+          <div className="V2VolumeSplit">
+            <div className="V2VolumeSplit__bar">
+              <div
+                className="V2VolumeSplit__segment V2VolumeSplit__segment--sequence"
+                style={{ width: `${payload.totals.messagesSent > 0 ? (payload.totals.sequenceMessagesSent / payload.totals.messagesSent) * 100 : 0}%` }}
+              />
+              <div
+                className="V2VolumeSplit__segment V2VolumeSplit__segment--manual"
+                style={{ width: `${payload.totals.messagesSent > 0 ? (payload.totals.manualMessagesSent / payload.totals.messagesSent) * 100 : 0}%` }}
+              />
+            </div>
+            <div className="V2VolumeSplit__legend">
+              <div className="V2VolumeSplit__item">
+                <span className="V2VolumeSplit__dot V2VolumeSplit__dot--sequence" />
+                <span className="V2VolumeSplit__label">Sequence</span>
+                <span className="V2VolumeSplit__value">{fmtInt(payload.totals.sequenceMessagesSent)} ({fmtPct(payload.totals.messagesSent > 0 ? (payload.totals.sequenceMessagesSent / payload.totals.messagesSent) * 100 : 0)})</span>
+                <span className="V2VolumeSplit__meta">{fmtPct(payload.totals.sequenceReplyRatePct)} reply rate</span>
+              </div>
+              <div className="V2VolumeSplit__item">
+                <span className="V2VolumeSplit__dot V2VolumeSplit__dot--manual" />
+                <span className="V2VolumeSplit__label">Manual</span>
+                <span className="V2VolumeSplit__value">{fmtInt(payload.totals.manualMessagesSent)} ({fmtPct(payload.totals.messagesSent > 0 ? (payload.totals.manualMessagesSent / payload.totals.messagesSent) * 100 : 0)})</span>
+                <span className="V2VolumeSplit__meta">{fmtPct(payload.totals.manualReplyRatePct)} reply rate</span>
+              </div>
+            </div>
+          </div>
+        </V2Panel>
+      )}
+
+      {/* ROI Dashboard */}
+      <div className="V2Grid V2Grid--2">
+        <V2Panel title="ROI Calculator" caption="Estimated return on SMS investment">
+          <div className="V2ROI">
+            <div className="V2ROI__main">
+              <div className="V2ROI__metric">
+                <span className="V2ROI__label">Total SMS Cost</span>
+                <span className="V2ROI__value">{fmtCurrency(roiMetrics?.totalCost ?? 0)}</span>
+              </div>
+              <div className="V2ROI__arrow">→</div>
+              <div className="V2ROI__metric">
+                <span className="V2ROI__label">Projected Revenue</span>
+                <span className="V2ROI__value V2ROI__value--positive">{fmtCurrency(roiMetrics?.projectedRevenue ?? 0)}</span>
+              </div>
+              <div className="V2ROI__arrow">→</div>
+              <div className="V2ROI__metric V2ROI__metric--highlight">
+                <span className="V2ROI__label">ROI</span>
+                <span className="V2ROI__value V2ROI__value--large">{fmtPct(roiMetrics?.roi ?? 0)}</span>
+              </div>
+            </div>
+            <div className="V2ROI__details">
+              <div className="V2ROI__detail">
+                <span>Cost per Booking</span>
+                <strong>{fmtCurrency(roiMetrics?.costPerBooking ?? 0)}</strong>
+              </div>
+              <div className="V2ROI__detail">
+                <span>Expected Conversions</span>
+                <strong>{(roiMetrics?.expectedConversions ?? 0).toFixed(1)}</strong>
+              </div>
+              <div className="V2ROI__detail">
+                <span>Conversion Rate</span>
+                <strong>{fmtPct(ROI_CONFIG.conversionRate * 100)}</strong>
+              </div>
+              <div className="V2ROI__detail">
+                <span>Revenue per Close</span>
+                <strong>{fmtCurrency(ROI_CONFIG.revenuePerBooking)}</strong>
+              </div>
+            </div>
+          </div>
+        </V2Panel>
+
+        <V2Panel title="Setter Efficiency" caption="Performance score based on bookings, opt-outs, and volume">
+          <div className="V2SetterEfficiency">
+            <div className="V2SetterEfficiency__card">
+              <div className="V2SetterEfficiency__header">
+                <span className="V2SetterEfficiency__name">Jack</span>
+                <span className="V2SetterEfficiency__score" data-score={setterScores?.jack.score ?? 0}>
+                  {(setterScores?.jack.score ?? 0).toFixed(0)}
+                </span>
+              </div>
+              <V2ProgressBar value={setterScores?.jack.score ?? 0} max={100} />
+              <div className="V2SetterEfficiency__stats">
+                <div><span>Bookings</span><strong>{setterScores?.jack.bookings ?? 0}</strong></div>
+                <div><span>Booking Rate</span><strong>{fmtPct(setterScores?.jack.bookingRate ?? 0)}</strong></div>
+                <div><span>Reply Rate</span><strong>{fmtPct(setterScores?.jack.replyRate ?? 0)}</strong></div>
+                <div><span>Opt-Outs</span><strong>{setterScores?.jack.optOuts ?? 0}</strong></div>
+              </div>
+            </div>
+            <div className="V2SetterEfficiency__card">
+              <div className="V2SetterEfficiency__header">
+                <span className="V2SetterEfficiency__name">Brandon</span>
+                <span className="V2SetterEfficiency__score" data-score={setterScores?.brandon.score ?? 0}>
+                  {(setterScores?.brandon.score ?? 0).toFixed(0)}
+                </span>
+              </div>
+              <V2ProgressBar value={setterScores?.brandon.score ?? 0} max={100} />
+              <div className="V2SetterEfficiency__stats">
+                <div><span>Bookings</span><strong>{setterScores?.brandon.bookings ?? 0}</strong></div>
+                <div><span>Booking Rate</span><strong>{fmtPct(setterScores?.brandon.bookingRate ?? 0)}</strong></div>
+                <div><span>Reply Rate</span><strong>{fmtPct(setterScores?.brandon.replyRate ?? 0)}</strong></div>
+                <div><span>Opt-Outs</span><strong>{setterScores?.brandon.optOuts ?? 0}</strong></div>
+              </div>
+            </div>
+          </div>
+        </V2Panel>
+      </div>
+
+      {/* Sequence ROI Table */}
+      <V2Panel title="Sequence ROI" caption="Return on investment by sequence">
+        <div className="V2TableWrap">
+          <table className="V2Table V2Table--striped">
+            <thead>
+              <tr>
+                <th>Sequence</th>
+                <th className="is-right">Sent</th>
+                <th className="is-right">Booked</th>
+                <th className="is-right">Cost</th>
+                <th className="is-right">Proj. Revenue</th>
+                <th className="is-right">ROI</th>
+                <th className="is-right">Cost/Booking</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sequenceROI.map((row) => (
+                <tr key={row.label}>
+                  <td>{row.label}</td>
+                  <td className="is-right">{fmtInt(row.sent)}</td>
+                  <td className="is-right">{fmtInt(row.booked)}</td>
+                  <td className="is-right">{fmtCurrency(row.cost)}</td>
+                  <td className="is-right">{fmtCurrency(row.projectedRevenue)}</td>
+                  <td className="is-right">
+                    <span className={`V2RoiTag ${row.roi > 500 ? 'V2RoiTag--excellent' : row.roi > 100 ? 'V2RoiTag--good' : 'V2RoiTag--poor'}`}>
+                      {fmtPct(row.roi)}
+                    </span>
+                  </td>
+                  <td className="is-right">{row.booked > 0 ? fmtCurrency(row.costPerBooking) : 'n/a'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </V2Panel>
 
       <div className="V2Grid V2Grid--2-1">
         <V2Panel
@@ -289,8 +597,8 @@ export function InsightsV2() {
                 />
               </V2Panel>
               <V2Panel title="Actions Next Week" caption="Recommended follow-ups">
-                <V2ActionList 
-                  actions={weekly?.actionsNextWeek?.length ? weekly.actionsNextWeek : ['No actions suggested. Review performance metrics.']} 
+                <V2ActionList
+                  actions={weekly?.actionsNextWeek?.length ? weekly.actionsNextWeek : ['No actions suggested. Review performance metrics.']}
                 />
               </V2Panel>
             </div>
@@ -378,7 +686,7 @@ export function InsightsV2() {
                 <V2MiniTrend
                   key={day.day}
                   day={dayLabel}
-                  sent={day.messagesSent}
+                  sent={volumeMode === 'sequence' ? day.sequenceMessagesSent : volumeMode === 'manual' ? day.manualMessagesSent : day.messagesSent}
                   replyRate={day.replyRatePct}
                   booked={day.canonicalBookedCalls}
                   optOuts={day.optOuts}

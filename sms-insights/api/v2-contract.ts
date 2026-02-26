@@ -564,18 +564,25 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
     optOuts: row.optOuts,
     optOutRatePct: row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
   })),
-  reps: source.repLeaderboard.map((row) => ({
-    repName: row.repName,
-    outboundConversations: row.outboundConversations,
-    replyRatePct: row.replyRatePct,
-    // TODO(Bug 3): canonicalBookedCalls is always 0 here because repLeaderboard rows only carry
-    // SMS heuristic signals (bookingSignalsSms). Slack booked-calls are attributed to jack/brandon/
-    // selfBooked buckets in bookedCalls.totals but are not yet joined to the rep leaderboard.
-    // Fix: cross-reference bookedCalls.totals.jack/brandon with repName to populate this field.
-    canonicalBookedCalls: 0,
-    diagnosticSmsBookingSignals: row.bookingSignalsSms,
-    optOuts: row.optOuts,
-  })),
+  reps: source.repLeaderboard.map((row) => {
+    // Fix for Bug 3: Cross-reference bookedCalls.totals.jack/brandon with repName
+    // to populate canonicalBookedCalls correctly.
+    const repNameLower = row.repName.toLowerCase();
+    let canonicalBookedCalls = 0;
+    if (repNameLower.includes('jack')) {
+      canonicalBookedCalls = source.bookedCalls?.jack ?? 0;
+    } else if (repNameLower.includes('brandon')) {
+      canonicalBookedCalls = source.bookedCalls?.brandon ?? 0;
+    }
+    return {
+      repName: row.repName,
+      outboundConversations: row.outboundConversations,
+      replyRatePct: row.replyRatePct,
+      canonicalBookedCalls,
+      diagnosticSmsBookingSignals: row.bookingSignalsSms,
+      optOuts: row.optOuts,
+    };
+  }),
   provenance: {
     canonicalBookedSource: 'slack',
     diagnosticBookingSignalsSource: 'sms_heuristics',

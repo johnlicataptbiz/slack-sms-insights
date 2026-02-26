@@ -746,3 +746,164 @@ export const useV2IncrementGuardrailOverride = () => {
     },
   });
 };
+
+// ─── Advanced Analytics Queries ────────────────────────────────────────────────
+
+export type LinePerformanceRow = {
+  line: string;
+  messagesSent: number;
+  repliesReceived: number;
+  replyRatePct: number;
+  optOuts: number;
+  optOutRatePct: number;
+  bookingSignals: number;
+  uniqueContacts: number;
+};
+
+export type LinePerformanceAnalytics = {
+  timeRange: { from: string; to: string };
+  lines: LinePerformanceRow[];
+  totals: {
+    totalLines: number;
+    totalMessages: number;
+    totalReplies: number;
+    overallReplyRate: number;
+    totalOptOuts: number;
+  };
+};
+
+export const useV2LinePerformance = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'line-performance', params],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<LinePerformanceAnalytics>>(
+        `/api/v2/analytics/line-performance?${searchParams.toString()}`
+      );
+      return response as ApiEnvelope<LinePerformanceAnalytics>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export type QualificationFunnelAnalytics = {
+  totalConversations: number;
+  qualifiedConversations: number;
+  funnel: {
+    employmentStatus: { fullTime: number; partTime: number; unknown: number };
+    revenueMix: { mostlyCash: number; mostlyInsurance: number; balanced: number; unknown: number };
+    coachingInterest: { high: number; medium: number; low: number; unknown: number };
+  };
+  escalationDistribution: { level1: number; level2: number; level3: number; level4: number };
+  cadenceDistribution: { idle: number; podcastSent: number; callOffered: number; nurturePool: number };
+  conversionByQualification: {
+    highInterestConversionRate: number;
+    mediumInterestConversionRate: number;
+    lowInterestConversionRate: number;
+  };
+};
+
+export const useV2QualificationFunnel = () => {
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'qualification-funnel'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<QualificationFunnelAnalytics>>(
+        '/api/v2/analytics/qualification-funnel'
+      );
+      return response as ApiEnvelope<QualificationFunnelAnalytics>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export type DraftAIPerformanceAnalytics = {
+  totalDrafts: number;
+  acceptedDrafts: number;
+  editedDrafts: number;
+  rejectedDrafts: number;
+  acceptanceRate: number;
+  editRate: number;
+  avgLintScore: number;
+  avgStructuralScore: number;
+  scoreByOutcome: {
+    accepted: { avgLint: number; avgStructural: number };
+    edited: { avgLint: number; avgStructural: number };
+    rejected: { avgLint: number; avgStructural: number };
+  };
+  trendByDay: Array<{
+    day: string;
+    total: number;
+    accepted: number;
+    edited: number;
+    avgLintScore: number;
+  }>;
+};
+
+export const useV2DraftAIPerformance = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'draft-ai-performance', params],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<DraftAIPerformanceAnalytics>>(
+        `/api/v2/analytics/draft-ai-performance?${searchParams.toString()}`
+      );
+      return response as ApiEnvelope<DraftAIPerformanceAnalytics>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export type FollowUpSLAAnalytics = {
+  totalWorkItems: number;
+  resolvedOnTime: number;
+  resolvedLate: number;
+  pending: number;
+  slaComplianceRate: number;
+  avgResolutionTimeMinutes: number;
+  byRep: Array<{
+    repId: string;
+    total: number;
+    onTime: number;
+    late: number;
+    pending: number;
+    complianceRate: number;
+  }>;
+  byType: Array<{
+    type: string;
+    total: number;
+    onTime: number;
+    late: number;
+    avgResolutionMinutes: number;
+  }>;
+};
+
+export const useV2FollowUpSLA = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+
+  return useQuery({
+    queryKey: ['v2', 'analytics', 'followup-sla', params],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<FollowUpSLAAnalytics>>(
+        `/api/v2/analytics/followup-sla?${searchParams.toString()}`
+      );
+      return response as ApiEnvelope<FollowUpSLAAnalytics>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};

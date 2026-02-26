@@ -69,6 +69,7 @@
   justify-content: space-between;
   gap: var(--v2-space-4);
   border-bottom: 1px solid rgba(16, 27, 50, 0.08);
+  -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   background: linear-gradient(90deg, rgba(245, 251, 255, 0.9), rgba(255, 255, 255, 0.82));
 }
@@ -2676,6 +2677,7 @@
     radial-gradient(1100px 700px at 5% 5%, rgba(17, 184, 214, 0.25), transparent 56%),
     radial-gradient(900px 640px at 95% 90%, rgba(19, 185, 129, 0.2), transparent 58%),
     color-mix(in srgb, #091022 66%, transparent 34%);
+  -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
 }
 
@@ -3827,6 +3829,7 @@
   cursor: pointer;
   font: 600 0.78rem/1 var(--v2-font-ui);
   color: var(--v2-muted);
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -5011,6 +5014,7 @@ display: inline-block;
 
 .V2Table th.is-sortable {
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
   white-space: nowrap;
 }

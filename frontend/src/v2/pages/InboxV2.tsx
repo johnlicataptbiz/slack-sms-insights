@@ -1325,6 +1325,7 @@ export default function InboxV2() {
                       <input
                         type="datetime-local"
                         className="V2Inbox__snoozeInput"
+                        aria-label="Snooze until date and time"
                         value={snoozeDate}
                         onChange={(e) => setSnoozeDate(e.target.value)}
                       />

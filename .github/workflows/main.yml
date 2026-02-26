@@ -19,12 +19,23 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: railway/action@v1
+      - uses: actions/setup-node@v3
         with:
-          service: sms-insights
-      - uses: vercel/action@v1
-        with:
-          env: production
+          node-version: 20
+
+      - name: Deploy backend to Railway
+        run: npx --yes @railway/cli@latest deploy --service sms-insights
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy frontend to Vercel
+        run: npx --yes vercel deploy --prod --token ${{ secrets.VERCEL_TOKEN }} --yes
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

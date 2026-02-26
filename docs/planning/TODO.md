@@ -64,5 +64,5 @@
 
 ## Phase 6 — Commit
 
-- [ ] Create branch `blackboxai/motion-notifications-ui`
-- [ ] Stage and commit all changes
+- [x] Create branch `blackboxai/motion-notifications-ui`
+- [x] Stage and commit all changes

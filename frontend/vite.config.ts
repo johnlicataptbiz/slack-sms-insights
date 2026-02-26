@@ -37,5 +37,27 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     target: 'esnext',
+    // Code splitting for better caching and reduced initial load
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks - rarely change, cached well
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-ui': ['sonner', 'clsx', 'tailwind-merge'],
+          // App chunks
+          'v2-pages': [
+            './src/v2/pages/InsightsV2.tsx',
+            './src/v2/pages/SequencesV2.tsx',
+            './src/v2/pages/RepV2.tsx',
+            './src/v2/pages/RunsV2.tsx',
+          ],
+          'v2-inbox': ['./src/v2/pages/InboxV2.tsx'],
+        },
+      },
+    },
+    // Increase chunk warning to 600KB since we're now splitting
+    chunkSizeWarningLimit: 600,
   },
 });

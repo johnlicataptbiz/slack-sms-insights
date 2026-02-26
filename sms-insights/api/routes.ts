@@ -75,6 +75,11 @@ import {
   getQualificationFunnelAnalytics,
 } from '../services/advanced-analytics.js';
 import {
+  applySecurityHeaders,
+  checkRateLimit,
+  applyRateLimitHeaders,
+} from '../services/security-headers.js';
+import {
   autoAssignWorkItems,
   bulkInferQualification,
   deduplicateLines,
@@ -3481,6 +3486,18 @@ export const handleApiRoute = async (
   const method = req.method?.toUpperCase() || 'GET';
   const requestOrigin = req.headers.origin;
   const origin = resolveCorsOrigin(requestOrigin);
+
+  // Apply security headers to all responses
+  applySecurityHeaders(res);
+
+  // Apply rate limiting
+  const rateLimitResult = checkRateLimit(req as { headers: Record<string, string | string[] | undefined> });
+  applyRateLimitHeaders(res, 100, rateLimitResult.remaining, rateLimitResult.resetIn);
+
+  if (!rateLimitResult.allowed) {
+    sendJson(res, 429, { error: 'Too many requests. Please try again later.' }, origin);
+    return true;
+  }
 
   if (requestOrigin && !origin) {
     sendJson(res, 403, { error: 'Origin is not allowed' });

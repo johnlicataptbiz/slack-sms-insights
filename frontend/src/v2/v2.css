@@ -554,8 +554,11 @@
   grid-template-columns: 1.6fr 1fr;
 }
 
-.V2RunsLayout.is-detail-focused {
-  grid-template-columns: minmax(0, 1fr);
+/* On mobile the grid collapses to 1 column; hide the list when a run is selected */
+@media (max-width: 1080px) {
+  .V2RunsLayout.is-detail-focused .V2RunsLayout__timeline {
+    display: none;
+  }
 }
 
 .V2Panel {

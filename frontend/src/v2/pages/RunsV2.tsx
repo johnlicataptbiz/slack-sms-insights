@@ -204,14 +204,25 @@ const getTodayCT = (): { date: string; hour: number } => {
 
 const extractDateStampParts = (run: RunV2): { month: string; day: string } => {
   const reportDay = extractReportDayLabel(run);
-  const isoDay = toIsoDay(reportDay);
-  if (isoDay) {
-    const date = new Date(`${isoDay}T12:00:00.000Z`);
-    return {
-      month: date.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }),
-      day: String(date.getUTCDate()),
-    };
+  if (reportDay) {
+    // Mirror formatReportDay: ISO dates → UTC noon anchor; other strings → parse as-is
+    const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(reportDay.trim())
+      ? `${reportDay.trim()}T12:00:00.000Z`
+      : reportDay;
+    const date = new Date(normalizedValue);
+    if (!Number.isNaN(date.getTime())) {
+      return {
+        month: date.toLocaleDateString('en-US', { month: 'short' }),
+        day: String(date.getDate()),
+      };
+    }
+    // Last resort: regex-extract from strings like "Feb 25, 2026" or "February 25, 2026"
+    const match = reportDay.match(/([A-Za-z]+)\s+(\d{1,2})/);
+    if (match) {
+      return { month: match[1].slice(0, 3), day: match[2] };
+    }
   }
+  // Fall back to the generation timestamp
   const date = new Date(run.timestamp);
   return {
     month: date.toLocaleDateString('en-US', { month: 'short' }),
@@ -645,10 +656,9 @@ export default function RunsV2() {
       </section>
 
       <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
-        {!isRunDetailFocused ? (
-          <V2Panel title="Report History" caption={`Showing ${runsData.data.items.length} reports`} className="V2RunsLayout__timeline">
-            <div className="V2RunList">
-              {runsData.data.items.map((run, index) => {
+        <V2Panel title="Report History" caption={`Showing ${runsData.data.items.length} reports`} className="V2RunsLayout__timeline">
+          <div className="V2RunList">
+            {runsData.data.items.map((run, index) => {
                 const runView = viewByRunId.get(run.id) || buildRunViewModel(run);
                 return (
                   <button
@@ -688,10 +698,9 @@ export default function RunsV2() {
                     </div>
                   </button>
                 );
-              })}
-            </div>
-          </V2Panel>
-        ) : null}
+            })}
+          </div>
+        </V2Panel>
 
         <V2Panel title="Report Details" caption="The summary and raw output." className="V2RunsLayout__detail">
           {selected && selectedView ? (

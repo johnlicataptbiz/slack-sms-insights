@@ -31,3 +31,27 @@
         `reportDate` (YYYY-MM-DD) when stored, falling back to generation `timestamp`. A manual
         report generated today for Feb 24 data now appears after Feb 25 in the list, not before it.
         Commit: e70f5c3
+
+## Phase 5 — Sequence Qualification Analytics 🚧 In Progress
+
+### Backend
+- [x] 1. Create `sms-insights/services/sequence-qualification-analytics.ts` — aggregation service
+      with `buildSequenceQualificationBreakdown()` function that queries conversations with
+      qualification data, aggregates by sequence, and extracts sample quotes from inbound messages
+- [x] 2. Update `sms-insights/api/routes.ts` — add `handleGetSequenceQualificationV2` handler and
+      GET `/api/v2/sequences/qualification` route with 7d/30d range support
+
+### Frontend
+- [x] 3. Update `frontend/src/api/v2Queries.ts` — add `useV2SequenceQualification` React hook with
+      types: `SequenceQualificationItem`, `SequenceQualificationBreakdown`
+- [x] 4. Create `frontend/src/v2/components/SequenceQualificationBreakdown.tsx` — collapsible
+      sequence cards showing employment status, revenue mix, coaching interest, top niches,
+      and sample quotes from leads
+- [x] 5. Create `frontend/src/v2/components/SequenceQualificationBreakdown.css` — styling for
+      the qualification breakdown component with metric cards, badges, and quote cards
+
+### Next Steps
+- [ ] 6. Update `frontend/src/v2/pages/SequencesV2.tsx` — integrate the qualification breakdown
+      component into the SequencesV2 dashboard, replacing or supplementing health alerts
+- [ ] 7. Add reply timing metrics panel (median time to first reply, reply rate by day of week)
+- [ ] 8. Test the full integration end-to-end

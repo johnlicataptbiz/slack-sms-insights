@@ -1085,3 +1085,62 @@ export const useV2DeduplicateLines = () => {
     },
   });
 };
+
+// ─── Sequence Qualification Analytics ─────────────────────────────────────────
+
+export type SequenceQualificationItem = {
+  sequenceLabel: string;
+  totalConversations: number;
+  withQualificationData: number;
+  employment: {
+    fullTime: number;
+    partTime: number;
+    unknown: number;
+  };
+  revenueMix: {
+    mostlyCash: number;
+    mostlyInsurance: number;
+    balanced: number;
+    unknown: number;
+  };
+  coachingInterest: {
+    high: number;
+    medium: number;
+    low: number;
+    unknown: number;
+  };
+  topNiches: Array<{ niche: string; count: number }>;
+  sampleQuotes: Array<{
+    contactKey: string;
+    quote: string;
+    inferredAt: string;
+  }>;
+};
+
+export type SequenceQualificationBreakdown = {
+  items: SequenceQualificationItem[];
+  window: {
+    from: string;
+    to: string;
+    timeZone: string;
+  };
+};
+
+export const useV2SequenceQualification = (params: { range: '7d' | '30d'; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+
+  return useQuery({
+    queryKey: ['v2', 'sequences', 'qualification', params],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<SequenceQualificationBreakdown>>(
+        `/api/v2/sequences/qualification?${searchParams.toString()}`
+      );
+      return response as ApiEnvelope<SequenceQualificationBreakdown>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};

@@ -92,6 +92,7 @@ import {
   getAuditLogs,
 } from '../services/comprehensive-fixes.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
+import { buildSequenceQualificationBreakdown } from '../services/sequence-qualification-analytics.js';
 import {
   assignWorkItem,
   decodeWorkItemCursor,
@@ -989,6 +990,41 @@ const handleGetScoreboardV2: RequestHandler = async (req, res, logger, origin) =
   const tz = (url.searchParams.get('tz') || '').trim();
   const data = await getScoreboardData({ weekStart: weekStart || undefined, timeZone: tz || undefined }, logger);
   sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone }), origin);
+};
+
+const handleGetSequenceQualificationV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const rangeParam = url.searchParams.get('range') || '7d';
+  const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
+
+  const { from, to } = resolveMetricsRange({ range: rangeParam, tz: timeZone });
+  
+  try {
+    const items = await buildSequenceQualificationBreakdown({
+      from: from.toISOString(),
+      to: to.toISOString(),
+      timezone: timeZone,
+      logger,
+    });
+    
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: { items, window: { from: from.toISOString(), to: to.toISOString(), timeZone } },
+        timeZone,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch sequence qualification data:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch sequence qualification data', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
 };
 
 const handleGetWeeklySummaryV2: RequestHandler = async (req, res, logger, origin) => {
@@ -3375,6 +3411,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/channels', handler: handleGetChannelsV2 },
   { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
   { method: 'GET', path: '/api/v2/scoreboard', handler: handleGetScoreboardV2 },
+  { method: 'GET', path: '/api/v2/sequences/qualification', handler: handleGetSequenceQualificationV2 },
   { method: 'GET', path: '/api/v2/inbox/send-config', handler: handleGetInboxSendConfigV2 },
   { method: 'POST', path: '/api/v2/inbox/send-config/default', handler: handlePostInboxSendDefaultV2 },
   { method: 'GET', path: '/api/v2/inbox/conversations', handler: handleGetInboxConversationsV2 },

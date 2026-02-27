@@ -1,7 +1,8 @@
 import { Fragment, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-import { useV2SalesMetrics, useV2Scoreboard } from '../../api/v2Queries';
+import { useV2SalesMetrics, useV2Scoreboard, useV2SequenceQualification } from '../../api/v2Queries';
+import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import type { SalesMetricsV2, ScoreboardLeadMagnetRow } from '../../api/v2-types';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
 import { useToast } from '../hooks/useToast';
@@ -158,9 +159,10 @@ export default function SequencesV2() {
 
   const salesMetricsQuery = useV2SalesMetrics({ range: mode, tz: BUSINESS_TZ });
   const scoreboardQuery = useV2Scoreboard({ tz: BUSINESS_TZ });
+  const sequenceQualQuery = useV2SequenceQualification({ range: mode, tz: BUSINESS_TZ });
 
-  const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading;
-  const isError = salesMetricsQuery.isError || scoreboardQuery.isError;
+  const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading || sequenceQualQuery.isLoading;
+  const isError = salesMetricsQuery.isError || scoreboardQuery.isError || sequenceQualQuery.isError;
 
   const salesMetrics = salesMetricsQuery.data?.data;
   const scoreboard = scoreboardQuery.data?.data;
@@ -414,49 +416,16 @@ export default function SequencesV2() {
         />
       </V2AnimatedList>
 
-      {/* ── Health Watchlist ── */}
-      <AnimatePresence>
-        {healthWatchlist.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-            animate={{ opacity: 1, height: 'auto', marginBottom: '1.5rem' }}
-            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <V2Panel
-              title="⚠ Sequence Health Alerts"
-              caption="Sequences flagged for attention based on opt-out rate, reply rate, or booking performance."
-            >
-              <V2AnimatedList className="V2RiskFlags">
-                {healthWatchlist.map((flag) => (
-                  <motion.div
-                    key={`${flag.sequence}-${flag.label}`}
-                    variants={{
-                      hidden: { opacity: 0, x: -20 },
-                      show: { opacity: 1, x: 0 }
-                    }}
-                    className={`V2RiskFlag V2RiskFlag--${flag.severity}`}
-                  >
-                    <h3 className="V2RiskFlag__title">{flag.label}</h3>
-                    <p className="V2RiskFlag__seq">{flag.sequence}</p>
-                    <p className="V2RiskFlag__detail">{flag.detail}</p>
-                    <div className="V2Watchlist__stats">
-                      {flag.stats.map((stat) => (
-                        <span
-                          key={stat.label}
-                          className={`V2Watchlist__stat${stat.variant ? ` V2Watchlist__stat--${stat.variant}` : ''}`}
-                        >
-                          {stat.label}: {stat.value}
-                        </span>
-                      ))}
-                    </div>
-                  </motion.div>
-                ))}
-              </V2AnimatedList>
-            </V2Panel>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* ── Sequence Qualification Breakdown ── */}
+      <V2Panel
+        title="Lead Qualification by Sequence"
+        caption={`Self-identified lead attributes from qualification inference · ${mode} window`}
+      >
+        <SequenceQualificationBreakdown
+          items={sequenceQualQuery.data?.data?.items ?? []}
+          isLoading={sequenceQualQuery.isLoading}
+        />
+      </V2Panel>
 
       {/* ── Sequence Performance Table ── */}
       <V2Panel

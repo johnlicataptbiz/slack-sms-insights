@@ -1,6 +1,7 @@
 import type { Logger } from '@slack/bolt';
 import type { Pool } from 'pg';
 import { getPool } from './db.js';
+import { maybeRecordConversionExample } from './conversion-example-ingestion.js';
 import { syncQualificationFromConversationText } from './qualification-sync.js';
 import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventDirection, SmsEventRow } from './sms-event-store.js';
@@ -112,6 +113,17 @@ export const upsertConversationFromEvent = async (
     const row = result.rows[0] ?? null;
     if (row) {
       await linkSmsEventToConversation(event.id, row.id, logger);
+
+      // ── Live conversion-example ingestion ──────────────────────────────
+      // When an inbound reply arrives, record the outbound message that
+      // preceded it as a "got_reply" conversion example so the training
+      // corpus grows continuously from real conversations.
+      if (event.direction === 'inbound') {
+        void maybeRecordConversionExample(event, row.id, logger).catch((err) => {
+          logger?.warn?.('[projector] Conversion example recording failed (non-fatal):', err);
+        });
+      }
+
       void syncQualificationFromConversationText(
         {
           conversationId: row.id,

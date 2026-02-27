@@ -100,7 +100,10 @@ const appMentionCallback = async ({
     const isAloware = isAlowareChannel(event.channel);
     const threadTs = event.thread_ts || event.ts;
     const shouldBroadcastThreadReply = isAloware && Boolean(threadTs) && shouldBroadcastReplies();
-    const prompt = removeMentions(event.text);
+    const rawPrompt = removeMentions(event.text);
+    // In the Aloware channel, a bare @mention with no text should default to the
+    // daily report (yesterday's data) — the same thing the 6 AM cron produces.
+    const prompt = isAloware && !rawPrompt ? 'daily report' : rawPrompt;
 
     // ── Guard: block reply-generation requests in Aloware channels ───────────
     if (isAloware && isReplyGenerationRequest(prompt)) {

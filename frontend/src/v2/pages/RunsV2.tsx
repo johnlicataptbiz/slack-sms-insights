@@ -424,6 +424,19 @@ export default function RunsV2() {
     return map;
   }, [runsData?.data.items]);
 
+  // Sort by report date (when stored) falling back to generation timestamp so
+  // the list always reads newest-report-first rather than newest-run-first.
+  // A manual report generated today for Feb 24 data should appear after Feb 25.
+  const sortedItems = useMemo(() => {
+    const items = runsData?.data.items || [];
+    return [...items].sort((a, b) => {
+      // reportDate is "YYYY-MM-DD"; timestamp is ISO — both sort correctly as strings
+      const aKey = a.reportDate || a.timestamp;
+      const bKey = b.reportDate || b.timestamp;
+      return bKey.localeCompare(aKey);
+    });
+  }, [runsData?.data.items]);
+
   // Always derive selected detail view from the selected run payload.
   // The timeline list is fetched without fullReport, so reusing the list view model
   // here can hide parsed sequence/rep sections.
@@ -658,7 +671,7 @@ export default function RunsV2() {
       <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
         <V2Panel title="Report History" caption={`Showing ${runsData.data.items.length} reports`} className="V2RunsLayout__timeline">
           <div className="V2RunList">
-            {runsData.data.items.map((run, index) => {
+            {sortedItems.map((run, index) => {
                 const runView = viewByRunId.get(run.id) || buildRunViewModel(run);
                 return (
                   <button

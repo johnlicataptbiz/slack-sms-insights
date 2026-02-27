@@ -80,6 +80,8 @@ const MOSTLY_CASH_PATTERNS = [
   /\bmostly cash\b/i,
   /\ball cash\b/i,
   /\bcash only\b/i,
+  /\bcash based\b/i,
+  /\bi['']?m cash\b/i,
   /\bprivate pay\b/i,
   /\bself pay\b/i,
   /\bout of pocket\b/i,
@@ -131,6 +133,8 @@ const MEDIUM_INTEREST_PATTERNS = [
 const LOW_INTEREST_PATTERNS = [
   /\bnot interested\b/i,
   /\bno thanks\b/i,
+  /\bnot (?:looking|ready) (?:to invest|for coaching)\b/i,
+  /\bnot right now\b/i,
   /\bunsubscribe\b/i,
   /\bremove me\b/i,
   /\bstop texting\b/i,

@@ -31,9 +31,10 @@ jobs:
           node-version: 20
 
       - name: Deploy backend to Railway
-        run: npx --yes @railway/cli@latest deploy --service sms-insights
+        run: npx --yes @railway/cli@latest up
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: sms-insights
 
       - name: Deploy frontend to Vercel
         run: npx --yes vercel deploy --prod --token ${{ secrets.VERCEL_TOKEN }} --yes

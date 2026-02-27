@@ -5471,6 +5471,95 @@ display: inline-block;
 }
 
 /* ============================================================
+   V2 RISK ALERT — High Opt-Out Warning Banner
+   ============================================================ */
+
+.V2RiskAlert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--v2-radius-md);
+  border: 1px solid rgba(239, 76, 98, 0.35);
+  background: linear-gradient(160deg, rgba(239, 76, 98, 0.12), rgba(255, 255, 255, 0.95));
+  box-shadow: var(--v2-shadow-1);
+  margin-bottom: var(--v2-space-3);
+}
+
+.V2RiskAlert--critical {
+  border-color: rgba(239, 76, 98, 0.45);
+  background: linear-gradient(160deg, rgba(239, 76, 98, 0.15), rgba(255, 255, 255, 0.95));
+}
+
+.V2RiskAlert__icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  display: grid;
+  place-content: center;
+  background: rgba(239, 76, 98, 0.15);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.V2RiskAlert__content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.V2RiskAlert__title {
+  margin: 0;
+  font-family: var(--v2-font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--v2-base-800);
+  line-height: 1.2;
+}
+
+.V2RiskAlert__text {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--v2-muted);
+  line-height: 1.4;
+}
+
+.V2RiskAlert__action {
+  border: 1px solid rgba(239, 76, 98, 0.4);
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--v2-critical);
+  font: 700 0.78rem/1 var(--v2-font-ui);
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.V2RiskAlert__action:hover {
+  transform: translateY(-1px);
+  border-color: rgba(239, 76, 98, 0.6);
+  background: rgba(255, 255, 255, 1);
+}
+
+@media (max-width: 600px) {
+  .V2RiskAlert {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+    padding: 0.75rem;
+  }
+
+  .V2RiskAlert__action {
+    align-self: stretch;
+    text-align: center;
+  }
+}
+
+/* ============================================================
    SEQUENCES V2 — TIMING PANEL
    ============================================================ */
 

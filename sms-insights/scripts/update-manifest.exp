@@ -1,0 +1,85 @@
+#!/usr/bin/expect -f
+
+set timeout 90
+cd [lindex $argv 0]
+
+spawn slack manifest update --app A0AFCE7ENE5
+
+# Step 1: Decline CLI auto-update if prompted
+expect {
+    -re {auto-update.*\(y/N\)} {
+        send "N\r"
+    }
+    -re {update to the latest.*\(y/N\)} {
+        send "N\r"
+    }
+    -re {Do you want to auto-update.*\(y/N\)} {
+        send "N\r"
+    }
+    eof {
+        puts "\n⚠️  Command exited before update prompt"
+        exit 0
+    }
+    timeout {
+        puts "\n⏰ Timed out at step 1"
+        exit 1
+    }
+}
+
+# Step 2: Wait for the manifest diff / confirmation prompt
+expect {
+    -re {Apply changes.*\(y/N\)} {
+        send "y\r"
+    }
+    -re {Would you like to apply.*\(y/N\)} {
+        send "y\r"
+    }
+    -re {Proceed.*\(y/N\)} {
+        send "y\r"
+    }
+    -re {confirm.*\(y/N\)} {
+        send "y\r"
+    }
+    -re {\? .*\(y/N\)} {
+        send "y\r"
+    }
+    "successfully" {
+        puts "\n✅ Manifest updated successfully!"
+        expect eof
+        exit 0
+    }
+    "no changes" {
+        puts "\n✅ No changes needed — manifest already up to date"
+        expect eof
+        exit 0
+    }
+    eof {
+        puts "\n⚠️  Command exited before confirmation prompt"
+        exit 0
+    }
+    timeout {
+        puts "\n⏰ Timed out waiting for confirmation"
+        exit 1
+    }
+}
+
+# Step 3: Wait for success/error after confirming
+expect {
+    "successfully" {
+        puts "\n✅ Manifest updated successfully!"
+    }
+    "Error" {
+        puts "\n❌ Error during manifest update"
+        exit 1
+    }
+    "no changes" {
+        puts "\n✅ No changes needed"
+    }
+    eof {
+        puts "\n✅ Done"
+    }
+    timeout {
+        puts "\n⏰ Timed out after confirmation"
+        exit 1
+    }
+}

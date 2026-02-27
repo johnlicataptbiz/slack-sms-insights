@@ -20,3 +20,14 @@
 - [x] 13. Push `/ask`, `/sms-report`, `/sms-scoreboard` slash commands to live Slack app (A0AFCE7ENE5)
         via `apps.manifest.update` API using Slack CLI rotation token
         Script: `sms-insights/scripts/push-manifest-final.py`
+
+## Phase 4 — Bug Fixes ✅ Complete
+- [x] 14. **Date display bug** (`app-mention.ts`) — bare `@SMS Insights` mention in #alowaresmsupdates
+        now defaults to `'daily report'` prompt instead of empty string. Generates the daily snapshot
+        format (`PT BIZ - DAILY SMS SNAPSHOT` + `Date:` header) so `reportDate` is stored and KPI
+        values render correctly in the dashboard. Bad Feb 27 run (null reportDate, wrong format)
+        deleted from DB (id: cfe3f1fe-17ab-42f3-b66c-4fe3c597014a).
+- [x] 15. **List ordering bug** (`RunsV2.tsx`) — added `sortedItems` useMemo that sorts by
+        `reportDate` (YYYY-MM-DD) when stored, falling back to generation `timestamp`. A manual
+        report generated today for Feb 24 data now appears after Feb 25 in the list, not before it.
+        Commit: e70f5c3

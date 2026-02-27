@@ -1,7 +1,9 @@
 import type { App } from '@slack/bolt';
-import { WebClient } from '@slack/web-api';
+import { generateAndPostReport } from './report-poster.js';
+import { logDailyRun } from './daily-run-logger.js';
 
 const DAILY_REPORT_CHANNEL_ID = 'C09ULGH1BEC'; // #alowaresmsupdates
+const DAILY_REPORT_CHANNEL_NAME = 'alowaresmsupdates';
 const CHECK_INTERVAL_MS = 60_000; // check every minute
 const REPORT_HOUR_CT = 6;
 const REPORT_MINUTE_CT = 0;
@@ -14,7 +16,6 @@ let cronIntervalId: ReturnType<typeof setInterval> | null = null;
  */
 const getCTDateParts = (): { date: string; hour: number; minute: number } => {
   const now = new Date();
-  // e.g. "02/25/2026, 06:00"
   const ctString = now.toLocaleString('en-US', {
     timeZone: 'America/Chicago',
     year: 'numeric',
@@ -25,47 +26,26 @@ const getCTDateParts = (): { date: string; hour: number; minute: number } => {
     hour12: false,
   });
   const [datePart, timePart] = ctString.split(', ');
-  const [month, day, year] = datePart.split('/');
-  const [hourStr, minuteStr] = timePart.split(':');
+  const [month, day, year] = (datePart ?? '').split('/');
+  const [hourStr, minuteStr] = (timePart ?? '').split(':');
   return {
     date: `${year}-${month}-${day}`,
-    hour: Number.parseInt(hourStr, 10),
-    minute: Number.parseInt(minuteStr, 10),
+    hour: Number.parseInt(hourStr ?? '0', 10),
+    minute: Number.parseInt(minuteStr ?? '0', 10),
   };
 };
 
 /**
  * Starts a persistent interval-based cron that fires the daily report at
- * 6:00 AM CT every day by posting as the user token (required to tag bots).
+ * 6:00 AM CT every day.
  *
- * Unlike the old one-shot chat.scheduleMessage approach, this cron survives
- * across days without needing a service restart.
+ * Instead of posting a trigger message and waiting for the bot to respond,
+ * this directly generates the report and posts it as a rich Block Kit card
+ * with interactive buttons. The full report text is posted in a thread reply.
  */
 export const startDailyReportCron = async (app: App): Promise<void> => {
-  const userToken = process.env.SLACK_USER_TOKEN?.trim();
-  if (!userToken) {
-    app.logger.warn('[cron] SLACK_USER_TOKEN not set; daily report cron disabled.');
-    return;
-  }
-
-  let botUserId: string | undefined;
-  try {
-    const authResult = await app.client.auth.test();
-    botUserId = authResult.user_id as string | undefined;
-  } catch (error) {
-    app.logger.error('[cron] Failed to resolve bot user ID:', error);
-    return;
-  }
-
-  if (!botUserId) {
-    app.logger.warn('[cron] Could not resolve bot user ID; daily report cron disabled.');
-    return;
-  }
-
-  const userClient = new WebClient(userToken);
-
   app.logger.info(
-    `[cron] Daily report cron started — fires at ${REPORT_HOUR_CT}:${String(REPORT_MINUTE_CT).padStart(2, '0')} AM CT targeting <@${botUserId}>`,
+    `[cron] Daily report cron started — fires at ${REPORT_HOUR_CT}:${String(REPORT_MINUTE_CT).padStart(2, '0')} AM CT`,
   );
 
   cronIntervalId = setInterval(() => {
@@ -74,28 +54,43 @@ export const startDailyReportCron = async (app: App): Promise<void> => {
         const { date, hour, minute } = getCTDateParts();
 
         // Only fire at the exact target minute
-        if (hour !== REPORT_HOUR_CT || minute !== REPORT_MINUTE_CT) {
-          return;
-        }
+        if (hour !== REPORT_HOUR_CT || minute !== REPORT_MINUTE_CT) return;
 
         // Deduplicate: only fire once per calendar day (CT)
-        if (lastRunDate === date) {
-          return;
-        }
+        if (lastRunDate === date) return;
 
         lastRunDate = date;
         app.logger.info(`[cron] Triggering daily report for ${date}`);
 
-        await userClient.chat.postMessage({
-          channel: DAILY_REPORT_CHANNEL_ID,
-          text: `<@${botUserId}> daily report`,
+        await generateAndPostReport({
+          client: app.client,
+          logger: app.logger,
+          channelId: DAILY_REPORT_CHANNEL_ID,
+          channelName: DAILY_REPORT_CHANNEL_NAME,
+          prompt: 'daily report',
+          reportType: 'daily',
         });
 
-        app.logger.info(`[cron] ✅ Daily report message posted for ${date}`);
+        app.logger.info(`[cron] ✅ Daily report posted for ${date}`);
       } catch (error) {
-        app.logger.error('[cron] Failed to post daily report message:', error);
+        app.logger.error('[cron] Failed to post daily report:', error);
         // Reset so it retries on the next tick (next minute)
         lastRunDate = null;
+
+        try {
+          await logDailyRun(
+            {
+              channelId: DAILY_REPORT_CHANNEL_ID,
+              channelName: DAILY_REPORT_CHANNEL_NAME,
+              reportType: 'daily',
+              status: 'error',
+              errorMessage: error instanceof Error ? error.message : String(error),
+            },
+            app.logger,
+          );
+        } catch (logError) {
+          app.logger.warn('[cron] Failed to log error run:', logError);
+        }
       }
     })();
   }, CHECK_INTERVAL_MS);

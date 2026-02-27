@@ -71,11 +71,20 @@ export type RunViewModel = {
 
 export const resolveSelectedRunViewModel = (
   selected: RunV2 | null,
-  _cachedById?: Map<string, RunViewModel>,
+  cachedById?: Map<string, RunViewModel>,
 ): RunViewModel | null => {
-  // Intentionally derive from selected payload to avoid stale list-cache view models
-  // (list fetch omits fullReport).
-  return selected ? buildRunViewModel(selected) : null;
+  // When viewing details, always derive from the full selected payload
+  // to ensure we have access to the complete report data
+  if (!selected) return null;
+  
+  // If we have a cached view model and the selected run doesn't have fullReport,
+  // use the cached view model to maintain consistency between preview and detail
+  if (cachedById && !selected.fullReport && cachedById.has(selected.id)) {
+    return cachedById.get(selected.id) || buildRunViewModel(selected);
+  }
+  
+  // Otherwise build a fresh view model from the selected run
+  return buildRunViewModel(selected);
 };
 
 const parseRange = (value: string | null): AllowedRange => {
@@ -171,19 +180,25 @@ const toIsoDay = (value: string | null): string | null => {
 
 const getTodayCT = (): { date: string; hour: number } => {
   const now = new Date();
-  const ctString = now.toLocaleString('en-US', {
+  // Use formatToParts for reliable cross-browser parsing — toLocaleString string-splitting
+  // is fragile and can return "24" for midnight with hour12:false in some environments.
+  const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Chicago',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     hour12: false,
-  });
-  const [datePart, timePart] = ctString.split(', ');
-  const [month, day, year] = datePart.split('/');
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  const year = get('year');
+  const month = get('month');
+  const day = get('day');
+  let hour = Number.parseInt(get('hour'), 10);
+  if (hour === 24) hour = 0; // Some implementations return 24 for midnight instead of 0
   return {
     date: `${year}-${month}-${day}`,
-    hour: Number.parseInt(timePart, 10),
+    hour,
   };
 };
 
@@ -289,7 +304,7 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
 
   const metricPreview =
     messagesSent !== null || repliesReceived !== null || booked !== null || optOuts !== null
-      ? `Sent ${formatCount(messagesSent)} | Replies ${formatCount(repliesReceived)} | Booked Calls ${formatCount(booked)} | Opt-outs ${formatCount(
+      ? `Sent ${formatCount(messagesSent)} | Replies ${formatCount(repliesReceived)} | Booked (report) ${formatCount(booked)} | Opt-outs ${formatCount(
           optOuts,
         )}`
       : null;
@@ -418,8 +433,11 @@ export default function RunsV2() {
     const items = runsData?.data.items || [];
     const hasTodayDailyRun = items.some((run) => {
       if (run.reportType !== 'daily') return false;
-      const reportDay = toIsoDay(extractReportDayLabel(run));
-      return reportDay === todayCT;
+      // Compare when the run was GENERATED (timestamp), not what day it covers (reportDate).
+      // Daily reports always cover yesterday, so reportDate never equals today — using it
+      // caused the banner to show permanently even when the cron had already run.
+      const generatedDay = toIsoDay(run.timestamp);
+      return generatedDay === todayCT;
     });
     return !hasTodayDailyRun;
   }, [runsData?.data.items]);
@@ -663,7 +681,7 @@ export default function RunsV2() {
                       <div className="V2RunList__kpis">
                         <span>Sent {formatCount(runView.messagesSent)}</span>
                         <span>Replies {formatCount(runView.repliesReceived)}</span>
-                        <span>Booked Calls {formatCount(runView.booked)}</span>
+                        <span>Booked (report) {formatCount(runView.booked)}</span>
                         <span>Opt-outs {formatCount(runView.optOuts)}</span>
                       </div>
                       <p className="V2RunList__summary">{runView.summaryPreview || 'No summary available for this report.'}</p>
@@ -714,13 +732,7 @@ export default function RunsV2() {
                   tone="accent"
                 />
                 <V2MetricCard
-                  label="Booked (from report)"
-                  value={formatCount(selectedView.booked)}
-                  tone={(selectedView.booked ?? 0) > 0 ? 'positive' : 'default'}
-                  meta="From run report text"
-                />
-                <V2MetricCard
-                  label="Booked (Slack-verified)"
+                  label="Booked Calls (Canonical)"
                   value={
                     selectedBookedMetricsQuery.isLoading
                       ? 'Loading…'
@@ -730,6 +742,12 @@ export default function RunsV2() {
                   }
                   meta={selectedReportDay ? `Report date: ${selectedReportDay}` : 'Date not detected'}
                   tone={(selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'}
+                />
+                <V2MetricCard
+                  label="Booked (from report text)"
+                  value={formatCount(selectedView.booked)}
+                  tone={(selectedView.booked ?? 0) > 0 ? 'positive' : 'default'}
+                  meta="Extracted from SMS report - may be inaccurate"
                 />
                 <V2MetricCard
                   label="Setter Split"
@@ -747,7 +765,7 @@ export default function RunsV2() {
               {selectedSlackBookedTotal !== null && selectedSlackBookedTotal > 0 && (
                 <V2Panel
                   title="Setter Split"
-                  caption="How booked calls are credited across setters and self-bookings for this report day."
+                  caption="How booked calls are credited across setters and self-bookings for this report day. Bookings are dated by when they were recorded in Slack — if a booking was entered after midnight it will appear in the next day's count, not this one."
                 >
                   <V2StatBar
                     segments={[
@@ -836,7 +854,12 @@ export default function RunsV2() {
                         <tr>
                           <th>Setter</th>
                           <th className="is-right">Conversations</th>
-                          <th className="is-right">Booked Calls</th>
+                          <th
+                            className="is-right"
+                            title="Bookings as reported by the Aloware SMS system — not Slack-verified. See 'Booked (Slack-verified)' above for the canonical count."
+                          >
+                            Bookings (from report)
+                          </th>
                           <th className="is-right">Opt-Outs</th>
                           <th>Top Sequence</th>
                         </tr>
@@ -846,7 +869,12 @@ export default function RunsV2() {
                           <tr key={`${row.name}-${index}`}>
                             <td>{row.name}</td>
                             <td className="is-right">{row.outboundConversations.toLocaleString()}</td>
-                            <td className="is-right">{row.booked.toLocaleString()}</td>
+                            <td
+                              className="is-right"
+                              title="Aloware-reported bookings — may differ from Slack-verified count above"
+                            >
+                              {row.booked.toLocaleString()}
+                            </td>
                             <td className="is-right">{row.optOuts.toLocaleString()}</td>
                             <td>{row.topSequenceLabel || '—'}</td>
                           </tr>
@@ -857,6 +885,9 @@ export default function RunsV2() {
                 ) : (
                   <p className="V2RunDetail__muted">No setter data found for this report.</p>
                 )}
+                <p className="V2RunDetail__muted" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
+                  ⓘ <strong>Important:</strong> "Bookings (from report)" are pulled from the Aloware SMS report text and may not match the Slack-verified count above. Always use <em>Booked Calls (Canonical)</em> as the official figure for reporting.
+                </p>
               </section>
 
               <details className="V2RunDetail__raw">

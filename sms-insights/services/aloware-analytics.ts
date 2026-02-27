@@ -3308,97 +3308,128 @@ export const buildDailyChecklistReportBundle = ({
 };
 
 export const buildDailySnapshotBlocks = (summary: DailySnapshotSummary): (KnownBlock | Block)[] => {
-  const formatRate = (pct: number, numerator: number, denominator: number): string => {
-    if (denominator <= 0) {
-      return 'n/a';
-    }
-    return `${pct.toFixed(1)}% (${numerator}/${denominator})`;
-  };
+  // ── Performance indicators (🟢 good · 🟡 watch · 🔴 act) ─────────────────
+  const replyRateIndicator = summary.replyRatePct >= 15 ? '🟢' : summary.replyRatePct >= 8 ? '🟡' : '🔴';
+  const optOutRatePct =
+    summary.outboundConversations > 0 ? (summary.optOuts / summary.outboundConversations) * 100 : 0;
+  const optOutIndicator = optOutRatePct <= 3 ? '🟢' : optOutRatePct <= 6 ? '🟡' : '🔴';
+  const bookingIndicator =
+    summary.bookingRatePerConversationPct >= 3 ? '🟢' : summary.bookingRatePerConversationPct >= 1 ? '🟡' : '🔴';
 
-  const bookingPerConversation = formatRate(
+  // ── Mini progress bar (5 blocks, scaled 0–25% for reply rate) ─────────────
+  const replyBarFilled = Math.min(5, Math.round((summary.replyRatePct / 25) * 5));
+  const replyBar = '▓'.repeat(replyBarFilled) + '░'.repeat(5 - replyBarFilled);
+
+  // ── Formatters ────────────────────────────────────────────────────────────
+  const fmt = (pct: number, n: number, d: number): string =>
+    d <= 0 ? 'n/a' : `${pct.toFixed(1)}% (${n}/${d})`;
+
+  const bookingPerConversation = fmt(
     summary.bookingRatePerConversationPct,
     summary.bookings,
     summary.outboundConversations,
   );
-  const bookingPerReply = formatRate(summary.bookingRatePerReplyPct, summary.bookings, summary.replies);
-  const replyRate = formatRate(summary.replyRatePct, summary.replies, summary.outboundConversations);
+  const bookingPerReply = fmt(summary.bookingRatePerReplyPct, summary.bookings, summary.replies);
+  const replyRate = fmt(summary.replyRatePct, summary.replies, summary.outboundConversations);
 
-  const topSequence = summary.topPerformingSequence
-    ? `${summary.topPerformingSequence.label}\nBookings: ${summary.topPerformingSequence.bookings} • Reply Rate: ${summary.topPerformingSequence.replyRatePct.toFixed(1)}%`
-    : 'none';
-  const riskSignal = summary.optOutRiskSequence
-    ? `${summary.optOutRiskSequence.label}\nOpt-outs: ${summary.optOutRiskSequence.optOuts} • Opt-out Rate: ${summary.optOutRiskSequence.optOutRatePct.toFixed(1)}%`
-    : 'none';
+  // ── Top sequence & risk signal ────────────────────────────────────────────
+  const topSequenceText = summary.topPerformingSequence
+    ? `*${summary.topPerformingSequence.label}*\n${summary.topPerformingSequence.bookings} booked · ${summary.topPerformingSequence.replyRatePct.toFixed(1)}% reply · ${summary.topPerformingSequence.conversations} conversations`
+    : '_none this window_';
+
+  const riskSignalText = summary.optOutRiskSequence
+    ? `*${summary.optOutRiskSequence.label}*\n${summary.optOutRiskSequence.optOuts} opt-outs · ${summary.optOutRiskSequence.optOutRatePct.toFixed(1)}% opt-out rate`
+    : '_no elevated risk_ 🟢';
+
+  // ── Signal summary line ───────────────────────────────────────────────────
+  const signals: string[] = [];
+  if (summary.replyRatePct >= 15) signals.push('reply rate is strong');
+  else if (summary.replyRatePct < 8) signals.push('reply rate is soft');
+  if (summary.bookings > 0)
+    signals.push(`${summary.bookings} booking${summary.bookings === 1 ? '' : 's'} confirmed`);
+  if (optOutRatePct > 6) signals.push('opt-out pressure elevated');
+  const signalLine = signals.length > 0 ? signals.join(' · ') : 'metrics within normal range';
 
   return [
+    // ── Header ────────────────────────────────────────────────────────────────
     {
       type: 'header',
-      text: {
-        type: 'plain_text',
-        text: 'Daily SMS Snapshot',
-      },
+      text: { type: 'plain_text', text: '📊  Daily SMS Snapshot', emoji: true },
     },
     {
       type: 'context',
       elements: [
         {
           type: 'mrkdwn',
-          text: `Date: ${summary.dateLabel} • Time Range: ${summary.windowLabel} (${summary.timezone})`,
-        },
-      ],
-    },
-    {
-      type: 'section',
-      fields: [
-        {
-          type: 'mrkdwn',
-          text: `*Outbound Conversations:*\n${summary.outboundConversations}`,
-        },
-        {
-          type: 'mrkdwn',
-          text: `*Reply Rate:*\n${replyRate}`,
-        },
-        {
-          type: 'mrkdwn',
-          text: `*Bookings:*\n${summary.bookings}`,
-        },
-        {
-          type: 'mrkdwn',
-          text: `*Opt-Outs:*\n${summary.optOuts}`,
+          text: `📅 *${summary.dateLabel}*  ·  🕐 ${summary.windowLabel}  ·  🌎 ${summary.timezone}`,
         },
       ],
     },
     { type: 'divider' },
+
+    // ── Core metrics ──────────────────────────────────────────────────────────
     {
       type: 'section',
       fields: [
         {
           type: 'mrkdwn',
-          text: `*Booking Rate / Conversation:*\n${bookingPerConversation}`,
+          text: `*📤 Outbound Conversations*\n${summary.outboundConversations.toLocaleString()}`,
         },
         {
           type: 'mrkdwn',
-          text: `*Booking Rate / Reply:*\n${bookingPerReply}`,
+          text: `*💬 Reply Rate*\n${replyRateIndicator} ${replyRate}\n\`${replyBar}\``,
         },
         {
           type: 'mrkdwn',
-          text: `*Rolling 7-Day Bookings / 100:*\n${summary.rolling7DayBookingPer100.toFixed(1)}`,
+          text: `*📅 Bookings*\n${bookingIndicator} ${summary.bookings}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*🚫 Opt-Outs*\n${optOutIndicator} ${summary.optOuts}`,
         },
       ],
     },
+    { type: 'divider' },
+
+    // ── Revenue signals ───────────────────────────────────────────────────────
     {
       type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*Top Performing Sequence*\n${topSequence}`,
-      },
+      fields: [
+        {
+          type: 'mrkdwn',
+          text: `*📈 Booking / Conversation*\n${bookingPerConversation}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*🎯 Booking / Reply*\n${bookingPerReply}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*📊 7-Day Bookings / 100*\n${summary.rolling7DayBookingPer100.toFixed(1)}`,
+        },
+      ],
     },
+    { type: 'divider' },
+
+    // ── Top sequence & risk ───────────────────────────────────────────────────
     {
       type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `*Risk Signal*\n${riskSignal}`,
-      },
+      fields: [
+        {
+          type: 'mrkdwn',
+          text: `*🏆 Top Performing Sequence*\n${topSequenceText}`,
+        },
+        {
+          type: 'mrkdwn',
+          text: `*⚠️ Opt-Out Risk Signal*\n${riskSignalText}`,
+        },
+      ],
+    },
+
+    // ── Signal summary ────────────────────────────────────────────────────────
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `💡 ${signalLine}` }],
     },
   ];
 };

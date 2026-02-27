@@ -10,13 +10,14 @@ import {
   isDailySnapshotReport,
 } from '../../services/daily-report-summary.js';
 import { logDailyRun } from '../../services/daily-run-logger.js';
+import { buildReportActionBlocks, splitReportText } from '../../services/report-poster.js';
 import { timeOperation } from '../../services/telemetry.js';
-
-const SLACK_TEXT_CHUNK_LIMIT = 3500;
 
 const removeMentions = (text: string): string => {
   return text.replace(/<@[^>]+>/g, '').trim();
 };
+
+// ─── Config ───────────────────────────────────────────────────────────────────
 
 type AppMentionConfig = {
   allowedBotIds: Set<string>;
@@ -72,59 +73,6 @@ const shouldBroadcastReplies = (): boolean => {
   return getAppMentionConfig().shouldBroadcastReplies;
 };
 
-const splitSlackText = (text: string, maxLen = SLACK_TEXT_CHUNK_LIMIT): string[] => {
-  const normalized = text.replaceAll('\r', '').trim();
-  if (normalized.length <= maxLen) {
-    return [normalized];
-  }
-
-  const chunks: string[] = [];
-  let current = '';
-  const paragraphs = normalized.split('\n\n');
-
-  const flushCurrent = () => {
-    if (current.trim().length > 0) {
-      chunks.push(current.trimEnd());
-      current = '';
-    }
-  };
-
-  for (const paragraph of paragraphs) {
-    const candidate = current.length > 0 ? `${current}\n\n${paragraph}` : paragraph;
-    if (candidate.length <= maxLen) {
-      current = candidate;
-      continue;
-    }
-
-    flushCurrent();
-
-    if (paragraph.length <= maxLen) {
-      current = paragraph;
-      continue;
-    }
-
-    let remaining = paragraph;
-    while (remaining.length > maxLen) {
-      const window = remaining.slice(0, maxLen);
-      const lineSplit = window.lastIndexOf('\n');
-      const wordSplit = window.lastIndexOf(' ');
-      const splitAt = Math.max(lineSplit, wordSplit);
-      const cut = splitAt > Math.floor(maxLen * 0.6) ? splitAt : maxLen;
-      chunks.push(remaining.slice(0, cut).trimEnd());
-      remaining = remaining.slice(cut).trimStart();
-    }
-    current = remaining;
-  }
-
-  flushCurrent();
-
-  if (chunks.length <= 1) {
-    return chunks.length === 1 ? chunks : [normalized];
-  }
-
-  return chunks.map((chunk, index) => `*Report chunk ${index + 1}/${chunks.length}*\n${chunk}`);
-};
-
 const resolveAlowareChannelName = (): string => {
   return (
     process.env.DAILY_REPORT_CHANNEL_NAME?.trim() || process.env.ALOWARE_CHANNEL_NAME?.trim() || 'alowaresmsupdates'
@@ -138,10 +86,13 @@ const appMentionCallback = async ({
 }: AllMiddlewareArgs & SlackEventMiddlewareArgs<'app_mention'>) => {
   try {
     logger.info(`[app_mention] received channel=${event.channel} ts=${event.ts}`);
+
+    // ── Guard: ignore bot self-mentions ──────────────────────────────────────
     if ('bot_id' in event && typeof event.bot_id === 'string' && !shouldAllowBotMention(event.bot_id)) {
       return;
     }
 
+    // ── Guard: channel allow-list ────────────────────────────────────────────
     if (!isChannelAllowed(event.channel)) {
       return;
     }
@@ -150,6 +101,8 @@ const appMentionCallback = async ({
     const threadTs = event.thread_ts || event.ts;
     const shouldBroadcastThreadReply = isAloware && Boolean(threadTs) && shouldBroadcastReplies();
     const prompt = removeMentions(event.text);
+
+    // ── Guard: block reply-generation requests in Aloware channels ───────────
     if (isAloware && isReplyGenerationRequest(prompt)) {
       await client.chat.postMessage({
         channel: event.channel,
@@ -160,83 +113,99 @@ const appMentionCallback = async ({
       return;
     }
 
-    let reportText = '';
-    let summaryBlocks: ReturnType<typeof buildDailySnapshotBlocks> | undefined;
-
-    if (isAloware) {
-      const reportBundle = (await timeOperation({
-        logger,
-        name: 'app_mention.generate_aloware_report',
-        context: {
-          channel_id: event.channel,
-        },
-        fn: async () =>
-          buildAlowareAnalyticsReportBundle({
-            channelId: event.channel,
-            client,
-            logger,
-            prompt,
-          }),
-      })) as Awaited<ReturnType<typeof buildAlowareAnalyticsReportBundle>>;
-
-      reportText = reportBundle.reportText;
-      if (reportBundle.summary) {
-        summaryBlocks = buildDailySnapshotBlocks(reportBundle.summary);
-      }
-    } else {
-      reportText = await timeOperation({
+    // ── Non-Aloware channels: plain AI response ──────────────────────────────
+    if (!isAloware) {
+      const responseText = await timeOperation({
         logger,
         name: 'app_mention.generate_openai_response',
-        context: {
-          channel_id: event.channel,
-        },
+        context: { channel_id: event.channel },
         fn: async () => generateAiResponse(prompt || 'Say hello in one sentence.'),
       });
+      await client.chat.postMessage({
+        channel: event.channel,
+        thread_ts: threadTs,
+        text: responseText as string,
+      });
+      return;
     }
 
-    const responseChunks = isAloware ? splitSlackText(reportText) : [reportText];
-
-    const postResult = (await timeOperation({
+    // ── Aloware channels: rich Block Kit report card ─────────────────────────
+    const reportBundle = (await timeOperation({
       logger,
-      name: 'app_mention.post_message',
-      context: {
-        channel_id: event.channel,
-        is_aloware: isAloware,
-      },
-      fn: async () => {
-        let firstTs = '';
-        if (summaryBlocks) {
-          const summaryPost = await client.chat.postMessage({
-            channel: event.channel,
-            thread_ts: threadTs,
-            reply_broadcast: shouldBroadcastThreadReply,
-            text: 'Daily SMS Snapshot',
-            blocks: summaryBlocks,
-          });
-          if (!firstTs && summaryPost.ts) {
-            firstTs = summaryPost.ts;
-          }
-        }
-        for (const [index, chunk] of responseChunks.entries()) {
-          const posted = await client.chat.postMessage({
-            channel: event.channel,
-            thread_ts: threadTs,
-            reply_broadcast: shouldBroadcastThreadReply && !summaryBlocks && index === 0,
-            text: chunk,
-          });
-          if (!firstTs && posted.ts) {
-            firstTs = posted.ts;
-          }
-        }
-        return { ts: firstTs };
-      },
-    })) as { ts?: string };
+      name: 'app_mention.generate_aloware_report',
+      context: { channel_id: event.channel },
+      fn: async () =>
+        buildAlowareAnalyticsReportBundle({
+          channelId: event.channel,
+          client,
+          logger,
+          prompt,
+        }),
+    })) as Awaited<ReturnType<typeof buildAlowareAnalyticsReportBundle>>;
 
-    const isDailySnapshot = isAloware && isDailySnapshotReport(reportText);
+    const reportText = reportBundle.reportText;
 
+    // Build summary blocks (snapshot card) + action buttons row
+    const summaryBlocks = reportBundle.summary
+      ? buildDailySnapshotBlocks(reportBundle.summary)
+      : [
+          {
+            type: 'section' as const,
+            text: {
+              type: 'mrkdwn' as const,
+              text: '📊 *SMS Report Generated* — see thread for full details.',
+            },
+          },
+        ];
+
+    // Post the summary card (with reply_broadcast if configured)
+    const summaryPost = await client.chat.postMessage({
+      channel: event.channel,
+      thread_ts: threadTs,
+      reply_broadcast: shouldBroadcastThreadReply,
+      text: 'Daily SMS Snapshot — see thread for full report',
+      blocks: [
+        ...summaryBlocks,
+        ...buildReportActionBlocks(event.channel, undefined, prompt),
+      ],
+    });
+
+    const postedTs = typeof summaryPost.ts === 'string' ? summaryPost.ts : undefined;
+
+    // Update the message so the Refresh button carries the correct messageTs
+    if (postedTs) {
+      await client.chat
+        .update({
+          channel: event.channel,
+          ts: postedTs,
+          text: 'Daily SMS Snapshot — see thread for full report',
+          blocks: [
+            ...summaryBlocks,
+            ...buildReportActionBlocks(event.channel, postedTs, prompt),
+          ],
+        })
+        .catch(() => {
+          // Non-fatal — Refresh button will fall back to body.message.ts
+        });
+    }
+
+    // Post full report text in thread
+    if (reportText && postedTs) {
+      const chunks = splitReportText(reportText);
+      for (const [index, chunk] of chunks.entries()) {
+        await client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: postedTs,
+          text: chunks.length > 1 ? `*Part ${index + 1}/${chunks.length}*\n${chunk}` : chunk,
+        });
+      }
+    }
+
+    // ── Daily analysis handoff (for daily snapshot reports) ──────────────────
+    const isDailySnapshot = isDailySnapshotReport(reportText);
     if (isDailySnapshot) {
       const summaryText = buildDailyReportSummary(reportText);
-      const replyThread = threadTs || postResult.ts || event.ts;
+      const replyThread = threadTs || postedTs || event.ts;
       await requestDailyAnalysisHandoff({
         botClient: client,
         channelId: event.channel,
@@ -246,32 +215,30 @@ const appMentionCallback = async ({
       });
     }
 
-    // Log the successful report run
-    if (isAloware) {
-      try {
-        const summaryText = isDailySnapshot
-          ? buildDailyReportSummary(reportText)
-          : reportText.split('\n').slice(0, 5).join('\n');
-        await logDailyRun(
-          {
-            channelId: event.channel,
-            channelName: resolveAlowareChannelName(),
-            reportDate: isDailySnapshot ? extractDailySnapshotReportDate(reportText) || undefined : undefined,
-            reportType: event.thread_ts ? 'manual' : 'daily',
-            status: 'success',
-            summaryText,
-            fullReport: reportText,
-          },
-          logger,
-        );
-      } catch (logError) {
-        logger.warn('Failed to log report run:', logError);
-      }
+    // ── Log the successful run ────────────────────────────────────────────────
+    try {
+      const summaryText = isDailySnapshot
+        ? buildDailyReportSummary(reportText)
+        : reportText.split('\n').slice(0, 5).join('\n');
+      await logDailyRun(
+        {
+          channelId: event.channel,
+          channelName: resolveAlowareChannelName(),
+          reportDate: isDailySnapshot ? extractDailySnapshotReportDate(reportText) ?? undefined : undefined,
+          reportType: event.thread_ts ? 'manual' : 'daily',
+          status: 'success',
+          summaryText,
+          fullReport: reportText,
+        },
+        logger,
+      );
+    } catch (logError) {
+      logger.warn('[app_mention] Failed to log report run:', logError);
     }
   } catch (error) {
-    logger.error(error);
+    logger.error('[app_mention] Unhandled error:', error);
 
-    // Log the failed report run
+    // ── Log the failed run ────────────────────────────────────────────────────
     try {
       await logDailyRun(
         {
@@ -284,7 +251,7 @@ const appMentionCallback = async ({
         logger,
       );
     } catch (logError) {
-      logger.warn('Failed to log error run:', logError);
+      logger.warn('[app_mention] Failed to log error run:', logError);
     }
   }
 };

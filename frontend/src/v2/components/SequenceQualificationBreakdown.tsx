@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Briefcase, DollarSign, Target, Quote, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
+import { Users, Briefcase, DollarSign, Target, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import type { SequenceQualificationItem } from '../../api/v2Queries';
 
 if (typeof document !== 'undefined') {
@@ -12,39 +12,66 @@ type Props = {
   isLoading?: boolean;
 };
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Number of conversations with at least one non-unknown qualification field */
+const computeWithQualData = (item: SequenceQualificationItem): number => {
+  const knownEmployment = item.fullTime.count + item.partTime.count;
+  const knownRevenue = item.mostlyCash.count + item.mostlyInsurance.count + item.balancedMix.count;
+  const knownInterest = item.highInterest.count + item.mediumInterest.count + item.lowInterest.count;
+  return Math.max(knownEmployment, knownRevenue, knownInterest);
+};
+
+/** Collect non-null sample quotes from all fields */
+const collectSampleQuotes = (item: SequenceQualificationItem): string[] => {
+  return [
+    item.fullTime.sampleQuote,
+    item.partTime.sampleQuote,
+    item.mostlyCash.sampleQuote,
+    item.mostlyInsurance.sampleQuote,
+    item.balancedMix.sampleQuote,
+    item.highInterest.sampleQuote,
+    item.mediumInterest.sampleQuote,
+    item.lowInterest.sampleQuote,
+  ].filter((q): q is string => q !== null && q.trim().length > 0);
+};
+
+// ─── MetricCard ──────────────────────────────────────────────────────────────
+
 const MetricCard: React.FC<{
   label: string;
-  value: number;
-  total: number;
+  count: number;
+  pct: number;
   icon: React.ReactNode;
   color: string;
-}> = ({ label, value, total, icon, color }) => {
-  const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-  
-  return (
-    <div className="metric-card">
-      <div className="metric-icon" style={{ backgroundColor: `${color}20`, color }}>
-        {icon}
-      </div>
-      <div className="metric-content">
-        <div className="metric-value" style={{ color }}>
-          {value}
-          <span className="metric-percentage">({percentage}%)</span>
-        </div>
-        <div className="metric-label">{label}</div>
-      </div>
+  sampleQuote?: string | null;
+}> = ({ label, count, pct, icon, color, sampleQuote }) => (
+  <div className="metric-card" title={sampleQuote ?? undefined}>
+    <div className="metric-icon" style={{ backgroundColor: `${color}20`, color }}>
+      {icon}
     </div>
-  );
-};
+    <div className="metric-content">
+      <div className="metric-value" style={{ color }}>
+        {count}
+        <span className="metric-percentage">({Math.round(pct)}%)</span>
+      </div>
+      <div className="metric-label">{label}</div>
+    </div>
+  </div>
+);
+
+// ─── SequenceCard ─────────────────────────────────────────────────────────────
 
 const SequenceCard: React.FC<{
   item: SequenceQualificationItem;
   isExpanded: boolean;
   onToggle: () => void;
 }> = ({ item, isExpanded, onToggle }) => {
+  const withQualData = computeWithQualData(item);
   const qualificationRate = item.totalConversations > 0
-    ? Math.round((item.withQualificationData / item.totalConversations) * 100)
+    ? Math.round((withQualData / item.totalConversations) * 100)
     : 0;
+  const sampleQuotes = collectSampleQuotes(item);
 
   return (
     <motion.div
@@ -63,7 +90,7 @@ const SequenceCard: React.FC<{
             </span>
           </div>
         </div>
-        <button className="expand-btn">
+        <button className="expand-btn" type="button">
           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
         </button>
       </div>
@@ -78,6 +105,7 @@ const SequenceCard: React.FC<{
             transition={{ duration: 0.3 }}
           >
             <div className="metrics-grid">
+              {/* Employment */}
               <div className="metric-section">
                 <h4>
                   <Briefcase size={16} />
@@ -86,21 +114,24 @@ const SequenceCard: React.FC<{
                 <div className="metric-row">
                   <MetricCard
                     label="Full-time"
-                    value={item.employment.fullTime}
-                    total={item.totalConversations}
+                    count={item.fullTime.count}
+                    pct={item.fullTime.pct}
                     icon={<Briefcase size={16} />}
                     color="#22c55e"
+                    sampleQuote={item.fullTime.sampleQuote}
                   />
                   <MetricCard
                     label="Part-time"
-                    value={item.employment.partTime}
-                    total={item.totalConversations}
+                    count={item.partTime.count}
+                    pct={item.partTime.pct}
                     icon={<Briefcase size={16} />}
                     color="#3b82f6"
+                    sampleQuote={item.partTime.sampleQuote}
                   />
                 </div>
               </div>
 
+              {/* Revenue Mix */}
               <div className="metric-section">
                 <h4>
                   <DollarSign size={16} />
@@ -109,28 +140,32 @@ const SequenceCard: React.FC<{
                 <div className="metric-row">
                   <MetricCard
                     label="Mostly Cash"
-                    value={item.revenueMix.mostlyCash}
-                    total={item.totalConversations}
+                    count={item.mostlyCash.count}
+                    pct={item.mostlyCash.pct}
                     icon={<DollarSign size={16} />}
                     color="#10b981"
+                    sampleQuote={item.mostlyCash.sampleQuote}
                   />
                   <MetricCard
                     label="Mostly Insurance"
-                    value={item.revenueMix.mostlyInsurance}
-                    total={item.totalConversations}
+                    count={item.mostlyInsurance.count}
+                    pct={item.mostlyInsurance.pct}
                     icon={<DollarSign size={16} />}
                     color="#8b5cf6"
+                    sampleQuote={item.mostlyInsurance.sampleQuote}
                   />
                   <MetricCard
                     label="Balanced"
-                    value={item.revenueMix.balanced}
-                    total={item.totalConversations}
+                    count={item.balancedMix.count}
+                    pct={item.balancedMix.pct}
                     icon={<DollarSign size={16} />}
                     color="#f59e0b"
+                    sampleQuote={item.balancedMix.sampleQuote}
                   />
                 </div>
               </div>
 
+              {/* Coaching Interest */}
               <div className="metric-section">
                 <h4>
                   <Target size={16} />
@@ -139,28 +174,32 @@ const SequenceCard: React.FC<{
                 <div className="metric-row">
                   <MetricCard
                     label="High Interest"
-                    value={item.coachingInterest.high}
-                    total={item.totalConversations}
+                    count={item.highInterest.count}
+                    pct={item.highInterest.pct}
                     icon={<TrendingUp size={16} />}
                     color="#22c55e"
+                    sampleQuote={item.highInterest.sampleQuote}
                   />
                   <MetricCard
                     label="Medium Interest"
-                    value={item.coachingInterest.medium}
-                    total={item.totalConversations}
+                    count={item.mediumInterest.count}
+                    pct={item.mediumInterest.pct}
                     icon={<TrendingUp size={16} />}
                     color="#f59e0b"
+                    sampleQuote={item.mediumInterest.sampleQuote}
                   />
                   <MetricCard
                     label="Low Interest"
-                    value={item.coachingInterest.low}
-                    total={item.totalConversations}
+                    count={item.lowInterest.count}
+                    pct={item.lowInterest.pct}
                     icon={<TrendingUp size={16} />}
                     color="#ef4444"
+                    sampleQuote={item.lowInterest.sampleQuote}
                   />
                 </div>
               </div>
 
+              {/* Top Niches */}
               {item.topNiches.length > 0 && (
                 <div className="metric-section">
                   <h4>Top Niches</h4>
@@ -174,19 +213,14 @@ const SequenceCard: React.FC<{
                 </div>
               )}
 
-              {item.sampleQuotes.length > 0 && (
+              {/* Sample Quotes */}
+              {sampleQuotes.length > 0 && (
                 <div className="metric-section quotes-section">
-                  <h4>
-                    <Quote size={16} />
-                    What Leads Are Saying
-                  </h4>
+                  <h4>What Leads Are Saying</h4>
                   <div className="quotes-list">
-                    {item.sampleQuotes.slice(0, 3).map((quote, idx) => (
+                    {sampleQuotes.slice(0, 3).map((quote, idx) => (
                       <div key={idx} className="quote-card">
-                        <p className="quote-text">"{quote.quote}"</p>
-                        <span className="quote-date">
-                          {new Date(quote.inferredAt).toLocaleDateString()}
-                        </span>
+                        <p className="quote-text">"{quote}"</p>
                       </div>
                     ))}
                   </div>
@@ -199,6 +233,8 @@ const SequenceCard: React.FC<{
     </motion.div>
   );
 };
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export const SequenceQualificationBreakdown: React.FC<Props> = ({ items, isLoading }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -221,9 +257,9 @@ export const SequenceQualificationBreakdown: React.FC<Props> = ({ items, isLoadi
     );
   }
 
-  // Calculate summary stats
+  // Summary stats
   const totalConversations = items.reduce((sum, item) => sum + item.totalConversations, 0);
-  const totalWithQualification = items.reduce((sum, item) => sum + item.withQualificationData, 0);
+  const totalWithQualification = items.reduce((sum, item) => sum + computeWithQualData(item), 0);
   const avgQualificationRate = totalConversations > 0
     ? Math.round((totalWithQualification / totalConversations) * 100)
     : 0;

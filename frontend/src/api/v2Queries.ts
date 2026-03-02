@@ -1093,33 +1093,27 @@ export const useV2DeduplicateLines = () => {
 
 // ─── Sequence Qualification Analytics ─────────────────────────────────────────
 
+type QualField = { count: number; pct: number; sampleQuote: string | null };
+
 export type SequenceQualificationItem = {
   sequenceLabel: string;
   totalConversations: number;
-  withQualificationData: number;
-  employment: {
-    fullTime: number;
-    partTime: number;
-    unknown: number;
-  };
-  revenueMix: {
-    mostlyCash: number;
-    mostlyInsurance: number;
-    balanced: number;
-    unknown: number;
-  };
-  coachingInterest: {
-    high: number;
-    medium: number;
-    low: number;
-    unknown: number;
-  };
+  // Employment
+  fullTime: QualField;
+  partTime: QualField;
+  unknownEmployment: QualField;
+  // Revenue mix
+  mostlyCash: QualField;
+  mostlyInsurance: QualField;
+  balancedMix: QualField;
+  unknownRevenue: QualField;
+  // Coaching interest
+  highInterest: QualField;
+  mediumInterest: QualField;
+  lowInterest: QualField;
+  unknownInterest: QualField;
+  // Niches
   topNiches: Array<{ niche: string; count: number }>;
-  sampleQuotes: Array<{
-    contactKey: string;
-    quote: string;
-    inferredAt: string;
-  }>;
 };
 
 export type SequenceQualificationBreakdown = {

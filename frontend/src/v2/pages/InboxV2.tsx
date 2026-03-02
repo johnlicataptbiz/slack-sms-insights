@@ -4,6 +4,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 
 import {
   useV2AddConversationNote,
@@ -287,6 +288,12 @@ export default function InboxV2() {
   );
   // Double Pitch Protection banner
   const [showDoublePitchWarning, setShowDoublePitchWarning] = useState(false);
+  const [isNarrowComposerViewport, setIsNarrowComposerViewport] = useState(
+    () =>
+      typeof window !== "undefined"
+        ? window.matchMedia("(max-width: 900px)").matches
+        : false,
+  );
 
   const qualificationProgressLive =
     computeQualificationProgress(qualificationState);
@@ -366,6 +373,27 @@ export default function InboxV2() {
     estimateSize: () => 96,
     overscan: 8,
   });
+  const composerLayoutStorageId = isNarrowComposerViewport
+    ? "v2-inbox-composer-layout-vertical"
+    : "v2-inbox-composer-layout-horizontal";
+  const { defaultLayout: composerSavedLayout, onLayoutChanged: onComposerLayoutChanged } =
+    useDefaultLayout({
+      id: composerLayoutStorageId,
+      panelIds: ["composer-primary", "composer-sidebar"],
+    });
+  const composerDefaultLayout = composerSavedLayout ?? {
+    "composer-primary": isNarrowComposerViewport ? 62 : 66,
+    "composer-sidebar": isNarrowComposerViewport ? 38 : 34,
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(max-width: 900px)");
+    const onChange = () => setIsNarrowComposerViewport(mediaQuery.matches);
+    onChange();
+    mediaQuery.addEventListener("change", onChange);
+    return () => mediaQuery.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     // Do NOT auto-switch while the composer modal is open.
@@ -1873,8 +1901,20 @@ export default function InboxV2() {
                   )}
                 </V2State>
               ) : (
-                <div className="V2Inbox__composerGrid">
-                  <div className="V2Inbox__composerPrimary">
+                <Group
+                  className="V2Inbox__composerPanels"
+                  id="v2-inbox-composer-group"
+                  orientation={
+                    isNarrowComposerViewport ? "vertical" : "horizontal"
+                  }
+                  defaultLayout={composerDefaultLayout}
+                  onLayoutChanged={onComposerLayoutChanged}
+                >
+                  <Panel
+                    id="composer-primary"
+                    minSize={isNarrowComposerViewport ? "260px" : "45%"}
+                  >
+                    <div className="V2Inbox__composerPrimary">
                     {/* Conversation Thread - Chat Style */}
                     <div className="V2Inbox__chatThread" ref={chatThreadRef}>
                       {detail.messages.map((message) => {
@@ -2205,17 +2245,29 @@ export default function InboxV2() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                    </div>
+                  </Panel>
 
-                  {/* Sidebar: Tabbed with Radix Tabs */}
-                  <Tabs.Root
-                    defaultValue="qualify"
-                    className="V2Inbox__composerSidebar V2Inbox__sideColumn"
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      overflow: "hidden",
-                    }}
+                  <Separator
+                    className={`V2Inbox__composerResizeHandle ${
+                      isNarrowComposerViewport ? "is-vertical" : "is-horizontal"
+                    }`}
+                    title="Resize composer panels"
+                  />
+
+                  <Panel
+                    id="composer-sidebar"
+                    minSize={isNarrowComposerViewport ? "180px" : "22%"}
+                  >
+                    {/* Sidebar: Tabbed with Radix Tabs */}
+                    <Tabs.Root
+                      defaultValue="qualify"
+                      className="V2Inbox__composerSidebar V2Inbox__sideColumn"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        overflow: "hidden",
+                      }}
                   >
                     <Tabs.List
                       style={{
@@ -2814,8 +2866,9 @@ export default function InboxV2() {
                         </Tabs.Content>
                       )}
                     </div>
-                  </Tabs.Root>
-                </div>
+                    </Tabs.Root>
+                  </Panel>
+                </Group>
               )}
             </div>
           </section>

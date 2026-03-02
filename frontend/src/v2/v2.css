@@ -2773,14 +2773,63 @@
   align-items: start;
 }
 
+.V2Inbox__composerPanels {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  gap: 0.85rem;
+}
+
+.V2Inbox__composerResizeHandle {
+  flex: 0 0 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.V2Inbox__composerResizeHandle::before {
+  content: "";
+  display: block;
+  width: 3px;
+  height: 56px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--v2-accent) 26%, var(--v2-border) 74%);
+}
+
+.V2Inbox__composerResizeHandle:hover::before {
+  background: color-mix(in srgb, var(--v2-accent) 48%, var(--v2-border) 52%);
+}
+
+.V2Inbox__composerResizeHandle.is-horizontal {
+  cursor: col-resize;
+}
+
+.V2Inbox__composerResizeHandle.is-vertical {
+  cursor: row-resize;
+  flex-basis: 12px;
+}
+
+.V2Inbox__composerResizeHandle.is-vertical::before {
+  width: 56px;
+  height: 3px;
+}
+
 .V2Inbox__composerPrimary {
   display: grid;
   gap: 0.72rem;
+  min-width: 0;
+  height: 100%;
 }
 
 .V2Inbox__composerSidebar {
   display: grid;
   gap: 0.72rem;
+  min-width: 0;
+  height: 100%;
 }
 
 .V2Inbox__composerIntro {
@@ -3662,6 +3711,10 @@
 @media (max-width: 900px) {
   .V2Inbox__composerGrid {
     grid-template-columns: 1fr;
+  }
+
+  .V2Inbox__composerPanels {
+    gap: 0.6rem;
   }
 }
 

@@ -27,6 +27,11 @@ export async function reportError(app: App, error: unknown, context: string) {
     !adminChannel ||
     (slackError?.code === 'slack_webapi_platform_error' && slackError?.data?.error === 'invalid_auth')
   ) {
+    if (slackError?.data?.error === 'invalid_auth') {
+      app.logger.error(
+        `[${context}] Slack reporting skipped due to invalid_auth. Check SLACK_BOT_TOKEN and SLACK_APP_TOKEN.`,
+      );
+    }
     return;
   }
 

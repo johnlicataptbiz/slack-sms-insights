@@ -1,9 +1,14 @@
 import pg from 'pg';
 const { Pool } = pg;
 
+const databaseUrl = (process.env.DATABASE_URL || '').trim();
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required');
+}
+
 async function main() {
   const pool = new Pool({
-    connectionString: 'postgresql://postgres:WglVXtUmBjZIhCtOTLcLbeWpxsganAsi@crossover.proxy.rlwy.net:56263/railway'
+    connectionString: databaseUrl,
   });
 
   const r = await pool.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'booked_calls'");

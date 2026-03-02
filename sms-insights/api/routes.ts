@@ -64,7 +64,9 @@ import {
   getDashboardSession,
   getDashboardSessionTtlSeconds,
 } from '../services/session-store.js';
-import { mintStreamToken, verifyStreamToken } from '../services/stream-token.js';
+import { getPool } from '../services/db.js';
+import { getSlackAuthRuntimeStatus } from '../services/runtime-status.js';
+import { getStreamTokenSecretConfigStatus, mintStreamToken, verifyStreamToken } from '../services/stream-token.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
 
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
@@ -217,7 +219,7 @@ const getSendCapPerConversationHour = (): number =>
   parsePositiveInteger(process.env.SMS_SEND_CAP_PER_CONVERSATION_HOUR, 20);
 
 const getDashboardPassword = (): string => {
-  return (process.env.DASHBOARD_PASSWORD || 'bigbizin26').trim();
+  return (process.env.DASHBOARD_PASSWORD || '').trim();
 };
 
 const getPersistentSessionTtlSeconds = (): number =>
@@ -593,6 +595,11 @@ const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => 
   }
 
   const expected = getDashboardPassword();
+  if (!expected) {
+    _logger?.error('Password auth attempted while DASHBOARD_PASSWORD is not configured');
+    sendJson(res, 503, { error: 'Password auth is not configured on the server' }, origin);
+    return;
+  }
   if (!expected || password !== expected) {
     sendJson(res, 401, { error: 'Invalid password' }, origin);
     return;
@@ -657,14 +664,72 @@ const handleAuthLogout: RequestHandler = async (req, res, _logger, origin) => {
   });
 };
 
+const getBuildSha = (): string => {
+  return (
+    (process.env.BUILD_SHA || '').trim() ||
+    (process.env.VERCEL_GIT_COMMIT_SHA || '').trim() ||
+    (process.env.RAILWAY_GIT_COMMIT_SHA || '').trim() ||
+    'unknown'
+  );
+};
+
 const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
+  const dbPool = getPool();
+  let dbStatus: 'ok' | 'warn' | 'error' = 'warn';
+  let dbDetail = 'Database pool is not initialized';
+  if (dbPool) {
+    try {
+      await dbPool.query('SELECT 1');
+      dbStatus = 'ok';
+      dbDetail = 'Database query check passed';
+    } catch (error) {
+      dbStatus = 'error';
+      dbDetail = `Database query check failed: ${error instanceof Error ? error.message : String(error)}`;
+    }
+  }
+
+  const streamTokenConfig = getStreamTokenSecretConfigStatus();
+  const slackAuthRuntime = getSlackAuthRuntimeStatus();
+  const buildSha = getBuildSha();
+  const hasBuildSha = buildSha !== 'unknown';
+  const criticalFailure = dbStatus === 'error' || streamTokenConfig.status === 'error';
+  const hasWarnings = dbStatus === 'warn' || streamTokenConfig.status === 'warn' || !hasBuildSha;
+
+  const status = criticalFailure ? 'degraded' : hasWarnings ? 'degraded' : 'ok';
+
   sendJson(
     res,
     200,
     {
-      ok: true,
-      service: 'sms-insights-api',
+      ok: !criticalFailure,
+      status,
+      service: 'ptbizsms-api',
+      appName: 'ptbizsms',
       time: new Date().toISOString(),
+      checks: {
+        db: {
+          status: dbStatus,
+          detail: dbDetail,
+        },
+        slack_auth: {
+          status: slackAuthRuntime.status,
+          detail: slackAuthRuntime.detail,
+          updatedAt: slackAuthRuntime.updatedAt,
+        },
+        stream_token_config: {
+          status: streamTokenConfig.status,
+          configured: streamTokenConfig.configured,
+          detail: streamTokenConfig.reason,
+        },
+        auth_mode: {
+          status: 'ok',
+          value: 'password_only',
+        },
+        build_sha: {
+          status: hasBuildSha ? 'ok' : 'warn',
+          value: buildSha,
+        },
+      },
     },
     origin,
   );
@@ -673,7 +738,9 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
 const handleOauthStart: RequestHandler = async (_req, res, logger) => {
   if (!isDashboardSlackOauthEnabled()) {
     res.writeHead(302, {
-      Location: '/?auth=password',
+      Location: '/?auth=password&oauth=deprecated',
+      Warning: '299 - "Dashboard Slack OAuth is deprecated; use password login"',
+      'X-PTBizSMS-Deprecated': 'dashboard-slack-oauth',
       'Cache-Control': 'no-store',
       'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
     });
@@ -712,7 +779,9 @@ const handleOauthStart: RequestHandler = async (_req, res, logger) => {
 const handleOauthCallback: RequestHandler = async (req, res, logger) => {
   if (!isDashboardSlackOauthEnabled()) {
     res.writeHead(302, {
-      Location: '/?auth=password',
+      Location: '/?auth=password&oauth=deprecated',
+      Warning: '299 - "Dashboard Slack OAuth is deprecated; use password login"',
+      'X-PTBizSMS-Deprecated': 'dashboard-slack-oauth',
       'Cache-Control': 'no-store',
       'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
     });
@@ -1490,7 +1559,19 @@ const handleGetStreamToken: RequestHandler = async (req, res, _logger, origin) =
   const user = getVerifiedSlackUser(req);
   const userId = user.user_id || user.user || 'unknown';
   const ttl = getStreamTokenTtlSeconds();
-  const token = mintStreamToken({ subject: userId, ttlSeconds: ttl });
+  let token = '';
+  try {
+    token = mintStreamToken({ subject: userId, ttlSeconds: ttl });
+  } catch (error) {
+    _logger?.error('Failed to mint stream token', error);
+    sendJson(
+      res,
+      503,
+      { error: 'Realtime token service is not configured', code: 'stream_token_unavailable' },
+      origin,
+    );
+    return;
+  }
 
   sendJson(res, 200, { token, ttlSeconds: ttl }, origin);
 };

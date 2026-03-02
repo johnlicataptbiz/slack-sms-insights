@@ -10,6 +10,8 @@ import registerListeners from './listeners/index.js';
 import { initDatabase, initializeSchema } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
 import { logger } from './services/logger.js';
+import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
+import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
@@ -20,6 +22,28 @@ const assertStartupSecurityConfig = (): void => {
   if (allowDummyAuthToken && isProduction()) {
     throw new Error('ALLOW_DUMMY_AUTH_TOKEN cannot be enabled in production.');
   }
+  if (isProduction() && !(process.env.DASHBOARD_PASSWORD || '').trim()) {
+    throw new Error('DASHBOARD_PASSWORD is required in production.');
+  }
+  assertStreamTokenSecretConfigured();
+};
+
+type SlackStartupErrorLike = {
+  code?: string;
+  data?: { error?: string };
+  message?: string;
+};
+
+const parseSlackStartupError = (error: unknown): { invalidAuth: boolean; reason: string } => {
+  const fallback = error instanceof Error ? error.message : String(error);
+  if (!error || typeof error !== 'object') {
+    return { invalidAuth: false, reason: fallback };
+  }
+  const err = error as SlackStartupErrorLike;
+  if (err.data?.error === 'invalid_auth' || err.code === 'slack_webapi_platform_error') {
+    return { invalidAuth: true, reason: err.data?.error || err.message || fallback };
+  }
+  return { invalidAuth: false, reason: err.message || fallback };
 };
 
 const getLogLevel = (): LogLevel => {
@@ -71,7 +95,12 @@ app.error(async (error) => {
 /** Start Bolt App */
 (async () => {
   try {
+    setSlackAuthRuntimeStatus('unknown', 'Slack runtime has not started yet');
     assertStartupSecurityConfig();
+    const streamStatus = getStreamTokenSecretConfigStatus();
+    if (streamStatus.status !== 'ok') {
+      logger.app.warn(`[startup] stream token config: ${streamStatus.reason}`);
+    }
 
     // Initialize database
     await initDatabase(app.logger);
@@ -142,12 +171,37 @@ app.error(async (error) => {
     });
 
     // Start Bolt App
-    if (process.env.SLACK_BOT_TOKEN !== 'xoxb-dummy') {
-      await app.start();
-      logger.app.info('⚡️ Bolt app is running via Socket Mode!');
-    } else {
+    let slackStarted = false;
+    if (process.env.SLACK_BOT_TOKEN === 'xoxb-dummy') {
+      setSlackAuthRuntimeStatus('disabled', 'Slack bot runtime disabled: xoxb-dummy token in use');
       logger.app.info('⚡️ Bolt app skipped (dummy token detected)');
+    } else {
+      const missingSlackEnv: string[] = [];
+      if (!(process.env.SLACK_BOT_TOKEN || '').trim()) missingSlackEnv.push('SLACK_BOT_TOKEN');
+      if (!(process.env.SLACK_APP_TOKEN || '').trim()) missingSlackEnv.push('SLACK_APP_TOKEN');
+
+      if (missingSlackEnv.length > 0) {
+        const detail = `Slack runtime disabled: missing required env vars ${missingSlackEnv.join(', ')}`;
+        setSlackAuthRuntimeStatus('error', detail);
+        logger.app.error(detail);
+      } else {
+        try {
+          await app.start();
+          slackStarted = true;
+          setSlackAuthRuntimeStatus('ok', 'Slack Bolt app started in Socket Mode');
+          logger.app.info('⚡️ Bolt app is running via Socket Mode!');
+        } catch (error) {
+          const parsed = parseSlackStartupError(error);
+          const detail = parsed.invalidAuth
+            ? `Slack startup failed (invalid_auth). Check SLACK_BOT_TOKEN and SLACK_APP_TOKEN.`
+            : `Slack startup failed: ${parsed.reason}`;
+          setSlackAuthRuntimeStatus('error', detail);
+          logger.app.error(detail);
+          await reportError(app, error, 'Slack Startup Failure');
+        }
+      }
     }
+
     logger.app.info({
       msg: 'Token config diagnostics',
       alowareApiTokenLength: safeEnvLen(process.env.ALOWARE_API_TOKEN),
@@ -157,7 +211,7 @@ app.error(async (error) => {
     });
 
     // 🕒 Daily Report Cron — fires at 6:00 AM CT every day via user token
-    if (process.env.SLACK_BOT_TOKEN !== 'xoxb-dummy') {
+    if (slackStarted) {
       const { startDailyReportCron } = await import('./services/cron-scheduler.js');
       await startDailyReportCron(app);
     }
@@ -165,6 +219,9 @@ app.error(async (error) => {
     // monday read-sync/writeback maintenance jobs (feature-flag gated).
     // startMondaySyncJobs(app.logger);
   } catch (error) {
+    logger.app.error(
+      `[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`,
+    );
     await reportError(app, error, 'Startup Failure');
   }
 })();

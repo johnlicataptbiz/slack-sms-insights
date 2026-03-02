@@ -12,8 +12,28 @@ export function useEventStream() {
     let es: EventSource | null = null;
     let mounted = true;
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let failureCount = 0;
+    let disabledUntil = 0;
+
+    const scheduleReconnect = (baseDelayMs: number) => {
+      const cappedFailures = Math.min(failureCount, 6);
+      const jitter = Math.floor(Math.random() * 500);
+      const backoffMs = Math.min(baseDelayMs * Math.pow(2, cappedFailures), 60_000) + jitter;
+      retryTimer = setTimeout(() => {
+        if (mounted) connect();
+      }, backoffMs);
+    };
 
     const connect = async () => {
+      if (!mounted) return;
+      const now = Date.now();
+      if (disabledUntil > now) {
+        retryTimer = setTimeout(() => {
+          if (mounted) connect();
+        }, disabledUntil - now);
+        return;
+      }
+
       try {
         const res = await fetch('/api/stream-token');
         if (!res.ok) {
@@ -22,6 +42,7 @@ export function useEventStream() {
         const { token } = await res.json();
 
         if (!mounted) return;
+        failureCount = 0;
 
         // Close existing if any (shouldn't happen due to cleanup, but safe)
         es?.close();
@@ -57,19 +78,24 @@ export function useEventStream() {
         });
 
         es.onerror = (err) => {
-          console.warn('EventSource failed, reconnecting...', err);
+          failureCount += 1;
+          console.warn('EventSource failed, reconnecting with backoff...', { failureCount, err });
           es?.close();
           es = null;
-          // Re-fetch token and reconnect after delay
-          retryTimer = setTimeout(() => {
-            if (mounted) connect();
-          }, 3000);
+          if (failureCount >= 8) {
+            disabledUntil = Date.now() + 60_000;
+            console.warn('Realtime temporarily paused after repeated failures', { disabledUntil });
+          }
+          scheduleReconnect(3_000);
         };
       } catch (err) {
-        console.warn('Realtime setup failed, retrying...', err);
-        retryTimer = setTimeout(() => {
-          if (mounted) connect();
-        }, 10000);
+        failureCount += 1;
+        console.warn('Realtime setup failed, retrying with backoff...', { failureCount, err });
+        if (failureCount >= 8) {
+          disabledUntil = Date.now() + 60_000;
+          console.warn('Realtime temporarily paused after repeated token failures', { disabledUntil });
+        }
+        scheduleReconnect(10_000);
       }
     };
 

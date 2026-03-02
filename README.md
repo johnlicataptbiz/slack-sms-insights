@@ -58,8 +58,8 @@ PT Biz SMS Insights is a comprehensive analytics platform that:
 │  │  (reports)  │ │  (events)   │ │   (threads) │          │
 │  └─────────────┘ └─────────────┘ └─────────────┘          │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐          │
-│  │ work_items  │ │booked_calls │ │   users     │          │
-│  │   (SLA)     │ │   (calls)   │ │  (oauth)    │          │
+│  │ work_items  │ │booked_calls │ │ sessions    │          │
+│  │   (SLA)     │ │   (calls)   │ │ (password)  │          │
 │  └─────────────┘ └─────────────┘ └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -139,7 +139,7 @@ SlackCLI/
 - **Campaign table** with filtering and sorting
 - **Dark mode** support
 - **Mobile responsive** design
-- **Slack OAuth** authentication
+- **Password-based** authentication
 
 ### Legacy Dashboard
 - Daily runs list with status indicators
@@ -149,13 +149,12 @@ SlackCLI/
 
 ## 🔐 Authentication
 
-The dashboard uses Slack OAuth for authentication:
+The dashboard uses password-based session authentication:
 
-1. User clicks "Sign in with Slack"
-2. OAuth flow redirects to Slack
-3. User authorizes the app
-4. Redirect back with access token
-5. Token stored in memory (no localStorage for security)
+1. User enters dashboard password
+2. Backend validates credentials and creates a secure session
+3. Frontend verifies session via `/api/auth/verify`
+4. CSRF tokens are required for protected write operations
 
 ## 📊 Data Flow
 
@@ -180,9 +179,9 @@ Display in real-time
 ```
 User visits dashboard
     ↓
-Slack OAuth login
+Password login
     ↓
-Frontend gets token
+Frontend verifies session
     ↓
 Fetches /api/runs
     ↓
@@ -259,9 +258,9 @@ npx tsx scripts/backfill-slack-events.ts
 - Ensure backend is running on correct port
 - Check CORS configuration
 
-**"OAuth flow fails"**
-- Verify Slack app redirect URIs
-- Check `DASHBOARD_AUTH_REDIRECT_URI` matches
+**"Password login fails"**
+- Verify `DASHBOARD_PASSWORD` is set on the backend
+- Check backend logs for rate-limit or session-store errors
 
 See [LOCAL_DEV.md](docs/setup/LOCAL_DEV.md) for more troubleshooting.
 

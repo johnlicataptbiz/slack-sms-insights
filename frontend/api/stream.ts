@@ -18,7 +18,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const token = typeof req.query.token === 'string' ? req.query.token : '';
-  const upstreamBase = process.env.RAILWAY_API_BASE_URL || 'https://sms-insights-production.up.railway.app';
+  const upstreamBase = (process.env.RAILWAY_API_BASE_URL || '').trim();
+  if (!upstreamBase) {
+    res.status(500).json({
+      error: 'RAILWAY_API_BASE_URL is required for stream proxy',
+      code: 'missing_railway_api_base_url',
+    });
+    return;
+  }
   const upstreamUrl = `${upstreamBase}/api/stream?token=${encodeURIComponent(token)}`;
 
   // SSE headers

@@ -11,7 +11,6 @@ import { logDailyRun } from './daily-run-logger.js';
 
 const SLACK_TEXT_CHUNK_LIMIT = 3500;
 export const DASHBOARD_URL = 'https://ptbizsms.com/v2/runs';
-export const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD?.trim() || 'bigbizin26';
 
 // ─── Text Splitting ───────────────────────────────────────────────────────────
 
@@ -102,7 +101,7 @@ export const buildReportActionBlocks = (
       elements: [
         {
           type: 'mrkdwn',
-          text: `🔐 Dashboard password: \`${DASHBOARD_PASSWORD}\` · <${DASHBOARD_URL}|Open Dashboard>`,
+          text: `🔐 Dashboard access is password-protected · <${DASHBOARD_URL}|Open Dashboard>`,
         },
       ],
     },

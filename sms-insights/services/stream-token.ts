@@ -28,13 +28,50 @@ const safeEqual = (a: string, b: string): boolean => {
   return timingSafeEqual(ab, bb);
 };
 
+const isProduction = (): boolean => {
+  return (process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+};
+
+export const isStreamTokenSecretConfigured = (): boolean => {
+  return (process.env.STREAM_TOKEN_SECRET || '').trim().length > 0;
+};
+
+export const getStreamTokenSecretConfigStatus = (): {
+  configured: boolean;
+  status: 'ok' | 'warn' | 'error';
+  reason: string;
+} => {
+  const configured = isStreamTokenSecretConfigured();
+  if (configured) {
+    return { configured: true, status: 'ok', reason: 'STREAM_TOKEN_SECRET is configured' };
+  }
+  if (isProduction()) {
+    return {
+      configured: false,
+      status: 'error',
+      reason: 'STREAM_TOKEN_SECRET is missing in production',
+    };
+  }
+  return {
+    configured: false,
+    status: 'warn',
+    reason: 'Using development stream token fallback secret',
+  };
+};
+
+export const assertStreamTokenSecretConfigured = (): void => {
+  const status = getStreamTokenSecretConfigStatus();
+  if (!status.configured && status.status === 'error') {
+    throw new Error('STREAM_TOKEN_SECRET is required in production');
+  }
+};
+
 export const getStreamTokenSecret = (): string => {
   const secret = (process.env.STREAM_TOKEN_SECRET || '').trim();
   if (secret) return secret;
 
   // Dev fallback only. In production, set STREAM_TOKEN_SECRET.
-  const env = (process.env.NODE_ENV || '').trim().toLowerCase();
-  if (env === 'production') {
+  if (isProduction()) {
     throw new Error('STREAM_TOKEN_SECRET is required in production');
   }
   return 'dev-stream-token-secret-change-me';

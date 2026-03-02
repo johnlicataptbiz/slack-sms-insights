@@ -37,8 +37,6 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const oauthRedirectNotice =
-    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('auth') === 'password';
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -104,16 +102,14 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
           <p className="PasswordGate__subtitle">Enter your password to continue.</p>
         </motion.div>
 
-        {oauthRedirectNotice ? (
-          <motion.p
-            className="PasswordGate__notice"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-          >
-            Slack auth is disabled. Use the dashboard password.
-          </motion.p>
-        ) : null}
+        <motion.p
+          className="PasswordGate__notice"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          Sign in with your dashboard password.
+        </motion.p>
 
         {/* Form */}
         <motion.form

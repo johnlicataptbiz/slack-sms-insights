@@ -1,6 +1,6 @@
 import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from '@slack/bolt';
 import { getDailyRuns } from '../../services/daily-run-logger.js';
-import { DASHBOARD_PASSWORD, DASHBOARD_URL } from '../../services/report-poster.js';
+import { DASHBOARD_URL } from '../../services/report-poster.js';
 
 const appHomeOpenedCallback = async ({
   client,
@@ -100,7 +100,7 @@ const appHomeOpenedCallback = async ({
             elements: [
               {
                 type: 'mrkdwn',
-                text: `🔐 Dashboard password: \`${DASHBOARD_PASSWORD}\`  ·  <${DASHBOARD_URL}|Open Dashboard>`,
+                text: `🔐 Dashboard access is password-protected  ·  <${DASHBOARD_URL}|Open Dashboard>`,
               },
             ],
           },

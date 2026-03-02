@@ -8,9 +8,13 @@
 import pg from 'pg';
 const { Pool } = pg;
 
+const databaseUrl = (process.env.DATABASE_URL || '').trim();
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL is required');
+}
+
 const pool = new Pool({
-  connectionString:
-    'postgresql://postgres:WglVXtUmBjZIhCtOTLcLbeWpxsganAsi@crossover.proxy.rlwy.net:56263/railway',
+  connectionString: databaseUrl,
 });
 
 // ─── EMPLOYMENT PATTERNS (from PT Biz Core Client Definition + Language Playbook) ───

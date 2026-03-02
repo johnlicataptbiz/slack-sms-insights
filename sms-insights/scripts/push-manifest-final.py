@@ -47,7 +47,6 @@ manifest = {
     "oauth_config": {
         "redirect_urls": [
             "https://localhost:3000/api/oauth/callback",
-            "https://sms-insights-production.up.railway.app/api/oauth/callback",
             "https://ptbizsms.com/api/oauth/callback"
         ],
         "scopes": {

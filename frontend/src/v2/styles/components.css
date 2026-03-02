@@ -357,9 +357,6 @@
 }
 
 .V2ExportButton__dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
   min-width: 180px;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
@@ -433,9 +430,6 @@
 }
 
 .V2DateRangePicker__dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
   min-width: 280px;
   background: var(--glass-bg-strong);
   border: 1px solid var(--glass-border);
@@ -617,10 +611,7 @@
 }
 
 .V2SearchInput__suggestions {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  width: min(340px, calc(100vw - 1rem));
   max-height: 200px;
   overflow-y: auto;
   background: var(--glass-bg-strong);

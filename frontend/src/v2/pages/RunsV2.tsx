@@ -1,5 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import {
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  size,
+  useDismiss,
+  useFloating,
+  useInteractions,
+} from '@floating-ui/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 import { useV2Channels, useV2Run, useV2Runs, useV2SalesMetrics } from '../../api/v2Queries';
 import type { RunV2 } from '../../api/v2-types';
@@ -364,6 +376,30 @@ export default function RunsV2() {
   const [copied, setCopied] = useState<'current' | string | null>(null);
   const [showSavedViews, setShowSavedViews] = useState(false);
   const [staleBannerDismissed, setStaleBannerDismissed] = useState(false);
+  const {
+    refs: savedViewsRefs,
+    floatingStyles: savedViewsFloatingStyles,
+    context: savedViewsFloatingContext,
+  } = useFloating({
+    open: showSavedViews,
+    onOpenChange: setShowSavedViews,
+    placement: 'bottom-end',
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      offset(8),
+      flip({ padding: 12 }),
+      shift({ padding: 12 }),
+      size({
+        padding: 12,
+        apply({ availableHeight, elements }) {
+          elements.floating.style.maxHeight = `${Math.max(260, Math.min(640, availableHeight))}px`;
+        },
+      }),
+    ],
+  });
+  const savedViewsDismiss = useDismiss(savedViewsFloatingContext);
+  const { getReferenceProps: getSavedViewsReferenceProps, getFloatingProps: getSavedViewsFloatingProps } =
+    useInteractions([savedViewsDismiss]);
 
   const daysBack = parseRange(searchParams.get('range'));
   const channelId = searchParams.get('channel') || null;
@@ -622,7 +658,12 @@ export default function RunsV2() {
             <button
               type="button"
               className="V2Shell__defsButton"
-              onClick={() => setShowSavedViews((v) => !v)}
+              ref={savedViewsRefs.setReference}
+              {...getSavedViewsReferenceProps({
+                onClick: () => setShowSavedViews((v) => !v),
+                'aria-expanded': showSavedViews,
+                'aria-haspopup': 'dialog',
+              })}
             >
               {showSavedViews ? '✕ Saved Views' : '⊞ Saved Views'}
             </button>
@@ -928,53 +969,74 @@ export default function RunsV2() {
         </V2Panel>
       </div>
 
-      {showSavedViews && (
-        <V2Panel title="Saved Views" caption="Save and share specific run views. Up to 12 saved.">
-          <div className="V2SavedViews">
-            <div className="V2SavedViews__composer">
-              <input
-                type="text"
-                value={newViewName}
-                onChange={(e) => setNewViewName(e.target.value)}
-                placeholder="View name (e.g. Jack weekly + main line)"
-              />
-              <button type="button" onClick={saveCurrentView}>
-                Save current view
-              </button>
-              <button type="button" onClick={() => void copyShareLink('current', shareableUrl)}>
-                {copied === 'current' ? 'Copied link' : 'Copy current link'}
-              </button>
+      <AnimatePresence>
+        {showSavedViews && (
+          <FloatingPortal>
+            <div
+              ref={savedViewsRefs.setFloating}
+              style={savedViewsFloatingStyles}
+              {...getSavedViewsFloatingProps({
+                role: 'dialog',
+                'aria-label': 'Saved views',
+              })}
+            >
+              <motion.div
+                className="V2Runs__savedViewsPopover"
+                initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                transition={{ duration: 0.16 }}
+              >
+                <V2Panel title="Saved Views" caption="Save and share specific run views. Up to 12 saved.">
+                  <div className="V2SavedViews">
+                    <div className="V2SavedViews__composer">
+                      <input
+                        type="text"
+                        value={newViewName}
+                        onChange={(e) => setNewViewName(e.target.value)}
+                        placeholder="View name (e.g. Jack weekly + main line)"
+                      />
+                      <button type="button" onClick={saveCurrentView}>
+                        Save current view
+                      </button>
+                      <button type="button" onClick={() => void copyShareLink('current', shareableUrl)}>
+                        {copied === 'current' ? 'Copied link' : 'Copy current link'}
+                      </button>
+                    </div>
+                    {savedViews.length ? (
+                      <div className="V2SavedViews__list">
+                        {savedViews.map((view) => (
+                          <article className="V2SavedViews__item" key={view.id}>
+                            <div>
+                              <h3>{view.name}</h3>
+                              <p>
+                                Last {view.range} days | Channel: {view.channelId || 'All'} | Report: {view.runId ? view.runId.slice(0, 8) : 'none'}
+                              </p>
+                            </div>
+                            <div className="V2SavedViews__actions">
+                              <button type="button" onClick={() => applySavedView(view)}>
+                                Open
+                              </button>
+                              <button type="button" onClick={() => void copyShareLink(view.id, buildSavedViewUrl(view))}>
+                                {copied === view.id ? 'Copied' : 'Copy URL'}
+                              </button>
+                              <button type="button" onClick={() => deleteSavedView(view.id)}>
+                                Delete
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    ) : (
+                      <V2State kind="empty">No saved views yet.</V2State>
+                    )}
+                  </div>
+                </V2Panel>
+              </motion.div>
             </div>
-            {savedViews.length ? (
-              <div className="V2SavedViews__list">
-                {savedViews.map((view) => (
-                  <article className="V2SavedViews__item" key={view.id}>
-                    <div>
-                      <h3>{view.name}</h3>
-                      <p>
-                        Last {view.range} days | Channel: {view.channelId || 'All'} | Report: {view.runId ? view.runId.slice(0, 8) : 'none'}
-                      </p>
-                    </div>
-                    <div className="V2SavedViews__actions">
-                      <button type="button" onClick={() => applySavedView(view)}>
-                        Open
-                      </button>
-                      <button type="button" onClick={() => void copyShareLink(view.id, buildSavedViewUrl(view))}>
-                        {copied === view.id ? 'Copied' : 'Copy URL'}
-                      </button>
-                      <button type="button" onClick={() => deleteSavedView(view.id)}>
-                        Delete
-                      </button>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <V2State kind="empty">No saved views yet.</V2State>
-            )}
-          </div>
-        </V2Panel>
-      )}
+          </FloatingPortal>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

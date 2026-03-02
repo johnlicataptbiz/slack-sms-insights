@@ -1,5 +1,15 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  useDismiss,
+  useFloating,
+  useInteractions,
+} from '@floating-ui/react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Issue #17: Export Functionality
@@ -24,6 +34,19 @@ export function ExportButton({
 }: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const {
+    refs,
+    floatingStyles,
+    context,
+  } = useFloating({
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    placement: 'bottom-end',
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+  const dismiss = useDismiss(context);
+  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss]);
 
   const handleExport = async (format: ExportFormat) => {
     setIsExporting(true);
@@ -50,10 +73,13 @@ export function ExportButton({
     <div className="V2ExportButton" role="group" aria-label="Export options">
       <button
         className="V2ExportButton__trigger"
-        onClick={() => setIsOpen(!isOpen)}
+        ref={refs.setReference}
         disabled={disabled || isExporting}
-        aria-expanded={isOpen}
-        aria-haspopup="menu"
+        {...getReferenceProps({
+          onClick: () => setIsOpen(!isOpen),
+          'aria-expanded': isOpen,
+          'aria-haspopup': 'menu',
+        })}
       >
         {isExporting ? (
           <span className="V2ExportButton__spinner" aria-hidden="true" />
@@ -69,39 +95,46 @@ export function ExportButton({
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            className="V2ExportButton__dropdown"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}
-            role="menu"
-          >
-            <button
-              className="V2ExportButton__option"
-              onClick={() => handleExport('csv')}
-              role="menuitem"
+          <FloatingPortal>
+            <div
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps({ role: 'menu' })}
             >
-              <span className="V2ExportButton__optionIcon" aria-hidden="true">📊</span>
-              <span>Export as CSV</span>
-            </button>
-            <button
-              className="V2ExportButton__option"
-              onClick={() => handleExport('json')}
-              role="menuitem"
-            >
-              <span className="V2ExportButton__optionIcon" aria-hidden="true">{ }</span>
-              <span>Export as JSON</span>
-            </button>
-            <button
-              className="V2ExportButton__option"
-              onClick={() => handleExport('pdf')}
-              role="menuitem"
-            >
-              <span className="V2ExportButton__optionIcon" aria-hidden="true">📄</span>
-              <span>Export as PDF</span>
-            </button>
-          </motion.div>
+              <motion.div
+                className="V2ExportButton__dropdown"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+              >
+                <button
+                  className="V2ExportButton__option"
+                  onClick={() => handleExport('csv')}
+                  role="menuitem"
+                >
+                  <span className="V2ExportButton__optionIcon" aria-hidden="true">📊</span>
+                  <span>Export as CSV</span>
+                </button>
+                <button
+                  className="V2ExportButton__option"
+                  onClick={() => handleExport('json')}
+                  role="menuitem"
+                >
+                  <span className="V2ExportButton__optionIcon" aria-hidden="true">{ }</span>
+                  <span>Export as JSON</span>
+                </button>
+                <button
+                  className="V2ExportButton__option"
+                  onClick={() => handleExport('pdf')}
+                  role="menuitem"
+                >
+                  <span className="V2ExportButton__optionIcon" aria-hidden="true">📄</span>
+                  <span>Export as PDF</span>
+                </button>
+              </motion.div>
+            </div>
+          </FloatingPortal>
         )}
       </AnimatePresence>
     </div>

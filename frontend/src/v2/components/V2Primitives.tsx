@@ -1,5 +1,18 @@
 import { useId, type ReactNode, useState } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import {
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  useDismiss,
+  useFloating,
+  useFocus,
+  useHover,
+  useInteractions,
+  useRole,
+} from '@floating-ui/react';
 
 import { V2_TERM_DEFINITIONS, type V2TermKey } from '../copy';
 import {
@@ -452,16 +465,38 @@ export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) 
   const definition = V2_TERM_DEFINITIONS[term];
   const text = label ?? definition.label;
   const [isOpen, setIsOpen] = useState(false);
+  const {
+    refs,
+    floatingStyles,
+    context,
+  } = useFloating({
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    placement: 'bottom-start',
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(8), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+  const hover = useHover(context, { move: false });
+  const focus = useFocus(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context, { role: 'tooltip' });
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    hover,
+    focus,
+    dismiss,
+    role,
+  ]);
 
   return (
     <span className="V2Term">
       <motion.button
         className="V2Term__button"
         type="button"
-        aria-describedby={id}
-        onHoverStart={() => setIsOpen(true)}
-        onHoverEnd={() => setIsOpen(false)}
+        ref={refs.setReference}
         whileHover={{ scale: 1.02 }}
+        {...getReferenceProps({
+          'aria-describedby': isOpen ? id : undefined,
+        })}
       >
         <span>{text}</span>
         <motion.span
@@ -478,18 +513,25 @@ export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) 
       </motion.button>
       <AnimatePresence>
         {isOpen && (
-          <motion.span
-            className="V2Term__tooltip"
-            id={id}
-            role="tooltip"
-            variants={tooltipVariants}
-            initial="hidden"
-            animate="visible"
-            exit="hidden"
-          >
-            <strong>{definition.label}</strong>
-            <span>{definition.definition}</span>
-          </motion.span>
+          <FloatingPortal>
+            <div
+              id={id}
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps()}
+            >
+              <motion.span
+                className="V2Term__tooltip"
+                variants={tooltipVariants}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+              >
+                <strong>{definition.label}</strong>
+                <span>{definition.definition}</span>
+              </motion.span>
+            </div>
+          </FloatingPortal>
         )}
       </AnimatePresence>
     </span>

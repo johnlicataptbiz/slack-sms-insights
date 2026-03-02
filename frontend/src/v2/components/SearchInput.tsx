@@ -1,6 +1,17 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useDebounce } from '../hooks/useDebounce';
+import {
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  size,
+  useDismiss,
+  useFloating,
+  useInteractions,
+} from '@floating-ui/react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Issue #19: Search Input Component
@@ -38,6 +49,28 @@ export function SearchInput({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLUListElement>(null);
+  const {
+    refs,
+    floatingStyles,
+    context,
+  } = useFloating({
+    open: showSuggestions,
+    onOpenChange: setShowSuggestions,
+    placement: 'bottom-start',
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      offset(6),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      size({
+        apply({ rects, elements }) {
+          elements.floating.style.width = `${rects.reference.width}px`;
+        },
+      }),
+    ],
+  });
+  const dismiss = useDismiss(context);
+  const { getFloatingProps } = useInteractions([dismiss]);
 
   const value = controlledValue !== undefined ? controlledValue : internalValue;
   const debouncedValue = useDebounce(value, debounceMs);
@@ -141,14 +174,16 @@ export function SearchInput({
         </span>
 
         <input
-          ref={inputRef}
+          ref={(node) => {
+            inputRef.current = node;
+            refs.setReference(node);
+          }}
           type="text"
           className="V2SearchInput__input"
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onFocus={() => setShowSuggestions(value.length > 0 && suggestions.length > 0)}
-          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
           placeholder={placeholder}
           autoFocus={autoFocus}
           aria-label={ariaLabel}
@@ -175,30 +210,38 @@ export function SearchInput({
 
       <AnimatePresence>
         {showSuggestions && suggestions.length > 0 && (
-          <motion.ul
-            ref={suggestionsRef}
-            id="search-suggestions"
-            className="V2SearchInput__suggestions"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.15 }}
-            role="listbox"
-          >
-            {suggestions.map((suggestion, index) => (
-              <li
-                key={suggestion}
-                className={`V2SearchInput__suggestion ${
-                  index === selectedIndex ? 'V2SearchInput__suggestion--selected' : ''
-                }`}
-                onClick={() => handleSuggestionClick(suggestion)}
-                role="option"
-                aria-selected={index === selectedIndex}
+          <FloatingPortal>
+            <div
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps()}
+            >
+              <motion.ul
+                ref={suggestionsRef}
+                id="search-suggestions"
+                className="V2SearchInput__suggestions"
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                role="listbox"
               >
-                {suggestion}
-              </li>
-            ))}
-          </motion.ul>
+                {suggestions.map((suggestion, index) => (
+                  <li
+                    key={suggestion}
+                    className={`V2SearchInput__suggestion ${
+                      index === selectedIndex ? 'V2SearchInput__suggestion--selected' : ''
+                    }`}
+                    onClick={() => handleSuggestionClick(suggestion)}
+                    role="option"
+                    aria-selected={index === selectedIndex}
+                  >
+                    {suggestion}
+                  </li>
+                ))}
+              </motion.ul>
+            </div>
+          </FloatingPortal>
         )}
       </AnimatePresence>
     </div>

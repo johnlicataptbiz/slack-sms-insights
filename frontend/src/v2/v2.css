@@ -1301,6 +1301,16 @@
   gap: var(--v2-space-3);
 }
 
+.V2Runs__savedViewsPopover {
+  width: min(760px, calc(100vw - 1.2rem));
+  overflow: auto;
+  z-index: 1200;
+}
+
+.V2Runs__savedViewsPopover .V2Panel {
+  margin: 0;
+}
+
 .V2SavedViews__composer {
   display: flex;
   gap: 0.55rem;

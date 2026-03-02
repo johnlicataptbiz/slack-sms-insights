@@ -1,5 +1,15 @@
 import { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  useDismiss,
+  useFloating,
+  useInteractions,
+} from '@floating-ui/react';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Issue #18: Date Range Picker Component
@@ -41,6 +51,19 @@ export function DateRangePicker({
   const [activePreset, setActivePreset] = useState<PresetRange | null>(null);
   const [customFrom, setCustomFrom] = useState(formatDate(from));
   const [customTo, setCustomTo] = useState(formatDate(to));
+  const {
+    refs,
+    floatingStyles,
+    context,
+  } = useFloating({
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    placement: 'bottom-start',
+    whileElementsMounted: autoUpdate,
+    middleware: [offset(6), flip({ padding: 8 }), shift({ padding: 8 })],
+  });
+  const dismiss = useDismiss(context);
+  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss]);
 
   const detectActivePreset = useMemo((): PresetRange | null => {
     const now = new Date();
@@ -117,10 +140,13 @@ export function DateRangePicker({
       <button
         type="button"
         className="V2DateRangePicker__trigger"
-        onClick={() => setIsOpen(!isOpen)}
+        ref={refs.setReference}
         disabled={disabled}
-        aria-expanded={isOpen}
-        aria-haspopup="dialog"
+        {...getReferenceProps({
+          onClick: () => setIsOpen(!isOpen),
+          'aria-expanded': isOpen,
+          'aria-haspopup': 'dialog',
+        })}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -140,68 +166,77 @@ export function DateRangePicker({
 
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            className="V2DateRangePicker__dropdown"
-            initial={{ opacity: 0, y: -8, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.95 }}
-            transition={{ duration: 0.15 }}
-            role="dialog"
-            aria-label="Select date range"
-          >
-            <div className="V2DateRangePicker__presets">
-              {presets.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={`V2DateRangePicker__preset ${
-                    (activePreset || detectActivePreset) === preset
-                      ? 'V2DateRangePicker__preset--active'
-                      : ''
-                  }`}
-                  onClick={() => handlePresetClick(preset)}
-                >
-                  {PRESET_LABELS[preset]}
-                </button>
-              ))}
-            </div>
-
-            {(activePreset === 'custom' || presets.includes('custom')) && (
-              <div className="V2DateRangePicker__custom">
-                <div className="V2DateRangePicker__inputs">
-                  <div className="V2DateRangePicker__field">
-                    <label htmlFor="drp-from">From</label>
-                    <input
-                      id="drp-from"
-                      type="date"
-                      value={customFrom}
-                      onChange={(e) => setCustomFrom(e.target.value)}
-                      min={minDate ? formatDate(minDate) : undefined}
-                      max={customTo}
-                    />
-                  </div>
-                  <div className="V2DateRangePicker__field">
-                    <label htmlFor="drp-to">To</label>
-                    <input
-                      id="drp-to"
-                      type="date"
-                      value={customTo}
-                      onChange={(e) => setCustomTo(e.target.value)}
-                      min={customFrom}
-                      max={maxDate ? formatDate(maxDate) : formatDate(new Date())}
-                    />
-                  </div>
+          <FloatingPortal>
+            <div
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps({
+                role: 'dialog',
+                'aria-label': 'Select date range',
+              })}
+            >
+              <motion.div
+                className="V2DateRangePicker__dropdown"
+                initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+              >
+                <div className="V2DateRangePicker__presets">
+                  {presets.map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      className={`V2DateRangePicker__preset ${
+                        (activePreset || detectActivePreset) === preset
+                          ? 'V2DateRangePicker__preset--active'
+                          : ''
+                      }`}
+                      onClick={() => handlePresetClick(preset)}
+                    >
+                      {PRESET_LABELS[preset]}
+                    </button>
+                  ))}
                 </div>
-                <button
-                  type="button"
-                  className="V2DateRangePicker__apply"
-                  onClick={handleCustomApply}
-                >
-                  Apply
-                </button>
-              </div>
-            )}
-          </motion.div>
+
+                {(activePreset === 'custom' || presets.includes('custom')) && (
+                  <div className="V2DateRangePicker__custom">
+                    <div className="V2DateRangePicker__inputs">
+                      <div className="V2DateRangePicker__field">
+                        <label htmlFor="drp-from">From</label>
+                        <input
+                          id="drp-from"
+                          type="date"
+                          value={customFrom}
+                          onChange={(e) => setCustomFrom(e.target.value)}
+                          min={minDate ? formatDate(minDate) : undefined}
+                          max={customTo}
+                        />
+                      </div>
+                      <div className="V2DateRangePicker__field">
+                        <label htmlFor="drp-to">To</label>
+                        <input
+                          id="drp-to"
+                          type="date"
+                          value={customTo}
+                          onChange={(e) => setCustomTo(e.target.value)}
+                          min={customFrom}
+                          max={maxDate ? formatDate(maxDate) : formatDate(new Date())}
+                        />
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="V2DateRangePicker__apply"
+                      onClick={handleCustomApply}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            </div>
+          </FloatingPortal>
         )}
       </AnimatePresence>
     </div>

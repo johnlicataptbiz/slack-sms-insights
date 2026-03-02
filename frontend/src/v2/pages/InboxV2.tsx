@@ -5,6 +5,17 @@ import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
+import {
+  FloatingPortal,
+  autoUpdate,
+  flip,
+  offset,
+  shift,
+  size,
+  useDismiss,
+  useFloating,
+  useInteractions,
+} from "@floating-ui/react";
 
 import {
   useV2AddConversationNote,
@@ -385,6 +396,33 @@ export default function InboxV2() {
     "composer-primary": isNarrowComposerViewport ? 62 : 66,
     "composer-sidebar": isNarrowComposerViewport ? 38 : 34,
   };
+  const {
+    refs: templateFloatingRefs,
+    floatingStyles: templateFloatingStyles,
+    context: templateFloatingContext,
+  } = useFloating({
+    open: showTemplates,
+    onOpenChange: setShowTemplates,
+    placement: "top-end",
+    whileElementsMounted: autoUpdate,
+    middleware: [
+      offset(8),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      size({
+        padding: 8,
+        apply({ availableHeight, elements }) {
+          elements.floating.style.maxHeight = `${Math.min(
+            340,
+            Math.max(180, availableHeight),
+          )}px`;
+        },
+      }),
+    ],
+  });
+  const templateDismiss = useDismiss(templateFloatingContext);
+  const { getReferenceProps: getTemplateReferenceProps, getFloatingProps } =
+    useInteractions([templateDismiss]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -394,6 +432,12 @@ export default function InboxV2() {
     mediaQuery.addEventListener("change", onChange);
     return () => mediaQuery.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    if (!isComposerModalOpen && showTemplates) {
+      setShowTemplates(false);
+    }
+  }, [isComposerModalOpen, showTemplates]);
 
   useEffect(() => {
     // Do NOT auto-switch while the composer modal is open.
@@ -2153,82 +2197,97 @@ export default function InboxV2() {
                             <button
                               type="button"
                               className="V2Inbox__button V2Inbox__button--small"
-                              onClick={() => setShowTemplates((prev) => !prev)}
                               title="Insert template"
+                              ref={templateFloatingRefs.setReference}
+                              {...getTemplateReferenceProps({
+                                onClick: () =>
+                                  setShowTemplates((prev) => !prev),
+                                "aria-expanded": showTemplates,
+                                "aria-haspopup": "dialog",
+                              })}
                             >
                               Templates
                             </button>
                             {showTemplates && (
-                              <div className="V2Inbox__templateDropdown">
-                                {templatesQuery.data &&
-                                templatesQuery.data.length > 0 ? (
-                                  templatesQuery.data.map((tpl) => (
-                                    <div
-                                      key={tpl.id}
-                                      className="V2Inbox__templateItem"
+                              <FloatingPortal>
+                                <div
+                                  className="V2Inbox__templateDropdown"
+                                  ref={templateFloatingRefs.setFloating}
+                                  style={templateFloatingStyles}
+                                  {...getFloatingProps({
+                                    "aria-label": "Templates menu",
+                                  })}
+                                >
+                                  {templatesQuery.data &&
+                                  templatesQuery.data.length > 0 ? (
+                                    templatesQuery.data.map((tpl) => (
+                                      <div
+                                        key={tpl.id}
+                                        className="V2Inbox__templateItem"
+                                      >
+                                        <button
+                                          type="button"
+                                          className="V2Inbox__templateInsert"
+                                          onClick={() =>
+                                            onInsertTemplate(tpl.body)
+                                          }
+                                          title={tpl.body}
+                                        >
+                                          {tpl.name}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="V2Inbox__templateDelete"
+                                          onClick={() =>
+                                            void onDeleteTemplate(tpl.id)
+                                          }
+                                          title="Delete template"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                    ))
+                                  ) : (
+                                    <p className="V2Inbox__templateEmpty">
+                                      No templates saved yet.
+                                    </p>
+                                  )}
+                                  <div className="V2Inbox__templateCreate">
+                                    <input
+                                      type="text"
+                                      className="V2Inbox__templateNameInput"
+                                      value={newTemplateName}
+                                      onChange={(e) =>
+                                        setNewTemplateName(e.target.value)
+                                      }
+                                      placeholder="Template name…"
+                                    />
+                                    <textarea
+                                      className="V2Inbox__templateBodyInput"
+                                      value={newTemplateBody}
+                                      onChange={(e) =>
+                                        setNewTemplateBody(e.target.value)
+                                      }
+                                      rows={2}
+                                      placeholder="Message body… use {{name}} for contact name"
+                                    />
+                                    <button
+                                      type="button"
+                                      className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                                      onClick={onCreateTemplate}
+                                      disabled={
+                                        createTemplateMutation.isPending ||
+                                        !newTemplateName.trim() ||
+                                        !newTemplateBody.trim()
+                                      }
                                     >
-                                      <button
-                                        type="button"
-                                        className="V2Inbox__templateInsert"
-                                        onClick={() =>
-                                          onInsertTemplate(tpl.body)
-                                        }
-                                        title={tpl.body}
-                                      >
-                                        {tpl.name}
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className="V2Inbox__templateDelete"
-                                        onClick={() =>
-                                          void onDeleteTemplate(tpl.id)
-                                        }
-                                        title="Delete template"
-                                      >
-                                        ✕
-                                      </button>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <p className="V2Inbox__templateEmpty">
-                                    No templates saved yet.
-                                  </p>
-                                )}
-                                <div className="V2Inbox__templateCreate">
-                                  <input
-                                    type="text"
-                                    className="V2Inbox__templateNameInput"
-                                    value={newTemplateName}
-                                    onChange={(e) =>
-                                      setNewTemplateName(e.target.value)
-                                    }
-                                    placeholder="Template name…"
-                                  />
-                                  <textarea
-                                    className="V2Inbox__templateBodyInput"
-                                    value={newTemplateBody}
-                                    onChange={(e) =>
-                                      setNewTemplateBody(e.target.value)
-                                    }
-                                    rows={2}
-                                    placeholder="Message body… use {{name}} for contact name"
-                                  />
-                                  <button
-                                    type="button"
-                                    className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                                    onClick={onCreateTemplate}
-                                    disabled={
-                                      createTemplateMutation.isPending ||
-                                      !newTemplateName.trim() ||
-                                      !newTemplateBody.trim()
-                                    }
-                                  >
-                                    {createTemplateMutation.isPending
-                                      ? "Saving…"
-                                      : "+ Save Template"}
-                                  </button>
+                                      {createTemplateMutation.isPending
+                                        ? "Saving…"
+                                        : "+ Save Template"}
+                                    </button>
+                                  </div>
                                 </div>
-                              </div>
+                              </FloatingPortal>
                             )}
                           </div>
                           <button

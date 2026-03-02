@@ -5652,3 +5652,21 @@ display: inline-block;
   color: var(--v2-muted);
   white-space: nowrap;
 }
+
+/* Command palette */
+.CmdPalette__group [cmdk-group-heading] {
+  padding: 0.4rem 0.55rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--v2-muted);
+}
+
+.CmdPalette__item[data-selected="true"] {
+  background: rgba(17, 184, 214, 0.12);
+}
+
+.CmdPalette__item[data-selected="true"] span:last-child {
+  background: rgba(17, 184, 214, 0.16);
+  color: var(--v2-accent);
+}

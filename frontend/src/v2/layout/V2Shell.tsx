@@ -1,11 +1,13 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { Drawer } from 'vaul';
 
 import { client } from '../../api/client';
 import { uiModeStorageKey } from '../../uiMode';
 import { V2_TERM_DEFINITIONS, V2_TERM_GROUPS, v2Copy } from '../copy';
 import { springs, easing, listContainerVariants, listItemVariants } from '../utils/motion';
+import { CommandPalette, CommandPaletteTrigger } from '../components/CommandPalette';
 
 type NavItem = {
   to: string;
@@ -39,38 +41,11 @@ const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: st
   navigate(to);
 };
 
-// Drawer animation variants
-const drawerVariants: Variants = {
-  hidden: { x: '100%', opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      type: 'spring' as const,
-      stiffness: 300,
-      damping: 30,
-    },
-  },
-  exit: {
-    x: '100%',
-    opacity: 0,
-    transition: {
-      duration: 0.25,
-      ease: easing.smooth,
-    },
-  },
-};
-
-// Backdrop animation
-const backdropVariants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1 },
-  exit: { opacity: 0 },
-};
 
 export default function V2Shell({ children }: { children: ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDefinitionsOpen, setIsDefinitionsOpen] = useState(false);
+  const [isCmdOpen, setIsCmdOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(mobileMediaQuery).matches : false,
   );
@@ -80,6 +55,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setIsMenuOpen(false);
     setIsDefinitionsOpen(false);
+    setIsCmdOpen(false);
   }, [location.pathname]);
 
   useEffect(() => {
@@ -170,6 +146,9 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="V2Shell__topActions">
+          {/* ⌘K Command Palette Trigger */}
+          <CommandPaletteTrigger onClick={() => setIsCmdOpen(true)} />
+
           <motion.button
             className="V2Shell__defsButton"
             type="button"
@@ -286,89 +265,99 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         {v2Copy.actions.kpiDefinitions}
       </motion.button>
 
-      {/* Definitions Drawer */}
-      <AnimatePresence>
-        {isDefinitionsOpen && (
-          <>
-            <motion.div
-              className="V2DefsBackdrop is-open"
-              variants={backdropVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              onClick={() => setIsDefinitionsOpen(false)}
+      {/* KPI Definitions — vaul Drawer (replaces custom AnimatePresence drawer) */}
+      <Drawer.Root open={isDefinitionsOpen} onOpenChange={setIsDefinitionsOpen} direction="right">
+        <Drawer.Portal>
+          <Drawer.Overlay
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(4, 10, 22, 0.55)',
+              backdropFilter: 'blur(3px)',
+              zIndex: 800,
+            }}
+          />
+          <Drawer.Content
+            id="v2-kpi-definitions"
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 'min(480px, 92vw)',
+              background: 'var(--v2-surface)',
+              borderLeft: '1px solid rgba(17, 184, 214, 0.15)',
+              boxShadow: '-16px 0 48px rgba(4, 10, 22, 0.4)',
+              zIndex: 801,
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: '40px',
+                height: '4px',
+                background: 'rgba(17, 184, 214, 0.25)',
+                borderRadius: '2px',
+                margin: '12px auto 0',
+                flexShrink: 0,
+              }}
             />
-            <motion.aside
-              className="V2DefsDrawer is-open"
-              id="v2-kpi-definitions"
-              variants={drawerVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-            >
-              <motion.header
-                className="V2DefsDrawer__header"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
-                <div>
-                  <p className="V2DefsDrawer__eyebrow">Shared Vocabulary</p>
+            <div className="V2DefsDrawer__header">
+              <div>
+                <p className="V2DefsDrawer__eyebrow">Shared Vocabulary</p>
+                <Drawer.Title asChild>
                   <h2>{v2Copy.actions.kpiDefinitions}</h2>
-                </div>
-                <motion.button
-                  type="button"
-                  onClick={() => setIsDefinitionsOpen(false)}
-                  whileHover={{ scale: 1.1, rotate: 90 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  {v2Copy.actions.close}
-                </motion.button>
-              </motion.header>
-              <motion.p
-                className="V2DefsDrawer__summary"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.15 }}
+                </Drawer.Title>
+              </div>
+              <motion.button
+                type="button"
+                onClick={() => setIsDefinitionsOpen(false)}
+                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileTap={{ scale: 0.9 }}
               >
-                These definitions match the daily reports and scorecards so setters and managers are speaking the same language.
-              </motion.p>
-              {V2_TERM_GROUPS.map((group, groupIndex) => (
-                <motion.section
-                  className="V2DefsDrawer__group"
-                  key={group.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 + groupIndex * 0.1 }}
-                >
+                {v2Copy.actions.close}
+              </motion.button>
+            </div>
+            <Drawer.Description className="V2DefsDrawer__summary">
+              These definitions match the daily reports and scorecards so setters and managers are speaking the same language.
+            </Drawer.Description>
+            <div style={{ overflowY: 'auto', flex: 1, padding: '0 1.25rem 2rem' }}>
+              {V2_TERM_GROUPS.map((group) => (
+                <section className="V2DefsDrawer__group" key={group.title}>
                   <h3>{group.title}</h3>
                   <div className="V2DefsDrawer__rows">
-                    {group.keys.map((key, keyIndex) => {
+                    {group.keys.map((key) => {
                       const item = V2_TERM_DEFINITIONS[key];
                       return (
-                        <motion.article
+                        <article
                           className="V2DefsDrawer__row"
                           key={key}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.25 + groupIndex * 0.1 + keyIndex * 0.03 }}
-                          whileHover={{
-                            backgroundColor: 'rgba(17, 184, 214, 0.05)',
-                            x: 4,
-                          }}
                         >
                           <h4>{item.label}</h4>
                           <p>{item.definition}</p>
-                        </motion.article>
+                        </article>
                       );
                     })}
                   </div>
-                </motion.section>
+                </section>
               ))}
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+            </div>
+          </Drawer.Content>
+        </Drawer.Portal>
+      </Drawer.Root>
+
+      {/* ⌘K Command Palette */}
+      <CommandPalette
+        open={isCmdOpen}
+        onOpenChange={setIsCmdOpen}
+        onSignOut={() => void handleLogout()}
+        onToggleLegacy={() => {
+          localStorage.setItem(uiModeStorageKey, 'legacy');
+          navigate('/legacy?ui=legacy');
+        }}
+      />
     </div>
   );
 }

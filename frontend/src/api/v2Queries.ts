@@ -299,12 +299,17 @@ export const useV2InboxConversations = (params: InboxListParams) => {
   });
 };
 
-export const useV2InboxConversationDetail = (conversationId: string | null) => {
+export const useV2InboxConversationDetail = (
+  conversationId: string | null,
+  options?: { forceSyncTick?: number },
+) => {
+  const forceSyncTick = options?.forceSyncTick ?? 0;
   return useQuery({
-    queryKey: ['v2', 'inbox', 'conversation', conversationId],
+    queryKey: ['v2', 'inbox', 'conversation', conversationId, forceSyncTick],
     enabled: Boolean(conversationId),
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/inbox/conversations/${conversationId}`);
+      const query = forceSyncTick > 0 ? `?sync=1&t=${forceSyncTick}` : '';
+      const response = await client.get<unknown>(`/api/v2/inbox/conversations/${conversationId}${query}`);
       assertInboxConversationDetailEnvelope(response);
       return response as ApiEnvelope<InboxConversationDetailV2>;
     },

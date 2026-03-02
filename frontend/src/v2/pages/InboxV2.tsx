@@ -226,6 +226,7 @@ export default function InboxV2() {
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const [sendStatus, setSendStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [justSentMessage, setJustSentMessage] = useState<{text: string; timestamp: string; confirmed?: boolean} | null>(null);
+  const [detailForceSyncTick, setDetailForceSyncTick] = useState(0);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
 
@@ -316,7 +317,7 @@ export default function InboxV2() {
     }
   }, [conversations, selectedConversationId, isComposerModalOpen]);
 
-  const detailQuery = useV2InboxConversationDetail(selectedConversationId);
+  const detailQuery = useV2InboxConversationDetail(selectedConversationId, { forceSyncTick: detailForceSyncTick });
 
   const generateDraftMutation = useV2GenerateDraft();
   const sendMutation = useV2SendInboxMessage();
@@ -513,6 +514,7 @@ export default function InboxV2() {
 
     setFlashMessage(null);
     setSendStatus('sending');
+    setJustSentMessage({ text: messageText, timestamp: new Date().toISOString(), confirmed: false });
 
     try {
       const sendFromNumber = selectedLineOption?.lineId == null ? selectedLineOption?.fromNumber || null : null;
@@ -528,7 +530,8 @@ export default function InboxV2() {
       
       if (result.data.status === 'sent' || result.data.status === 'duplicate') {
         setSendStatus('sent');
-        setJustSentMessage({ text: messageText, timestamp: new Date().toISOString(), confirmed: true });
+        setJustSentMessage(null);
+        setDetailForceSyncTick((prev) => prev + 1);
         
         setComposerText('');
         setSelectedDraftId(null);
@@ -552,10 +555,12 @@ export default function InboxV2() {
         }, 2000);
       } else {
         setSendStatus('error');
+        setJustSentMessage(null);
         toast.error(`Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`);
       }
     } catch (error) {
       setSendStatus('error');
+      setJustSentMessage(null);
       toast.error(`Send failed: ${String((error as Error)?.message || error)}`);
     }
   };
@@ -1364,7 +1369,11 @@ export default function InboxV2() {
                 <button
                   type="button"
                   className="V2Inbox__button V2Inbox__button--small"
-                  onClick={() => void detailQuery.refetch()}
+                  onClick={() => {
+                    setDetailForceSyncTick((prev) => prev + 1);
+                    void listQuery.refetch();
+                    void notesQuery.refetch();
+                  }}
                   disabled={detailQuery.isFetching}
                   title="Refresh messages"
                 >
@@ -1416,7 +1425,7 @@ export default function InboxV2() {
                     })}
                     
                     {/* Optimistic sent message */}
-                    {justSentMessage && (
+                    {justSentMessage && !justSentMessage.confirmed && (
                       <article className={`V2Inbox__chatMessage V2Inbox__chatMessage--outbound ${!justSentMessage.confirmed ? 'V2Inbox__chatMessage--sending' : 'V2Inbox__chatMessage--confirmed'}`}>
                         <div className="V2Inbox__chatMessageHeader">
                           <span className="V2Inbox__chatSpeaker">You</span>

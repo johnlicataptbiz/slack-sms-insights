@@ -166,6 +166,77 @@ const getDbOrThrow = (): Pool => {
   return pool;
 };
 
+const BOOKED_CALLS_CHANNEL_ID = (process.env.BOOKED_CALLS_CHANNEL_ID || '').trim() || null;
+
+const buildBookedCallsExistsSql = (bookedCallsChannelPlaceholder: string): string => `
+        EXISTS (
+          SELECT 1
+          FROM booked_calls bc
+          LEFT JOIN LATERAL (
+            SELECT
+              COALESCE(
+                NULLIF(
+                  (regexp_match(
+                    COALESCE(bc.raw #>> '{attachments,0,fallback}', ''),
+                    '\\\\*(?:Phone|Phone Number|Mobile Phone)\\\\*:\\\\s*([^\\\\n]+)'
+                  ))[1],
+                  ''
+                ),
+                NULLIF(
+                  (regexp_match(
+                    COALESCE(bc.text, ''),
+                    '(\\\\+?\\\\d[\\\\d\\\\s().-]{8,}\\\\d)'
+                  ))[1],
+                  ''
+                )
+              ) AS phone_raw,
+              COALESCE(
+                NULLIF(
+                  (regexp_match(
+                    COALESCE(bc.raw #>> '{attachments,0,fallback}', ''),
+                    '\\\\*(?:Name|Contact Name)\\\\*:\\\\s*([^\\\\n]+)'
+                  ))[1],
+                  ''
+                ),
+                NULLIF(
+                  trim(
+                    concat_ws(
+                      ' ',
+                      (regexp_match(
+                        COALESCE(bc.raw #>> '{attachments,0,fallback}', ''),
+                        '\\\\*First Name\\\\*:\\\\s*([^\\\\n]+)'
+                      ))[1],
+                      (regexp_match(
+                        COALESCE(bc.raw #>> '{attachments,0,fallback}', ''),
+                        '\\\\*Last Name\\\\*:\\\\s*([^\\\\n]+)'
+                      ))[1]
+                    )
+                  ),
+                  ''
+                )
+              ) AS name_raw
+          ) parsed ON TRUE
+          WHERE (${bookedCallsChannelPlaceholder}::text IS NULL OR bc.slack_channel_id = ${bookedCallsChannelPlaceholder}::text)
+            AND (
+              COALESCE(bc.text, '') ~* '(call booked|booked|appointment|scheduled|automation|\\\\bset\\\\b)'
+              OR COALESCE(bc.raw #>> '{attachments,0,fallback}', '') ~* '(call booked|booked|appointment|scheduled|automation|\\\\bset\\\\b)'
+            )
+            AND (
+              (
+                RIGHT(regexp_replace(COALESCE(c.contact_phone, ''), '\\\\D', '', 'g'), 10) <> ''
+                AND RIGHT(regexp_replace(COALESCE(parsed.phone_raw, ''), '\\\\D', '', 'g'), 10) <> ''
+                AND RIGHT(regexp_replace(COALESCE(c.contact_phone, ''), '\\\\D', '', 'g'), 10)
+                  = RIGHT(regexp_replace(COALESCE(parsed.phone_raw, ''), '\\\\D', '', 'g'), 10)
+              )
+              OR (
+                COALESCE(lower(trim(p.name)), '') <> ''
+                AND COALESCE(lower(trim(parsed.name_raw)), '') <> ''
+                AND lower(trim(p.name)) = lower(trim(parsed.name_raw))
+              )
+            )
+        )
+`;
+
 export const getConversationState = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
@@ -333,7 +404,7 @@ export const listInboxConversations = async (
   const client = await pool.connect();
   try {
     const where: string[] = [];
-    const values: Array<string | number | boolean> = [];
+    const values: Array<string | number | boolean | null> = [];
     let index = 1;
 
     if (params.status) {
@@ -360,6 +431,9 @@ export const listInboxConversations = async (
 
     const limit = Math.max(1, Math.min(params.limit, 200));
     const offset = Math.max(0, params.offset);
+
+    values.push(BOOKED_CALLS_CHANNEL_ID ?? null);
+    const bookedCallsChannelPlaceholder = `$${index++}`;
 
     values.push(limit);
     const limitPlaceholder = `$${index++}`;
@@ -440,15 +514,7 @@ export const listInboxConversations = async (
         latest_message.event_ts AS last_message_at,
         latest_outbound.aloware_user AS latest_outbound_user,
         latest_outbound.line AS latest_outbound_line,
-        EXISTS (
-          SELECT 1
-          FROM monday_call_snapshots m
-          WHERE m.is_booked = true
-            AND (
-              m.contact_key = c.contact_key
-              OR (p.name IS NOT NULL AND m.contact_key = 'name:' || p.name)
-            )
-        ) AS monday_booked
+        ${buildBookedCallsExistsSql(bookedCallsChannelPlaceholder)} AS monday_booked
       FROM conversations c
       LEFT JOIN inbox_contact_profiles p
         ON p.contact_key = c.contact_key
@@ -561,15 +627,7 @@ export const getInboxConversationById = async (
         latest_message.event_ts AS last_message_at,
         latest_outbound.aloware_user AS latest_outbound_user,
         latest_outbound.line AS latest_outbound_line,
-        EXISTS (
-          SELECT 1
-          FROM monday_call_snapshots m
-          WHERE m.is_booked = true
-            AND (
-              m.contact_key = c.contact_key
-              OR (p.name IS NOT NULL AND m.contact_key = 'name:' || p.name)
-            )
-        ) AS monday_booked
+        ${buildBookedCallsExistsSql('$2')} AS monday_booked
       FROM conversations c
       LEFT JOIN inbox_contact_profiles p
         ON p.contact_key = c.contact_key
@@ -584,7 +642,7 @@ export const getInboxConversationById = async (
       WHERE c.id = $1
       LIMIT 1;
       `,
-      [conversationId],
+      [conversationId, BOOKED_CALLS_CHANNEL_ID ?? null],
     );
 
     return result.rows[0] ?? null;

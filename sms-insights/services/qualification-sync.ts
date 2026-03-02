@@ -14,6 +14,7 @@ type SyncQualificationParams = {
   contactKey: string;
   contactId: string | null;
   triggerDirection?: InboxMessageRow['direction'];
+  allowOverwriteKnown?: boolean;
   currentState?: ConversationStateRow | null;
   messages?: InboxMessageRow[] | null;
   messageLimit?: number;
@@ -54,7 +55,12 @@ export const syncQualificationFromConversationText = async (
     };
   }
 
-  const inference = inferQualificationStateFromMessages(fallbackState, messages, logger);
+  const inference = inferQualificationStateFromMessages(
+    fallbackState,
+    messages,
+    { allowOverwriteKnown: params.allowOverwriteKnown === true },
+    logger,
+  );
   if (!inference.changed) {
     return {
       state: fallbackState,

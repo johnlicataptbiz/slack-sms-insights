@@ -2343,6 +2343,10 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
   }
 
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const syncParam = (url.searchParams.get('sync') || '').trim().toLowerCase();
+  const forceSyncFromThread = syncParam === '1' || syncParam === 'true' || syncParam === 'force';
+
   const conversationId = getConversationIdFromPath(req);
   if (!conversationId) {
     return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
@@ -2404,6 +2408,7 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       contactKey: conversation.contact_key,
       contactId: conversation.contact_id,
       triggerDirection: 'inbound',
+      allowOverwriteKnown: forceSyncFromThread,
       currentState: ensuredState,
       messages,
     },

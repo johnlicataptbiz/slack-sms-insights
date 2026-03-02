@@ -25,6 +25,10 @@ export type QualificationInferenceResult = {
   };
 };
 
+type InferenceOptions = {
+  allowOverwriteKnown?: boolean;
+};
+
 const toEpochMs = (value: string): number => {
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
@@ -199,9 +203,11 @@ const isNicheMissing = (value: string | null): boolean => !value || value.trim()
 export const inferQualificationStateFromMessages = (
   state: ConversationStateRow,
   messages: InboxMessageRow[],
+  options?: InferenceOptions,
   logger?: Pick<Logger, 'debug'>,
 ): QualificationInferenceResult => {
   const inboundBodies = getInboundBodiesNewestFirst(messages);
+  const allowOverwriteKnown = options?.allowOverwriteKnown === true;
   const inferred = {
     fullOrPartTime: inferEmploymentStatus(inboundBodies),
     niche: inferNiche(inboundBodies),
@@ -210,19 +216,26 @@ export const inferQualificationStateFromMessages = (
   };
 
   const snapshot: QualificationSnapshot = {
-    fullOrPartTime:
-      state.qualification_full_or_part_time === 'unknown' && inferred.fullOrPartTime
+    fullOrPartTime: inferred.fullOrPartTime
+      ? allowOverwriteKnown || state.qualification_full_or_part_time === 'unknown'
         ? inferred.fullOrPartTime
-        : state.qualification_full_or_part_time,
-    niche: isNicheMissing(state.qualification_niche) && inferred.niche ? inferred.niche : state.qualification_niche,
-    revenueMix:
-      state.qualification_revenue_mix === 'unknown' && inferred.revenueMix
+        : state.qualification_full_or_part_time
+      : state.qualification_full_or_part_time,
+    niche: inferred.niche
+      ? allowOverwriteKnown || isNicheMissing(state.qualification_niche)
+        ? inferred.niche
+        : state.qualification_niche
+      : state.qualification_niche,
+    revenueMix: inferred.revenueMix
+      ? allowOverwriteKnown || state.qualification_revenue_mix === 'unknown'
         ? inferred.revenueMix
-        : state.qualification_revenue_mix,
-    coachingInterest:
-      state.qualification_coaching_interest === 'unknown' && inferred.coachingInterest
+        : state.qualification_revenue_mix
+      : state.qualification_revenue_mix,
+    coachingInterest: inferred.coachingInterest
+      ? allowOverwriteKnown || state.qualification_coaching_interest === 'unknown'
         ? inferred.coachingInterest
-        : state.qualification_coaching_interest,
+        : state.qualification_coaching_interest
+      : state.qualification_coaching_interest,
     progressStep: 0,
   };
   snapshot.progressStep = resolveQualificationProgressStep(snapshot);

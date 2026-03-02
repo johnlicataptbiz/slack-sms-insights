@@ -40,18 +40,10 @@ export function parseReport(reportText: string): ParsedReport {
   const lines = reportText.split('\n').map((line) => line.trim());
   const reps: RepMetrics[] = [];
   let currentRep: RepMetrics | null = null;
-  let currentSection: string | null = null;
 
   const date = reportText.match(DATE_PATTERN)?.[1]?.trim();
 
   for (const line of lines) {
-    if (line.startsWith('*Core Metrics*')) {
-      currentSection = 'Core Metrics';
-      continue;
-    } else if (line.startsWith('*') && line !== '*Core Metrics*') {
-      currentSection = null;
-    }
-
     // Check for Rep header
     const repMatch = line.match(REP_PATTERN);
     if (repMatch) {

@@ -51,7 +51,12 @@
       the qualification breakdown component with metric cards, badges, and quote cards
 
 ### Next Steps
-- [ ] 6. Update `frontend/src/v2/pages/SequencesV2.tsx` — integrate the qualification breakdown
+- [x] 6. Update `frontend/src/v2/pages/SequencesV2.tsx` — integrate the qualification breakdown
       component into the SequencesV2 dashboard, replacing or supplementing health alerts
-- [ ] 7. Add reply timing metrics panel (median time to first reply, reply rate by day of week)
-- [ ] 8. Test the full integration end-to-end
+- [x] 7. Add reply timing metrics panel (median time to first reply, reply rate by day of week)
+- [x] 8. Test the full integration end-to-end
+      - `/api/v2/sequences/qualification` returns data ✅
+      - `/api/v2/inbox/conversations` returns data ✅
+      - `/api/v2/inbox/conversations/:id` returns full detail ✅
+      - `/api/health` all checks passing ✅
+      - Frontend live at ptbizsms.com ✅

@@ -225,7 +225,7 @@ export const generateAndPostReport = async ({
         channelId,
         channelName: channelName ?? 'unknown',
         reportDate: isDailySnapshot
-          ? extractDailySnapshotReportDate(reportBundle.reportText) ?? undefined
+          ? (extractDailySnapshotReportDate(reportBundle.reportText) ?? undefined)
           : undefined,
         reportType,
         status: 'success',

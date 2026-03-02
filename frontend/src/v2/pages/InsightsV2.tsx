@@ -33,8 +33,8 @@ const rangeLabel = (range: InsightsRange): string => {
 // Calculate trend direction from sparkline data
 const calculateTrend = (data: number[]): 'up' | 'down' | 'flat' => {
   if (data.length < 2) return 'flat';
-  const first = data[0];
-  const last = data[data.length - 1];
+  const first = data[0] ?? 0;
+  const last = data[data.length - 1] ?? first;
   const change = last - first;
   if (change > 0.01) return 'up';
   if (change < -0.01) return 'down';
@@ -63,6 +63,7 @@ export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2) => {
     bookedTotalAllChannels,
     bookedSmsLinkedStrict,
     bookedSelf,
+    bookedNonSmsOrUnknown,
     bookedNonSmsOrUnknownExcludingSelf,
     bookedAttribution,
   };

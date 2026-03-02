@@ -73,6 +73,7 @@ describe('events', () => {
     await appHomeOpenedCallback(buildArguments({}));
 
     assert(spy.mock.callCount() === 1);
-    assert.deepEqual(fakeLogger.error.mock.calls[0].arguments, [testError]);
+    const loggerArgs = fakeLogger.error.mock.calls[0].arguments;
+    assert.equal(loggerArgs[loggerArgs.length - 1], testError);
   });
 });

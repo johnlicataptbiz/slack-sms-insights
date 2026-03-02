@@ -1,5 +1,5 @@
 import { useId, type ReactNode, useState } from 'react';
-import { motion, AnimatePresence, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 
 import { V2_TERM_DEFINITIONS, type V2TermKey } from '../copy';
 import {
@@ -14,14 +14,6 @@ import {
   easing,
   fadeInUp,
 } from '../utils/motion';
-
-// ─── Animated Number Counter ─────────────────────────────────────────────────
-function AnimatedNumber({ value, formatFn }: { value: number; formatFn?: (n: number) => string }) {
-  const spring = useSpring(value, { stiffness: 100, damping: 20 });
-  const display = useTransform(spring, (latest) => formatFn ? formatFn(Math.round(latest)) : Math.round(latest).toString());
-
-  return <motion.span>{display}</motion.span>;
-}
 
 // ─── Sparkline ───────────────────────────────────────────────────────────────
 export function V2Sparkline({
@@ -363,10 +355,10 @@ export function V2ProgressBar({
 
 // ─── State Display ───────────────────────────────────────────────────────────
 export function V2State({ kind, children }: { kind: 'loading' | 'error' | 'empty'; children: ReactNode }) {
-  const iconVariants = {
+  const iconVariants: Variants = {
     loading: {
       rotate: 360,
-      transition: { duration: 1.5, repeat: Infinity, ease: 'linear' },
+      transition: { duration: 1.5, repeat: Infinity, ease: 'linear' as const },
     },
     error: {
       scale: [1, 1.1, 1],
@@ -374,7 +366,7 @@ export function V2State({ kind, children }: { kind: 'loading' | 'error' | 'empty
     },
     empty: {
       y: [0, -5, 0],
-      transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' },
+      transition: { duration: 2, repeat: Infinity, ease: 'easeInOut' as const },
     },
   };
 
@@ -756,7 +748,7 @@ export function V2Badge({
   return (
     <motion.span
       className={`V2Badge V2Badge--${variant}`}
-      variants={animated ? badgeVariants : undefined}
+      {...(animated ? { variants: badgeVariants } : {})}
       initial={animated ? 'hidden' : false}
       animate={animated ? 'visible' : false}
       whileHover={{ scale: 1.05 }}

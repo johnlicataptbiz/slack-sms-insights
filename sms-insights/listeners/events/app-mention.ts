@@ -167,10 +167,7 @@ const appMentionCallback = async ({
       thread_ts: threadTs,
       reply_broadcast: shouldBroadcastThreadReply,
       text: 'Daily SMS Snapshot — see thread for full report',
-      blocks: [
-        ...summaryBlocks,
-        ...buildReportActionBlocks(event.channel, undefined, prompt),
-      ],
+      blocks: [...summaryBlocks, ...buildReportActionBlocks(event.channel, undefined, prompt)],
     });
 
     const postedTs = typeof summaryPost.ts === 'string' ? summaryPost.ts : undefined;
@@ -182,10 +179,7 @@ const appMentionCallback = async ({
           channel: event.channel,
           ts: postedTs,
           text: 'Daily SMS Snapshot — see thread for full report',
-          blocks: [
-            ...summaryBlocks,
-            ...buildReportActionBlocks(event.channel, postedTs, prompt),
-          ],
+          blocks: [...summaryBlocks, ...buildReportActionBlocks(event.channel, postedTs, prompt)],
         })
         .catch(() => {
           // Non-fatal — Refresh button will fall back to body.message.ts
@@ -227,7 +221,7 @@ const appMentionCallback = async ({
         {
           channelId: event.channel,
           channelName: resolveAlowareChannelName(),
-          reportDate: isDailySnapshot ? extractDailySnapshotReportDate(reportText) ?? undefined : undefined,
+          reportDate: isDailySnapshot ? (extractDailySnapshotReportDate(reportText) ?? undefined) : undefined,
           reportType: event.thread_ts ? 'manual' : 'daily',
           status: 'success',
           summaryText,

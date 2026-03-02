@@ -12,11 +12,9 @@ export const ALOWARE_CHANNEL_NAME = 'alowaresmsupdates';
 const fmtNum = (n: number): string => n.toLocaleString();
 const fmtPct = (n: number): string => `${n.toFixed(1)}%`;
 
-const replyRateIndicator = (rate: number): string =>
-  rate >= 15 ? '🟢' : rate >= 8 ? '🟡' : '🔴';
+const replyRateIndicator = (rate: number): string => (rate >= 15 ? '🟢' : rate >= 8 ? '🟡' : '🔴');
 
-const optOutIndicator = (rate: number): string =>
-  rate <= 3 ? '🟢' : rate <= 6 ? '🟡' : '🔴';
+const optOutIndicator = (rate: number): string => (rate <= 3 ? '🟢' : rate <= 6 ? '🟡' : '🔴');
 
 const miniBar = (value: number, max: number, blocks = 5): string => {
   const filled = max > 0 ? Math.min(blocks, Math.round((value / max) * blocks)) : 0;
@@ -25,10 +23,7 @@ const miniBar = (value: number, max: number, blocks = 5): string => {
 
 // ─── Block Kit builder ────────────────────────────────────────────────────────
 
-export const buildScoreboardBlocks = (
-  data: ScoreboardV2,
-  messageTs?: string,
-): (KnownBlock | Block)[] => {
+export const buildScoreboardBlocks = (data: ScoreboardV2, messageTs?: string): (KnownBlock | Block)[] => {
   const { weekly, monthly, sequences, compliance, timing, window: win } = data;
 
   // ── Setter leaderboard ────────────────────────────────────────────────────

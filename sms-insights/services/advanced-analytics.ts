@@ -90,13 +90,13 @@ export const getLinePerformanceAnalytics = async (params: {
     LEFT JOIN inbound_stats i ON o.line = i.line
     ORDER BY o.messages_sent DESC
     `,
-    [fromIso, toIso]
+    [fromIso, toIso],
   );
 
   const lines: LinePerformanceRow[] = rows.map((row) => {
-    const messagesSent = parseInt(row.messages_sent, 10);
-    const repliesReceived = parseInt(row.replies_received, 10);
-    const optOuts = parseInt(row.opt_outs, 10);
+    const messagesSent = Number.parseInt(row.messages_sent, 10);
+    const repliesReceived = Number.parseInt(row.replies_received, 10);
+    const optOuts = Number.parseInt(row.opt_outs, 10);
 
     return {
       line: row.line,
@@ -105,8 +105,8 @@ export const getLinePerformanceAnalytics = async (params: {
       replyRatePct: messagesSent > 0 ? (repliesReceived / messagesSent) * 100 : 0,
       optOuts,
       optOutRatePct: messagesSent > 0 ? (optOuts / messagesSent) * 100 : 0,
-      bookingSignals: parseInt(row.booking_signals, 10),
-      uniqueContacts: parseInt(row.unique_contacts, 10),
+      bookingSignals: Number.parseInt(row.booking_signals, 10),
+      uniqueContacts: Number.parseInt(row.unique_contacts, 10),
     };
   });
 
@@ -206,8 +206,8 @@ export const getQualificationFunnelAnalytics = async (): Promise<QualificationFu
   `);
 
   const row = funnelRows[0];
-  const totalConversations = parseInt(row.total_conversations, 10);
-  const qualifiedConversations = parseInt(row.qualified_conversations, 10);
+  const totalConversations = Number.parseInt(row.total_conversations, 10);
+  const qualifiedConversations = Number.parseInt(row.qualified_conversations, 10);
 
   // Calculate conversion rates by interest level
   const { rows: conversionRows } = await pool.query<{
@@ -227,8 +227,8 @@ export const getQualificationFunnelAnalytics = async (): Promise<QualificationFu
   const conversionByInterest: Record<string, { total: number; booked: number }> = {};
   for (const cr of conversionRows) {
     conversionByInterest[cr.coaching_interest] = {
-      total: parseInt(cr.total, 10),
-      booked: parseInt(cr.booked, 10),
+      total: Number.parseInt(cr.total, 10),
+      booked: Number.parseInt(cr.booked, 10),
     };
   }
 
@@ -243,34 +243,34 @@ export const getQualificationFunnelAnalytics = async (): Promise<QualificationFu
     qualifiedConversations,
     funnel: {
       employmentStatus: {
-        fullTime: parseInt(row.full_time, 10),
-        partTime: parseInt(row.part_time, 10),
-        unknown: parseInt(row.employment_unknown, 10),
+        fullTime: Number.parseInt(row.full_time, 10),
+        partTime: Number.parseInt(row.part_time, 10),
+        unknown: Number.parseInt(row.employment_unknown, 10),
       },
       revenueMix: {
-        mostlyCash: parseInt(row.mostly_cash, 10),
-        mostlyInsurance: parseInt(row.mostly_insurance, 10),
-        balanced: parseInt(row.balanced, 10),
-        unknown: parseInt(row.revenue_unknown, 10),
+        mostlyCash: Number.parseInt(row.mostly_cash, 10),
+        mostlyInsurance: Number.parseInt(row.mostly_insurance, 10),
+        balanced: Number.parseInt(row.balanced, 10),
+        unknown: Number.parseInt(row.revenue_unknown, 10),
       },
       coachingInterest: {
-        high: parseInt(row.high_interest, 10),
-        medium: parseInt(row.medium_interest, 10),
-        low: parseInt(row.low_interest, 10),
-        unknown: parseInt(row.interest_unknown, 10),
+        high: Number.parseInt(row.high_interest, 10),
+        medium: Number.parseInt(row.medium_interest, 10),
+        low: Number.parseInt(row.low_interest, 10),
+        unknown: Number.parseInt(row.interest_unknown, 10),
       },
     },
     escalationDistribution: {
-      level1: parseInt(row.level_1, 10),
-      level2: parseInt(row.level_2, 10),
-      level3: parseInt(row.level_3, 10),
-      level4: parseInt(row.level_4, 10),
+      level1: Number.parseInt(row.level_1, 10),
+      level2: Number.parseInt(row.level_2, 10),
+      level3: Number.parseInt(row.level_3, 10),
+      level4: Number.parseInt(row.level_4, 10),
     },
     cadenceDistribution: {
-      idle: parseInt(row.cadence_idle, 10),
-      podcastSent: parseInt(row.cadence_podcast_sent, 10),
-      callOffered: parseInt(row.cadence_call_offered, 10),
-      nurturePool: parseInt(row.cadence_nurture_pool, 10),
+      idle: Number.parseInt(row.cadence_idle, 10),
+      podcastSent: Number.parseInt(row.cadence_podcast_sent, 10),
+      callOffered: Number.parseInt(row.cadence_call_offered, 10),
+      nurturePool: Number.parseInt(row.cadence_nurture_pool, 10),
     },
     conversionByQualification: {
       highInterestConversionRate: calcConversionRate('high'),
@@ -322,7 +322,8 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     edited_drafts: string;
     avg_lint_score: string;
     avg_structural_score: string;
-  }>(`
+  }>(
+    `
     SELECT
       COUNT(*)::text AS total_drafts,
       COUNT(CASE WHEN accepted = true THEN 1 END)::text AS accepted_drafts,
@@ -331,12 +332,14 @@ export const getDraftAIPerformanceAnalytics = async (params: {
       COALESCE(AVG(structural_score), 0)::text AS avg_structural_score
     FROM draft_suggestions
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
-  `, [fromIso, toIso]);
+  `,
+    [fromIso, toIso],
+  );
 
   const overall = overallRows[0];
-  const totalDrafts = parseInt(overall.total_drafts, 10);
-  const acceptedDrafts = parseInt(overall.accepted_drafts, 10);
-  const editedDrafts = parseInt(overall.edited_drafts, 10);
+  const totalDrafts = Number.parseInt(overall.total_drafts, 10);
+  const acceptedDrafts = Number.parseInt(overall.accepted_drafts, 10);
+  const editedDrafts = Number.parseInt(overall.edited_drafts, 10);
   const rejectedDrafts = Math.max(0, totalDrafts - acceptedDrafts);
 
   // Score by outcome
@@ -344,7 +347,8 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     outcome: string;
     avg_lint: string;
     avg_structural: string;
-  }>(`
+  }>(
+    `
     SELECT
       CASE
         WHEN accepted = true THEN 'accepted'
@@ -356,7 +360,9 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     FROM draft_suggestions
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
-  `, [fromIso, toIso]);
+  `,
+    [fromIso, toIso],
+  );
 
   const scoreByOutcome = {
     accepted: { avgLint: 0, avgStructural: 0 },
@@ -367,8 +373,8 @@ export const getDraftAIPerformanceAnalytics = async (params: {
   for (const row of outcomeRows) {
     if (row.outcome in scoreByOutcome) {
       scoreByOutcome[row.outcome as keyof typeof scoreByOutcome] = {
-        avgLint: parseFloat(row.avg_lint),
-        avgStructural: parseFloat(row.avg_structural),
+        avgLint: Number.parseFloat(row.avg_lint),
+        avgStructural: Number.parseFloat(row.avg_structural),
       };
     }
   }
@@ -380,7 +386,8 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     accepted: string;
     edited: string;
     avg_lint_score: string;
-  }>(`
+  }>(
+    `
     SELECT
       TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') AS day,
       COUNT(*)::text AS total,
@@ -391,14 +398,16 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
     ORDER BY 1
-  `, [fromIso, toIso]);
+  `,
+    [fromIso, toIso],
+  );
 
   const trendByDay = trendRows.map((row) => ({
     day: row.day,
-    total: parseInt(row.total, 10),
-    accepted: parseInt(row.accepted, 10),
-    edited: parseInt(row.edited, 10),
-    avgLintScore: parseFloat(row.avg_lint_score),
+    total: Number.parseInt(row.total, 10),
+    accepted: Number.parseInt(row.accepted, 10),
+    edited: Number.parseInt(row.edited, 10),
+    avgLintScore: Number.parseFloat(row.avg_lint_score),
   }));
 
   return {
@@ -408,8 +417,8 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     rejectedDrafts,
     acceptanceRate: totalDrafts > 0 ? (acceptedDrafts / totalDrafts) * 100 : 0,
     editRate: totalDrafts > 0 ? (editedDrafts / totalDrafts) * 100 : 0,
-    avgLintScore: parseFloat(overall.avg_lint_score),
-    avgStructuralScore: parseFloat(overall.avg_structural_score),
+    avgLintScore: Number.parseFloat(overall.avg_lint_score),
+    avgStructuralScore: Number.parseFloat(overall.avg_structural_score),
     scoreByOutcome,
     trendByDay,
   };
@@ -441,10 +450,7 @@ export type FollowUpSLAAnalytics = {
   }>;
 };
 
-export const getFollowUpSLAAnalytics = async (params: {
-  from: Date;
-  to: Date;
-}): Promise<FollowUpSLAAnalytics> => {
+export const getFollowUpSLAAnalytics = async (params: { from: Date; to: Date }): Promise<FollowUpSLAAnalytics> => {
   const pool = getPool();
   if (!pool) throw new Error('Database not initialized');
 
@@ -458,7 +464,8 @@ export const getFollowUpSLAAnalytics = async (params: {
     resolved_late: string;
     pending: string;
     avg_resolution_minutes: string;
-  }>(`
+  }>(
+    `
     SELECT
       COUNT(*)::text AS total_work_items,
       COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at <= due_at THEN 1 END)::text AS resolved_on_time,
@@ -467,13 +474,15 @@ export const getFollowUpSLAAnalytics = async (params: {
       COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60), 0)::text AS avg_resolution_minutes
     FROM work_items
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
-  `, [fromIso, toIso]);
+  `,
+    [fromIso, toIso],
+  );
 
   const overall = overallRows[0];
-  const totalWorkItems = parseInt(overall.total_work_items, 10);
-  const resolvedOnTime = parseInt(overall.resolved_on_time, 10);
-  const resolvedLate = parseInt(overall.resolved_late, 10);
-  const pending = parseInt(overall.pending, 10);
+  const totalWorkItems = Number.parseInt(overall.total_work_items, 10);
+  const resolvedOnTime = Number.parseInt(overall.resolved_on_time, 10);
+  const resolvedLate = Number.parseInt(overall.resolved_late, 10);
+  const pending = Number.parseInt(overall.pending, 10);
   const resolved = resolvedOnTime + resolvedLate;
 
   // By rep
@@ -483,7 +492,8 @@ export const getFollowUpSLAAnalytics = async (params: {
     on_time: string;
     late: string;
     pending: string;
-  }>(`
+  }>(
+    `
     SELECT
       COALESCE(rep_id, 'Unassigned') AS rep_id,
       COUNT(*)::text AS total,
@@ -494,19 +504,21 @@ export const getFollowUpSLAAnalytics = async (params: {
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
     ORDER BY COUNT(*) DESC
-  `, [fromIso, toIso]);
+  `,
+    [fromIso, toIso],
+  );
 
   const byRep = repRows.map((row) => {
-    const total = parseInt(row.total, 10);
-    const onTime = parseInt(row.on_time, 10);
-    const late = parseInt(row.late, 10);
+    const total = Number.parseInt(row.total, 10);
+    const onTime = Number.parseInt(row.on_time, 10);
+    const late = Number.parseInt(row.late, 10);
     const repResolved = onTime + late;
     return {
       repId: row.rep_id,
       total,
       onTime,
       late,
-      pending: parseInt(row.pending, 10),
+      pending: Number.parseInt(row.pending, 10),
       complianceRate: repResolved > 0 ? (onTime / repResolved) * 100 : 0,
     };
   });
@@ -518,7 +530,8 @@ export const getFollowUpSLAAnalytics = async (params: {
     on_time: string;
     late: string;
     avg_resolution_minutes: string;
-  }>(`
+  }>(
+    `
     SELECT
       type,
       COUNT(*)::text AS total,
@@ -529,14 +542,16 @@ export const getFollowUpSLAAnalytics = async (params: {
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
     ORDER BY COUNT(*) DESC
-  `, [fromIso, toIso]);
+  `,
+    [fromIso, toIso],
+  );
 
   const byType = typeRows.map((row) => ({
     type: row.type,
-    total: parseInt(row.total, 10),
-    onTime: parseInt(row.on_time, 10),
-    late: parseInt(row.late, 10),
-    avgResolutionMinutes: parseFloat(row.avg_resolution_minutes),
+    total: Number.parseInt(row.total, 10),
+    onTime: Number.parseInt(row.on_time, 10),
+    late: Number.parseInt(row.late, 10),
+    avgResolutionMinutes: Number.parseFloat(row.avg_resolution_minutes),
   }));
 
   return {
@@ -545,7 +560,7 @@ export const getFollowUpSLAAnalytics = async (params: {
     resolvedLate,
     pending,
     slaComplianceRate: resolved > 0 ? (resolvedOnTime / resolved) * 100 : 0,
-    avgResolutionTimeMinutes: parseFloat(overall.avg_resolution_minutes),
+    avgResolutionTimeMinutes: Number.parseFloat(overall.avg_resolution_minutes),
     byRep,
     byType,
   };

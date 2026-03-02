@@ -53,18 +53,21 @@ const DEFAULT_CONFIG: SecurityHeadersConfig = {
 /**
  * Apply security headers to response
  */
-export function applySecurityHeaders(
-  res: ServerResponse,
-  config: SecurityHeadersConfig = DEFAULT_CONFIG
-): void {
+export function applySecurityHeaders(res: ServerResponse, config: SecurityHeadersConfig = DEFAULT_CONFIG): void {
+  const setResponseHeader = (name: string, value: string) => {
+    if (typeof res.setHeader === 'function') {
+      res.setHeader(name, value);
+    }
+  };
+
   // Content Security Policy
   if (config.csp) {
-    res.setHeader('Content-Security-Policy', config.csp);
+    setResponseHeader('Content-Security-Policy', config.csp);
   }
 
   // X-Frame-Options
   if (config.frameOptions) {
-    res.setHeader('X-Frame-Options', config.frameOptions);
+    setResponseHeader('X-Frame-Options', config.frameOptions);
   }
 
   // Strict-Transport-Security
@@ -76,27 +79,27 @@ export function applySecurityHeaders(
     if (config.hsts.preload) {
       hstsValue += '; preload';
     }
-    res.setHeader('Strict-Transport-Security', hstsValue);
+    setResponseHeader('Strict-Transport-Security', hstsValue);
   }
 
   // X-Content-Type-Options
   if (config.noSniff) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
+    setResponseHeader('X-Content-Type-Options', 'nosniff');
   }
 
   // X-XSS-Protection (legacy but still helps older browsers)
   if (config.xssProtection) {
-    res.setHeader('X-XSS-Protection', '1; mode=block');
+    setResponseHeader('X-XSS-Protection', '1; mode=block');
   }
 
   // Referrer-Policy
   if (config.referrerPolicy) {
-    res.setHeader('Referrer-Policy', config.referrerPolicy);
+    setResponseHeader('Referrer-Policy', config.referrerPolicy);
   }
 
   // Permissions-Policy
   if (config.permissionsPolicy) {
-    res.setHeader('Permissions-Policy', config.permissionsPolicy);
+    setResponseHeader('Permissions-Policy', config.permissionsPolicy);
   }
 }
 
@@ -132,7 +135,7 @@ const DEFAULT_RATE_LIMIT: RateLimitConfig = {
  */
 export function checkRateLimit(
   req: { headers: Record<string, string | string[] | undefined> },
-  config: RateLimitConfig = DEFAULT_RATE_LIMIT
+  config: RateLimitConfig = DEFAULT_RATE_LIMIT,
 ): { allowed: boolean; remaining: number; resetIn: number } {
   const key = config.keyBy?.(req) ?? 'default';
   const now = Date.now();
@@ -162,12 +165,10 @@ export function checkRateLimit(
 /**
  * Apply rate limit headers to response
  */
-export function applyRateLimitHeaders(
-  res: ServerResponse,
-  limit: number,
-  remaining: number,
-  resetIn: number
-): void {
+export function applyRateLimitHeaders(res: ServerResponse, limit: number, remaining: number, resetIn: number): void {
+  if (typeof res.setHeader !== 'function') {
+    return;
+  }
   res.setHeader('X-RateLimit-Limit', limit.toString());
   res.setHeader('X-RateLimit-Remaining', remaining.toString());
   res.setHeader('X-RateLimit-Reset', Math.ceil(resetIn / 1000).toString());

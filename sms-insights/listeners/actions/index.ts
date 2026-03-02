@@ -1,13 +1,13 @@
 import type { App } from '@slack/bolt';
+import { buildAlowareAnalyticsReportBundle, buildDailySnapshotBlocks } from '../../services/aloware-analytics.js';
 import { isAlowareChannel } from '../../services/aloware-policy.js';
 import { buildReportActionBlocks, generateAndPostReport, splitReportText } from '../../services/report-poster.js';
-import { buildAlowareAnalyticsReportBundle, buildDailySnapshotBlocks } from '../../services/aloware-analytics.js';
+import { getScoreboardData } from '../../services/scoreboard.js';
 import {
   ALOWARE_CHANNEL_ID,
   buildScoreboardBlocks,
   generateAndPostScoreboard,
 } from '../../services/scoreboard-poster.js';
-import { getScoreboardData } from '../../services/scoreboard.js';
 
 type ReportActionValue = {
   channelId?: string;
@@ -108,7 +108,7 @@ const register = (app: App) => {
       await client.chat
         .postMessage({
           channel: channelId,
-          text: '❌ Failed to generate yesterday\'s report. Please try again.',
+          text: "❌ Failed to generate yesterday's report. Please try again.",
         })
         .catch(() => {});
     }

@@ -1,6 +1,6 @@
 import type { App } from '@slack/bolt';
-import { generateAndPostReport } from './report-poster.js';
 import { logDailyRun } from './daily-run-logger.js';
+import { generateAndPostReport } from './report-poster.js';
 
 const DAILY_REPORT_CHANNEL_ID = 'C09ULGH1BEC'; // #alowaresmsupdates
 const DAILY_REPORT_CHANNEL_NAME = 'alowaresmsupdates';

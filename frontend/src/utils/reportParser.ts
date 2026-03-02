@@ -79,18 +79,16 @@ export function parseReport(reportText: string): ParsedReport {
         continue;
       }
 
-      if (currentSection === 'Core Metrics') {
-        const bookingsMatch = line.match(BOOKINGS_PATTERN);
-        if (bookingsMatch) {
-          currentRep.bookings = Number.parseInt(bookingsMatch[1] || '0', 10);
-          continue;
-        }
+      const bookingsMatch = line.match(BOOKINGS_PATTERN);
+      if (bookingsMatch) {
+        currentRep.bookings = Number.parseInt(bookingsMatch[1] || '0', 10);
+        continue;
+      }
 
-        const optOutsMatch = line.match(OPT_OUTS_PATTERN);
-        if (optOutsMatch) {
-          currentRep.optOuts = Number.parseInt(optOutsMatch[1] || '0', 10);
-          continue;
-        }
+      const optOutsMatch = line.match(OPT_OUTS_PATTERN);
+      if (optOutsMatch) {
+        currentRep.optOuts = Number.parseInt(optOutsMatch[1] || '0', 10);
+        continue;
       }
     }
 

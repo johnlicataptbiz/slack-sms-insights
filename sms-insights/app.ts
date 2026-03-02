@@ -193,7 +193,7 @@ app.error(async (error) => {
         } catch (error) {
           const parsed = parseSlackStartupError(error);
           const detail = parsed.invalidAuth
-            ? `Slack startup failed (invalid_auth). Check SLACK_BOT_TOKEN and SLACK_APP_TOKEN.`
+            ? 'Slack startup failed (invalid_auth). Check SLACK_BOT_TOKEN and SLACK_APP_TOKEN.'
             : `Slack startup failed: ${parsed.reason}`;
           setSlackAuthRuntimeStatus('error', detail);
           logger.app.error(detail);
@@ -219,9 +219,7 @@ app.error(async (error) => {
     // monday read-sync/writeback maintenance jobs (feature-flag gated).
     // startMondaySyncJobs(app.logger);
   } catch (error) {
-    logger.app.error(
-      `[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    logger.app.error(`[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`);
     await reportError(app, error, 'Startup Failure');
   }
 })();

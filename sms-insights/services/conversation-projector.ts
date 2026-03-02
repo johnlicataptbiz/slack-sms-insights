@@ -1,7 +1,7 @@
 import type { Logger } from '@slack/bolt';
 import type { Pool } from 'pg';
-import { getPool } from './db.js';
 import { maybeRecordConversionExample } from './conversion-example-ingestion.js';
+import { getPool } from './db.js';
 import { syncQualificationFromConversationText } from './qualification-sync.js';
 import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventDirection, SmsEventRow } from './sms-event-store.js';

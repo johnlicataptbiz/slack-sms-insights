@@ -3,13 +3,32 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
 import {
+  getDraftAIPerformanceAnalytics,
+  getFollowUpSLAAnalytics,
+  getLinePerformanceAnalytics,
+  getQualificationFunnelAnalytics,
+} from '../services/advanced-analytics.js';
+import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
   getBookedCallsSummary,
 } from '../services/booked-calls.js';
+import {
+  autoAssignWorkItems,
+  bulkInferQualification,
+  deduplicateLines,
+  getAuditLogs,
+  getGoals,
+  getLineActivityBalance,
+  getResponseTimeStats,
+  getTimeToBookingStats,
+  getTrendAlerts,
+  logAuditEvent,
+} from '../services/comprehensive-fixes.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
+import { getPool } from '../services/db.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
 import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
 import { generateDraftSuggestion } from '../services/inbox-draft-engine.js';
@@ -49,13 +68,17 @@ import {
   getVolumeByDayMetrics,
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
+import { getPrismaRuntimeStatus } from '../services/prisma.js';
 import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
+import { getSlackAuthRuntimeStatus } from '../services/runtime-status.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
 import { getScoreboardData } from '../services/scoreboard.js';
+import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../services/security-headers.js';
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
+import { buildSequenceQualificationBreakdown } from '../services/sequence-qualification-analytics.js';
 import {
   createDashboardSession,
   type DashboardSession,
@@ -64,38 +87,10 @@ import {
   getDashboardSession,
   getDashboardSessionTtlSeconds,
 } from '../services/session-store.js';
-import { getPool } from '../services/db.js';
-import { getPrismaRuntimeStatus } from '../services/prisma.js';
-import { getSlackAuthRuntimeStatus } from '../services/runtime-status.js';
 import { getStreamTokenSecretConfigStatus, mintStreamToken, verifyStreamToken } from '../services/stream-token.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
-
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
-import {
-  getDraftAIPerformanceAnalytics,
-  getFollowUpSLAAnalytics,
-  getLinePerformanceAnalytics,
-  getQualificationFunnelAnalytics,
-} from '../services/advanced-analytics.js';
-import {
-  applySecurityHeaders,
-  checkRateLimit,
-  applyRateLimitHeaders,
-} from '../services/security-headers.js';
-import {
-  autoAssignWorkItems,
-  bulkInferQualification,
-  deduplicateLines,
-  getGoals,
-  getLineActivityBalance,
-  getResponseTimeStats,
-  getTimeToBookingStats,
-  getTrendAlerts,
-  logAuditEvent,
-  getAuditLogs,
-} from '../services/comprehensive-fixes.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
-import { buildSequenceQualificationBreakdown } from '../services/sequence-qualification-analytics.js';
 import {
   assignWorkItem,
   decodeWorkItemCursor,
@@ -1074,7 +1069,7 @@ const handleGetSequenceQualificationV2: RequestHandler = async (req, res, logger
   const timeZone = url.searchParams.get('tz') || DEFAULT_BUSINESS_TIMEZONE;
 
   const { from, to } = resolveMetricsRange({ range: rangeParam, tz: timeZone });
-  
+
   try {
     const items = await buildSequenceQualificationBreakdown({
       from: from.toISOString(),
@@ -1082,7 +1077,7 @@ const handleGetSequenceQualificationV2: RequestHandler = async (req, res, logger
       timezone: timeZone,
       logger,
     });
-    
+
     sendJson(
       res,
       200,
@@ -1097,7 +1092,10 @@ const handleGetSequenceQualificationV2: RequestHandler = async (req, res, logger
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch sequence qualification data', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch sequence qualification data',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -1571,12 +1569,7 @@ const handleGetStreamToken: RequestHandler = async (req, res, _logger, origin) =
     token = mintStreamToken({ subject: userId, ttlSeconds: ttl });
   } catch (error) {
     _logger?.error('Failed to mint stream token', error);
-    sendJson(
-      res,
-      503,
-      { error: 'Realtime token service is not configured', code: 'stream_token_unavailable' },
-      origin,
-    );
+    sendJson(res, 503, { error: 'Realtime token service is not configured', code: 'stream_token_unavailable' }, origin);
     return;
   }
 
@@ -3419,7 +3412,7 @@ const handlePostAutoAssignV2: RequestHandler = async (_req, res, _logger, origin
 
 const handlePostBulkInferQualificationV2: RequestHandler = async (req, res, _logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+  const limit = Number.parseInt(url.searchParams.get('limit') || '100', 10);
   const result = await bulkInferQualification(limit);
   sendJson(res, 200, toEnvelope({ data: result, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
 };
@@ -3434,7 +3427,7 @@ const handleGetAuditLogsV2: RequestHandler = async (req, res, _logger, origin) =
   const action = url.searchParams.get('action') || undefined;
   const resourceType = url.searchParams.get('resourceType') || undefined;
   const userId = url.searchParams.get('userId') || undefined;
-  const limit = parseInt(url.searchParams.get('limit') || '100', 10);
+  const limit = Number.parseInt(url.searchParams.get('limit') || '100', 10);
 
   const data = await getAuditLogs({ action, resourceType, userId, limit });
   sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);

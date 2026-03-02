@@ -4,7 +4,11 @@ import { buildAlowareAnalyticsReport } from '../../services/aloware-analytics.js
 import { isAlowareChannel, isReplyGenerationRequest, REPLY_BLOCKED_MESSAGE } from '../../services/aloware-policy.js';
 import { isChannelAllowed } from '../../services/channel-access.js';
 import { generateAndPostReport } from '../../services/report-poster.js';
-import { ALOWARE_CHANNEL_ID, ALOWARE_CHANNEL_NAME, generateAndPostScoreboard } from '../../services/scoreboard-poster.js';
+import {
+  ALOWARE_CHANNEL_ID,
+  ALOWARE_CHANNEL_NAME,
+  generateAndPostScoreboard,
+} from '../../services/scoreboard-poster.js';
 
 const SLACK_TEXT_CHUNK_LIMIT = 3000;
 
@@ -148,9 +152,7 @@ const register = (app: App) => {
 
       // Delete the loading placeholder now that the real report is posted
       if (loadingTs) {
-        await client.chat
-          .delete({ channel: command.channel_id, ts: loadingTs })
-          .catch(() => {});
+        await client.chat.delete({ channel: command.channel_id, ts: loadingTs }).catch(() => {});
       }
     } catch (error) {
       logger.error('[/sms-report] Failed to generate report:', error);
@@ -217,9 +219,7 @@ const register = (app: App) => {
 
       // Delete the loading placeholder
       if (loadingTs) {
-        await client.chat
-          .delete({ channel: ALOWARE_CHANNEL_ID, ts: loadingTs })
-          .catch(() => {});
+        await client.chat.delete({ channel: ALOWARE_CHANNEL_ID, ts: loadingTs }).catch(() => {});
       }
 
       // If the command was run from a different channel, notify the user

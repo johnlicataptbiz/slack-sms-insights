@@ -25,10 +25,7 @@ const decodeAccelerateApiKey = (apiKey: string): AccelerateApiKeyPayload => {
   return JSON.parse(payloadRaw) as AccelerateApiKeyPayload;
 };
 
-export const resolveNodePostgresConnectionString = (
-  databaseUrl: string,
-  logger?: LoggerLike,
-): string => {
+export const resolveNodePostgresConnectionString = (databaseUrl: string, logger?: LoggerLike): string => {
   if (!databaseUrl.startsWith('prisma+postgres://')) {
     return databaseUrl;
   }

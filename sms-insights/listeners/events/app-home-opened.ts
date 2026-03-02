@@ -13,14 +13,10 @@ const appHomeOpenedCallback = async ({
   }
 
   // ── Fetch recent runs from DB for live "Recent Reports" section ───────────
-  const recentRuns = await getDailyRuns(
-    { limit: 3, daysBack: 14, legacyMode: 'exclude' },
-    logger,
-  ).catch(() => []);
+  const recentRuns = await getDailyRuns({ limit: 3, daysBack: 14, legacyMode: 'exclude' }, logger).catch(() => []);
 
   // ── Format recent run rows ────────────────────────────────────────────────
-  const runStatusEmoji = (status: string): string =>
-    status === 'success' ? '✅' : status === 'error' ? '❌' : '⏳';
+  const runStatusEmoji = (status: string): string => (status === 'success' ? '✅' : status === 'error' ? '❌' : '⏳');
 
   const formatRunDate = (row: { report_date: string | null; timestamp: string }): string => {
     const raw = row.report_date ?? row.timestamp;
@@ -150,8 +146,8 @@ const appHomeOpenedCallback = async ({
               text: [
                 '*Use these commands in `#alowaresmsupdates` (or any channel for scoreboard):*',
                 '',
-                '`/sms-report`  →  Generate *today\'s* full SMS performance report',
-                '`/sms-report yesterday`  →  Generate *yesterday\'s* report',
+                "`/sms-report`  →  Generate *today's* full SMS performance report",
+                "`/sms-report yesterday`  →  Generate *yesterday's* report",
                 '`/sms-report 2025-01-15`  →  Report for a *specific date* (YYYY-MM-DD)',
                 '`/sms-report 1/15`  →  Report for a *specific date* (MM/DD)',
                 '`/sms-scoreboard`  →  Post the *weekly setter scoreboard* with bookings, sequences & compliance',
@@ -214,7 +210,7 @@ const appHomeOpenedCallback = async ({
               type: 'mrkdwn',
               text: [
                 '• Hit *🔄 Refresh* on any report card to pull the latest data without generating a new message',
-                '• Hit *📅 Yesterday* to instantly compare with the previous day\'s performance',
+                "• Hit *📅 Yesterday* to instantly compare with the previous day's performance",
                 '• Hit *📊 Scoreboard* on any report card to see the weekly setter leaderboard',
                 '• Mention *@SMS Insights* in any allowed channel to ask a question or request a report',
                 '• Use `/ask` for free-form questions like _"how many leads did we get this week?"_',

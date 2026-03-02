@@ -219,7 +219,11 @@ const extractDateStampParts = (run: RunV2): { month: string; day: string } => {
     // Last resort: regex-extract from strings like "Feb 25, 2026" or "February 25, 2026"
     const match = reportDay.match(/([A-Za-z]+)\s+(\d{1,2})/);
     if (match) {
-      return { month: match[1].slice(0, 3), day: match[2] };
+      const monthMatch = match[1];
+      const dayMatch = match[2];
+      if (monthMatch && dayMatch) {
+        return { month: monthMatch.slice(0, 3), day: dayMatch };
+      }
     }
   }
   // Fall back to the generation timestamp
@@ -294,8 +298,9 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
     ? parsed?.totalRepliesReceived ?? null
     : matchNumber(run.summaryText, REPLIES_RECEIVED_PATTERN);
   const replyRatePct = hasParsedBreakdown ? parsed?.overallReplyRate ?? null : matchNumber(run.summaryText, REPLY_RATE_PATTERN);
+  const parsedBookedFromSequences = parsed?.allSequences.reduce((sum, row) => sum + row.booked, 0) ?? null;
   const booked = hasParsedBreakdown
-    ? parsed?.totalBooked ?? null
+    ? parsedBookedFromSequences
     : matchNumber(run.summaryText, CALLS_BOOKED_PATTERN) ?? matchNumber(run.summaryText, BOOKINGS_ALT_PATTERN);
   const optOuts = hasParsedBreakdown ? parsed?.totalOptOuts ?? null : matchNumber(run.summaryText, OPT_OUTS_PATTERN);
   const outboundConversations = sumMatches(fullReport, OUTBOUND_CONVERSATIONS_PATTERN) ?? matchNumber(run.summaryText, OUTBOUND_FROM_SUMMARY_PATTERN);

@@ -127,7 +127,7 @@ export const maybeRecordConversionExample = async (
 
     // ── Get escalation level from conversation state (default 1) ─────────
     const { rows: stateRows } = await client.query<{ escalation_level: number }>(
-      `SELECT escalation_level FROM conversation_state WHERE conversation_id = $1 LIMIT 1`,
+      'SELECT escalation_level FROM conversation_state WHERE conversation_id = $1 LIMIT 1',
       [conversationId],
     );
     const escalationLevel = Math.max(1, Math.min(4, stateRows[0]?.escalation_level ?? 1)) as 1 | 2 | 3 | 4;

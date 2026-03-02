@@ -1061,8 +1061,8 @@ export const useV2AutoAssign = () => {
 export const useV2BulkInferQualification = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (limit = 100) => {
+  return useMutation<unknown, Error, number>({
+    mutationFn: async (limit: number = 100) => {
       const response = await client.post(`/api/v2/admin/bulk-infer-qualification?limit=${limit}`, {});
       return response;
     },

@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 
 import { client } from '../../api/client';
 import { uiModeStorageKey } from '../../uiMode';
@@ -39,37 +39,14 @@ const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: st
   navigate(to);
 };
 
-// Nav item animation variants
-const navItemVariants = {
-  initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0 },
-  hover: { x: 6, scale: 1.02 },
-  tap: { scale: 0.97 },
-};
-
-// Sidebar animation variants
-const sidebarVariants = {
-  hidden: { x: -260, opacity: 0 },
-  visible: {
-    x: 0,
-    opacity: 1,
-    transition: {
-      type: 'spring',
-      stiffness: 400,
-      damping: 30,
-      staggerChildren: 0.05,
-    },
-  },
-};
-
 // Drawer animation variants
-const drawerVariants = {
+const drawerVariants: Variants = {
   hidden: { x: '100%', opacity: 0 },
   visible: {
     x: 0,
     opacity: 1,
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       stiffness: 300,
       damping: 30,
     },

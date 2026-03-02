@@ -29,7 +29,7 @@ export function analyzeDraftQuality(
     lastMessage?: string;
     conversationLength?: number;
     sequence?: string;
-  }
+  },
 ): DraftQualityScore {
   const scores: DraftQualityScore = {
     overall: 0,
@@ -75,7 +75,10 @@ export function analyzeDraftQuality(
   }
   if (context.lastMessage && draft.length > 20) {
     // Check if draft references something from last message
-    const lastWords = context.lastMessage.toLowerCase().split(/\s+/).filter((w) => w.length > 4);
+    const lastWords = context.lastMessage
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 4);
     const draftLower = draft.toLowerCase();
     if (lastWords.some((w) => draftLower.includes(w))) {
       personalizationScore += 25;
@@ -104,17 +107,12 @@ export function analyzeDraftQuality(
 
   // Overall score (weighted average)
   scores.overall = Math.round(
-    scores.tone * 0.2 +
-    scores.length * 0.15 +
-    scores.personalization * 0.35 +
-    scores.callToAction * 0.3
+    scores.tone * 0.2 + scores.length * 0.15 + scores.personalization * 0.35 + scores.callToAction * 0.3,
   );
 
   // Confidence (based on how well we can analyze)
   scores.confidence = Math.round(
-    (scores.overall > 70 ? 80 : 50) +
-    (context.contactName ? 10 : 0) +
-    (context.lastMessage ? 10 : 0)
+    (scores.overall > 70 ? 80 : 50) + (context.contactName ? 10 : 0) + (context.lastMessage ? 10 : 0),
   );
 
   return scores;
@@ -123,19 +121,22 @@ export function analyzeDraftQuality(
 /**
  * Get high-performing message templates from conversation history
  */
-export async function getHighPerformingTemplates(limit = 10): Promise<Array<{
-  body: string;
-  replyRate: number;
-  bookingRate: number;
-  sequence: string | null;
-}>> {
+export async function getHighPerformingTemplates(limit = 10): Promise<
+  Array<{
+    body: string;
+    replyRate: number;
+    bookingRate: number;
+    sequence: string | null;
+  }>
+> {
   const pool = getPool();
   if (!pool) {
     return [];
   }
 
   // Find outbound messages that led to replies or bookings
-  const result = await pool.query(`
+  const result = await pool.query(
+    `
     WITH outbound_performance AS (
       SELECT
         e.body,
@@ -172,12 +173,14 @@ export async function getHighPerformingTemplates(limit = 10): Promise<Array<{
     WHERE reply_count > 0
     ORDER BY (reply_count::float / sent_count) * (1 + booking_count::float / GREATEST(1, reply_count)) DESC
     LIMIT $1
-  `, [limit]);
+  `,
+    [limit],
+  );
 
   return result.rows.map((row) => ({
     body: row.body,
-    replyRate: parseFloat(row.reply_rate) || 0,
-    bookingRate: parseFloat(row.booking_rate) || 0,
+    replyRate: Number.parseFloat(row.reply_rate) || 0,
+    bookingRate: Number.parseFloat(row.booking_rate) || 0,
     sequence: row.sequence,
   }));
 }
@@ -250,14 +253,12 @@ export async function getDraftAcceptancePatterns(): Promise<{
 /**
  * Generate improved draft based on patterns
  */
-export async function generateImprovedDraft(
-  context: {
-    contactName?: string;
-    lastMessage?: string;
-    conversationSummary?: string;
-    sequence?: string;
-  }
-): Promise<{
+export async function generateImprovedDraft(context: {
+  contactName?: string;
+  lastMessage?: string;
+  conversationSummary?: string;
+  sequence?: string;
+}): Promise<{
   draft: string;
   qualityScore: DraftQualityScore;
   basedOn: string;

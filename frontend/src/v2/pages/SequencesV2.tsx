@@ -140,12 +140,28 @@ type MergedSeqRow = {
   smsReplyPct: number | null;
 };
 
-type HealthFlag = {
-  sequence: string;
-  label: string;
-  detail: string;
-  severity: 'critical' | 'warning' | 'info';
-  stats: Array<{ label: string; value: string; variant?: 'critical' | 'warning' }>;
+export const computeSequenceHeaderMetrics = (
+  payload: SalesMetricsV2,
+  sequenceRows: SalesMetricsV2['sequences'],
+) => {
+  const totalBookedAllChannels = payload.totals.canonicalBookedCalls;
+  const totalBookedAttributedToRows = sequenceRows.reduce((sum, row) => sum + row.canonicalBookedCalls, 0);
+  const attribution = payload.provenance.sequenceBookedAttribution;
+  const unattributedCalls =
+    attribution?.unattributedCalls ?? Math.max(0, totalBookedAllChannels - totalBookedAttributedToRows);
+  const totalBookedAfterReply =
+    attribution?.strictSmsReplyLinkedCalls ??
+    sequenceRows.reduce((sum, row) => sum + row.canonicalBookedAfterSmsReply, 0);
+  const totalBookedNonSmsOrUnknown =
+    attribution?.nonSmsOrUnknownCalls ?? Math.max(0, totalBookedAllChannels - totalBookedAfterReply);
+
+  return {
+    totalBookedAllChannels,
+    totalBookedAttributedToRows,
+    unattributedCalls,
+    totalBookedAfterReply,
+    totalBookedNonSmsOrUnknown,
+  };
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -253,55 +269,6 @@ export default function SequencesV2() {
       avgReplyRate,
       smsReplyBookingPct,
     };
-  }, [mergedRows]);
-
-  // Health watchlist — flag sequences needing attention
-  const healthWatchlist = useMemo((): HealthFlag[] => {
-    const flags: HealthFlag[] = [];
-    for (const row of mergedRows) {
-      if (row.isManual) continue;
-      if (row.messagesSent < 5) continue;
-      if (row.optOutRatePct >= 5 && row.messagesSent >= 10) {
-        flags.push({
-          sequence: row.label,
-          label: '⚠ High Opt-Out Rate',
-          detail: `${fmtPct(row.optOutRatePct)} opt-out rate on ${fmtInt(row.messagesSent)} messages. Review messaging tone and targeting.`,
-          severity: 'critical',
-          stats: [
-            { label: 'Opt-Out Rate', value: fmtPct(row.optOutRatePct), variant: 'critical' },
-            { label: 'Opt-Outs', value: fmtInt(row.optOuts) },
-            { label: 'Sent', value: fmtInt(row.messagesSent) },
-          ],
-        });
-      }
-      if (row.replyRatePct < 5 && row.messagesSent >= 30) {
-        flags.push({
-          sequence: row.label,
-          label: '↓ Low Reply Rate',
-          detail: `Only ${fmtPct(row.replyRatePct)} reply rate on ${fmtInt(row.messagesSent)} messages. Consider refreshing copy or targeting.`,
-          severity: 'warning',
-          stats: [
-            { label: 'Reply Rate', value: fmtPct(row.replyRatePct), variant: 'warning' },
-            { label: 'Replied', value: fmtInt(row.repliesReceived) },
-            { label: 'Sent', value: fmtInt(row.messagesSent) },
-          ],
-        });
-      }
-      if (row.canonicalBookedCalls === 0 && row.messagesSent > 100) {
-        flags.push({
-          sequence: row.label,
-          label: '○ Zero Bookings',
-          detail: `${fmtInt(row.messagesSent)} messages sent with no attributed bookings in this window.`,
-          severity: 'info',
-          stats: [
-            { label: 'Sent', value: fmtInt(row.messagesSent) },
-            { label: 'Reply Rate', value: fmtPct(row.replyRatePct) },
-            { label: 'Booked', value: '0' },
-          ],
-        });
-      }
-    }
-    return flags;
   }, [mergedRows]);
 
   const toggleExpanded = (label: string) => {

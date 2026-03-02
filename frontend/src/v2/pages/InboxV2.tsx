@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 
 import {
   useV2AddConversationNote,
@@ -477,7 +476,13 @@ export default function InboxV2() {
       // Find the last outbound call link index
       let lastCallLinkOutboundIdx = -1;
       for (let i = msgs.length - 1; i >= 0; i--) {
-        if (msgs[i].direction === 'outbound' && msgs[i].body && containsCallLink(msgs[i].body!)) {
+        const message = msgs[i];
+        if (
+          message &&
+          message.direction === 'outbound' &&
+          message.body &&
+          containsCallLink(message.body)
+        ) {
           lastCallLinkOutboundIdx = i;
           break;
         }

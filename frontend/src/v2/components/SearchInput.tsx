@@ -100,7 +100,10 @@ export function SearchInput({
         case 'Enter':
           e.preventDefault();
           if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
-            handleSuggestionClick(suggestions[selectedIndex]);
+            const suggestion = suggestions[selectedIndex];
+            if (suggestion !== undefined) {
+              handleSuggestionClick(suggestion);
+            }
           } else {
             onSearch?.(value);
           }

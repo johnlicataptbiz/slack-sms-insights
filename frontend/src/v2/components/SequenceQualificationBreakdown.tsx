@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Briefcase, DollarSign, Target, Quote, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
 import type { SequenceQualificationItem } from '../../api/v2Queries';
-import './SequenceQualificationBreakdown.css';
+
+if (typeof document !== 'undefined') {
+  void import('./SequenceQualificationBreakdown.css');
+}
 
 type Props = {
   items: SequenceQualificationItem[];

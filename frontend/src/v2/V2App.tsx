@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
@@ -15,7 +15,7 @@ import './v2.css';
 import './styles/components.css';
 
 // Enhanced page transition variants
-const enhancedPageVariants = {
+const enhancedPageVariants: Variants = {
   initial: {
     opacity: 0,
     y: 20,
@@ -40,7 +40,7 @@ const enhancedPageVariants = {
     filter: 'blur(2px)',
     transition: {
       duration: 0.25,
-      ease: 'easeIn',
+      ease: 'easeIn' as const,
     },
   },
 };

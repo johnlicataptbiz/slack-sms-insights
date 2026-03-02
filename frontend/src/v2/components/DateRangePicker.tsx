@@ -210,7 +210,7 @@ export function DateRangePicker({
 
 // Utility functions
 function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] ?? '';
 }
 
 function formatDisplayDate(date: Date): string {

@@ -3310,8 +3310,7 @@ export const buildDailyChecklistReportBundle = ({
 export const buildDailySnapshotBlocks = (summary: DailySnapshotSummary): (KnownBlock | Block)[] => {
   // ── Performance indicators (🟢 good · 🟡 watch · 🔴 act) ─────────────────
   const replyRateIndicator = summary.replyRatePct >= 15 ? '🟢' : summary.replyRatePct >= 8 ? '🟡' : '🔴';
-  const optOutRatePct =
-    summary.outboundConversations > 0 ? (summary.optOuts / summary.outboundConversations) * 100 : 0;
+  const optOutRatePct = summary.outboundConversations > 0 ? (summary.optOuts / summary.outboundConversations) * 100 : 0;
   const optOutIndicator = optOutRatePct <= 3 ? '🟢' : optOutRatePct <= 6 ? '🟡' : '🔴';
   const bookingIndicator =
     summary.bookingRatePerConversationPct >= 3 ? '🟢' : summary.bookingRatePerConversationPct >= 1 ? '🟡' : '🔴';
@@ -3321,8 +3320,7 @@ export const buildDailySnapshotBlocks = (summary: DailySnapshotSummary): (KnownB
   const replyBar = '▓'.repeat(replyBarFilled) + '░'.repeat(5 - replyBarFilled);
 
   // ── Formatters ────────────────────────────────────────────────────────────
-  const fmt = (pct: number, n: number, d: number): string =>
-    d <= 0 ? 'n/a' : `${pct.toFixed(1)}% (${n}/${d})`;
+  const fmt = (pct: number, n: number, d: number): string => (d <= 0 ? 'n/a' : `${pct.toFixed(1)}% (${n}/${d})`);
 
   const bookingPerConversation = fmt(
     summary.bookingRatePerConversationPct,
@@ -3345,8 +3343,7 @@ export const buildDailySnapshotBlocks = (summary: DailySnapshotSummary): (KnownB
   const signals: string[] = [];
   if (summary.replyRatePct >= 15) signals.push('reply rate is strong');
   else if (summary.replyRatePct < 8) signals.push('reply rate is soft');
-  if (summary.bookings > 0)
-    signals.push(`${summary.bookings} booking${summary.bookings === 1 ? '' : 's'} confirmed`);
+  if (summary.bookings > 0) signals.push(`${summary.bookings} booking${summary.bookings === 1 ? '' : 's'} confirmed`);
   if (optOutRatePct > 6) signals.push('opt-out pressure elevated');
   const signalLine = signals.length > 0 ? signals.join(' · ') : 'metrics within normal range';
 

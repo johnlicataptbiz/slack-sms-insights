@@ -1,14 +1,10 @@
-import { withAccelerate } from '@prisma/extension-accelerate';
 import { PrismaClient } from '@prisma/client';
+import { withAccelerate } from '@prisma/extension-accelerate';
 
 let prisma: ReturnType<typeof createPrismaClient> | undefined;
 
 const resolvePrismaUrl = (): string => {
-  const configured = (
-    process.env.PRISMA_ACCELERATE_URL ||
-    process.env.DATABASE_URL ||
-    ''
-  ).trim();
+  const configured = (process.env.PRISMA_ACCELERATE_URL || process.env.DATABASE_URL || '').trim();
   if (!configured) {
     throw new Error('Missing PRISMA_ACCELERATE_URL or DATABASE_URL');
   }
@@ -38,11 +34,7 @@ export type PrismaStatus = {
 };
 
 export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
-  const configured = (
-    process.env.PRISMA_ACCELERATE_URL ||
-    process.env.DATABASE_URL ||
-    ''
-  ).trim();
+  const configured = (process.env.PRISMA_ACCELERATE_URL || process.env.DATABASE_URL || '').trim();
   if (!configured) {
     return {
       status: 'warn',

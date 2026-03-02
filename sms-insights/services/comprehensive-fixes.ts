@@ -22,7 +22,7 @@ export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors:
 
   const workload: Record<string, number> = {};
   for (const row of workloadRows) {
-    workload[row.rep_id] = parseInt(row.count, 10);
+    workload[row.rep_id] = Number.parseInt(row.count, 10);
   }
 
   // Get unassigned work items with their conversation's last outbound line
@@ -62,10 +62,7 @@ export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors:
     }
 
     try {
-      await pool.query(
-        `UPDATE work_items SET rep_id = $1, updated_at = NOW() WHERE id = $2`,
-        [repId, row.id]
-      );
+      await pool.query('UPDATE work_items SET rep_id = $1, updated_at = NOW() WHERE id = $2', [repId, row.id]);
       workload[repId] = (workload[repId] || 0) + 1;
       assigned++;
     } catch (err) {
@@ -88,19 +85,22 @@ export type DraftRejectionReason =
 export const trackDraftRejection = async (
   draftId: string,
   reason: DraftRejectionReason,
-  feedback?: string
+  feedback?: string,
 ): Promise<void> => {
   const pool = getPool();
   if (!pool) throw new Error('Database not initialized');
 
-  await pool.query(`
+  await pool.query(
+    `
     UPDATE draft_suggestions
     SET
       rejection_reason = $2,
       rejection_feedback = $3,
       rejected_at = NOW()
     WHERE id = $1
-  `, [draftId, reason, feedback || null]);
+  `,
+    [draftId, reason, feedback || null],
+  );
 };
 
 export const getDraftRejectionStats = async (): Promise<{
@@ -125,7 +125,7 @@ export const getDraftRejectionStats = async (): Promise<{
   const allFeedback: string[] = [];
 
   for (const row of rows) {
-    byReason[row.reason] = parseInt(row.count, 10);
+    byReason[row.reason] = Number.parseInt(row.count, 10);
     if (row.sample_feedback) {
       allFeedback.push(...row.sample_feedback.slice(0, 3));
     }
@@ -157,10 +157,10 @@ export const getLineActivityBalance = async (): Promise<{
     ORDER BY COUNT(*) DESC
   `);
 
-  const total = rows.reduce((sum, r) => sum + parseInt(r.count, 10), 0);
+  const total = rows.reduce((sum, r) => sum + Number.parseInt(r.count, 10), 0);
 
   const lines = rows.map((row) => {
-    const count = parseInt(row.count, 10);
+    const count = Number.parseInt(row.count, 10);
     const share = total > 0 ? (count / total) * 100 : 0;
     return {
       line: row.line,
@@ -171,11 +171,11 @@ export const getLineActivityBalance = async (): Promise<{
   });
 
   // Generate alert if severe imbalance
-  const imbalanced = lines.filter(l => l.isImbalanced);
+  const imbalanced = lines.filter((l) => l.isImbalanced);
   let alert: string | null = null;
 
   if (imbalanced.length > 0) {
-    const lowLines = imbalanced.filter(l => l.share < 10).map(l => l.line);
+    const lowLines = imbalanced.filter((l) => l.share < 10).map((l) => l.line);
     if (lowLines.length > 0) {
       alert = `Line activity imbalance: ${lowLines.join(', ')} has <10% of volume in the last 7 days`;
     }
@@ -190,7 +190,8 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
   if (!pool) throw new Error('Database not initialized');
 
   // Get conversations with unknown qualification but recent activity
-  const { rows } = await pool.query<{ conversation_id: string; contact_phone: string }>(`
+  const { rows } = await pool.query<{ conversation_id: string; contact_phone: string }>(
+    `
     SELECT DISTINCT c.id AS conversation_id, c.contact_phone
     FROM conversations c
     LEFT JOIN conversation_state cs ON c.id = cs.conversation_id
@@ -204,23 +205,28 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
       WHERE event_ts >= NOW() - INTERVAL '30 days'
     )
     LIMIT $1
-  `, [limit]);
+  `,
+    [limit],
+  );
 
   let updated = 0;
 
   for (const row of rows) {
     // Get conversation text
-    const { rows: messages } = await pool.query<{ body: string; direction: string }>(`
+    const { rows: messages } = await pool.query<{ body: string; direction: string }>(
+      `
       SELECT body, direction
       FROM sms_events
       WHERE contact_phone = $1
       ORDER BY event_ts
       LIMIT 50
-    `, [row.contact_phone]);
+    `,
+      [row.contact_phone],
+    );
 
     const inboundText = messages
-      .filter(m => m.direction === 'inbound' && m.body)
-      .map(m => m.body)
+      .filter((m) => m.direction === 'inbound' && m.body)
+      .map((m) => m.body)
       .join(' ');
 
     if (!inboundText || inboundText.length < 20) continue;
@@ -242,7 +248,12 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
     }
 
     // Interest inference
-    if (lowerText.includes('very interested') || lowerText.includes('definitely') || lowerText.includes('love to') || lowerText.includes("let's do it")) {
+    if (
+      lowerText.includes('very interested') ||
+      lowerText.includes('definitely') ||
+      lowerText.includes('love to') ||
+      lowerText.includes("let's do it")
+    ) {
       inferredState.interest = 'high';
     } else if (lowerText.includes('interested') || lowerText.includes('maybe') || lowerText.includes('tell me more')) {
       inferredState.interest = 'medium';
@@ -277,11 +288,14 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
       }
 
       if (updates.length > 0) {
-        await pool.query(`
+        await pool.query(
+          `
           UPDATE conversation_state
           SET ${updates.join(', ')}, updated_at = NOW()
           WHERE conversation_id = $1
-        `, values);
+        `,
+          values,
+        );
         updated++;
       }
     }
@@ -425,14 +439,14 @@ export const getTimeToBookingStats = async (): Promise<TimeToBookingStats> => {
   `);
 
   return {
-    avgDays: parseFloat(stats.avg_days),
-    medianDays: parseFloat(stats.median_days),
-    minDays: parseFloat(stats.min_days),
-    maxDays: parseFloat(stats.max_days),
-    bySequence: sequenceRows.map(r => ({
+    avgDays: Number.parseFloat(stats.avg_days),
+    medianDays: Number.parseFloat(stats.median_days),
+    minDays: Number.parseFloat(stats.min_days),
+    maxDays: Number.parseFloat(stats.max_days),
+    bySequence: sequenceRows.map((r) => ({
       sequence: r.sequence,
-      avgDays: parseFloat(r.avg_days),
-      bookings: parseInt(r.bookings, 10),
+      avgDays: Number.parseFloat(r.avg_days),
+      bookings: Number.parseInt(r.bookings, 10),
     })),
   };
 };
@@ -453,10 +467,7 @@ export type ResponseTimeStats = {
   }>;
 };
 
-export const getResponseTimeStats = async (params: {
-  from: Date;
-  to: Date;
-}): Promise<ResponseTimeStats> => {
+export const getResponseTimeStats = async (params: { from: Date; to: Date }): Promise<ResponseTimeStats> => {
   const pool = getPool();
   if (!pool) throw new Error('Database not initialized');
 
@@ -464,7 +475,8 @@ export const getResponseTimeStats = async (params: {
     avg_minutes: string;
     median_minutes: string;
     p95_minutes: string;
-  }>(`
+  }>(
+    `
     WITH response_pairs AS (
       SELECT
         inbound.event_ts AS inbound_time,
@@ -493,7 +505,9 @@ export const getResponseTimeStats = async (params: {
       COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_minutes), 0)::text AS p95_minutes
     FROM response_pairs
     WHERE response_minutes > 0 AND response_minutes < 1440
-  `, [params.from.toISOString(), params.to.toISOString()]);
+  `,
+    [params.from.toISOString(), params.to.toISOString()],
+  );
 
   const stats = rows[0];
 
@@ -502,7 +516,8 @@ export const getResponseTimeStats = async (params: {
     rep: string;
     avg_minutes: string;
     responses: string;
-  }>(`
+  }>(
+    `
     WITH response_pairs AS (
       SELECT
         outbound.line,
@@ -535,13 +550,16 @@ export const getResponseTimeStats = async (params: {
     WHERE response_minutes > 0 AND response_minutes < 1440
     GROUP BY 1
     ORDER BY AVG(response_minutes)
-  `, [params.from.toISOString(), params.to.toISOString()]);
+  `,
+    [params.from.toISOString(), params.to.toISOString()],
+  );
 
   // By hour
   const { rows: hourRows } = await pool.query<{
     hour: string;
     avg_minutes: string;
-  }>(`
+  }>(
+    `
     WITH response_pairs AS (
       SELECT
         EXTRACT(HOUR FROM inbound.event_ts AT TIME ZONE 'America/Chicago') AS hour,
@@ -562,20 +580,22 @@ export const getResponseTimeStats = async (params: {
     WHERE response_minutes > 0 AND response_minutes < 1440
     GROUP BY hour
     ORDER BY hour
-  `, [params.from.toISOString(), params.to.toISOString()]);
+  `,
+    [params.from.toISOString(), params.to.toISOString()],
+  );
 
   return {
-    avgMinutes: parseFloat(stats.avg_minutes),
-    medianMinutes: parseFloat(stats.median_minutes),
-    p95Minutes: parseFloat(stats.p95_minutes),
-    byRep: repRows.map(r => ({
+    avgMinutes: Number.parseFloat(stats.avg_minutes),
+    medianMinutes: Number.parseFloat(stats.median_minutes),
+    p95Minutes: Number.parseFloat(stats.p95_minutes),
+    byRep: repRows.map((r) => ({
       rep: r.rep,
-      avgMinutes: parseFloat(r.avg_minutes),
-      responses: parseInt(r.responses, 10),
+      avgMinutes: Number.parseFloat(r.avg_minutes),
+      responses: Number.parseInt(r.responses, 10),
     })),
-    byHour: hourRows.map(r => ({
-      hour: parseInt(r.hour, 10),
-      avgMinutes: parseFloat(r.avg_minutes),
+    byHour: hourRows.map((r) => ({
+      hour: Number.parseInt(r.hour, 10),
+      avgMinutes: Number.parseFloat(r.avg_minutes),
     })),
   };
 };
@@ -597,7 +617,13 @@ export const getGoals = async (): Promise<Goal[]> => {
   if (!pool) throw new Error('Database not initialized');
 
   // Define goals
-  const goals: Array<{ name: string; target: number; unit: string; period: 'daily' | 'weekly' | 'monthly'; query: string }> = [
+  const goals: Array<{
+    name: string;
+    target: number;
+    unit: string;
+    period: 'daily' | 'weekly' | 'monthly';
+    query: string;
+  }> = [
     {
       name: 'Daily Bookings',
       target: 3,
@@ -646,7 +672,7 @@ export const getGoals = async (): Promise<Goal[]> => {
 
   for (const goal of goals) {
     const { rows } = await pool.query<{ value: string }>(goal.query.replace('::text', '::text AS value'));
-    const current = parseFloat(rows[0]?.value || '0');
+    const current = Number.parseFloat(rows[0]?.value || '0');
 
     // For "max" targets like opt-out rate, invert the logic
     const isMaxTarget = goal.unit.includes('max');
@@ -701,8 +727,8 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
        AND event_ts < CURRENT_DATE - INTERVAL '1 day')::text AS last_week
   `);
 
-  const todayReplyRate = parseFloat(replyRateRows[0]?.today || '0');
-  const lastWeekReplyRate = parseFloat(replyRateRows[0]?.last_week || '0');
+  const todayReplyRate = Number.parseFloat(replyRateRows[0]?.today || '0');
+  const lastWeekReplyRate = Number.parseFloat(replyRateRows[0]?.last_week || '0');
 
   if (lastWeekReplyRate > 0 && todayReplyRate < lastWeekReplyRate * 0.7) {
     alerts.push({
@@ -730,8 +756,8 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
        AND event_ts < CURRENT_DATE)::text AS avg
   `);
 
-  const todayOptOuts = parseInt(optOutRows[0]?.today || '0', 10);
-  const avgOptOuts = parseFloat(optOutRows[0]?.avg || '0');
+  const todayOptOuts = Number.parseInt(optOutRows[0]?.today || '0', 10);
+  const avgOptOuts = Number.parseFloat(optOutRows[0]?.avg || '0');
 
   if (avgOptOuts > 0 && todayOptOuts > avgOptOuts * 2) {
     alerts.push({
@@ -752,7 +778,7 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
     WHERE event_ts >= CURRENT_DATE AT TIME ZONE 'America/Chicago'
   `);
 
-  const todayActivity = parseInt(activityRows[0]?.count || '0', 10);
+  const todayActivity = Number.parseInt(activityRows[0]?.count || '0', 10);
   const currentHour = new Date().getHours();
 
   // If after 10am and less than 10 messages, flag it
@@ -794,17 +820,20 @@ export const logAuditEvent = async (params: {
   const pool = getPool();
   if (!pool) throw new Error('Database not initialized');
 
-  await pool.query(`
+  await pool.query(
+    `
     INSERT INTO audit_logs (action, resource_type, resource_id, user_id, details, ip_address)
     VALUES ($1, $2, $3, $4, $5, $6)
-  `, [
-    params.action,
-    params.resourceType,
-    params.resourceId,
-    params.userId || null,
-    JSON.stringify(params.details || {}),
-    params.ipAddress || null,
-  ]);
+  `,
+    [
+      params.action,
+      params.resourceType,
+      params.resourceId,
+      params.userId || null,
+      JSON.stringify(params.details || {}),
+      params.ipAddress || null,
+    ],
+  );
 };
 
 export const getAuditLogs = async (params: {
@@ -855,15 +884,18 @@ export const getAuditLogs = async (params: {
     details: string;
     ip_address: string | null;
     created_at: string;
-  }>(`
+  }>(
+    `
     SELECT id, action, resource_type, resource_id, user_id, details, ip_address, created_at
     FROM audit_logs
     ${whereClause}
     ORDER BY created_at DESC
     LIMIT ${limit}
-  `, values);
+  `,
+    values,
+  );
 
-  return rows.map(row => ({
+  return rows.map((row) => ({
     id: row.id,
     action: row.action,
     resourceType: row.resource_type,

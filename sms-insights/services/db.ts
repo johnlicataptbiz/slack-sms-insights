@@ -1,5 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { Pool } from 'pg';
+import { resolveNodePostgresConnectionString } from './database-url.js';
 
 let pool: Pool | undefined;
 
@@ -18,8 +19,10 @@ export const initDatabase = async (logger?: Pick<Logger, 'info' | 'error'>): Pro
     return;
   }
 
+  const connectionString = resolveNodePostgresConnectionString(databaseUrl, logger);
+
   pool = new Pool({
-    connectionString: databaseUrl,
+    connectionString,
     max: 10,
     idleTimeoutMillis: 30000,
     // Railway proxy can be latent; avoid frequent timeouts in local dev.

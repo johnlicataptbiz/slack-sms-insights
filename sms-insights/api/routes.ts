@@ -65,6 +65,7 @@ import {
   getDashboardSessionTtlSeconds,
 } from '../services/session-store.js';
 import { getPool } from '../services/db.js';
+import { getPrismaRuntimeStatus } from '../services/prisma.js';
 import { getSlackAuthRuntimeStatus } from '../services/runtime-status.js';
 import { getStreamTokenSecretConfigStatus, mintStreamToken, verifyStreamToken } from '../services/stream-token.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
@@ -688,6 +689,7 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
     }
   }
 
+  const prismaRuntime = await getPrismaRuntimeStatus();
   const streamTokenConfig = getStreamTokenSecretConfigStatus();
   const slackAuthRuntime = getSlackAuthRuntimeStatus();
   const buildSha = getBuildSha();
@@ -710,6 +712,11 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
         db: {
           status: dbStatus,
           detail: dbDetail,
+        },
+        prisma_accelerate: {
+          status: prismaRuntime.status,
+          configured: prismaRuntime.configured,
+          detail: prismaRuntime.detail,
         },
         slack_auth: {
           status: slackAuthRuntime.status,

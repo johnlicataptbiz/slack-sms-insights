@@ -94,6 +94,10 @@ type SendContext = {
   senderEmail?: string | null;
   senderIdentity?: string | null;
   idempotencyKey?: string | null;
+  setterAssist?: {
+    chipLabel: string;
+    intent: string;
+  } | null;
 };
 
 export type SendInboxMessageResult = {
@@ -156,6 +160,7 @@ export const sendInboxMessage = async (
             to: context.profile?.phone || context.conversation.contact_phone,
             escalationLevel,
             blockedReason: 'stage_gating',
+            setterAssist: context.setterAssist ?? null,
           },
           responsePayload: null,
           errorMessage: `Call links require escalation level ${MIN_ESCALATION_FOR_CALL_LINK}+ (current: ${escalationLevel})`,
@@ -223,6 +228,7 @@ export const sendInboxMessage = async (
       lineId: context.lineId ?? null,
       senderUserId: context.senderUserId ?? null,
       senderEmail: context.senderEmail ?? null,
+      setterAssist: context.setterAssist ?? null,
     },
     responsePayload: null,
   };

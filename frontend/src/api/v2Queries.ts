@@ -2,11 +2,13 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { client } from './client';
 import {
+  assertMondayBoardCatalogV2Envelope,
   assertDraftSuggestionEnvelope,
   assertChannelsV2Envelope,
   assertInboxSendConfigEnvelope,
   assertInboxConversationDetailEnvelope,
   assertInboxConversationListEnvelope,
+  assertMondayScorecardsV2Envelope,
   assertRunV2Envelope,
   assertRunsListV2Envelope,
   assertMondayLeadInsightsV2Envelope,
@@ -20,6 +22,7 @@ import {
 import type {
   AlowareSequenceSyncV2,
   ApiEnvelope,
+  BoardCatalogV2,
   CallOutcomeV2,
   ChannelsV2,
   DraftSuggestionV2,
@@ -27,7 +30,9 @@ import type {
   InboxConversationDetailV2,
   InboxConversationListV2,
   MondayLeadInsightsV2,
+  MondayScorecardsV2,
   ObjectionFrequencyRowV2,
+  SetterAssistPerformanceRowV2,
   QualificationStateV2,
   RunV2,
   RunsListV2,
@@ -309,7 +314,8 @@ type MondayLeadInsightsQueryParams = {
   from?: string;
   to?: string;
   tz?: string;
-  boardId?: string;
+  scope?: 'curated' | 'all' | 'board_ids';
+  boardIds?: string[];
   sourceLimit?: number;
   setterLimit?: number;
 };
@@ -325,7 +331,8 @@ const toMondayLeadInsightsSearchParams = (params: MondayLeadInsightsQueryParams)
     search.set('range', params.range || '30d');
   }
   if (params.tz) search.set('tz', params.tz);
-  if (params.boardId) search.set('boardId', params.boardId);
+  if (params.scope) search.set('scope', params.scope);
+  if (params.boardIds?.length) search.set('boardIds', params.boardIds.join(','));
   if (Number.isFinite(params.sourceLimit)) search.set('sourceLimit', String(params.sourceLimit));
   if (Number.isFinite(params.setterLimit)) search.set('setterLimit', String(params.setterLimit));
   return search;
@@ -339,6 +346,80 @@ export const useV2MondayLeadInsights = (params: MondayLeadInsightsQueryParams) =
       const response = await client.get<unknown>(`/api/v2/admin/monday/lead-insights?${search.toString()}`);
       assertMondayLeadInsightsV2Envelope(response);
       return response as ApiEnvelope<MondayLeadInsightsV2>;
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
+  });
+};
+
+type MondayBoardCatalogQueryParams = {
+  staleThresholdHours?: number;
+};
+
+const toMondayBoardCatalogSearchParams = (params: MondayBoardCatalogQueryParams): URLSearchParams => {
+  const search = new URLSearchParams();
+  if (Number.isFinite(params.staleThresholdHours)) {
+    search.set('staleThresholdHours', String(params.staleThresholdHours));
+  }
+  return search;
+};
+
+export const useV2MondayBoardCatalog = (params: MondayBoardCatalogQueryParams = {}) => {
+  const search = toMondayBoardCatalogSearchParams(params);
+  return useQuery({
+    queryKey: ['v2', 'admin', 'monday', 'board-catalog', params],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/admin/monday/board-catalog?${search.toString()}`);
+      assertMondayBoardCatalogV2Envelope(response);
+      return response as ApiEnvelope<BoardCatalogV2>;
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
+  });
+};
+
+type MondayScorecardsQueryParams = {
+  range?: 'today' | '7d' | '30d';
+  day?: string;
+  from?: string;
+  to?: string;
+  tz?: string;
+  boardClass?: string;
+  metricOwner?: string;
+  metricName?: string;
+};
+
+const toMondayScorecardsSearchParams = (params: MondayScorecardsQueryParams): URLSearchParams => {
+  const search = new URLSearchParams();
+  if (params.day) {
+    search.set('day', params.day);
+  } else if (params.from && params.to) {
+    search.set('from', params.from);
+    search.set('to', params.to);
+  } else {
+    search.set('range', params.range || '30d');
+  }
+  if (params.tz) search.set('tz', params.tz);
+  if (params.boardClass) search.set('boardClass', params.boardClass);
+  if (params.metricOwner) search.set('metricOwner', params.metricOwner);
+  if (params.metricName) search.set('metricName', params.metricName);
+  return search;
+};
+
+export const useV2MondayScorecards = (params: MondayScorecardsQueryParams) => {
+  const search = toMondayScorecardsSearchParams(params);
+  return useQuery({
+    queryKey: ['v2', 'admin', 'monday', 'scorecards', params],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/admin/monday/scorecards?${search.toString()}`);
+      assertMondayScorecardsV2Envelope(response);
+      return response as ApiEnvelope<MondayScorecardsV2>;
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -456,6 +537,7 @@ export const useV2GenerateDraft = () => {
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
       void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'analytics', 'setter-assist-performance'] });
     },
   });
 };
@@ -471,6 +553,10 @@ export const useV2SendInboxMessage = () => {
       fromNumber?: string;
       senderIdentity?: string;
       draftId?: string;
+      setterAssist?: {
+        chipLabel: string;
+        intent: string;
+      };
     }) => {
       const response = await client.post<unknown>(`/api/v2/inbox/conversations/${params.conversationId}/send`, {
         body: params.body,
@@ -479,6 +565,7 @@ export const useV2SendInboxMessage = () => {
         fromNumber: params.fromNumber,
         senderIdentity: params.senderIdentity,
         draftId: params.draftId,
+        setterAssist: params.setterAssist,
       });
       assertSendMessageResultEnvelope(response);
       return response as ApiEnvelope<SendMessageResultV2>;
@@ -857,6 +944,20 @@ export const useV2ObjectionFrequency = () =>
         '/api/v2/inbox/analytics/objection-frequency',
       );
       return (response as ApiEnvelope<ObjectionFrequencyRowV2[]>).data;
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+
+export const useV2SetterAssistPerformance = () =>
+  useQuery({
+    queryKey: ['v2', 'inbox', 'analytics', 'setter-assist-performance'],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<SetterAssistPerformanceRowV2[]>>(
+        '/api/v2/inbox/analytics/setter-assist-performance',
+      );
+      return (response as ApiEnvelope<SetterAssistPerformanceRowV2[]>).data;
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

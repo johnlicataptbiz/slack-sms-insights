@@ -220,6 +220,150 @@ export type WeeklyManagerSummaryV2 = {
   actionsNextWeek: string[];
 };
 
+export type MondayLeadScopeV2 = 'curated' | 'all' | 'board_ids';
+
+export type MondayLeadInsightsV2 = {
+  window: {
+    fromDay: string;
+    toDay: string;
+    timeZone: string;
+    scope: MondayLeadScopeV2;
+  };
+  includedBoards: string[];
+  excludedBoards: string[];
+  totals: {
+    leads: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    badTiming: number;
+    badFit: number;
+    noShow: number;
+    cancelled: number;
+  };
+  outcomesByCategory: Array<{
+    category: string;
+    count: number;
+  }>;
+  topSources: Array<{
+    source: string;
+    count: number;
+  }>;
+  topSetters: Array<{
+    setter: string;
+    leads: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    badTiming: number;
+    badFit: number;
+    noShow: number;
+    cancelled: number;
+  }>;
+  activityByDay: Array<{
+    day: string;
+    leads: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    badTiming: number;
+    badFit: number;
+    noShow: number;
+    cancelled: number;
+  }>;
+  mondaySyncState: Array<{
+    boardId: string;
+    status: string | null;
+    lastSyncAt: string | null;
+    updatedAt: string | null;
+    error: string | null;
+  }>;
+  dataQuality: {
+    attributionRows: number;
+    sourceCoveragePct: number;
+    campaignCoveragePct: number;
+    setByCoveragePct: number;
+    touchpointsCoveragePct: number;
+    staleBoards: number;
+    erroredBoards: number;
+    emptyBoards: number;
+  };
+};
+
+export type BoardCatalogV2 = {
+  generatedAt: string;
+  staleThresholdHours: number;
+  totals: {
+    boards: number;
+    active: number;
+    funnelBoards: number;
+    synced: number;
+    stale: number;
+    errored: number;
+    empty: number;
+  };
+  boards: Array<{
+    boardId: string;
+    boardLabel: string;
+    boardClass: string;
+    metricGrain: string;
+    includeInFunnel: boolean;
+    includeInExec: boolean;
+    active: boolean;
+    ownerTeam: string | null;
+    notes: string | null;
+    syncStatus: string | null;
+    lastSyncAt: string | null;
+    syncUpdatedAt: string | null;
+    syncError: string | null;
+    isStale: boolean;
+    snapshotCount: number;
+    leadOutcomeCount: number;
+    leadAttributionCount: number;
+    setterActivityCount: number;
+    metricFactCount: number;
+    coverage: {
+      sourcePopulated: number;
+      campaignPopulated: number;
+      setByPopulated: number;
+      touchpointsPopulated: number;
+    };
+  }>;
+};
+
+export type MondayScorecardsV2 = {
+  window: { fromDay: string; toDay: string; timeZone: string };
+  filters: {
+    boardClass: string | null;
+    metricOwner: string | null;
+    metricName: string | null;
+  };
+  totals: {
+    rows: number;
+    boards: number;
+    metrics: number;
+  };
+  metrics: Array<{
+    metricName: string;
+    rowCount: number;
+    boards: number;
+    totalValue: number | null;
+    avgValue: number | null;
+  }>;
+  trendByDay: Array<{
+    day: string;
+    metricName: string;
+    value: number | null;
+    rowCount: number;
+  }>;
+  byOwner: Array<{
+    metricOwner: string;
+    role: 'setter' | 'closer' | 'other';
+    rowCount: number;
+    totalValue: number | null;
+  }>;
+};
+
 export type QualificationStateV2 = {
   fullOrPartTime: 'full_time' | 'part_time' | 'unknown';
   niche: string | null;
@@ -249,6 +393,14 @@ export type InboxMessageV2 = {
   createdAt: string;
   slackChannelId: string;
   slackMessageTs: string;
+  linkPreviews?: Array<{
+    url: string;
+    hostname: string | null;
+    title: string | null;
+    description: string | null;
+    siteName: string | null;
+    image: string | null;
+  }>;
 };
 
 export type InboxContactCardV2 = {
@@ -393,6 +545,10 @@ export type SendMessageRequestV2 = {
   lineId?: number;
   fromNumber?: string;
   senderIdentity?: string;
+  setterAssist?: {
+    chipLabel: string;
+    intent: string;
+  };
 };
 
 export type SendMessageResultV2 = {

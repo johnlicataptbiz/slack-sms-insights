@@ -13,6 +13,11 @@ import {
   parseISO,
 } from "date-fns";
 import { useForm } from "react-hook-form";
+import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
+import { parsePhoneNumberFromString } from "libphonenumber-js";
+import Linkify from "linkify-react";
+import { useHotkeys } from "react-hotkeys-hook";
+import { Mention, MentionsInput } from "react-mentions";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { z } from "zod";
 import {
@@ -43,6 +48,7 @@ import {
   useV2InboxTemplates,
   useV2IncrementGuardrailOverride,
   useV2ObjectionFrequency,
+  useV2SetterAssistPerformance,
   useV2OverrideEscalation,
   useV2SendInboxMessage,
   useV2SetDefaultSendLine,
@@ -99,6 +105,14 @@ const shorten = (value: string | null, max = 100): string => {
   return `${value.slice(0, max)}...`;
 };
 
+const formatPhoneDisplay = (value: string | null | undefined): string => {
+  const input = (value || "").trim();
+  if (!input) return "";
+  const parsed = parsePhoneNumberFromString(input, "US");
+  if (parsed?.isValid()) return parsed.formatNational();
+  return input;
+};
+
 // ---------------------------------------------------------------------------
 // Link Detection
 // ---------------------------------------------------------------------------
@@ -131,6 +145,44 @@ const containsCallLink = (text: string): boolean => {
 const containsPodcastLink = (text: string): boolean => {
   const lower = text.toLowerCase();
   return PODCAST_LINK_PATTERNS.some((pattern) => lower.includes(pattern));
+};
+
+type SetterIntent =
+  | "ready"
+  | "pricing"
+  | "timing"
+  | "insurance"
+  | "skeptical"
+  | "how_to"
+  | "unknown";
+
+const inferSetterIntent = (messageBody: string | null | undefined): SetterIntent => {
+  const text = (messageBody || "").toLowerCase();
+  if (!text) return "unknown";
+  if (/\b(book|let's do|lets do|ready|i'm in|im in|sign me up|call me)\b/.test(text)) {
+    return "ready";
+  }
+  if (/\b(price|pricing|cost|expensive|afford|budget)\b/.test(text)) {
+    return "pricing";
+  }
+  if (/\b(busy|later|next week|next month|timing|not now)\b/.test(text)) {
+    return "timing";
+  }
+  if (/\b(insurance|cash|credential|billing|reimbursement)\b/.test(text)) {
+    return "insurance";
+  }
+  if (/\b(scam|skeptical|not sure|doubt|trust)\b/.test(text)) {
+    return "skeptical";
+  }
+  if (/\b(how|what does|how do i|steps|process)\b/.test(text)) {
+    return "how_to";
+  }
+  return "unknown";
+};
+
+type SetterStarterChip = {
+  label: string;
+  template: string;
 };
 
 const createClientIdempotencyKey = (): string => {
@@ -299,6 +351,89 @@ const COACHING_INTEREST_OPTIONS: V2SelectOption[] = [
   { value: "low", label: "Low" },
 ];
 
+const TEMPLATE_OWNER_MENTIONS = [
+  { id: "Jack", display: "@Jack" },
+  { id: "Brandon", display: "@Brandon" },
+];
+
+const TEMPLATE_VARIABLE_MENTIONS = [
+  { id: "{{name}}", display: "{{name}}" },
+  { id: "{{first_name}}", display: "{{first_name}}" },
+  { id: "{{phone}}", display: "{{phone}}" },
+  { id: "{{line}}", display: "{{line}}" },
+  { id: "{{calendly}}", display: "{{calendly}}" },
+];
+
+const templateMentionsInputStyle = {
+  control: {
+    minHeight: 64,
+    border: "1px solid rgba(7, 19, 36, 0.14)",
+    borderRadius: 8,
+    background: "rgba(255, 255, 255, 0.95)",
+    fontSize: 13,
+    fontFamily: "inherit",
+  },
+  highlighter: {
+    padding: "0.45rem 0.55rem",
+  },
+  input: {
+    margin: 0,
+    padding: "0.45rem 0.55rem",
+    outline: 0,
+    border: 0,
+    minHeight: 64,
+  },
+  suggestions: {
+    list: {
+      backgroundColor: "#ffffff",
+      border: "1px solid rgba(7, 19, 36, 0.14)",
+      borderRadius: 8,
+      fontSize: 12,
+      boxShadow: "0 12px 24px rgba(7, 19, 36, 0.16)",
+    },
+    item: {
+      padding: "6px 10px",
+      borderBottom: "1px solid rgba(7, 19, 36, 0.08)",
+    },
+  },
+} as const;
+
+const composerMentionsInputStyle = {
+  control: {
+    minHeight: 60,
+    border: "1px solid color-mix(in srgb, var(--v2-accent) 28%, var(--v2-border) 72%)",
+    borderRadius: 12,
+    background: "linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 253, 255, 0.92))",
+    fontSize: 14,
+    fontFamily: "inherit",
+  },
+  highlighter: {
+    padding: "0.65rem 0.8rem",
+  },
+  input: {
+    margin: 0,
+    padding: "0.65rem 0.8rem",
+    outline: 0,
+    border: 0,
+    minHeight: 60,
+    maxHeight: 220,
+  },
+  suggestions: {
+    list: {
+      backgroundColor: "#ffffff",
+      border: "1px solid rgba(7, 19, 36, 0.14)",
+      borderRadius: 8,
+      fontSize: 12,
+      boxShadow: "0 12px 24px rgba(7, 19, 36, 0.16)",
+      zIndex: 42,
+    },
+    item: {
+      padding: "6px 10px",
+      borderBottom: "1px solid rgba(7, 19, 36, 0.08)",
+    },
+  },
+} as const;
+
 const assignSchema = z.object({
   ownerLabel: z.string().trim().max(80, "Owner name is too long"),
 });
@@ -334,6 +469,9 @@ export default function InboxV2() {
   const [ownerFilter, setOwnerFilter] = useState<
     "all" | "jack" | "brandon" | "unassigned"
   >("all");
+  const [sortMode, setSortMode] = useState<
+    "recent" | "oldest" | "urgent" | "needs_reply"
+  >("recent");
   const [search, setSearch] = useState("");
   const [selectedConversationId, setSelectedConversationId] = useState<
     string | null
@@ -341,6 +479,8 @@ export default function InboxV2() {
   const [isComposerModalOpen, setIsComposerModalOpen] = useState(false);
   const [composerText, setComposerText] = useState("");
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
+  const [selectedSetterChipLabel, setSelectedSetterChipLabel] = useState<string | null>(null);
   const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
     useState<string | null>(null);
   const [selectedLineKey, setSelectedLineKey] = useState("");
@@ -356,6 +496,7 @@ export default function InboxV2() {
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
   const listParentRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const sendLockRef = useRef(false);
   const pendingIdempotencyRef = useRef<{
     signature: string;
@@ -500,10 +641,45 @@ export default function InboxV2() {
     0,
     Math.min(100, 100 - urgentCount * 10 - unassignedCount * 5),
   );
+  const activeFiltersCount =
+    Number(statusFilter !== "open") +
+    Number(ownerFilter !== "all") +
+    Number(Boolean(search.trim())) +
+    Number(!needsReplyOnly) +
+    Number(sortMode !== "recent");
+  const sortedConversations = useMemo(() => {
+    const rows = [...conversations];
+    rows.sort((a, b) => {
+      const aAt = parseDateValue(a.lastMessage.createdAt || "")?.getTime() || 0;
+      const bAt = parseDateValue(b.lastMessage.createdAt || "")?.getTime() || 0;
+      if (sortMode === "oldest") return aAt - bAt;
+      if (sortMode === "needs_reply") {
+        const delta = b.openNeedsReplyCount - a.openNeedsReplyCount;
+        if (delta !== 0) return delta;
+        return bAt - aAt;
+      }
+      if (sortMode === "urgent") {
+        const aPriority =
+          (a.escalation.level <= 2 ? 5 : 0) + Math.min(a.openNeedsReplyCount, 4);
+        const bPriority =
+          (b.escalation.level <= 2 ? 5 : 0) + Math.min(b.openNeedsReplyCount, 4);
+        const delta = bPriority - aPriority;
+        if (delta !== 0) return delta;
+        return bAt - aAt;
+      }
+      return bAt - aAt;
+    });
+    return rows;
+  }, [conversations, sortMode]);
+  const selectedConversationIndex = useMemo(
+    () =>
+      sortedConversations.findIndex((row) => row.id === selectedConversationId),
+    [sortedConversations, selectedConversationId],
+  );
 
   // Virtual list for conversation list performance
   const rowVirtualizer = useVirtualizer({
-    count: conversations.length,
+    count: sortedConversations.length,
     getScrollElement: () => listParentRef.current,
     estimateSize: () => 96,
     overscan: 8,
@@ -534,7 +710,7 @@ export default function InboxV2() {
     listQuery.hasNextPage,
     listQuery.isFetchingNextPage,
     listQuery.isLoading,
-    conversations.length,
+    sortedConversations.length,
   ]);
   const composerLayoutStorageId = isNarrowComposerViewport
     ? "v2-inbox-composer-layout-vertical"
@@ -592,6 +768,12 @@ export default function InboxV2() {
   }, [isComposerModalOpen, showTemplates]);
 
   useEffect(() => {
+    if (!isComposerModalOpen && isEmojiPickerOpen) {
+      setIsEmojiPickerOpen(false);
+    }
+  }, [isComposerModalOpen, isEmojiPickerOpen]);
+
+  useEffect(() => {
     // Do NOT auto-switch while the composer modal is open.
     // When needsReplyOnly is true, a conversation drops out of the filtered list
     // the moment you reply to it — without this guard the effect would immediately
@@ -641,6 +823,7 @@ export default function InboxV2() {
   // Phase 3 hooks
   const stageConversionQuery = useV2StageConversion();
   const objectionFrequencyQuery = useV2ObjectionFrequency();
+  const setterAssistPerformanceQuery = useV2SetterAssistPerformance();
   const draftAiPerformanceQuery = useV2DraftAIPerformance({
     range: "30d",
     tz: "America/Chicago",
@@ -653,6 +836,189 @@ export default function InboxV2() {
   const detailConversation = detail?.conversation || null;
   const detailContactCard = detail?.contactCard || null;
   const detailMessages = Array.isArray(detail?.messages) ? detail.messages : [];
+  const latestInboundMessage = useMemo(() => {
+    for (let i = detailMessages.length - 1; i >= 0; i -= 1) {
+      const row = detailMessages[i];
+      if (row?.direction === "inbound") return row;
+    }
+    return null;
+  }, [detailMessages]);
+  const inferredIntent = inferSetterIntent(latestInboundMessage?.body);
+  const setterAssistSummary = useMemo(() => {
+    if (inferredIntent === "ready") {
+      return {
+        label: "Ready signal",
+        action: "Send call link and ask for two time slots.",
+      };
+    }
+    if (inferredIntent === "pricing") {
+      return {
+        label: "Price objection",
+        action: "Anchor ROI first, then ask a qualifying question.",
+      };
+    }
+    if (inferredIntent === "timing") {
+      return {
+        label: "Timing objection",
+        action: "Offer a low-friction next step and soft commitment.",
+      };
+    }
+    if (inferredIntent === "insurance") {
+      return {
+        label: "Business model concern",
+        action: "Ask payer mix and present a relevant case example.",
+      };
+    }
+    if (inferredIntent === "skeptical") {
+      return {
+        label: "Trust barrier",
+        action: "Lead with proof + short question to reopen dialogue.",
+      };
+    }
+    if (inferredIntent === "how_to") {
+      return {
+        label: "How-to question",
+        action: "Answer directly in 2 lines, then ask for current stage.",
+      };
+    }
+    return {
+      label: "General follow-up",
+      action: "Use a clear question that advances qualification.",
+    };
+  }, [inferredIntent]);
+  const setterStarterChips = useMemo<SetterStarterChip[]>(() => {
+    if (inferredIntent === "ready") {
+      return [
+        {
+          label: "Book now",
+          template:
+            "Awesome {{first_name}} - let’s lock it in. Are you more open this week or next week for a quick call?",
+        },
+        {
+          label: "Time options",
+          template:
+            "{{first_name}}, want to do a quick fit call? Send me 2 times that work and I’ll match one.",
+        },
+        {
+          label: "Commitment check",
+          template:
+            "Before we book, what outcome would make this call a win for you?",
+        },
+      ];
+    }
+    if (inferredIntent === "pricing") {
+      return [
+        {
+          label: "ROI reframe",
+          template:
+            "Totally fair question {{first_name}} - quick context: most clinic owners care less about cost and more about speed to results. What would this need to produce for it to feel worth it?",
+        },
+        {
+          label: "Budget qualifier",
+          template:
+            "What budget range were you hoping to stay in so I can point you to the right path?",
+        },
+        {
+          label: "Case proof",
+          template:
+            "Happy to share a similar clinic example first - cash-based or insurance-heavy model for you?",
+        },
+      ];
+    }
+    if (inferredIntent === "timing") {
+      return [
+        {
+          label: "Low-friction next step",
+          template:
+            "No pressure {{first_name}} - would it help if I send a 2-minute breakdown now and we revisit when timing is better?",
+        },
+        {
+          label: "Calendar anchor",
+          template:
+            "Makes sense. Should I follow up next week or next month so this doesn’t get lost?",
+        },
+        {
+          label: "Priority probe",
+          template:
+            "What would need to change for this to become a priority sooner?",
+        },
+      ];
+    }
+    if (inferredIntent === "insurance") {
+      return [
+        {
+          label: "Payer mix",
+          template:
+            "Quick one {{first_name}} - are you mostly insurance, mostly cash, or a blend right now?",
+        },
+        {
+          label: "Model bridge",
+          template:
+            "Got it. We can map this to your exact reimbursement setup so it’s practical, not generic. Want that?",
+        },
+        {
+          label: "Specific blocker",
+          template:
+            "What part feels most risky on the insurance side - authorization, reimbursement rate, or visit volume?",
+        },
+      ];
+    }
+    if (inferredIntent === "skeptical") {
+      return [
+        {
+          label: "Trust opener",
+          template:
+            "Totally get the hesitation {{first_name}}. Want me to share one concrete result from a clinic similar to yours?",
+        },
+        {
+          label: "Permission ask",
+          template:
+            "If it helps, I can keep this simple and practical. Open to a quick 2-minute explanation?",
+        },
+        {
+          label: "Concern isolate",
+          template:
+            "What’s your biggest concern right now so I can address that directly?",
+        },
+      ];
+    }
+    if (inferredIntent === "how_to") {
+      return [
+        {
+          label: "2-step answer",
+          template:
+            "Great question {{first_name}} - short answer: step 1 is [current baseline], step 2 is [first implementation]. Want the exact version for your clinic?",
+        },
+        {
+          label: "Current stage check",
+          template:
+            "So I tailor this right - where are you currently stuck in the process?",
+        },
+        {
+          label: "Offer walk-through",
+          template:
+            "Happy to walk you through it live in 10 minutes. This week or next week better?",
+        },
+      ];
+    }
+    return [
+      {
+        label: "Discovery question",
+        template:
+          "Hey {{first_name}} - quick one: what’s the #1 bottleneck in your clinic this month?",
+      },
+      {
+        label: "Objection bridge",
+        template:
+          "{{first_name}}, most clinic owners we help had the same concern before they saw how this applies to their setup. Want a 2-min breakdown?",
+      },
+      {
+        label: "Soft CTA",
+        template:
+          "If it helps, we can map this to your situation live. Does this week or next week work better?",
+      },
+    ];
+  }, [inferredIntent]);
   const detailDrafts = Array.isArray(detail?.drafts) ? detail.drafts : [];
   const detailMondayTrail = Array.isArray(detail?.mondayTrail)
     ? detail.mondayTrail
@@ -665,6 +1031,9 @@ export default function InboxV2() {
     : [];
   const objectionFrequencyRows = Array.isArray(objectionFrequencyQuery.data)
     ? objectionFrequencyQuery.data
+    : [];
+  const setterAssistRows = Array.isArray(setterAssistPerformanceQuery.data)
+    ? setterAssistPerformanceQuery.data
     : [];
   const draftAiPerformance = draftAiPerformanceQuery.data?.data || null;
   const setterLikeRate = toFiniteNumber(draftAiPerformance?.setterLikeRate);
@@ -751,6 +1120,7 @@ export default function InboxV2() {
     setShowDoublePitchWarning(false);
     setSequenceIdInput("");
     setLastSequenceSync(null);
+    setSelectedSetterChipLabel(null);
     noteForm.reset({ text: "" });
     snoozeForm.reset({ snoozedUntil: "" });
   }, [selectedConversationId]);
@@ -799,6 +1169,65 @@ export default function InboxV2() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isComposerModalOpen]);
 
+  const selectConversationAtIndex = (index: number) => {
+    const bounded = Math.max(0, Math.min(index, sortedConversations.length - 1));
+    const row = sortedConversations[bounded];
+    if (!row) return;
+    setSelectedConversationId(row.id);
+    setComposerText("");
+    setSelectedDraftId(null);
+    setDraftPrefillDoneForConversation(null);
+  };
+
+  useHotkeys(
+    "mod+f",
+    (event) => {
+      event.preventDefault();
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    },
+    { enableOnFormTags: true },
+    [],
+  );
+
+  useHotkeys(
+    "j",
+    (event) => {
+      event.preventDefault();
+      if (sortedConversations.length === 0) return;
+      const start = selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
+      selectConversationAtIndex(start + 1);
+    },
+    { enableOnFormTags: false },
+    [sortedConversations, selectedConversationIndex],
+  );
+
+  useHotkeys(
+    "k",
+    (event) => {
+      event.preventDefault();
+      if (sortedConversations.length === 0) return;
+      const start = selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
+      selectConversationAtIndex(start - 1);
+    },
+    { enableOnFormTags: false },
+    [sortedConversations, selectedConversationIndex],
+  );
+
+  useHotkeys(
+    "mod+shift+c",
+    (event) => {
+      event.preventDefault();
+      if (!selectedConversationId && sortedConversations.length > 0) {
+        selectConversationAtIndex(0);
+      }
+      setIsComposerModalOpen(true);
+      window.requestAnimationFrame(() => composerRef.current?.focus());
+    },
+    { enableOnFormTags: true },
+    [selectedConversationId, sortedConversations],
+  );
+
   const onGenerateDraft = async () => {
     if (!selectedConversationId) return;
 
@@ -809,6 +1238,7 @@ export default function InboxV2() {
       });
       setComposerText(result.data.text);
       setSelectedDraftId(result.data.id);
+      setSelectedSetterChipLabel(null);
       setDraftPrefillDoneForConversation(selectedConversationId);
       if (result.data.generationMode === "contextual_fallback") {
         const firstWarning =
@@ -888,6 +1318,87 @@ export default function InboxV2() {
     await executeSend(messageText);
   };
 
+  const onAppendEmoji = (emojiData: EmojiClickData) => {
+    setComposerText((prev) => `${prev}${emojiData.emoji}`);
+    setSendStatus((prev) => (prev === "sent" || prev === "error" ? "idle" : prev));
+    pendingIdempotencyRef.current = null;
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  const applyStarter = (template: string, chipLabel: string) => {
+    const firstName =
+      (detailContactCard?.name || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)[0] || "there";
+    const resolved = template.replace(/\{\{first_name\}\}/g, firstName);
+    setComposerText(resolved);
+    setSelectedSetterChipLabel(chipLabel);
+    setSendStatus("idle");
+    setSelectedDraftId(null);
+    pendingIdempotencyRef.current = null;
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  };
+
+  useHotkeys(
+    "mod+enter",
+    (event) => {
+      if (!isComposerModalOpen) return;
+      if (
+        sendMutation.isPending ||
+        composerText.trim().length === 0 ||
+        lineSelectionRequired ||
+        sendConfigQuery.isLoading
+      ) {
+        return;
+      }
+      event.preventDefault();
+      void onSend();
+    },
+    { enableOnFormTags: true },
+    [
+      isComposerModalOpen,
+      sendMutation.isPending,
+      composerText,
+      lineSelectionRequired,
+      sendConfigQuery.isLoading,
+      onSend,
+    ],
+  );
+
+  useHotkeys(
+    "mod+shift+a",
+    (event) => {
+      if (!isComposerModalOpen || !selectedConversationId) return;
+      event.preventDefault();
+      void onUpdateStatus("closed");
+    },
+    { enableOnFormTags: true },
+    [isComposerModalOpen, selectedConversationId],
+  );
+
+  useHotkeys(
+    "mod+shift+s",
+    (event) => {
+      if (!isComposerModalOpen || !selectedConversationId) return;
+      event.preventDefault();
+      const snoozedUntil = addHours(new Date(), 24).toISOString();
+      void snoozeMutation
+        .mutateAsync({
+          conversationId: selectedConversationId,
+          snoozedUntil,
+        })
+        .then(() => setFlashMessage("Snoozed for 24 hours."))
+        .catch((error) =>
+          setFlashMessage(
+            `Snooze failed: ${String((error as Error)?.message || error)}`,
+          ),
+        );
+    },
+    { enableOnFormTags: true },
+    [isComposerModalOpen, selectedConversationId],
+  );
+
   const executeSend = async (messageText: string) => {
     if (!selectedConversationId || sendLockRef.current) return;
     sendLockRef.current = true;
@@ -930,6 +1441,14 @@ export default function InboxV2() {
           : {}),
         ...(sendFromNumber ? { fromNumber: sendFromNumber } : {}),
         ...(selectedDraftId ? { draftId: selectedDraftId } : {}),
+        ...(selectedSetterChipLabel
+          ? {
+              setterAssist: {
+                chipLabel: selectedSetterChipLabel,
+                intent: inferredIntent,
+              },
+            }
+          : {}),
       });
       const lineSummary = formatSendLineLabel(result.data.lineSelection);
 
@@ -940,6 +1459,7 @@ export default function InboxV2() {
 
         setComposerText("");
         setSelectedDraftId(null);
+        setSelectedSetterChipLabel(null);
         pendingIdempotencyRef.current = null;
         if (result.data.status === "duplicate") {
           toast.info("Send deduped: message was already processed.");
@@ -1024,6 +1544,7 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     setComposerText("");
     setSelectedDraftId(null);
+    setSelectedSetterChipLabel(null);
     setDraftPrefillDoneForConversation(selectedConversationId);
     setFlashMessage("Draft cleared.");
   };
@@ -1414,6 +1935,7 @@ export default function InboxV2() {
             />
           </svg>
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Search conversations…"
             value={search}
@@ -1505,6 +2027,68 @@ export default function InboxV2() {
         </div>
       </div>
 
+      <section className="V2Inbox__commandDeck" aria-label="Inbox quick actions">
+        <button
+          type="button"
+          className="V2Inbox__commandCard V2Inbox__commandCard--urgent"
+          onClick={() => {
+            setSortMode("urgent");
+            setNeedsReplyOnly(true);
+            setStatusFilter("open");
+          }}
+        >
+          <span className="V2Inbox__commandLabel">Urgent Queue</span>
+          <strong>{urgentCount}</strong>
+          <small>Escalation L1-L2 that need reply</small>
+        </button>
+        <button
+          type="button"
+          className="V2Inbox__commandCard V2Inbox__commandCard--reply"
+          onClick={() => {
+            setSortMode("needs_reply");
+            setNeedsReplyOnly(true);
+          }}
+        >
+          <span className="V2Inbox__commandLabel">Needs Reply</span>
+          <strong>{unreadCount}</strong>
+          <small>Open threads waiting on outreach</small>
+        </button>
+        <button
+          type="button"
+          className="V2Inbox__commandCard V2Inbox__commandCard--owner"
+          onClick={() => {
+            setOwnerFilter("unassigned");
+            setNeedsReplyOnly(true);
+            setStatusFilter("open");
+            setSortMode("urgent");
+          }}
+        >
+          <span className="V2Inbox__commandLabel">Unassigned</span>
+          <strong>{unassignedCount}</strong>
+          <small>Route these to an owner first</small>
+        </button>
+        <div className="V2Inbox__commandMeta">
+          <p>
+            {activeFiltersCount > 0
+              ? `${activeFiltersCount} active filters`
+              : "No active filters"}
+          </p>
+          <button
+            type="button"
+            className="V2Inbox__commandReset"
+            onClick={() => {
+              setStatusFilter("open");
+              setNeedsReplyOnly(true);
+              setOwnerFilter("all");
+              setSearch("");
+              setSortMode("recent");
+            }}
+          >
+            Reset inbox view
+          </button>
+        </div>
+      </section>
+
       {flashMessage ? (
         <div className="V2Inbox__flash">{flashMessage}</div>
       ) : null}
@@ -1522,6 +2106,32 @@ export default function InboxV2() {
         <div className="V2Inbox__conversationColumn">
           <div className="V2Inbox__listHeader">
             <h2>Conversations</h2>
+            <div className="V2Inbox__listControls">
+              <label className="V2Inbox__sortLabel">
+                Sort
+                <select
+                  className="V2Inbox__sortSelect"
+                  value={sortMode}
+                  onChange={(event) =>
+                    setSortMode(
+                      event.target.value as
+                        | "recent"
+                        | "oldest"
+                        | "urgent"
+                        | "needs_reply",
+                    )
+                  }
+                >
+                  <option value="recent">Most recent</option>
+                  <option value="urgent">Urgent first</option>
+                  <option value="needs_reply">Needs reply first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </label>
+              <span className="V2Inbox__listHint">
+                Cmd/Ctrl+F search • J/K move • Cmd/Ctrl+Enter send • Cmd/Ctrl+Shift+S snooze • Cmd/Ctrl+Shift+A close
+              </span>
+            </div>
             <span className="V2Inbox__listCount">
               {totalConversations}
               {listQuery.hasNextPage ? "+" : ""} shown
@@ -1543,7 +2153,7 @@ export default function InboxV2() {
               Failed to load conversations:{" "}
               {String((listQuery.error as Error)?.message || listQuery.error)}
             </V2State>
-          ) : conversations.length === 0 ? (
+          ) : sortedConversations.length === 0 ? (
             <div className="V2Inbox__emptyState">
               <div className="V2Inbox__emptyIcon">📭</div>
               <h3>No conversations</h3>
@@ -1565,7 +2175,7 @@ export default function InboxV2() {
                   }}
                 >
                   {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                    const conversation = conversations[virtualItem.index];
+                    const conversation = sortedConversations[virtualItem.index];
                     if (!conversation) return null;
                     const isActive = selectedConversationId === conversation.id;
                     const hasUnread = conversation.openNeedsReplyCount > 0;
@@ -1602,7 +2212,7 @@ export default function InboxV2() {
                             {hasUnread && <span className="V2Inbox__convPip" />}
                             <span className="V2Inbox__convName">
                               {conversation.contactName ||
-                                conversation.contactPhone ||
+                                formatPhoneDisplay(conversation.contactPhone) ||
                                 conversation.contactKey}
                               {conversation.dnc && (
                                 <span className="V2Inbox__dncBadge">DNC</span>
@@ -1989,6 +2599,56 @@ export default function InboxV2() {
                 </div>
               )}
             </div>
+
+            <div className="V2Inbox__analyticsSection">
+              <h4 className="V2Inbox__analyticsSectionTitle">
+                Setter Chip Performance (30d)
+              </h4>
+              {setterAssistPerformanceQuery.isLoading ? (
+                <p className="V2Inbox__analyticsHint">Loading…</p>
+              ) : setterAssistPerformanceQuery.isError ? (
+                <p className="V2Inbox__analyticsHint">Failed to load</p>
+              ) : setterAssistRows.length === 0 ? (
+                <p className="V2Inbox__analyticsHint">
+                  No tracked chip sends yet
+                </p>
+              ) : (
+                <table className="V2Inbox__conversionTable">
+                  <thead>
+                    <tr>
+                      <th>Chip</th>
+                      <th>Sent</th>
+                      <th>Replies</th>
+                      <th>Reply %</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {setterAssistRows.slice(0, 8).map((row) => (
+                      <tr key={row.chip_label}>
+                        <td>{row.chip_label}</td>
+                        <td>{row.sent_count}</td>
+                        <td>{row.replied_count}</td>
+                        <td>
+                          <span
+                            className="V2Inbox__conversionRate"
+                            style={{
+                              color:
+                                Number(row.reply_rate_pct) >= 45
+                                  ? "var(--v2-positive)"
+                                  : Number(row.reply_rate_pct) >= 25
+                                    ? "var(--v2-warning)"
+                                    : "var(--v2-critical)",
+                            }}
+                          >
+                            {Number(row.reply_rate_pct).toFixed(1)}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -2167,11 +2827,11 @@ export default function InboxV2() {
                   <>
                     <h3>
                       {detailContactCard?.name ||
-                        detailContactCard?.phone ||
+                        formatPhoneDisplay(detailContactCard?.phone) ||
                         detailContactCard?.contactKey}
                     </h3>
                     <p className="V2Inbox__composerMeta">
-                      {detailContactCard?.phone || "n/a"} · Owner:{" "}
+                      {formatPhoneDisplay(detailContactCard?.phone) || "n/a"} · Owner:{" "}
                       {detailConversation?.ownerLabel || "Unassigned"} · Stage:
                       L{detailConversation?.escalation.level ?? "?"}
                     </p>
@@ -2353,7 +3013,7 @@ export default function InboxV2() {
                       {detailMessages.map((message) => {
                         const leadLabel =
                           detailContactCard?.name ||
-                          detailContactCard?.phone ||
+                          formatPhoneDisplay(detailContactCard?.phone) ||
                           "Lead";
                         // For outbound messages: prefer inferring from message body (e.g., "Jack with PT Biz")
                         // Fall back to alowareUser field, then to default setter
@@ -2388,8 +3048,45 @@ export default function InboxV2() {
                               </time>
                             </div>
                             <p className="V2Inbox__chatBody">
-                              {message.body || "(empty)"}
+                              <Linkify
+                                options={{
+                                  target: "_blank",
+                                  rel: "noopener noreferrer",
+                                  className: "V2Inbox__chatLink",
+                                }}
+                              >
+                                {message.body || "(empty)"}
+                              </Linkify>
                             </p>
+                            {Array.isArray(message.linkPreviews) &&
+                            message.linkPreviews.length > 0 ? (
+                              <div className="V2Inbox__chatPreviews">
+                                {message.linkPreviews.slice(0, 2).map((preview) => (
+                                  <a
+                                    key={`${message.id}-${preview.url}`}
+                                    className="V2Inbox__chatPreviewCard"
+                                    href={preview.url}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                  >
+                                    {preview.image ? (
+                                      <img
+                                        className="V2Inbox__chatPreviewImage"
+                                        src={preview.image}
+                                        alt={preview.title || preview.hostname || "Link preview"}
+                                      />
+                                    ) : null}
+                                    <div className="V2Inbox__chatPreviewBody">
+                                      <strong>
+                                        {preview.title || preview.siteName || preview.hostname || preview.url}
+                                      </strong>
+                                      {preview.description ? <small>{shorten(preview.description, 120)}</small> : null}
+                                      <span>{preview.hostname || preview.url}</span>
+                                    </div>
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
                           </article>
                         );
                       })}
@@ -2406,7 +3103,15 @@ export default function InboxV2() {
                             </time>
                           </div>
                           <p className="V2Inbox__chatBody">
-                            {justSentMessage.text}
+                            <Linkify
+                              options={{
+                                target: "_blank",
+                                rel: "noopener noreferrer",
+                                className: "V2Inbox__chatLink",
+                              }}
+                            >
+                              {justSentMessage.text}
+                            </Linkify>
                           </p>
                           <span className="V2Inbox__sendingIndicator">
                             {!justSentMessage.confirmed ? "Sending…" : "✓ Sent"}
@@ -2417,6 +3122,30 @@ export default function InboxV2() {
 
                     {/* Composer Area */}
                     <div className="V2Inbox__chatComposer">
+                      <div className="V2Inbox__setterAssist">
+                        <div className="V2Inbox__setterAssistHeader">
+                          <p>Setter Assist</p>
+                          <span>{setterAssistSummary.label}</span>
+                        </div>
+                        <p className="V2Inbox__setterAssistAction">
+                          {setterAssistSummary.action}
+                        </p>
+                        <div className="V2Inbox__setterAssistChips">
+                          {setterStarterChips.map((chip) => (
+                            <button
+                              key={chip.label}
+                              type="button"
+                              className="V2Inbox__setterChip"
+                              onClick={() =>
+                                applyStarter(chip.template, chip.label)
+                              }
+                            >
+                              {chip.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       {/* Double Pitch Protection Banner */}
                       {showDoublePitchWarning && (
                         <div
@@ -2456,12 +3185,14 @@ export default function InboxV2() {
                         </div>
                       )}
                       <div className="V2Inbox__chatInputRow">
-                        <textarea
-                          ref={composerRef}
+                        <MentionsInput
+                          inputRef={(element: HTMLTextAreaElement | null) => {
+                            composerRef.current = element;
+                          }}
                           className="V2Inbox__chatInput"
+                          style={composerMentionsInputStyle}
                           value={composerText}
-                          onChange={(event) => {
-                            const nextText = event.target.value;
+                          onChange={(_event, nextText) => {
                             setComposerText(nextText);
                             setSendStatus((prev) =>
                               prev === "sent" || prev === "error"
@@ -2481,9 +3212,28 @@ export default function InboxV2() {
                               }
                             }
                           }}
-                          placeholder="Type your message…"
-                          rows={3}
-                        />
+                          placeholder="Type your message... use @ for owners, / for variables, Cmd/Ctrl+Enter to send"
+                          allowSuggestionsAboveCursor
+                        >
+                          <Mention
+                            trigger="@"
+                            data={TEMPLATE_OWNER_MENTIONS}
+                            markup="__display__"
+                            displayTransform={(id: string, display: string) =>
+                              display || id
+                            }
+                            appendSpaceOnAdd
+                          />
+                          <Mention
+                            trigger="/"
+                            data={TEMPLATE_VARIABLE_MENTIONS}
+                            markup="__display__"
+                            displayTransform={(id: string, display: string) =>
+                              display || id
+                            }
+                            appendSpaceOnAdd
+                          />
+                        </MentionsInput>
                         <div className="V2Inbox__chatActions">
                           <button
                             type="button"
@@ -2576,6 +3326,7 @@ export default function InboxV2() {
                                 if (!draft) return;
                                 setComposerText(draft.text);
                                 setSelectedDraftId(draft.id);
+                                setSelectedSetterChipLabel(null);
                               }}
                               options={[
                                 {
@@ -2664,19 +3415,42 @@ export default function InboxV2() {
                                       }
                                       placeholder="Template name…"
                                     />
-                                    <textarea
+                                    <MentionsInput
                                       className="V2Inbox__templateBodyInput"
+                                      style={templateMentionsInputStyle}
                                       value={newTemplateBody}
-                                      onChange={(e) =>
+                                      onChange={(_event, newValue) =>
                                         templateForm.setValue(
                                           "body",
-                                          e.target.value,
+                                          newValue,
                                           { shouldValidate: true },
                                         )
                                       }
-                                      rows={2}
-                                      placeholder="Message body… use {{name}} for contact name"
-                                    />
+                                      placeholder="Message body... use / for variables and @ for owner tags"
+                                      allowSuggestionsAboveCursor
+                                      forceSuggestionsAboveCursor
+                                    >
+                                      <Mention
+                                        trigger="@"
+                                        data={TEMPLATE_OWNER_MENTIONS}
+                                        markup="__display__"
+                                        displayTransform={(
+                                          id: string,
+                                          display: string,
+                                        ) => display || id}
+                                        appendSpaceOnAdd
+                                      />
+                                      <Mention
+                                        trigger="/"
+                                        data={TEMPLATE_VARIABLE_MENTIONS}
+                                        markup="__display__"
+                                        displayTransform={(
+                                          id: string,
+                                          display: string,
+                                        ) => display || id}
+                                        appendSpaceOnAdd
+                                      />
+                                    </MentionsInput>
                                     <button
                                       type="button"
                                       className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
@@ -2697,6 +3471,29 @@ export default function InboxV2() {
                                 </div>
                               </FloatingPortal>
                             )}
+                          </div>
+                          <div className="V2Inbox__emojiWrap">
+                            <button
+                              type="button"
+                              className="V2Inbox__button V2Inbox__button--small"
+                              onClick={() =>
+                                setIsEmojiPickerOpen((prev) => !prev)
+                              }
+                              title="Insert emoji"
+                            >
+                              😀
+                            </button>
+                            {isEmojiPickerOpen ? (
+                              <div className="V2Inbox__emojiPopover">
+                                <EmojiPicker
+                                  width={300}
+                                  height={360}
+                                  lazyLoadEmojis
+                                  searchDisabled={false}
+                                  onEmojiClick={onAppendEmoji}
+                                />
+                              </div>
+                            ) : null}
                           </div>
                           <button
                             type="button"

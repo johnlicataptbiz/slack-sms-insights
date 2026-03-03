@@ -1,4 +1,5 @@
 import type { Logger } from '@slack/bolt';
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 
 const DEFAULT_ALOWARE_BASE_URL = 'https://app.aloware.com';
 
@@ -125,6 +126,11 @@ export type AlowareContactLookupResult = {
 };
 
 const normalizePhone = (phoneNumber: string): string => {
+  const parsed = parsePhoneNumberFromString(phoneNumber, 'US');
+  if (parsed?.isValid()) {
+    const national = String(parsed.nationalNumber || '').trim();
+    if (national.length > 0) return national.length > 10 ? national.slice(-10) : national;
+  }
   const digits = phoneNumber.replace(/\D/g, '');
   if (digits.length === 11 && digits.startsWith('1')) return digits.slice(1);
   return digits;

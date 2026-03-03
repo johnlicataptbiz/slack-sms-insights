@@ -1604,6 +1604,14 @@ export type ObjectionFrequencyRow = {
   count: number;
 };
 
+export type SetterAssistPerformanceRow = {
+  chip_label: string;
+  sent_count: number;
+  replied_count: number;
+  joined_count: number;
+  reply_rate_pct: number;
+};
+
 export const getObjectionFrequencyAnalytics = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ObjectionFrequencyRow[]> => {
@@ -1623,6 +1631,66 @@ export const getObjectionFrequencyAnalytics = async (
     return result.rows;
   } catch (err) {
     logger?.error('getObjectionFrequencyAnalytics failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const getSetterAssistPerformanceAnalytics = async (
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<SetterAssistPerformanceRow[]> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<SetterAssistPerformanceRow>(`
+      WITH attempts AS (
+        SELECT
+          sa.id,
+          sa.conversation_id,
+          sa.created_at,
+          sa.request_payload #>> '{setterAssist,chipLabel}' AS chip_label
+        FROM send_attempts sa
+        WHERE sa.status = 'sent'
+          AND sa.request_payload #>> '{setterAssist,chipLabel}' IS NOT NULL
+          AND sa.created_at >= NOW() - INTERVAL '30 days'
+      ),
+      enriched AS (
+        SELECT
+          a.chip_label,
+          a.conversation_id,
+          EXISTS (
+            SELECT 1
+            FROM sms_events e
+            WHERE e.conversation_id = a.conversation_id
+              AND e.direction = 'inbound'
+              AND e.event_ts > a.created_at
+              AND e.event_ts <= a.created_at + INTERVAL '72 hours'
+          ) AS replied_within_72h
+        FROM attempts a
+      )
+      SELECT
+        e.chip_label,
+        COUNT(*)::int AS sent_count,
+        COUNT(*) FILTER (WHERE e.replied_within_72h)::int AS replied_count,
+        COUNT(*) FILTER (WHERE s.call_outcome = 'joined')::int AS joined_count,
+        ROUND(
+          (
+            COUNT(*) FILTER (WHERE e.replied_within_72h)::numeric
+            / NULLIF(COUNT(*)::numeric, 0)
+          ) * 100,
+          1
+        )::float AS reply_rate_pct
+      FROM enriched e
+      LEFT JOIN conversation_state s
+        ON s.conversation_id = e.conversation_id
+      GROUP BY e.chip_label
+      ORDER BY sent_count DESC, replied_count DESC, e.chip_label ASC
+      LIMIT 12
+    `);
+    return result.rows;
+  } catch (err) {
+    logger?.error('getSetterAssistPerformanceAnalytics failed', err);
     throw err;
   } finally {
     client.release();

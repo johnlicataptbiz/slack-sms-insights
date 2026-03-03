@@ -46,6 +46,7 @@ import {
   getDraftSuggestionById,
   getInboxConversationById,
   getObjectionFrequencyAnalytics,
+  getSetterAssistPerformanceAnalytics,
   getSendAttemptVolumeCounts,
   getStageConversionAnalytics,
   incrementGuardrailOverride,
@@ -75,6 +76,13 @@ import {
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
 import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
+import {
+  getMondayScorecards,
+  listMondayBoardCatalog,
+  parseBoardIdsQuery,
+  parseScope,
+} from '../services/monday-governed-analytics.js';
+import { buildMessageLinkPreviews } from '../services/link-previews.js';
 import { getPrismaRuntimeStatus } from '../services/prisma.js';
 import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
@@ -2520,6 +2528,10 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
   ensuredState = inferredStateResult.state || ensuredState;
   const drafts = await listDraftSuggestionsForConversation(conversationId, 20, logger);
   const mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
+  const messageLinkPreviews = await buildMessageLinkPreviews(
+    messages.map((msg) => ({ id: msg.id, body: msg.body })),
+    logger,
+  );
 
   const mergedRow = {
     ...conversation,
@@ -2589,6 +2601,7 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       createdAt: msg.event_ts,
       slackChannelId: msg.slack_channel_id,
       slackMessageTs: msg.slack_message_ts,
+      linkPreviews: messageLinkPreviews.get(msg.id) || [],
     })),
     drafts: drafts.map((draft) => ({
       id: draft.id,
@@ -2780,6 +2793,10 @@ const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) =
     fromNumber?: string;
     senderIdentity?: string;
     draftId?: string;
+    setterAssist?: {
+      chipLabel?: string;
+      intent?: string;
+    } | null;
   } = {};
   try {
     body = (await parseJsonBody(req)) as typeof body;
@@ -2792,6 +2809,17 @@ const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) =
   if (!messageBody) {
     return sendJson(res, 400, { error: 'Missing message body' }, origin);
   }
+  const setterAssist =
+    body.setterAssist &&
+    typeof body.setterAssist.chipLabel === 'string' &&
+    body.setterAssist.chipLabel.trim().length > 0 &&
+    typeof body.setterAssist.intent === 'string' &&
+    body.setterAssist.intent.trim().length > 0
+      ? {
+          chipLabel: body.setterAssist.chipLabel.trim().slice(0, 120),
+          intent: body.setterAssist.intent.trim().slice(0, 60),
+        }
+      : null;
 
   if (body.draftId && isStrictLintEnabled()) {
     const linkedDraft = await getDraftSuggestionById(body.draftId, logger);
@@ -2837,6 +2865,7 @@ const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) =
         requestPayload: {
           sendCaps: sendCaps.limits,
           currentVolume: sendCaps.totals,
+          setterAssist,
         },
         responsePayload: null,
         errorMessage: sendCaps.reason || 'SMS send cap reached',
@@ -2878,6 +2907,7 @@ const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) =
       senderEmail: authUser.email || null,
       senderIdentity: body.senderIdentity || null,
       idempotencyKey: body.idempotencyKey || null,
+      setterAssist,
     },
     logger,
   );
@@ -3634,6 +3664,14 @@ const handleGetObjectionFrequencyV2: RequestHandler = async (_req, res, logger, 
   sendJson(res, 200, toEnvelope({ data: rows, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
 };
 
+const handleGetSetterAssistPerformanceV2: RequestHandler = async (_req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+  const rows = await getSetterAssistPerformanceAnalytics(logger);
+  sendJson(res, 200, toEnvelope({ data: rows, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
 const handleGetLinePerformanceV2: RequestHandler = async (req, res, _logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   const rangeParam = url.searchParams.get('range') || '7d';
@@ -3754,7 +3792,12 @@ const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, o
   if (!fromDay || !toDay) {
     return sendJson(res, 400, { error: 'Failed to resolve timezone day range' }, origin);
   }
-  const boardId = (url.searchParams.get('boardId') || '').trim() || null;
+  const scopeParam = url.searchParams.get('scope');
+  let scope = parseScope(scopeParam);
+  const boardIds = parseBoardIdsQuery(url.searchParams.get('boardIds'));
+  const boardId = (url.searchParams.get('boardId') || '').trim();
+  if (boardId && !boardIds.includes(boardId)) boardIds.unshift(boardId);
+  if (!scopeParam && boardIds.length > 0) scope = 'board_ids';
   const sourceLimitRaw = Number.parseInt(url.searchParams.get('sourceLimit') || '12', 10);
   const setterLimitRaw = Number.parseInt(url.searchParams.get('setterLimit') || '12', 10);
   const sourceLimit = Number.isFinite(sourceLimitRaw) ? Math.max(1, Math.min(50, sourceLimitRaw)) : 12;
@@ -3766,7 +3809,8 @@ const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, o
         fromDay,
         toDay,
         timeZone: resolved.timeZone,
-        boardId,
+        scope,
+        boardIds,
         sourceLimit,
         setterLimit,
       },
@@ -3788,6 +3832,92 @@ const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, o
       res,
       500,
       { error: 'Failed to fetch monday lead insights', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetMondayBoardCatalogV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const staleThresholdHoursRaw = Number.parseInt(url.searchParams.get('staleThresholdHours') || '24', 10);
+  const staleThresholdHours = Number.isFinite(staleThresholdHoursRaw)
+    ? Math.max(1, Math.min(240, staleThresholdHoursRaw))
+    : 24;
+  try {
+    const data = await listMondayBoardCatalog({ staleThresholdHours }, logger);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch monday board catalog:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch monday board catalog', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetMondayScorecardsV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  const fromDay = dayKeyInTimeZone(resolved.from, resolved.timeZone);
+  const toDay = dayKeyInTimeZone(resolved.to, resolved.timeZone);
+  if (!fromDay || !toDay) {
+    return sendJson(res, 400, { error: 'Failed to resolve timezone day range' }, origin);
+  }
+
+  const boardClass = (url.searchParams.get('boardClass') || '').trim() || null;
+  const metricOwner = (url.searchParams.get('metricOwner') || '').trim() || null;
+  const metricName = (url.searchParams.get('metricName') || '').trim() || null;
+
+  try {
+    const data = await getMondayScorecards(
+      {
+        fromDay,
+        toDay,
+        timeZone: resolved.timeZone,
+        boardClass,
+        metricOwner,
+        metricName,
+      },
+      logger,
+    );
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch monday scorecards:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch monday scorecards', details: error instanceof Error ? error.message : String(error) },
       origin,
     );
   }
@@ -3944,6 +4074,7 @@ const apiRoutes: ApiRoute[] = [
   },
   { method: 'GET', path: '/api/v2/inbox/analytics/stage-conversion', handler: handleGetStageConversionV2 },
   { method: 'GET', path: '/api/v2/inbox/analytics/objection-frequency', handler: handleGetObjectionFrequencyV2 },
+  { method: 'GET', path: '/api/v2/inbox/analytics/setter-assist-performance', handler: handleGetSetterAssistPerformanceV2 },
   { method: 'GET', path: '/api/v2/analytics/line-performance', handler: handleGetLinePerformanceV2 },
   { method: 'GET', path: '/api/v2/analytics/qualification-funnel', handler: handleGetQualificationFunnelV2 },
   { method: 'GET', path: '/api/v2/analytics/draft-ai-performance', handler: handleGetDraftAIPerformanceV2 },
@@ -3958,8 +4089,12 @@ const apiRoutes: ApiRoute[] = [
   { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },
   { method: 'GET', path: '/api/v2/admin/audit-logs', handler: handleGetAuditLogsV2 },
   { method: 'GET', path: '/api/v2/admin/cron-status', handler: handleGetCronStatus },
+  { method: 'GET', path: '/api/v2/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
+  { method: 'GET', path: '/api/v2/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
   { method: 'GET', path: '/api/v2/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
   { method: 'GET', path: '/api/admin/cron-status', handler: handleGetCronStatus },
+  { method: 'GET', path: '/api/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
+  { method: 'GET', path: '/api/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
   { method: 'GET', path: '/api/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },

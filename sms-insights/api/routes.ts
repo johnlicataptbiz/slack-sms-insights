@@ -27,6 +27,7 @@ import {
   logAuditEvent,
 } from '../services/comprehensive-fixes.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
+import { getCronStatusSnapshot } from '../services/cron-scheduler.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import { getPool } from '../services/db.js';
 import {
@@ -3702,6 +3703,11 @@ const handleGetAuditLogsV2: RequestHandler = async (req, res, _logger, origin) =
   sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
 };
 
+const handleGetCronStatus: RequestHandler = async (_req, res, _logger, origin) => {
+  const data = getCronStatusSnapshot();
+  sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
 const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
@@ -3866,6 +3872,8 @@ const apiRoutes: ApiRoute[] = [
   { method: 'POST', path: '/api/v2/admin/bulk-infer-qualification', handler: handlePostBulkInferQualificationV2 },
   { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },
   { method: 'GET', path: '/api/v2/admin/audit-logs', handler: handleGetAuditLogsV2 },
+  { method: 'GET', path: '/api/v2/admin/cron-status', handler: handleGetCronStatus },
+  { method: 'GET', path: '/api/admin/cron-status', handler: handleGetCronStatus },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },

@@ -3,6 +3,7 @@ import { logDailyRun } from './daily-run-logger.js';
 import { getDefaultLrnBackfillOptions, runLrnBackfill } from './lrn-refresh.js';
 import { generateAndPostReport } from './report-poster.js';
 
+const BUSINESS_TIMEZONE = 'America/Chicago';
 const DAILY_REPORT_CHANNEL_ID = 'C09ULGH1BEC'; // #alowaresmsupdates
 const DAILY_REPORT_CHANNEL_NAME = 'alowaresmsupdates';
 const CHECK_INTERVAL_MS = 60_000; // check every minute
@@ -37,6 +38,27 @@ const getCTDateParts = (): { date: string; hour: number; minute: number } => {
     date: `${year}-${month}-${day}`,
     hour: Number.parseInt(hourStr ?? '0', 10),
     minute: Number.parseInt(minuteStr ?? '0', 10),
+  };
+};
+
+const pad2 = (value: number): string => String(value).padStart(2, '0');
+
+const addDaysToYmd = (ymd: string, days: number): string => {
+  const [yearRaw, monthRaw, dayRaw] = ymd.split('-');
+  const year = Number.parseInt(yearRaw || '0', 10);
+  const month = Number.parseInt(monthRaw || '1', 10);
+  const day = Number.parseInt(dayRaw || '1', 10);
+  const date = new Date(Date.UTC(year, month - 1, day + days));
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+};
+
+const resolveNextRunCt = (targetHour: number, targetMinute: number): { date: string; time: string } => {
+  const { date, hour, minute } = getCTDateParts();
+  const sameDayEligible = hour < targetHour || (hour === targetHour && minute < targetMinute);
+  const nextDate = sameDayEligible ? date : addDaysToYmd(date, 1);
+  return {
+    date: nextDate,
+    time: `${pad2(targetHour)}:${pad2(targetMinute)}`,
   };
 };
 
@@ -113,6 +135,70 @@ const parseIntOr = (value: string | undefined, fallback: number): number => {
 };
 
 const isLrnRefreshEnabled = (): boolean => parseBool(process.env.ALOWARE_LRN_REFRESH_CRON_ENABLED, false);
+
+export const getCronStatusSnapshot = (): {
+  timezone: string;
+  serverTimeIso: string;
+  dailyReport: {
+    running: boolean;
+    targetHourCt: number;
+    targetMinuteCt: number;
+    lastRunDateCt: string | null;
+    nextRunCt: { date: string; time: string };
+  };
+  lrnRefresh: {
+    running: boolean;
+    enabled: boolean;
+    targetHourCt: number;
+    targetMinuteCt: number;
+    lastRunDateCt: string | null;
+    nextRunCt: { date: string; time: string };
+    options: {
+      limit: number;
+      delayMs: number;
+      staleDays: number;
+      forceAll: boolean;
+    };
+  };
+} => {
+  const lrnEnabled = isLrnRefreshEnabled();
+  const defaultOptions = getDefaultLrnBackfillOptions();
+  const lrnTargetHour = Math.max(0, Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)));
+  const lrnTargetMinute = Math.max(
+    0,
+    Math.min(59, parseIntOr(process.env.ALOWARE_LRN_REFRESH_MINUTE_CT, LRN_REFRESH_DEFAULT_MINUTE_CT)),
+  );
+  const limit = Math.max(1, parseIntOr(process.env.ALOWARE_LRN_REFRESH_LIMIT, defaultOptions.limit));
+  const delayMs = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_DELAY_MS, defaultOptions.delayMs));
+  const staleDays = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_STALE_DAYS, defaultOptions.staleDays));
+  const forceAll = parseBool(process.env.ALOWARE_LRN_REFRESH_FORCE_ALL, false);
+
+  return {
+    timezone: BUSINESS_TIMEZONE,
+    serverTimeIso: new Date().toISOString(),
+    dailyReport: {
+      running: cronIntervalId !== null,
+      targetHourCt: REPORT_HOUR_CT,
+      targetMinuteCt: REPORT_MINUTE_CT,
+      lastRunDateCt: lastRunDate,
+      nextRunCt: resolveNextRunCt(REPORT_HOUR_CT, REPORT_MINUTE_CT),
+    },
+    lrnRefresh: {
+      running: lrnIntervalId !== null,
+      enabled: lrnEnabled,
+      targetHourCt: lrnTargetHour,
+      targetMinuteCt: lrnTargetMinute,
+      lastRunDateCt: lastLrnRefreshDate,
+      nextRunCt: resolveNextRunCt(lrnTargetHour, lrnTargetMinute),
+      options: {
+        limit,
+        delayMs,
+        staleDays,
+        forceAll,
+      },
+    },
+  };
+};
 
 export const startLrnRefreshCron = (app: App): void => {
   if (!isLrnRefreshEnabled()) {

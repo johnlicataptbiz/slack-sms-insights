@@ -10,6 +10,7 @@ import registerListeners from './listeners/index.js';
 import { initDatabase, initializeSchema } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
 import { logger } from './services/logger.js';
+import { startMondaySyncJobs } from './services/monday-sync.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
 import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
 
@@ -218,7 +219,7 @@ app.error(async (error) => {
     }
 
     // monday read-sync/writeback maintenance jobs (feature-flag gated).
-    // startMondaySyncJobs(app.logger);
+    startMondaySyncJobs(app.logger);
   } catch (error) {
     logger.app.error(`[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`);
     await reportError(app, error, 'Startup Failure');

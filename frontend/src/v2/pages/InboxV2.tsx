@@ -39,7 +39,6 @@ import {
   useV2CreateTemplate,
   useV2DeleteTemplate,
   useV2DisenrollConversationFromSequence,
-  useV2DraftAIPerformance,
   useV2EnrollConversationToSequence,
   useV2GenerateCrmNotes,
   useV2GenerateDraft,
@@ -48,12 +47,10 @@ import {
   useV2InboxSendConfig,
   useV2InboxTemplates,
   useV2IncrementGuardrailOverride,
-  useV2ObjectionFrequency,
   useV2OverrideEscalation,
   useV2SendInboxMessage,
   useV2SetDefaultSendLine,
   useV2SnoozeConversation,
-  useV2StageConversion,
   useV2UpdateCallOutcome,
   useV2UpdateConversationStatus,
   useV2UpdateObjectionTags,
@@ -818,13 +815,6 @@ export default function InboxV2() {
   const createTemplateMutation = useV2CreateTemplate();
   const deleteTemplateMutation = useV2DeleteTemplate();
 
-  // Phase 3 hooks
-  const stageConversionQuery = useV2StageConversion();
-  const objectionFrequencyQuery = useV2ObjectionFrequency();
-  const draftAiPerformanceQuery = useV2DraftAIPerformance({
-    range: "30d",
-    tz: "America/Chicago",
-  });
   const updateObjectionTagsMutation = useV2UpdateObjectionTags();
   const updateCallOutcomeMutation = useV2UpdateCallOutcome();
   const incrementGuardrailOverrideMutation = useV2IncrementGuardrailOverride();
@@ -890,18 +880,6 @@ export default function InboxV2() {
   const contactTags = Array.isArray(detailContactCard?.tags)
     ? detailContactCard.tags
     : [];
-  const stageConversionRows = Array.isArray(stageConversionQuery.data)
-    ? stageConversionQuery.data
-    : [];
-  const objectionFrequencyRows = Array.isArray(objectionFrequencyQuery.data)
-    ? objectionFrequencyQuery.data
-    : [];
-  const draftAiPerformance = draftAiPerformanceQuery.data?.data || null;
-  const setterLikeRate = toFiniteNumber(draftAiPerformance?.setterLikeRate);
-  const genericToneRate = toFiniteNumber(draftAiPerformance?.genericToneRate);
-  const setterAnchorCoverageRate = toFiniteNumber(
-    draftAiPerformance?.setterAnchorCoverageRate,
-  );
   const sendConfig = sendConfigQuery.data?.data || null;
   const lineOptions = sendConfig?.lines || [];
   const lineSelectOptions: V2SelectOption[] = [
@@ -1926,7 +1904,6 @@ export default function InboxV2() {
         >
           <span className="V2Inbox__commandLabel">Urgent Queue</span>
           <strong>{urgentCount}</strong>
-          <small>Escalation L1-L2 that need reply</small>
         </button>
         <button
           type="button"
@@ -1938,7 +1915,6 @@ export default function InboxV2() {
         >
           <span className="V2Inbox__commandLabel">Needs Reply</span>
           <strong>{unreadCount}</strong>
-          <small>Open threads waiting on outreach</small>
         </button>
         <button
           type="button"
@@ -1952,14 +1928,9 @@ export default function InboxV2() {
         >
           <span className="V2Inbox__commandLabel">Unassigned</span>
           <strong>{unassignedCount}</strong>
-          <small>Route these to an owner first</small>
         </button>
         <div className="V2Inbox__commandMeta">
-          <p>
-            {activeFiltersCount > 0
-              ? `${activeFiltersCount} active filters`
-              : "No active filters"}
-          </p>
+          {activeFiltersCount > 0 ? <p>{activeFiltersCount} filters</p> : null}
           <button
             type="button"
             className="V2Inbox__commandReset"
@@ -2015,13 +1986,10 @@ export default function InboxV2() {
                   <option value="oldest">Oldest first</option>
                 </select>
               </label>
-              <span className="V2Inbox__listHint">
-                Cmd/Ctrl+F search • J/K move • Cmd/Ctrl+Enter send • Cmd/Ctrl+Shift+S snooze • Cmd/Ctrl+Shift+A close
-              </span>
             </div>
             <span className="V2Inbox__listCount">
               {totalConversations}
-              {listQuery.hasNextPage ? "+" : ""} shown
+              {listQuery.hasNextPage ? "+" : ""}
             </span>
           </div>
 
@@ -2044,7 +2012,6 @@ export default function InboxV2() {
             <div className="V2Inbox__emptyState">
               <div className="V2Inbox__emptyIcon">📭</div>
               <h3>No conversations</h3>
-              <p>Try adjusting your filters or search terms</p>
             </div>
           ) : (
             <>
@@ -2247,246 +2214,9 @@ export default function InboxV2() {
             {unassignedCount > 0 && (
               <div className="V2Inbox__alertBanner">
                 <span className="V2Inbox__alertIcon">⚠️</span>
-                <span>{unassignedCount} conversations need an owner</span>
+                <span>{unassignedCount} unassigned</span>
               </div>
             )}
-
-            <div className="V2Inbox__workloadSection">
-              <h4>Team Workload</h4>
-              <div className="V2Inbox__workloadBars">
-                <div className="V2Inbox__workloadItem">
-                  <div className="V2Inbox__workloadHeader">
-                    <span className="V2Inbox__workloadName">
-                      <span
-                        className="V2Inbox__workloadAvatar"
-                        style={{ background: "#11b8d6" }}
-                      >
-                        J
-                      </span>
-                      Jack
-                    </span>
-                    <span>{jackCount} convos</span>
-                  </div>
-                  <div className="V2Inbox__workloadBar">
-                    <div
-                      className="V2Inbox__workloadFill"
-                      style={{
-                        width: `${totalConversations > 0 ? (jackCount / totalConversations) * 100 : 0}%`,
-                        background: "#11b8d6",
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="V2Inbox__workloadItem">
-                  <div className="V2Inbox__workloadHeader">
-                    <span className="V2Inbox__workloadName">
-                      <span
-                        className="V2Inbox__workloadAvatar"
-                        style={{ background: "#13b981" }}
-                      >
-                        B
-                      </span>
-                      Brandon
-                    </span>
-                    <span>{brandonCount} convos</span>
-                  </div>
-                  <div className="V2Inbox__workloadBar">
-                    <div
-                      className="V2Inbox__workloadFill"
-                      style={{
-                        width: `${totalConversations > 0 ? (brandonCount / totalConversations) * 100 : 0}%`,
-                        background: "#13b981",
-                      }}
-                    />
-                  </div>
-                </div>
-                {unassignedCount > 0 && (
-                  <div className="V2Inbox__workloadItem">
-                    <div className="V2Inbox__workloadHeader">
-                      <span className="V2Inbox__workloadName">
-                        <span
-                          className="V2Inbox__workloadAvatar"
-                          style={{ background: "#56607a" }}
-                        >
-                          ?
-                        </span>
-                        Unassigned
-                      </span>
-                      <span>{unassignedCount} convos</span>
-                    </div>
-                    <div className="V2Inbox__workloadBar">
-                      <div
-                        className="V2Inbox__workloadFill"
-                        style={{
-                          width: `${totalConversations > 0 ? (unassignedCount / totalConversations) * 100 : 0}%`,
-                          background: "#ef4c62",
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Phase 3: Stage → Call Conversion */}
-            <div className="V2Inbox__analyticsSection">
-              <h4 className="V2Inbox__analyticsSectionTitle">
-                Stage-to-Call Conversion
-              </h4>
-              {stageConversionQuery.isLoading ? (
-                <p className="V2Inbox__analyticsHint">Loading…</p>
-              ) : stageConversionQuery.isError ? (
-                <p className="V2Inbox__analyticsHint">Failed to load</p>
-              ) : stageConversionRows.length === 0 ? (
-                <p className="V2Inbox__analyticsHint">No conversion data yet</p>
-              ) : (
-                <table className="V2Inbox__conversionTable">
-                  <thead>
-                    <tr>
-                      <th>Stage</th>
-                      <th>Total</th>
-                      <th>Offered</th>
-                      <th>Outcome</th>
-                      <th>Rate</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stageConversionRows.map((row) => (
-                      <tr key={row.escalation_level}>
-                        <td>L{row.escalation_level}</td>
-                        <td>{row.total_conversations}</td>
-                        <td>{row.call_offered_count}</td>
-                        <td>{row.call_outcome_count}</td>
-                        <td>
-                          <span
-                            className="V2Inbox__conversionRate"
-                            style={{
-                              color:
-                                Number(row.conversion_rate_pct) >= 50
-                                  ? "var(--v2-positive)"
-                                  : Number(row.conversion_rate_pct) >= 25
-                                    ? "var(--v2-warning)"
-                                    : "var(--v2-critical)",
-                            }}
-                          >
-                            {Number(row.conversion_rate_pct).toFixed(1)}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-
-            {/* Phase 3: Objection Frequency */}
-            <div className="V2Inbox__analyticsSection">
-              <h4 className="V2Inbox__analyticsSectionTitle">Top Objections</h4>
-              {objectionFrequencyQuery.isLoading ? (
-                <p className="V2Inbox__analyticsHint">Loading…</p>
-              ) : objectionFrequencyQuery.isError ? (
-                <p className="V2Inbox__analyticsHint">Failed to load</p>
-              ) : objectionFrequencyRows.length === 0 ? (
-                <p className="V2Inbox__analyticsHint">
-                  No objection tags recorded yet
-                </p>
-              ) : (
-                <div className="V2Inbox__objectionBars">
-                  {(() => {
-                    const maxCount = Math.max(
-                      ...objectionFrequencyRows.map((r) => r.count),
-                      1,
-                    );
-                    return objectionFrequencyRows
-                      .slice(0, 8)
-                      .map((row) => (
-                        <div key={row.tag} className="V2Inbox__objectionRow">
-                          <span className="V2Inbox__objectionTag">
-                            {row.tag}
-                          </span>
-                          <div className="V2Inbox__objectionBarWrap">
-                            <div
-                              className="V2Inbox__objectionBar"
-                              style={{
-                                width: `${(row.count / maxCount) * 100}%`,
-                              }}
-                            />
-                          </div>
-                          <span className="V2Inbox__objectionCount">
-                            {row.count}
-                          </span>
-                        </div>
-                      ));
-                  })()}
-                </div>
-              )}
-            </div>
-
-            <div className="V2Inbox__analyticsSection">
-              <h4 className="V2Inbox__analyticsSectionTitle">
-                Draft Voice Quality (30d)
-              </h4>
-              {draftAiPerformanceQuery.isLoading ? (
-                <p className="V2Inbox__analyticsHint">Loading…</p>
-              ) : draftAiPerformanceQuery.isError || !draftAiPerformance ? (
-                <p className="V2Inbox__analyticsHint">Failed to load</p>
-              ) : (
-                <div className="V2Inbox__objectionBars">
-                  <div className="V2Inbox__objectionRow">
-                    <span className="V2Inbox__objectionTag">Setter-like rate</span>
-                    <div className="V2Inbox__objectionBarWrap">
-                      <div
-                        className="V2Inbox__objectionBar"
-                        style={{
-                          width: `${Math.max(0, Math.min(100, setterLikeRate))}%`,
-                          background:
-                            "linear-gradient(90deg, #11b8d6, #13b981)",
-                        }}
-                      />
-                    </div>
-                    <span className="V2Inbox__objectionCount">
-                      {setterLikeRate.toFixed(1)}
-                      %
-                    </span>
-                  </div>
-                  <div className="V2Inbox__objectionRow">
-                    <span className="V2Inbox__objectionTag">Generic-tone rate</span>
-                    <div className="V2Inbox__objectionBarWrap">
-                      <div
-                        className="V2Inbox__objectionBar"
-                        style={{
-                          width: `${Math.max(0, Math.min(100, genericToneRate))}%`,
-                          background: "#ef4c62",
-                        }}
-                      />
-                    </div>
-                    <span className="V2Inbox__objectionCount">
-                      {genericToneRate.toFixed(1)}
-                      %
-                    </span>
-                  </div>
-                  <div className="V2Inbox__objectionRow">
-                    <span className="V2Inbox__objectionTag">Style anchor coverage</span>
-                    <div className="V2Inbox__objectionBarWrap">
-                      <div
-                        className="V2Inbox__objectionBar"
-                        style={{
-                          width: `${Math.max(
-                            0,
-                            Math.min(100, setterAnchorCoverageRate),
-                          )}%`,
-                          background: "#56607a",
-                        }}
-                      />
-                    </div>
-                    <span className="V2Inbox__objectionCount">
-                      {setterAnchorCoverageRate.toFixed(1)}
-                      %
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
 
           </div>
         </div>

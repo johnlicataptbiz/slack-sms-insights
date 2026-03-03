@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { format as formatDateFns, formatISO, isValid, parseISO } from 'date-fns';
 import {
   FloatingPortal,
   autoUpdate,
@@ -17,6 +18,7 @@ import { useV2Channels, useV2Run, useV2Runs, useV2SalesMetrics } from '../../api
 import type { RunV2 } from '../../api/v2-types';
 import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser';
 import { v2Copy } from '../copy';
+import { V2Select, type V2SelectOption } from '../components/V2Select';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2StatBar } from '../components/V2Primitives';
 
 const savedViewsStorageKey = 'ptbizsms-v2-runs-saved-views';
@@ -79,6 +81,22 @@ export type RunViewModel = {
   outboundConversations: number | null;
   topSequences: RunSequenceInsight[];
   repRows: RunRepInsight[];
+};
+
+const RUNS_RANGE_OPTIONS: V2SelectOption[] = [
+  { value: '1', label: '1 day' },
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+  { value: '90', label: '90 days' },
+];
+
+const ALL_CHANNEL_VALUE = '__all_channels__';
+
+const parseDateValue = (value: string): Date | null => {
+  const fromIso = parseISO(value);
+  if (isValid(fromIso)) return fromIso;
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
 };
 
 export const resolveSelectedRunViewModel = (
@@ -153,13 +171,17 @@ const sumMatches = (source: string | null, pattern: RegExp): number | null => {
   return found ? total : null;
 };
 
-const formatDateTime = (value: string) => new Date(value).toLocaleString();
+const formatDateTime = (value: string) => {
+  const date = parseDateValue(value);
+  if (!date) return value;
+  return formatDateFns(date, 'PPp');
+};
 
 const formatReportDay = (value: string): string => {
   const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00.000Z` : value;
-  const date = new Date(normalizedValue);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const date = parseDateValue(normalizedValue);
+  if (!date) return value;
+  return formatDateFns(date, 'PP');
 };
 
 const extractReportDayLabel = (run: RunV2): string | null => {
@@ -185,9 +207,9 @@ const toIsoDay = (value: string | null): string | null => {
   const trimmed = value.trim();
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
 
-  const parsed = new Date(trimmed);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toISOString().slice(0, 10);
+  const parsed = parseDateValue(trimmed);
+  if (!parsed) return null;
+  return formatDateFns(parsed, 'yyyy-MM-dd');
 };
 
 const getTodayCT = (): { date: string; hour: number } => {
@@ -221,11 +243,11 @@ const extractDateStampParts = (run: RunV2): { month: string; day: string } => {
     const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(reportDay.trim())
       ? `${reportDay.trim()}T12:00:00.000Z`
       : reportDay;
-    const date = new Date(normalizedValue);
-    if (!Number.isNaN(date.getTime())) {
+    const date = parseDateValue(normalizedValue);
+    if (date) {
       return {
-        month: date.toLocaleDateString('en-US', { month: 'short' }),
-        day: String(date.getDate()),
+        month: formatDateFns(date, 'MMM'),
+        day: formatDateFns(date, 'd'),
       };
     }
     // Last resort: regex-extract from strings like "Feb 25, 2026" or "February 25, 2026"
@@ -239,10 +261,11 @@ const extractDateStampParts = (run: RunV2): { month: string; day: string } => {
     }
   }
   // Fall back to the generation timestamp
-  const date = new Date(run.timestamp);
+  const date = parseDateValue(run.timestamp);
+  if (!date) return { month: '—', day: '—' };
   return {
-    month: date.toLocaleDateString('en-US', { month: 'short' }),
-    day: String(date.getDate()),
+    month: formatDateFns(date, 'MMM'),
+    day: formatDateFns(date, 'd'),
   };
 };
 
@@ -579,7 +602,8 @@ export default function RunsV2() {
 
   const saveCurrentView = () => {
     const trimmed = newViewName.trim();
-    const name = trimmed || `Runs ${new Date().toLocaleString()}`;
+    const now = new Date();
+    const name = trimmed || `Runs ${formatDateFns(now, 'PP p')}`;
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const nextView: SavedRunsView = {
       id,
@@ -587,7 +611,7 @@ export default function RunsV2() {
       range: daysBack,
       channelId,
       runId: selectedId,
-      createdAt: new Date().toISOString(),
+      createdAt: formatISO(now),
     };
     setSavedViews((prev) => [nextView, ...prev].slice(0, 12));
     setNewViewName('');
@@ -627,33 +651,34 @@ export default function RunsV2() {
           <div className="V2ControlsRow">
             <label className="V2Control">
               <span>Show last (days)</span>
-              <select
-                value={daysBack}
-                onChange={(e) => {
-                  setParams({ range: parseRange(e.target.value), runId: null });
-                }}
-              >
-                <option value={1}>1</option>
-                <option value={7}>7</option>
-                <option value={30}>30</option>
-                <option value={90}>90</option>
-              </select>
+              <V2Select
+                value={String(daysBack)}
+                onValueChange={(value) =>
+                  setParams({ range: parseRange(value), runId: null })
+                }
+                options={RUNS_RANGE_OPTIONS}
+                ariaLabel="Show last days"
+              />
             </label>
             <label className="V2Control">
               <span>Channel</span>
-              <select
-                value={channelId || ''}
-                onChange={(e) => {
-                  setParams({ channelId: e.target.value || null, runId: null });
-                }}
-              >
-                <option value="">All</option>
-                {channels.map((channel) => (
-                  <option key={channel.channelId} value={channel.channelId}>
-                    {channel.channelName || channel.channelId} ({channel.runCount})
-                  </option>
-                ))}
-              </select>
+              <V2Select
+                value={channelId || ALL_CHANNEL_VALUE}
+                onValueChange={(value) =>
+                  setParams({
+                    channelId: value === ALL_CHANNEL_VALUE ? null : value,
+                    runId: null,
+                  })
+                }
+                options={[
+                  { value: ALL_CHANNEL_VALUE, label: 'All channels' },
+                  ...channels.map((channel) => ({
+                    value: channel.channelId,
+                    label: `${channel.channelName || channel.channelId} (${channel.runCount})`,
+                  })),
+                ]}
+                ariaLabel="Filter by channel"
+              />
             </label>
             <button
               type="button"

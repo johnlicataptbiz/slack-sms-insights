@@ -2,9 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import * as Switch from "@radix-ui/react-switch";
 import * as Tabs from "@radix-ui/react-tabs";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAutoAnimate } from "@formkit/auto-animate/react";
+import { addHours, format as formatDateFns, formatDistanceToNow, isValid, parseISO } from "date-fns";
+import { useForm } from "react-hook-form";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
+import { z } from "zod";
 import {
   FloatingPortal,
   autoUpdate,
@@ -42,30 +46,29 @@ import {
 } from "../../api/v2Queries";
 import { CALL_OUTCOME_LABELS } from "../../api/v2-types";
 import type { CallOutcomeV2, QualificationStateV2 } from "../../api/v2-types";
+import { V2Select, type V2SelectOption } from "../components/V2Select";
 import { V2State } from "../components/V2Primitives";
 import { useToast } from "../hooks/useToast";
 
+const parseDateValue = (value: string): Date | null => {
+  const parsed = parseISO(value);
+  if (isValid(parsed)) return parsed;
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+};
+
 const fmtDateTime = (value: string | null) => {
   if (!value) return "n/a";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  const date = parseDateValue(value);
+  if (!date) return value;
+  return formatDateFns(date, "PPp");
 };
 
 const timeAgo = (value: string | null): string => {
   if (!value) return "";
-  const date = new Date(value);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  const date = parseDateValue(value);
+  if (!date) return value;
+  return formatDistanceToNow(date, { addSuffix: true });
 };
 
 const shorten = (value: string | null, max = 100): string => {
@@ -230,6 +233,55 @@ const escalationLevelSubtitle = (level: 1 | 2 | 3 | 4): string => {
   return "Scaling Hybrid";
 };
 
+const LINE_NONE_VALUE = "__line_none__";
+const DRAFT_NONE_VALUE = "__draft_none__";
+
+const FULL_OR_PART_TIME_OPTIONS: V2SelectOption[] = [
+  { value: "unknown", label: "Unknown" },
+  { value: "full_time", label: "Full Time" },
+  { value: "part_time", label: "Part Time" },
+];
+
+const REVENUE_MIX_OPTIONS: V2SelectOption[] = [
+  { value: "unknown", label: "Unknown" },
+  { value: "mostly_cash", label: "Mostly Cash" },
+  { value: "mostly_insurance", label: "Mostly Insurance" },
+  { value: "balanced", label: "Balanced" },
+];
+
+const COACHING_INTEREST_OPTIONS: V2SelectOption[] = [
+  { value: "unknown", label: "Unknown" },
+  { value: "high", label: "High" },
+  { value: "medium", label: "Medium" },
+  { value: "low", label: "Low" },
+];
+
+const assignSchema = z.object({
+  ownerLabel: z.string().trim().max(80, "Owner name is too long"),
+});
+
+const snoozeSchema = z.object({
+  snoozedUntil: z
+    .string()
+    .trim()
+    .min(1, "Select a snooze date/time")
+    .refine((value) => parseDateValue(value) !== null, "Invalid date/time"),
+});
+
+const noteSchema = z.object({
+  text: z.string().trim().min(1, "Note cannot be empty").max(1000, "Note is too long"),
+});
+
+const templateSchema = z.object({
+  name: z.string().trim().min(1, "Template name is required").max(100, "Template name is too long"),
+  body: z.string().trim().min(1, "Template body is required").max(1600, "Template body is too long"),
+});
+
+type AssignFormValues = z.infer<typeof assignSchema>;
+type SnoozeFormValues = z.infer<typeof snoozeSchema>;
+type NoteFormValues = z.infer<typeof noteSchema>;
+type TemplateFormValues = z.infer<typeof templateSchema>;
+
 export default function InboxV2() {
   const [statusFilter, setStatusFilter] = useState<
     "open" | "closed" | "dnc" | ""
@@ -276,12 +328,23 @@ export default function InboxV2() {
   const [escalationReason, setEscalationReason] = useState("");
 
   // Phase 2 — Team Collaboration
-  const [noteText, setNoteText] = useState("");
-  const [snoozeDate, setSnoozeDate] = useState("");
-  const [assignLabel, setAssignLabel] = useState("");
   const [showTemplates, setShowTemplates] = useState(false);
-  const [newTemplateName, setNewTemplateName] = useState("");
-  const [newTemplateBody, setNewTemplateBody] = useState("");
+  const assignForm = useForm<AssignFormValues>({
+    resolver: zodResolver(assignSchema),
+    defaultValues: { ownerLabel: "" },
+  });
+  const snoozeForm = useForm<SnoozeFormValues>({
+    resolver: zodResolver(snoozeSchema),
+    defaultValues: { snoozedUntil: "" },
+  });
+  const noteForm = useForm<NoteFormValues>({
+    resolver: zodResolver(noteSchema),
+    defaultValues: { text: "" },
+  });
+  const templateForm = useForm<TemplateFormValues>({
+    resolver: zodResolver(templateSchema),
+    defaultValues: { name: "", body: "" },
+  });
 
   // Phase 3 state
   const [objectionTagInput, setObjectionTagInput] = useState("");
@@ -491,6 +554,18 @@ export default function InboxV2() {
   const detail = detailQuery.data?.data || null;
   const sendConfig = sendConfigQuery.data?.data || null;
   const lineOptions = sendConfig?.lines || [];
+  const lineSelectOptions: V2SelectOption[] = [
+    { value: LINE_NONE_VALUE, label: "No line selected" },
+    ...lineOptions.map((option) => ({
+      value: option.key,
+      label: formatSendLineLabel(option),
+    })),
+  ];
+  const assignLabel = assignForm.watch("ownerLabel");
+  const snoozeDate = snoozeForm.watch("snoozedUntil");
+  const noteText = noteForm.watch("text");
+  const newTemplateName = templateForm.watch("name");
+  const newTemplateBody = templateForm.watch("body");
   const selectedLineOption =
     lineOptions.find((option) => option.key === selectedLineKey) || null;
   const lineSelectionRequired =
@@ -534,10 +609,10 @@ export default function InboxV2() {
     setQualificationState(detail.conversation.qualification);
     setEscalationLevel(detail.conversation.escalation.level);
     setEscalationReason(detail.conversation.escalation.reason || "");
-    setAssignLabel(detail.conversation.ownerLabel || "");
+    assignForm.reset({ ownerLabel: detail.conversation.ownerLabel || "" });
     setLocalObjectionTags(detail.conversation.objectionTags ?? []);
     setLocalCallOutcome(detail.conversation.callOutcome ?? null);
-  }, [detail]);
+  }, [assignForm, detail]);
 
   useEffect(() => {
     setDraftPrefillDoneForConversation(null);
@@ -545,6 +620,8 @@ export default function InboxV2() {
     // next conversation's thread when the user switches contacts.
     setJustSentMessage(null);
     setShowDoublePitchWarning(false);
+    noteForm.reset({ text: "" });
+    snoozeForm.reset({ snoozedUntil: "" });
   }, [selectedConversationId]);
 
   useEffect(() => {
@@ -718,16 +795,14 @@ export default function InboxV2() {
 
         // Phase 2: Auto-Snooze
         if (containsPodcastLink(messageText)) {
-          const snoozeUntil = new Date();
-          snoozeUntil.setHours(snoozeUntil.getHours() + 72); // 72 hours
+          const snoozeUntil = addHours(new Date(), 72);
           await snoozeMutation.mutateAsync({
             conversationId: selectedConversationId,
             snoozedUntil: snoozeUntil.toISOString(),
           });
           toast.info("Podcast link sent. Snoozed for 72 hours.");
         } else if (containsCallLink(messageText)) {
-          const snoozeUntil = new Date();
-          snoozeUntil.setHours(snoozeUntil.getHours() + 96); // 96 hours (4 days)
+          const snoozeUntil = addHours(new Date(), 96);
           await snoozeMutation.mutateAsync({
             conversationId: selectedConversationId,
             snoozedUntil: snoozeUntil.toISOString(),
@@ -919,15 +994,15 @@ export default function InboxV2() {
 
   // ── Phase 2 handlers ──────────────────────────────────────────────────────
 
-  const onAddNote = async () => {
-    if (!selectedConversationId || noteText.trim().length === 0) return;
+  const onAddNote = async (values: NoteFormValues) => {
+    if (!selectedConversationId) return;
     try {
       await addNoteMutation.mutateAsync({
         conversationId: selectedConversationId,
         author: "agent",
-        text: noteText.trim(),
+        text: values.text.trim(),
       });
-      setNoteText("");
+      noteForm.reset({ text: "" });
     } catch (error) {
       setFlashMessage(
         `Note failed: ${String((error as Error)?.message || error)}`,
@@ -935,14 +1010,19 @@ export default function InboxV2() {
     }
   };
 
-  const onSnooze = async () => {
-    if (!selectedConversationId || !snoozeDate) return;
+  const onSnooze = async (values: SnoozeFormValues) => {
+    if (!selectedConversationId) return;
+    const snoozedUntil = parseDateValue(values.snoozedUntil);
+    if (!snoozedUntil) {
+      setFlashMessage("Select a valid snooze date.");
+      return;
+    }
     try {
       await snoozeMutation.mutateAsync({
         conversationId: selectedConversationId,
-        snoozedUntil: snoozeDate,
+        snoozedUntil: snoozedUntil.toISOString(),
       });
-      setSnoozeDate("");
+      snoozeForm.reset({ snoozedUntil: "" });
       setFlashMessage("Conversation snoozed.");
     } catch (error) {
       setFlashMessage(
@@ -958,6 +1038,7 @@ export default function InboxV2() {
         conversationId: selectedConversationId,
         snoozedUntil: null,
       });
+      snoozeForm.reset({ snoozedUntil: "" });
       setFlashMessage("Snooze cleared.");
     } catch (error) {
       setFlashMessage(
@@ -966,14 +1047,15 @@ export default function InboxV2() {
     }
   };
 
-  const onAssign = async () => {
+  const onAssign = async (values: AssignFormValues) => {
     if (!selectedConversationId) return;
+    const ownerLabel = values.ownerLabel.trim();
     try {
       await assignMutation.mutateAsync({
         conversationId: selectedConversationId,
-        ownerLabel: assignLabel.trim() || null,
+        ownerLabel: ownerLabel || null,
       });
-      setFlashMessage(`Assigned to: ${assignLabel.trim() || "Unassigned"}`);
+      setFlashMessage(`Assigned to: ${ownerLabel || "Unassigned"}`);
     } catch (error) {
       setFlashMessage(
         `Assign failed: ${String((error as Error)?.message || error)}`,
@@ -988,15 +1070,13 @@ export default function InboxV2() {
     setShowTemplates(false);
   };
 
-  const onCreateTemplate = async () => {
-    if (!newTemplateName.trim() || !newTemplateBody.trim()) return;
+  const onCreateTemplate = async (values: TemplateFormValues) => {
     try {
       await createTemplateMutation.mutateAsync({
-        name: newTemplateName.trim(),
-        body: newTemplateBody.trim(),
+        name: values.name.trim(),
+        body: values.body.trim(),
       });
-      setNewTemplateName("");
-      setNewTemplateBody("");
+      templateForm.reset({ name: "", body: "" });
     } catch (error) {
       setFlashMessage(
         `Template save failed: ${String((error as Error)?.message || error)}`,
@@ -1013,6 +1093,11 @@ export default function InboxV2() {
       );
     }
   };
+
+  const submitAssign = assignForm.handleSubmit(onAssign);
+  const submitSnooze = snoozeForm.handleSubmit(onSnooze);
+  const submitAddNote = noteForm.handleSubmit(onAddNote);
+  const submitCreateTemplate = templateForm.handleSubmit(onCreateTemplate);
 
   const getHealthColor = (score: number): string => {
     if (score >= 80) return "#13b981";
@@ -1859,16 +1944,23 @@ export default function InboxV2() {
                         type="text"
                         className="V2Inbox__assignInput"
                         value={assignLabel}
-                        onChange={(e) => setAssignLabel(e.target.value)}
+                        onChange={(e) =>
+                          assignForm.setValue("ownerLabel", e.target.value, {
+                            shouldValidate: true,
+                          })
+                        }
                         placeholder="Rep name…"
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") void onAssign();
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void submitAssign();
+                          }
                         }}
                       />
                       <button
                         type="button"
                         className="V2Inbox__button V2Inbox__button--small"
-                        onClick={onAssign}
+                        onClick={() => void submitAssign()}
                         disabled={assignMutation.isPending}
                       >
                         {assignMutation.isPending ? "…" : "Assign"}
@@ -1879,12 +1971,16 @@ export default function InboxV2() {
                         className="V2Inbox__snoozeInput"
                         aria-label="Snooze until date and time"
                         value={snoozeDate}
-                        onChange={(e) => setSnoozeDate(e.target.value)}
+                        onChange={(e) =>
+                          snoozeForm.setValue("snoozedUntil", e.target.value, {
+                            shouldValidate: true,
+                          })
+                        }
                       />
                       <button
                         type="button"
                         className="V2Inbox__button V2Inbox__button--small"
-                        onClick={onSnooze}
+                        onClick={() => void submitSnooze()}
                         disabled={snoozeMutation.isPending || !snoozeDate}
                       >
                         {snoozeMutation.isPending ? "…" : "Snooze"}
@@ -2147,50 +2243,46 @@ export default function InboxV2() {
                         })()}
                         <div className="V2Inbox__chatTools">
                           {lineOptions.length > 0 && (
-                            <select
-                              className="V2Inbox__chatLineSelect"
-                              value={selectedLineKey}
-                              onChange={(event) =>
-                                setSelectedLineKey(event.target.value)
+                            <V2Select
+                              triggerClassName="V2Inbox__chatLineSelect"
+                              value={selectedLineKey || LINE_NONE_VALUE}
+                              onValueChange={(value) =>
+                                setSelectedLineKey(
+                                  value === LINE_NONE_VALUE ? "" : value,
+                                )
                               }
-                              title="Select send line"
-                            >
-                              <option value="">Line…</option>
-                              {lineOptions.map((option) => (
-                                <option key={option.key} value={option.key}>
-                                  {formatSendLineLabel(option)}
-                                </option>
-                              ))}
-                            </select>
+                              options={lineSelectOptions}
+                              ariaLabel="Select send line"
+                            />
                           )}
                           {detail.drafts.length > 0 && (
-                            <select
-                              className="V2Inbox__chatDraftSelect"
-                              value={selectedDraftId || ""}
-                              onChange={(event) => {
-                                const draftId = event.target.value;
-                                if (draftId) {
-                                  const draft = detail.drafts.find(
-                                    (d) => d.id === draftId,
-                                  );
-                                  if (draft) {
-                                    setComposerText(draft.text);
-                                    setSelectedDraftId(draft.id);
-                                  }
+                            <V2Select
+                              triggerClassName="V2Inbox__chatDraftSelect"
+                              value={selectedDraftId || DRAFT_NONE_VALUE}
+                              onValueChange={(value) => {
+                                if (value === DRAFT_NONE_VALUE) {
+                                  setSelectedDraftId(null);
+                                  return;
                                 }
+                                const draft = detail.drafts.find(
+                                  (d) => d.id === value,
+                                );
+                                if (!draft) return;
+                                setComposerText(draft.text);
+                                setSelectedDraftId(draft.id);
                               }}
-                              title="Use a saved draft"
-                            >
-                              <option value="">
-                                Drafts ({detail.drafts.length})
-                              </option>
-                              {detail.drafts.slice(0, 5).map((draft) => (
-                                <option key={draft.id} value={draft.id}>
-                                  {shorten(draft.text, 40)} (L
-                                  {draft.lintScore.toFixed(0)})
-                                </option>
-                              ))}
-                            </select>
+                              options={[
+                                {
+                                  value: DRAFT_NONE_VALUE,
+                                  label: `Drafts (${detail.drafts.length})`,
+                                },
+                                ...detail.drafts.slice(0, 5).map((draft) => ({
+                                  value: draft.id,
+                                  label: `${shorten(draft.text, 40)} (L${draft.lintScore.toFixed(0)})`,
+                                })),
+                              ]}
+                              ariaLabel="Use a saved draft"
+                            />
                           )}
                           {/* Templates */}
                           <div className="V2Inbox__templateWrapper">
@@ -2258,7 +2350,11 @@ export default function InboxV2() {
                                       className="V2Inbox__templateNameInput"
                                       value={newTemplateName}
                                       onChange={(e) =>
-                                        setNewTemplateName(e.target.value)
+                                        templateForm.setValue(
+                                          "name",
+                                          e.target.value,
+                                          { shouldValidate: true },
+                                        )
                                       }
                                       placeholder="Template name…"
                                     />
@@ -2266,7 +2362,11 @@ export default function InboxV2() {
                                       className="V2Inbox__templateBodyInput"
                                       value={newTemplateBody}
                                       onChange={(e) =>
-                                        setNewTemplateBody(e.target.value)
+                                        templateForm.setValue(
+                                          "body",
+                                          e.target.value,
+                                          { shouldValidate: true },
+                                        )
                                       }
                                       rows={2}
                                       placeholder="Message body… use {{name}} for contact name"
@@ -2274,7 +2374,9 @@ export default function InboxV2() {
                                     <button
                                       type="button"
                                       className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                                      onClick={onCreateTemplate}
+                                      onClick={() =>
+                                        void submitCreateTemplate()
+                                      }
                                       disabled={
                                         createTemplateMutation.isPending ||
                                         !newTemplateName.trim() ||
@@ -2458,20 +2560,18 @@ export default function InboxV2() {
                           >
                             <label className="V2Control">
                               <span>Full or Part Time</span>
-                              <select
+                              <V2Select
                                 value={qualificationState.fullOrPartTime}
-                                onChange={(e) =>
+                                onValueChange={(value) =>
                                   setQualificationState((prev) => ({
                                     ...prev,
-                                    fullOrPartTime: e.target
-                                      .value as QualificationStateV2["fullOrPartTime"],
+                                    fullOrPartTime:
+                                      value as QualificationStateV2["fullOrPartTime"],
                                   }))
                                 }
-                              >
-                                <option value="unknown">Unknown</option>
-                                <option value="full_time">Full Time</option>
-                                <option value="part_time">Part Time</option>
-                              </select>
+                                options={FULL_OR_PART_TIME_OPTIONS}
+                                ariaLabel="Full or part time"
+                              />
                             </label>
                             <label className="V2Control">
                               <span>Niche</span>
@@ -2489,41 +2589,33 @@ export default function InboxV2() {
                             </label>
                             <label className="V2Control">
                               <span>Revenue Mix</span>
-                              <select
+                              <V2Select
                                 value={qualificationState.revenueMix}
-                                onChange={(e) =>
+                                onValueChange={(value) =>
                                   setQualificationState((prev) => ({
                                     ...prev,
-                                    revenueMix: e.target
-                                      .value as QualificationStateV2["revenueMix"],
+                                    revenueMix:
+                                      value as QualificationStateV2["revenueMix"],
                                   }))
                                 }
-                              >
-                                <option value="unknown">Unknown</option>
-                                <option value="mostly_cash">Mostly Cash</option>
-                                <option value="mostly_insurance">
-                                  Mostly Insurance
-                                </option>
-                                <option value="balanced">Balanced</option>
-                              </select>
+                                options={REVENUE_MIX_OPTIONS}
+                                ariaLabel="Revenue mix"
+                              />
                             </label>
                             <label className="V2Control">
                               <span>Coaching Interest</span>
-                              <select
+                              <V2Select
                                 value={qualificationState.coachingInterest}
-                                onChange={(e) =>
+                                onValueChange={(value) =>
                                   setQualificationState((prev) => ({
                                     ...prev,
-                                    coachingInterest: e.target
-                                      .value as QualificationStateV2["coachingInterest"],
+                                    coachingInterest:
+                                      value as QualificationStateV2["coachingInterest"],
                                   }))
                                 }
-                              >
-                                <option value="unknown">Unknown</option>
-                                <option value="high">High</option>
-                                <option value="medium">Medium</option>
-                                <option value="low">Low</option>
-                              </select>
+                                options={COACHING_INTEREST_OPTIONS}
+                                ariaLabel="Coaching interest"
+                              />
                             </label>
                             <button
                               type="button"
@@ -2642,7 +2734,7 @@ export default function InboxV2() {
                                     {note.author}
                                   </span>
                                   <span className="V2Inbox__noteTime">
-                                    {new Date(note.createdAt).toLocaleString()}
+                                    {fmtDateTime(note.createdAt)}
                                   </span>
                                 </div>
                                 <p className="V2Inbox__noteBody">{note.text}</p>
@@ -2653,21 +2745,27 @@ export default function InboxV2() {
                             <textarea
                               className="V2Inbox__noteInput"
                               value={noteText}
-                              onChange={(e) => setNoteText(e.target.value)}
+                              onChange={(e) =>
+                                noteForm.setValue("text", e.target.value, {
+                                  shouldValidate: true,
+                                })
+                              }
                               rows={2}
                               placeholder="Add a note… (⌘↵ to save)"
                               onKeyDown={(e) => {
                                 if (
                                   e.key === "Enter" &&
                                   (e.metaKey || e.ctrlKey)
-                                )
-                                  void onAddNote();
+                                ) {
+                                  e.preventDefault();
+                                  void submitAddNote();
+                                }
                               }}
                             />
                             <button
                               type="button"
                               className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                              onClick={onAddNote}
+                              onClick={() => void submitAddNote()}
                               disabled={
                                 addNoteMutation.isPending ||
                                 noteText.trim().length === 0
@@ -2879,19 +2977,16 @@ export default function InboxV2() {
                             </p>
                             <label className="V2Control">
                               <span>Active Line</span>
-                              <select
-                                value={selectedLineKey}
-                                onChange={(e) =>
-                                  setSelectedLineKey(e.target.value)
+                              <V2Select
+                                value={selectedLineKey || LINE_NONE_VALUE}
+                                onValueChange={(value) =>
+                                  setSelectedLineKey(
+                                    value === LINE_NONE_VALUE ? "" : value,
+                                  )
                                 }
-                              >
-                                <option value="">Select a line…</option>
-                                {lineOptions.map((option) => (
-                                  <option key={option.key} value={option.key}>
-                                    {formatSendLineLabel(option)}
-                                  </option>
-                                ))}
-                              </select>
+                                options={lineSelectOptions}
+                                ariaLabel="Active send line"
+                              />
                             </label>
                             <div
                               style={{

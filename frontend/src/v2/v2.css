@@ -330,6 +330,78 @@
   transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
+.V2Select__trigger {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.45rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font: inherit;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-radius-sm);
+  padding: 0.6rem 0.75rem;
+  background: var(--v2-surface-2);
+  color: var(--v2-text);
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.V2Select__trigger[data-placeholder] {
+  color: var(--v2-muted);
+}
+
+.V2Select__icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--v2-muted);
+}
+
+.V2Select__content {
+  z-index: 140;
+  min-width: var(--radix-select-trigger-width);
+  max-height: min(22rem, var(--radix-select-content-available-height));
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--v2-border);
+  background: color-mix(in srgb, var(--v2-surface) 90%, white 10%);
+  box-shadow: var(--v2-shadow-2);
+}
+
+.V2Select__viewport {
+  padding: 0.3rem;
+}
+
+.V2Select__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font-size: 0.83rem;
+  line-height: 1.2;
+  color: var(--v2-text);
+  cursor: pointer;
+  user-select: none;
+}
+
+.V2Select__item[data-highlighted] {
+  outline: none;
+  background: color-mix(in srgb, var(--v2-accent-soft) 62%, transparent 38%);
+}
+
+.V2Select__item[data-disabled] {
+  color: var(--v2-muted);
+  cursor: not-allowed;
+}
+
+.V2Select__itemIndicator {
+  color: var(--v2-accent);
+  display: inline-flex;
+  align-items: center;
+}
+
 .V2Control textarea {
   font: inherit;
   border: 1px solid var(--v2-border);
@@ -352,6 +424,7 @@
 }
 
 .V2Control select:focus,
+.V2Select__trigger:focus,
 .V2Control input:focus,
 .V2Control textarea:focus {
   outline: none;
@@ -2368,6 +2441,7 @@
 }
 
 .V2Inbox__stateCard .V2Control select,
+.V2Inbox__stateCard .V2Control .V2Select__trigger,
 .V2Inbox__stateCard .V2Control input {
   border-radius: 14px;
   border: 1px solid color-mix(in srgb, var(--state-accent) 34%, rgba(7, 19, 36, 0.14) 66%);
@@ -2376,6 +2450,7 @@
 }
 
 .V2Inbox__stateCard .V2Control select:focus,
+.V2Inbox__stateCard .V2Control .V2Select__trigger:focus,
 .V2Inbox__stateCard .V2Control input:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--state-accent) 74%, rgba(7, 19, 36, 0.16) 26%);
@@ -3573,6 +3648,7 @@
 
 .V2Inbox__chatLineSelect,
 .V2Inbox__chatDraftSelect {
+  min-height: auto;
   font: inherit;
   font-size: 0.75rem;
   padding: 0.35rem 0.55rem;

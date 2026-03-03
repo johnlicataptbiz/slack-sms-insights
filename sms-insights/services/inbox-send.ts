@@ -8,6 +8,7 @@ import {
   getConversationState,
   getSendAttemptByIdempotency,
   type InsertSendAttemptInput,
+  reserveSendAttemptIdempotency,
   insertSendAttempt,
   type SendAttemptRow,
 } from './inbox-store.js';
@@ -204,18 +205,6 @@ export const sendInboxMessage = async (
     };
   }
 
-  if (context.idempotencyKey) {
-    const existing = await getSendAttemptByIdempotency(context.conversation.id, context.idempotencyKey, logger);
-    if (existing) {
-      return {
-        status: 'duplicate',
-        reason: 'idempotency key already processed',
-        sendAttempt: existing,
-        outboundEvent: null,
-      };
-    }
-  }
-
   const allowlist = evaluateAllowlist(context.senderUserId, context.senderEmail);
   const dnc = context.conversation.status === 'dnc' || context.profile?.dnc === true;
 
@@ -237,6 +226,30 @@ export const sendInboxMessage = async (
     },
     responsePayload: null,
   };
+
+  if (context.idempotencyKey) {
+    const reservation = await reserveSendAttemptIdempotency(
+      {
+        ...commonAttemptPayload,
+        idempotencyKey: context.idempotencyKey,
+      },
+      logger,
+    );
+    if (!reservation) {
+      const existing = await getSendAttemptByIdempotency(context.conversation.id, context.idempotencyKey, logger);
+      if (existing) {
+        return {
+          status: 'duplicate',
+          reason:
+            existing.status === 'queued'
+              ? 'idempotency key already in progress'
+              : 'idempotency key already processed',
+          sendAttempt: existing,
+          outboundEvent: null,
+        };
+      }
+    }
+  }
 
   if (!allowlist.allowed) {
     const sendAttempt = await createSendAttemptRecord(

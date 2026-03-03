@@ -3740,6 +3740,20 @@
   flex-wrap: wrap;
 }
 
+.V2Inbox__sendReliability {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 184, 214, 0.28);
+  background: rgba(17, 184, 214, 0.08);
+  color: var(--v2-accent-strong);
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .V2Inbox__chatLineSelect,
 .V2Inbox__chatDraftSelect {
   min-height: auto;

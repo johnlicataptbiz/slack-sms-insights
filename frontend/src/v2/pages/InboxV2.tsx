@@ -116,6 +116,16 @@ const containsPodcastLink = (text: string): boolean => {
   return PODCAST_LINK_PATTERNS.some((pattern) => lower.includes(pattern));
 };
 
+const createClientIdempotencyKey = (): string => {
+  if (
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+  ) {
+    return `inbox-${globalThis.crypto.randomUUID()}`;
+  }
+  return `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+};
+
 // ---------------------------------------------------------------------------
 // SMS segment counter
 // GSM-7: 160 chars single / 153 chars per segment in multi-part
@@ -330,6 +340,11 @@ export default function InboxV2() {
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
   const listParentRef = useRef<HTMLDivElement | null>(null);
+  const sendLockRef = useRef(false);
+  const pendingIdempotencyRef = useRef<{
+    signature: string;
+    key: string;
+  } | null>(null);
 
   const [qualificationState, setQualificationState] =
     useState<QualificationStateV2>({
@@ -672,6 +687,9 @@ export default function InboxV2() {
     // Clear the optimistic sent-message bubble so it doesn't bleed into the
     // next conversation's thread when the user switches contacts.
     setJustSentMessage(null);
+    setSendStatus("idle");
+    sendLockRef.current = false;
+    pendingIdempotencyRef.current = null;
     setShowDoublePitchWarning(false);
     setSequenceIdInput("");
     setLastSequenceSync(null);
@@ -755,6 +773,7 @@ export default function InboxV2() {
   };
 
   const onSend = async () => {
+    if (sendLockRef.current) return;
     if (!selectedConversationId || composerText.trim().length === 0) return;
     if (lineSelectionRequired) {
       setFlashMessage("Select a send line before sending.");
@@ -812,7 +831,8 @@ export default function InboxV2() {
   };
 
   const executeSend = async (messageText: string) => {
-    if (!selectedConversationId) return;
+    if (!selectedConversationId || sendLockRef.current) return;
+    sendLockRef.current = true;
 
     setFlashMessage(null);
     setSendStatus("sending");
@@ -823,6 +843,22 @@ export default function InboxV2() {
     });
 
     try {
+      const sendSignature = [
+        selectedConversationId,
+        selectedLineOption?.lineId ?? "line:none",
+        selectedLineOption?.fromNumber ?? "from:none",
+        messageText,
+      ].join("|");
+      const cachedIdempotency = pendingIdempotencyRef.current;
+      const idempotencyKey =
+        cachedIdempotency && cachedIdempotency.signature === sendSignature
+          ? cachedIdempotency.key
+          : createClientIdempotencyKey();
+      pendingIdempotencyRef.current = {
+        signature: sendSignature,
+        key: idempotencyKey,
+      };
+
       const sendFromNumber =
         selectedLineOption?.lineId == null
           ? selectedLineOption?.fromNumber || null
@@ -830,7 +866,7 @@ export default function InboxV2() {
       const result = await sendMutation.mutateAsync({
         conversationId: selectedConversationId,
         body: messageText,
-        idempotencyKey: `inbox-${Date.now()}`,
+        idempotencyKey,
         ...(selectedLineOption?.lineId != null
           ? { lineId: selectedLineOption.lineId }
           : {}),
@@ -846,7 +882,12 @@ export default function InboxV2() {
 
         setComposerText("");
         setSelectedDraftId(null);
-        toast.success("Message sent successfully");
+        pendingIdempotencyRef.current = null;
+        if (result.data.status === "duplicate") {
+          toast.info("Send deduped: message was already processed.");
+        } else {
+          toast.success("Message sent successfully");
+        }
 
         // Phase 2: Auto-Snooze
         if (containsPodcastLink(messageText)) {
@@ -879,6 +920,8 @@ export default function InboxV2() {
       setSendStatus("error");
       setJustSentMessage(null);
       toast.error(`Send failed: ${String((error as Error)?.message || error)}`);
+    } finally {
+      sendLockRef.current = false;
     }
   };
 
@@ -2336,6 +2379,12 @@ export default function InboxV2() {
                           onChange={(event) => {
                             const nextText = event.target.value;
                             setComposerText(nextText);
+                            setSendStatus((prev) =>
+                              prev === "sent" || prev === "error"
+                                ? "idle"
+                                : prev,
+                            );
+                            pendingIdempotencyRef.current = null;
                             if (selectedDraftId) {
                               const selectedDraft = detailDrafts.find(
                                 (draft) => draft.id === selectedDraftId,
@@ -2408,6 +2457,13 @@ export default function InboxV2() {
                           );
                         })()}
                         <div className="V2Inbox__chatTools">
+                          <span className="V2Inbox__sendReliability">
+                            {sendStatus === "sending"
+                              ? "Sending with retry-safe guard…"
+                              : pendingIdempotencyRef.current
+                                ? "Retry-safe key active"
+                                : "Retry-safe send enabled"}
+                          </span>
                           {lineOptions.length > 0 && (
                             <V2Select
                               triggerClassName="V2Inbox__chatLineSelect"

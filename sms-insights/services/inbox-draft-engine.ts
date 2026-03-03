@@ -42,7 +42,9 @@ export type DraftLintIssue = {
     | 'forbidden_bullet_list'
     | 'line_stacking_pattern'
     | 'missing_cta_question'
-    | 'long_block_without_breaks';
+    | 'long_block_without_breaks'
+    | 'overlength_sms'
+    | 'unicode_risky_for_sms';
   message: string;
   blocking: boolean;
 };
@@ -531,6 +533,24 @@ const hasLongParagraph = (text: string): boolean => {
     .some((paragraph) => paragraph.length > 1200);
 };
 
+const hasOverlengthSms = (text: string): boolean => sanitizeInline(text).length > 320;
+
+const hasUnicodeRisk = (text: string): boolean => /[^\u0000-\u007F]/.test(text);
+
+const SOFT_DEFERRAL_PATTERNS = [
+  /\bkeep this in mind\b/i,
+  /\bwhen i(?:'|’)m ready\b/i,
+  /\bnot ready\b/i,
+  /\bneed more research\b/i,
+  /\bfew meetings\b/i,
+  /\brevis(?:e|ions?)\b/i,
+  /\bplanning ahead\b/i,
+  /\blater\b/i,
+];
+
+const isSoftDeferral = (text: string): boolean =>
+  SOFT_DEFERRAL_PATTERNS.some((pattern) => pattern.test(text));
+
 export const lintDraft = (text: string): DraftLintResult => {
   const issues: DraftLintIssue[] = [];
 
@@ -570,6 +590,22 @@ export const lintDraft = (text: string): DraftLintResult => {
     issues.push({
       code: 'long_block_without_breaks',
       message: 'Draft has a long block without natural spacing.',
+      blocking: false,
+    });
+  }
+
+  if (hasOverlengthSms(text)) {
+    issues.push({
+      code: 'overlength_sms',
+      message: 'Draft is too long for reliable SMS flow (target <= 320 chars).',
+      blocking: false,
+    });
+  }
+
+  if (hasUnicodeRisk(text)) {
+    issues.push({
+      code: 'unicode_risky_for_sms',
+      message: 'Draft includes non-ASCII characters that can increase SMS segments.',
       blocking: false,
     });
   }
@@ -636,6 +672,7 @@ const nextQualificationQuestion = (missingFields: string[], ownerVoice: OwnerVoi
 const chooseAcknowledgement = (latestInboundBody: string, ownerVoice: OwnerVoice = null): string => {
   const normalized = normalize(latestInboundBody);
   if (!normalized) return ownerVoice === 'jack' ? 'Got you.' : 'Appreciate the update.';
+  if (isSoftDeferral(normalized)) return ownerVoice === 'jack' ? 'Totally fair.' : 'That makes sense.';
   if (/thank|thanks|appreciate|grateful/.test(normalized))
     return ownerVoice === 'jack' ? 'Love that, appreciate you sharing.' : 'Love that and thanks for sharing.';
   if (/not receive|did not receive|didnt receive|have not received|hasnt received/.test(normalized)) {
@@ -657,14 +694,19 @@ const cleanGeneratedVoice = (text: string, ownerVoice: OwnerVoice = null): strin
     [/\bI have your niche noted as\b/gi, ownerVoice === 'jack' ? "Got your niche as" : 'I have your niche as'],
     [/\bWould you say your revenue mix is\b/gi, 'Are you'],
     [/\bWho is your core niche right now\?/gi, ownerVoice === 'jack' ? 'Who do you mainly want to serve right now?' : 'Who are you mainly trying to serve right now?'],
+    [/[“”]/g, '"'],
+    [/[‘’]/g, "'"],
+    [/\u00A0/g, ' '],
   ];
   for (const [pattern, replacement] of replacements) {
     next = next.replace(pattern, replacement);
   }
+  // Strip pictographic emoji that frequently inflate segment counts.
+  next = next.replace(/[\u{1F300}-\u{1FAFF}]/gu, '');
   return sanitizeInline(next);
 };
 
-const buildContextualFallbackDraft = (params: {
+export const buildContextualFallbackDraft = (params: {
   messages: InboxMessageRow[];
   state: ConversationStateRow | null;
   escalationLevel: EscalationLevel;
@@ -675,12 +717,27 @@ const buildContextualFallbackDraft = (params: {
 }): string => {
   const orderedMessages = orderMessagesChronologically(params.messages);
   const latestInbound = findLatestMessageByDirection(orderedMessages, 'inbound');
+  const hasPriorOutbound = orderedMessages.some(
+    (message) => message.direction === 'outbound' && (message.body || '').trim().length > 0,
+  );
   const knownNiche = sanitizeInline(params.state?.qualification_niche || params.contact?.profileNiche || '');
   const knownName = sanitizeInline(params.contact?.name || '');
   const ownerVoice = params.preferredOwnerVoice || null;
-  const acknowledgement = chooseAcknowledgement(sanitizeInline(latestInbound?.body || ''), ownerVoice);
+  const latestInboundBody = sanitizeInline(latestInbound?.body || '');
+  const acknowledgement = chooseAcknowledgement(latestInboundBody, ownerVoice);
 
-  const lineOne = knownName ? `${knownName}, ${acknowledgement}` : acknowledgement;
+  const lineOne = !hasPriorOutbound && knownName ? `${knownName}, ${acknowledgement}` : acknowledgement;
+
+  if (isSoftDeferral(latestInboundBody)) {
+    const softDeferralQuestion =
+      ownerVoice === 'jack'
+        ? 'Want me to check back in a few weeks, or would you rather ping me when you are ready?'
+        : 'Would you like me to check back in a few weeks, or should I wait for your ping when you are ready?';
+    return cleanGeneratedVoice(
+      [lineOne, 'Keep doing your homework and refining the plan.', softDeferralQuestion].join(' '),
+      ownerVoice,
+    );
+  }
 
   const contextBits: string[] = [];
   if (params.state && params.state.qualification_full_or_part_time !== 'unknown') {
@@ -735,6 +792,10 @@ const buildPrompt = (params: {
   const orderedMessages = orderMessagesChronologically(params.messages);
   const latestInbound = findLatestMessageByDirection(orderedMessages, 'inbound');
   const latestOutbound = findLatestMessageByDirection(orderedMessages, 'outbound');
+  const hasPriorOutbound = orderedMessages.some(
+    (message) => message.direction === 'outbound' && (message.body || '').trim().length > 0,
+  );
+  const latestInboundIsSoftDeferral = isSoftDeferral(latestInbound?.body || '');
   const recentThread = orderedMessages
     .slice(-24)
     .map((message) => {
@@ -839,6 +900,9 @@ const buildPrompt = (params: {
     'Never use em dash or hyphen characters ever.',
     'Avoid generic AI phrases: "I hope you are doing well", "just wanted to follow up", "quick reminder".',
     'Avoid corporate phrasing: "qualification accurate", "core niche", "revenue mix", "touch base".',
+    'If the thread already has prior outbound messages, do not restart with a fresh intro or "Hey Name". Continue the conversation naturally.',
+    'If latest inbound is a soft deferral ("keep this in mind", "not ready", "more research"), do not hard close for a call in this reply.',
+    'For soft deferral, acknowledge briefly, keep tone low pressure, and ask one permission-based follow-up question.',
     '',
     '=== SMS FORMATTING RULES ===',
     'Do not write stacked single-sentence paragraphs. Avoid excessive line breaks.',
@@ -846,6 +910,8 @@ const buildPrompt = (params: {
     'Default to one solid paragraph for short replies.',
     'Two natural paragraphs max for longer replies.',
     'No bullet or numbered lists unless a mirrored example uses them.',
+    'Keep total output <= 320 characters whenever possible.',
+    'Prefer ASCII punctuation and plain text to avoid Unicode segment expansion.',
     '',
     '=== STRUCTURAL MIRRORING (highest priority) ===',
     'Structural fidelity overrides stylistic preference.',
@@ -869,6 +935,8 @@ const buildPrompt = (params: {
     '',
     '=== CONTEXT ===',
     `Preferred setter voice: ${params.preferredOwnerVoice || 'unknown'}`,
+    `Thread already has outbound context: ${hasPriorOutbound ? 'yes' : 'no'}`,
+    `Latest inbound is soft deferral: ${latestInboundIsSoftDeferral ? 'yes' : 'no'}`,
     `Conversation keywords: ${params.conversationKeywords.join(', ') || 'none'}`,
     `Escalation level: ${params.escalationLevel}`,
     `Escalation reason: ${params.escalationReason}`,

@@ -877,6 +877,59 @@ export const insertSendAttempt = async (
   }
 };
 
+export const reserveSendAttemptIdempotency = async (
+  input: Omit<InsertSendAttemptInput, 'status' | 'retryCount' | 'responsePayload' | 'errorMessage'> & {
+    idempotencyKey: string;
+  },
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<SendAttemptRow | null> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const result = await client.query<SendAttemptRow>(
+      `
+      INSERT INTO send_attempts (
+        conversation_id,
+        message_body,
+        sender_identity,
+        line_id,
+        from_number,
+        allowlist_decision,
+        dnc_decision,
+        idempotency_key,
+        status,
+        retry_count,
+        request_payload,
+        response_payload,
+        error_message
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',0,$9,NULL,NULL)
+      ON CONFLICT (conversation_id, idempotency_key)
+      WHERE idempotency_key IS NOT NULL
+      DO NOTHING
+      RETURNING *;
+      `,
+      [
+        input.conversationId,
+        input.messageBody,
+        input.senderIdentity ?? null,
+        input.lineId ?? null,
+        input.fromNumber ?? null,
+        input.allowlistDecision,
+        input.dncDecision,
+        input.idempotencyKey,
+        input.requestPayload ?? null,
+      ],
+    );
+    return result.rows[0] ?? null;
+  } catch (err) {
+    logger?.error('reserveSendAttemptIdempotency failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export const getSendAttemptByIdempotency = async (
   conversationId: string,
   idempotencyKey: string,

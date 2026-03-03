@@ -354,21 +354,21 @@ export const updateConversationState = async (
         qualification_delivery_model = COALESCE($5::text, qualification_delivery_model),
         qualification_coaching_interest = COALESCE($6::text, qualification_coaching_interest),
         qualification_progress_step = COALESCE($7::integer, qualification_progress_step),
-        escalation_level = COALESCE($7::integer, escalation_level),
+        escalation_level = COALESCE($8::integer, escalation_level),
         escalation_reason = CASE
-          WHEN $8::text IS NULL THEN escalation_reason
-          ELSE $8::text
+          WHEN $9::text IS NULL THEN escalation_reason
+          ELSE $9::text
         END,
-        escalation_overridden = COALESCE($9::boolean, escalation_overridden),
+        escalation_overridden = COALESCE($10::boolean, escalation_overridden),
         last_podcast_sent_at = CASE
-          WHEN $10::timestamptz IS NULL THEN last_podcast_sent_at
-          ELSE $10::timestamptz
-        END,
-        next_followup_due_at = CASE
-          WHEN $11::timestamptz IS NULL THEN next_followup_due_at
+          WHEN $11::timestamptz IS NULL THEN last_podcast_sent_at
           ELSE $11::timestamptz
         END,
-        cadence_status = COALESCE($12::text, cadence_status),
+        next_followup_due_at = CASE
+          WHEN $12::timestamptz IS NULL THEN next_followup_due_at
+          ELSE $12::timestamptz
+        END,
+        cadence_status = COALESCE($13::text, cadence_status),
         updated_at = NOW()
       WHERE conversation_id = $1
       RETURNING *;

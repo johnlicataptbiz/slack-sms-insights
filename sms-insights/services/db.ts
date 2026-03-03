@@ -540,6 +540,11 @@ export const initializeSchema = async (): Promise<void> => {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
     `);
+    await client.query(`
+      ALTER TABLE conversation_state
+      ADD COLUMN IF NOT EXISTS qualification_delivery_model TEXT NOT NULL DEFAULT 'unknown'
+      CHECK (qualification_delivery_model IN ('brick_and_mortar', 'mobile', 'online', 'hybrid', 'unknown'));
+    `);
 
     // Outbound send audit trail with policy decisions and provider payloads.
     await client.query(`

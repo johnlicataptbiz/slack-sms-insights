@@ -33,6 +33,7 @@ type ConversationWithState = {
   qualification_full_or_part_time: string | null;
   qualification_niche: string | null;
   qualification_revenue_mix: string | null;
+  qualification_delivery_model: string | null;
   qualification_coaching_interest: string | null;
   qualification_progress_step: number | null;
   escalation_level: number | null;
@@ -72,6 +73,7 @@ const getConversationsNeedingQualification = async (limit?: number): Promise<Con
         cs.qualification_full_or_part_time,
         cs.qualification_niche,
         cs.qualification_revenue_mix,
+        cs.qualification_delivery_model,
         cs.qualification_coaching_interest,
         cs.qualification_progress_step,
         cs.escalation_level
@@ -83,8 +85,9 @@ const getConversationsNeedingQualification = async (limit?: number): Promise<Con
           OR cs.qualification_full_or_part_time = 'unknown'
           OR cs.qualification_niche IS NULL
           OR cs.qualification_revenue_mix = 'unknown'
+          OR cs.qualification_delivery_model = 'unknown'
           OR cs.qualification_coaching_interest = 'unknown'
-          OR cs.qualification_progress_step < 4
+          OR cs.qualification_progress_step < 5
         )
         AND EXISTS (
           SELECT 1 FROM sms_events se 
@@ -150,6 +153,12 @@ const backfillQualification = async (dryRun: boolean, limit?: number) => {
                 | 'mostly_cash'
                 | 'mostly_insurance'
                 | 'balanced'
+                | 'unknown',
+              qualification_delivery_model: (conv.qualification_delivery_model ?? 'unknown') as
+                | 'brick_and_mortar'
+                | 'mobile'
+                | 'online'
+                | 'hybrid'
                 | 'unknown',
               qualification_coaching_interest: (conv.qualification_coaching_interest ?? 'unknown') as
                 | 'high'

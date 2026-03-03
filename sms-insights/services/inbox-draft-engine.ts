@@ -14,6 +14,7 @@ const CANONICAL_DOC_PATHS = {
   escalationModel: '/Users/jl/Downloads/PT Biz Lead Messaging Escalation Model.docx',
   conversionMessages: '/Users/jl/Downloads/Booked Call Conversion Messages.docx',
   referenceDoc: '/Users/jl/Downloads/PT Biz Reference Doc for Lead Messaging Agents.docx',
+  clinicOwnerLanguagePlaybook: '/Users/jl/Downloads/Clinic_Owner_Language_Playbook.docx',
   socialLinks: '/Users/jl/Downloads/PT Biz Social Media Links.txt',
 } as const;
 
@@ -21,6 +22,7 @@ const OPENAI_MISSING_KEY_MESSAGE = 'Set OPENAI_API_KEY in your environment to en
 const MAX_EXAMPLES = 6;
 const MAX_RETRIES = 3;
 const MAX_STYLE_ANCHORS = 5;
+const MIN_EXAMPLE_KEYWORD_HITS = 2;
 
 export type EscalationLevel = 1 | 2 | 3 | 4;
 
@@ -28,6 +30,7 @@ type CanonicalSources = {
   escalationModel: string;
   conversionMessages: string;
   referenceDoc: string;
+  clinicOwnerLanguagePlaybook: string;
   socialLinks: string;
 };
 
@@ -61,6 +64,11 @@ export type DraftGenerationResult = {
     ConversionExampleRow & {
       outbound_body: string | null;
       outbound_user: string | null;
+      source_inbound_body: string | null;
+      source_conversation_id: string | null;
+      source_outbound_ts: string | null;
+      matchScore?: number;
+      matchHits?: string[];
     }
   >;
   styleAnchors: SetterVoiceExampleRow[];
@@ -106,6 +114,7 @@ const getCanonicalSources = (): CanonicalSources => {
     escalationModel: readDocx(CANONICAL_DOC_PATHS.escalationModel),
     conversionMessages: readDocx(CANONICAL_DOC_PATHS.conversionMessages),
     referenceDoc: readDocx(CANONICAL_DOC_PATHS.referenceDoc),
+    clinicOwnerLanguagePlaybook: readDocx(CANONICAL_DOC_PATHS.clinicOwnerLanguagePlaybook),
     socialLinks: safeReadText(CANONICAL_DOC_PATHS.socialLinks),
   };
   return canonicalSourcesCache;
@@ -133,12 +142,22 @@ const sanitizeInline = (value: string): string =>
     .replace(/[\u2012\u2013\u2014\u2015-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-const normalizeOwnerVoice = (ownerLabel: string | null | undefined): string | null => {
+type OwnerVoice = 'jack' | 'brandon' | null;
+type ConversionExampleCandidate = ConversionExampleRow & {
+  outbound_body: string | null;
+  outbound_user: string | null;
+  source_inbound_body: string | null;
+  source_conversation_id: string | null;
+  source_outbound_ts: string | null;
+  matchScore?: number;
+  matchHits?: string[];
+};
+const normalizeOwnerVoice = (ownerLabel: string | null | undefined): OwnerVoice => {
   const lower = (ownerLabel || '').trim().toLowerCase();
   if (!lower) return null;
   if (lower.includes('jack')) return 'jack';
   if (lower.includes('brandon')) return 'brandon';
-  return lower;
+  return null;
 };
 const findLatestMessageByDirection = (
   messages: InboxMessageRow[],
@@ -154,6 +173,217 @@ const findLatestMessageByDirection = (
 };
 const timelineSpeakerLabel = (message: InboxMessageRow): string =>
   message.direction === 'inbound' ? 'Lead' : message.aloware_user || 'Setter';
+
+const KEYWORD_STOPWORDS = new Set([
+  'a',
+  'an',
+  'and',
+  'are',
+  'as',
+  'at',
+  'be',
+  'been',
+  'but',
+  'by',
+  'can',
+  'do',
+  'for',
+  'from',
+  'got',
+  'have',
+  'hey',
+  'how',
+  'i',
+  'if',
+  'im',
+  'in',
+  'is',
+  'it',
+  'just',
+  'keep',
+  'like',
+  'make',
+  'my',
+  'of',
+  'on',
+  'or',
+  'our',
+  'right',
+  'so',
+  'still',
+  'that',
+  'the',
+  'their',
+  'them',
+  'there',
+  'they',
+  'this',
+  'to',
+  'up',
+  'we',
+  'what',
+  'when',
+  'with',
+  'you',
+  'your',
+  'youre',
+  'want',
+  'now',
+]);
+
+const tokenizeKeywords = (text: string): string[] => {
+  if (!text) return [];
+  const words = normalize(text)
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((token) => token.length >= 3)
+    .filter((token) => !KEYWORD_STOPWORDS.has(token))
+    .slice(0, 500);
+  return [...new Set(words)];
+};
+
+const extractPlaybookKeywords = (playbookText: string): string[] => {
+  const lines = playbookText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const terms: string[] = [];
+  for (const line of lines) {
+    if (/playbook/i.test(line)) continue;
+    const colonIndex = line.indexOf(':');
+    if (colonIndex > 0) {
+      terms.push(line.slice(0, colonIndex).trim());
+      continue;
+    }
+    if (/^[A-Za-z0-9\s/()-]{3,60}$/.test(line) && /^[A-Z0-9]/.test(line)) {
+      terms.push(line);
+    }
+  }
+  return tokenizeKeywords(terms.join(' ')).slice(0, 300);
+};
+
+const buildConversationKeywords = (params: {
+  messages: InboxMessageRow[];
+  state: ConversationStateRow | null;
+  contact?: DraftContactContext;
+}): string[] => {
+  const ordered = orderMessagesChronologically(params.messages);
+  const latestInbound = findLatestMessageByDirection(ordered, 'inbound');
+  const inboundWindow = ordered
+    .filter((message) => message.direction === 'inbound')
+    .slice(-8)
+    .map((message) => message.body || '')
+    .join(' ');
+  const contextText = [
+    latestInbound?.body || '',
+    inboundWindow,
+    params.state?.qualification_niche || '',
+    params.contact?.profileNiche || '',
+  ].join(' ');
+  return tokenizeKeywords(contextText).slice(0, 80);
+};
+
+const scoreConversionExample = (params: {
+  example: ConversionExampleCandidate;
+  conversationKeywords: string[];
+  preferredOwnerVoice: OwnerVoice;
+  playbookKeywordSet: Set<string>;
+}): { score: number; hits: string[] } => {
+  const corpus = `${params.example.source_inbound_body || ''} ${params.example.outbound_body || ''}`;
+  const exampleKeywordSet = new Set(tokenizeKeywords(corpus));
+  const hits = params.conversationKeywords.filter((keyword) => exampleKeywordSet.has(keyword));
+  const closedLabel = normalize(params.example.closed_won_label || '');
+  const closedWon = /\bwon\b/.test(closedLabel);
+  const closedLost = /\blost\b/.test(closedLabel);
+  const booked = /\bbook/.test(normalize(params.example.booked_call_label || ''));
+  const ownerMatch =
+    Boolean(params.preferredOwnerVoice) &&
+    normalize(params.example.outbound_user || '').includes(params.preferredOwnerVoice || '');
+
+  const playbookHitCount = hits.filter((keyword) => params.playbookKeywordSet.has(keyword)).length;
+  const standardHitCount = Math.max(0, hits.length - playbookHitCount);
+  // Playbook/domain terms carry much more signal than generic overlap.
+  let score = standardHitCount * 2 + playbookHitCount * 9;
+  if (booked) score += 5;
+  if (closedWon) score += 8;
+  if (closedLost) score += 2;
+  if (ownerMatch) score += 3;
+
+  return {
+    score,
+    hits: hits.slice(0, 10),
+  };
+};
+
+const rankConversionExamples = (params: {
+  examples: ConversionExampleCandidate[];
+  messages: InboxMessageRow[];
+  state: ConversationStateRow | null;
+  contact?: DraftContactContext;
+  preferredOwnerVoice: OwnerVoice;
+  playbookKeywords: string[];
+}): ConversionExampleCandidate[] => {
+  const conversationKeywords = buildConversationKeywords({
+    messages: params.messages,
+    state: params.state,
+    contact: params.contact,
+  });
+  const playbookKeywordSet = new Set(params.playbookKeywords);
+
+  const ranked = params.examples
+    .map((example) => {
+      const scored = scoreConversionExample({
+        example,
+        conversationKeywords,
+        preferredOwnerVoice: params.preferredOwnerVoice,
+        playbookKeywordSet,
+      });
+      return {
+        ...example,
+        matchScore: scored.score,
+        matchHits: scored.hits,
+      };
+    })
+    .sort((a, b) => {
+      const byScore = (b.matchScore || 0) - (a.matchScore || 0);
+      if (byScore !== 0) return byScore;
+      return toEpochMs(b.created_at) - toEpochMs(a.created_at);
+    });
+
+  const strongMatches = ranked.filter((example) => (example.matchHits?.length || 0) >= MIN_EXAMPLE_KEYWORD_HITS);
+  return (strongMatches.length > 0 ? strongMatches : ranked).slice(0, MAX_EXAMPLES);
+};
+
+const splitSentences = (text: string): string[] =>
+  text
+    .split(/(?<=[.!?])\s+/)
+    .map((segment) => sanitizeInline(segment))
+    .filter((segment) => segment.length > 0);
+
+const selectQuestionFromExamples = (params: {
+  examples: ConversionExampleCandidate[];
+  missingFields: string[];
+}): string | null => {
+  const field = params.missingFields[0] || '';
+  const fieldPatterns: Record<string, RegExp> = {
+    full_or_part_time: /\b(full|part|employee|clinic)\b/i,
+    niche: /\b(niche|serve|treat|population|specialty)\b/i,
+    revenue_mix: /\b(cash|insurance|mix|hybrid)\b/i,
+    coaching_interest: /\b(coach|coaching|support|help|mentor)\b/i,
+  };
+
+  for (const example of params.examples.slice(0, 4)) {
+    const questions = splitSentences(example.outbound_body || '').filter((sentence) => sentence.includes('?'));
+    if (questions.length === 0) continue;
+    const pattern = fieldPatterns[field];
+    const preferred = pattern ? questions.find((question) => pattern.test(question)) : questions[0];
+    const selected = preferred || (field ? null : questions[0]);
+    if (selected && selected.length >= 14 && selected.length <= 180) {
+      return selected;
+    }
+  }
+  return null;
+};
 
 const hasPattern = (text: string, patterns: RegExp[]): boolean => patterns.some((pattern) => pattern.test(text));
 
@@ -375,34 +605,63 @@ const renderCoachingInterestLabel = (value: ConversationStateRow['qualification_
   return 'unknown';
 };
 
-const nextQualificationQuestion = (missingFields: string[]): string => {
+const nextQualificationQuestion = (missingFields: string[], ownerVoice: OwnerVoice = null): string => {
+  const jack = ownerVoice === 'jack';
+  const brandon = ownerVoice === 'brandon';
   if (missingFields[0] === 'full_or_part_time') {
+    if (jack) return 'Are you full time right now or still part time?';
+    if (brandon) return 'Are you full time right now or still part time in clinic?';
     return 'Are you full time right now or still part time?';
   }
   if (missingFields[0] === 'niche') {
+    if (jack) return 'Who do you mainly want to serve right now?';
+    if (brandon) return 'Who are you mainly trying to treat right now?';
     return 'Who is your core niche right now?';
   }
   if (missingFields[0] === 'revenue_mix') {
+    if (jack) return 'Are you mostly cash, mostly insurance, or a blend right now?';
+    if (brandon) return 'Is your mix mostly cash, mostly insurance, or balanced right now?';
     return 'Would you say your revenue mix is mostly cash, mostly insurance, or balanced right now?';
   }
   if (missingFields[0] === 'coaching_interest') {
+    if (jack) return 'If we mapped a clear plan, how open are you to coaching support right now?';
+    if (brandon) return 'If we map this out together, how open are you to coaching support right now?';
     return 'If we map a clear plan, how open are you to business coaching right now?';
   }
+  if (jack) return 'Open to a quick call this week to map next steps?';
+  if (brandon) return 'Would you be open to a quick call this week to map next steps?';
   return 'Would you be open to a quick call this week so we can map the next step together?';
 };
 
-const chooseAcknowledgement = (latestInboundBody: string): string => {
+const chooseAcknowledgement = (latestInboundBody: string, ownerVoice: OwnerVoice = null): string => {
   const normalized = normalize(latestInboundBody);
-  if (!normalized) return 'Appreciate the update.';
-  if (/thank|thanks|appreciate|grateful/.test(normalized)) return 'Love that and thanks for sharing.';
+  if (!normalized) return ownerVoice === 'jack' ? 'Got you.' : 'Appreciate the update.';
+  if (/thank|thanks|appreciate|grateful/.test(normalized))
+    return ownerVoice === 'jack' ? 'Love that, appreciate you sharing.' : 'Love that and thanks for sharing.';
   if (/not receive|did not receive|didnt receive|have not received|hasnt received/.test(normalized)) {
-    return 'Thanks for the heads up.';
+    return ownerVoice === 'jack' ? 'Good callout, thank you.' : 'Thanks for the heads up.';
   }
   if (/book|scheduled|schedule|availability|available|call/.test(normalized)) {
-    return 'Perfect, timing sounds good.';
+    return ownerVoice === 'jack' ? 'Perfect, timing sounds good.' : 'Perfect, timing sounds good.';
   }
-  if (/\?/.test(latestInboundBody)) return 'Great question.';
-  return 'Appreciate the context.';
+  if (/\?/.test(latestInboundBody)) return ownerVoice === 'jack' ? 'Good question.' : 'Great question.';
+  return ownerVoice === 'jack' ? 'Got it, appreciate the context.' : 'Appreciate the context.';
+};
+
+const cleanGeneratedVoice = (text: string, ownerVoice: OwnerVoice = null): string => {
+  let next = text;
+  const replacements: Array<[RegExp, string]> = [
+    [/\bQuick check so I can keep qualification accurate\.?\s*/gi, 'Quick check. '],
+    [/\bI have your status marked as\b/gi, ownerVoice === 'jack' ? "Got you as" : 'I have you marked as'],
+    [/\bI have your revenue mix noted as\b/gi, ownerVoice === 'jack' ? "Got your mix as" : 'I have your mix as'],
+    [/\bI have your niche noted as\b/gi, ownerVoice === 'jack' ? "Got your niche as" : 'I have your niche as'],
+    [/\bWould you say your revenue mix is\b/gi, 'Are you'],
+    [/\bWho is your core niche right now\?/gi, ownerVoice === 'jack' ? 'Who do you mainly want to serve right now?' : 'Who are you mainly trying to serve right now?'],
+  ];
+  for (const [pattern, replacement] of replacements) {
+    next = next.replace(pattern, replacement);
+  }
+  return sanitizeInline(next);
 };
 
 const buildContextualFallbackDraft = (params: {
@@ -411,46 +670,52 @@ const buildContextualFallbackDraft = (params: {
   escalationLevel: EscalationLevel;
   missingFields: string[];
   contact?: DraftContactContext;
+  preferredOwnerVoice?: OwnerVoice;
+  rankedExamples?: ConversionExampleCandidate[];
 }): string => {
   const orderedMessages = orderMessagesChronologically(params.messages);
   const latestInbound = findLatestMessageByDirection(orderedMessages, 'inbound');
   const knownNiche = sanitizeInline(params.state?.qualification_niche || params.contact?.profileNiche || '');
   const knownName = sanitizeInline(params.contact?.name || '');
-  const acknowledgement = chooseAcknowledgement(sanitizeInline(latestInbound?.body || ''));
+  const ownerVoice = params.preferredOwnerVoice || null;
+  const acknowledgement = chooseAcknowledgement(sanitizeInline(latestInbound?.body || ''), ownerVoice);
 
   const lineOne = knownName ? `${knownName}, ${acknowledgement}` : acknowledgement;
 
   const contextBits: string[] = [];
-  if (knownNiche) {
-    contextBits.push(`I have your niche noted as ${knownNiche}.`);
-  }
-  if (params.state && params.state.qualification_revenue_mix !== 'unknown') {
-    contextBits.push(
-      `I have your revenue mix noted as ${renderRevenueMixLabel(params.state.qualification_revenue_mix)}.`,
-    );
-  }
   if (params.state && params.state.qualification_full_or_part_time !== 'unknown') {
-    contextBits.push(
-      `I have your status marked as ${renderEmploymentLabel(params.state.qualification_full_or_part_time)}.`,
-    );
-  }
-  if (params.state && params.state.qualification_coaching_interest !== 'unknown') {
-    contextBits.push(
-      `I have your coaching interest marked as ${renderCoachingInterestLabel(params.state.qualification_coaching_interest)}.`,
-    );
+    contextBits.push(`Got you as ${renderEmploymentLabel(params.state.qualification_full_or_part_time)}.`);
+  } else if (knownNiche) {
+    contextBits.push(`Got your niche as ${knownNiche}.`);
+  } else if (params.state && params.state.qualification_revenue_mix !== 'unknown') {
+    contextBits.push(`Got your mix as ${renderRevenueMixLabel(params.state.qualification_revenue_mix)}.`);
+  } else if (params.state && params.state.qualification_coaching_interest !== 'unknown') {
+    contextBits.push(`Got your coaching interest as ${renderCoachingInterestLabel(params.state.qualification_coaching_interest)}.`);
   }
 
-  const nextQuestion = nextQualificationQuestion(params.missingFields);
+  const matchedQuestion = selectQuestionFromExamples({
+    examples: params.rankedExamples || [],
+    missingFields: params.missingFields,
+  });
+  const nextQuestion = matchedQuestion || nextQualificationQuestion(params.missingFields, ownerVoice);
   const escalationBridge =
     params.missingFields.length === 0
       ? params.escalationLevel >= 3
-        ? 'You seem close to call readiness.'
+        ? ownerVoice === 'jack'
+          ? 'You look close to call ready.'
+          : 'You seem close to call readiness.'
         : params.escalationLevel === 2
-          ? 'I want to keep this practical and low pressure.'
-          : 'I want to keep this simple and useful.'
-      : 'Quick check so I can keep qualification accurate.';
+          ? ownerVoice === 'jack'
+            ? 'I want to keep this practical and low pressure.'
+            : 'I want to keep this practical and low pressure.'
+          : ownerVoice === 'jack'
+            ? 'Keeping this simple.'
+            : 'I want to keep this simple and useful.'
+      : ownerVoice === 'jack'
+        ? 'Quick check.'
+        : 'Quick check.';
 
-  return [lineOne, ...contextBits, escalationBridge, nextQuestion].join(' ').replace(/\s+/g, ' ').trim();
+  return cleanGeneratedVoice([lineOne, ...contextBits.slice(0, 1), escalationBridge, nextQuestion].join(' '), ownerVoice);
 };
 
 const buildPrompt = (params: {
@@ -459,17 +724,13 @@ const buildPrompt = (params: {
   escalationLevel: EscalationLevel;
   escalationReason: string;
   missingFields: string[];
-  examples: Array<
-    ConversionExampleRow & {
-      outbound_body: string | null;
-      outbound_user: string | null;
-    }
-  >;
+  examples: ConversionExampleCandidate[];
   styleAnchors: SetterVoiceExampleRow[];
-  preferredOwnerVoice?: string | null;
+  preferredOwnerVoice?: OwnerVoice;
   canonical: CanonicalSources;
   previousIssues?: DraftLintIssue[];
   contact?: DraftContactContext;
+  conversationKeywords: string[];
 }): string => {
   const orderedMessages = orderMessagesChronologically(params.messages);
   const latestInbound = findLatestMessageByDirection(orderedMessages, 'inbound');
@@ -509,7 +770,11 @@ const buildPrompt = (params: {
   const retrievedExamples = params.examples
     .slice(0, MAX_EXAMPLES)
     .map((example, index) => {
-      return `Retrieved example ${index + 1} (escalation=${example.escalation_level}, booked=${example.booked_call_label || 'unknown'}):\n${truncate(example.outbound_body || '', 900)}`;
+      return [
+        `Retrieved example ${index + 1} (score=${example.matchScore || 0}, keyword_hits=${(example.matchHits || []).join(', ') || 'none'}, escalation=${example.escalation_level}, booked=${example.booked_call_label || 'unknown'}, closed=${example.closed_won_label || 'unknown'}):`,
+        `Matched lead context:\n${truncate(example.source_inbound_body || '', 500)}`,
+        `Matched setter response:\n${truncate(example.outbound_body || '', 900)}`,
+      ].join('\n');
     })
     .join('\n\n');
 
@@ -544,8 +809,11 @@ const buildPrompt = (params: {
     '7) First sentence must directly acknowledge the lead most recent inbound context.',
     '8) Avoid generic AI phrases like "I hope you are doing well", "just wanted to follow up", or "quick reminder".',
     '9) Keep wording concrete and specific to this thread context.',
+    '10) Avoid corporate phrasing like "qualification accurate", "core niche", and "revenue mix". Use natural setter language.',
+    '11) Keep draft concise: 2 to 3 short sentences.',
     '',
     `Preferred setter voice: ${params.preferredOwnerVoice || 'unknown'}`,
+    `Conversation keywords: ${params.conversationKeywords.join(', ') || 'none'}`,
     `Escalation level: ${params.escalationLevel}`,
     `Escalation reason: ${params.escalationReason}`,
     `Missing qualification fields: ${params.missingFields.join(', ') || 'none'}`,
@@ -555,10 +823,10 @@ const buildPrompt = (params: {
     previousIssues,
     '',
     'Escalation model reference:',
-    truncate(params.canonical.escalationModel, 4000),
+    truncate(params.canonical.escalationModel, 2400),
     '',
     'PT Biz resource reference:',
-    truncate(params.canonical.referenceDoc, 2200),
+    truncate(params.canonical.referenceDoc, 1400),
     '',
     'Most recent inbound from lead:',
     latestInboundSummary,
@@ -568,7 +836,7 @@ const buildPrompt = (params: {
     `Most recent outbound line: ${latestOutboundLine}`,
     '',
     'Recent conversation window (oldest to newest):',
-    truncate(recentThread, 4500),
+    truncate(recentThread, 3200),
     '',
     `Setter voice anchors:\n${styleAnchorsBlock}`,
     '',
@@ -597,6 +865,7 @@ export const generateDraftSuggestion = async (
   const escalation = classifyEscalationLevel(orderedMessages, params.state);
   const missingFields = missingQualificationFields(params.state);
   const preferredOwnerVoice = normalizeOwnerVoice(params.contact?.ownerLabel);
+  const playbookKeywords = extractPlaybookKeywords(canonical.clinicOwnerLanguagePlaybook);
 
   const examples = await listConversionExamples(
     {
@@ -617,6 +886,19 @@ export const generateDraftSuggestion = async (
         logger,
       )
     : [];
+  const rankedExamples = rankConversionExamples({
+    examples,
+    messages: orderedMessages,
+    state: params.state,
+    contact: params.contact,
+    preferredOwnerVoice,
+    playbookKeywords,
+  });
+  const conversationKeywords = buildConversationKeywords({
+    messages: orderedMessages,
+    state: params.state,
+    contact: params.contact,
+  });
 
   let bestText = '';
   let bestLint: DraftLintResult = {
@@ -639,12 +921,13 @@ export const generateDraftSuggestion = async (
       escalationLevel: escalation.level,
       escalationReason: escalation.reason,
       missingFields,
-      examples,
+      examples: rankedExamples,
       styleAnchors,
       preferredOwnerVoice,
       canonical,
       previousIssues: lastIssues,
       contact: params.contact,
+      conversationKeywords,
     });
     lastPromptHash = promptHash(prompt);
 
@@ -666,6 +949,8 @@ export const generateDraftSuggestion = async (
         escalationLevel: escalation.level,
         missingFields,
         contact: params.contact,
+        preferredOwnerVoice,
+        rankedExamples,
       });
       usedFallback = true;
       generationMode = 'contextual_fallback';
@@ -682,6 +967,8 @@ export const generateDraftSuggestion = async (
         escalationLevel: escalation.level,
         missingFields,
         contact: params.contact,
+        preferredOwnerVoice,
+        rankedExamples,
       });
       usedFallback = true;
       generationMode = 'contextual_fallback';
@@ -690,8 +977,9 @@ export const generateDraftSuggestion = async (
       );
     }
 
-    const lint = lintDraft(output);
-    const genericIssue: DraftLintIssue | null = hasAiGenericPhrasing(output)
+    const cleanedOutput = cleanGeneratedVoice(output, preferredOwnerVoice);
+    const lint = lintDraft(cleanedOutput);
+    const genericIssue: DraftLintIssue | null = hasAiGenericPhrasing(cleanedOutput)
       ? {
           code: 'missing_cta_question',
           message: 'Draft sounds generic and not setter specific.',
@@ -710,7 +998,7 @@ export const generateDraftSuggestion = async (
         : lint;
 
     if (bestText.length === 0 || effectiveLint.score > bestLint.score) {
-      bestText = output;
+      bestText = cleanedOutput;
       bestLint = effectiveLint;
     }
 
@@ -727,7 +1015,7 @@ export const generateDraftSuggestion = async (
     escalationReason: escalation.reason,
     qualificationStep: qualificationStep(params.state),
     qualificationMissing: missingFields,
-    retrievedExamples: examples,
+    retrievedExamples: rankedExamples,
     styleAnchors,
     promptSnapshotHash: lastPromptHash,
     lint: bestLint,

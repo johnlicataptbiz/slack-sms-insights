@@ -1576,7 +1576,17 @@ export const listConversionExamples = async (
     limit: number;
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<Array<ConversionExampleRow & { outbound_body: string | null; outbound_user: string | null }>> => {
+): Promise<
+  Array<
+    ConversionExampleRow & {
+      outbound_body: string | null;
+      outbound_user: string | null;
+      source_inbound_body: string | null;
+      source_conversation_id: string | null;
+      source_outbound_ts: string | null;
+    }
+  >
+> => {
   const pool = getDbOrThrow();
   const client = await pool.connect();
   try {
@@ -1601,16 +1611,35 @@ export const listConversionExamples = async (
     const limitPlaceholder = `$${i++}`;
 
     const result = await client.query<
-      ConversionExampleRow & { outbound_body: string | null; outbound_user: string | null }
+      ConversionExampleRow & {
+        outbound_body: string | null;
+        outbound_user: string | null;
+        source_inbound_body: string | null;
+        source_conversation_id: string | null;
+        source_outbound_ts: string | null;
+      }
     >(
       `
       SELECT
         ce.*,
         e.body AS outbound_body,
-        e.aloware_user AS outbound_user
+        e.aloware_user AS outbound_user,
+        e.conversation_id AS source_conversation_id,
+        e.event_ts::text AS source_outbound_ts,
+        inbound.body AS source_inbound_body
       FROM conversion_examples ce
       LEFT JOIN sms_events e
         ON e.id = ce.source_outbound_event_id
+      LEFT JOIN LATERAL (
+        SELECT se.body
+        FROM sms_events se
+        WHERE se.conversation_id = e.conversation_id
+          AND se.direction = 'inbound'
+          AND se.event_ts <= e.event_ts
+          AND COALESCE(TRIM(se.body), '') <> ''
+        ORDER BY se.event_ts DESC
+        LIMIT 1
+      ) inbound ON TRUE
       ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY ce.created_at DESC
       LIMIT ${limitPlaceholder};

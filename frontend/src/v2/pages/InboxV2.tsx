@@ -336,7 +336,6 @@ export default function InboxV2() {
     timestamp: string;
     confirmed?: boolean;
   } | null>(null);
-  const [detailForceSyncTick, setDetailForceSyncTick] = useState(0);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
   const listParentRef = useRef<HTMLDivElement | null>(null);
@@ -558,7 +557,7 @@ export default function InboxV2() {
   }, [conversations, selectedConversationId, isComposerModalOpen]);
 
   const detailQuery = useV2InboxConversationDetail(selectedConversationId, {
-    forceSyncTick: detailForceSyncTick,
+    forceSync: isComposerModalOpen && Boolean(selectedConversationId),
     ...(isComposerModalOpen && selectedConversationId
       ? { refetchIntervalMs: 7000 }
       : {}),
@@ -725,16 +724,6 @@ export default function InboxV2() {
     window.requestAnimationFrame(() => composerRef.current?.focus());
   }, [isComposerModalOpen, selectedConversationId, detailConversation?.id]);
 
-  useEffect(() => {
-    if (!isComposerModalOpen || !selectedConversationId) return;
-    // Keep qualification/sidebar data synced from active thread text while composing.
-    setDetailForceSyncTick(Date.now());
-    const timer = window.setInterval(() => {
-      setDetailForceSyncTick(Date.now());
-    }, 7000);
-    return () => window.clearInterval(timer);
-  }, [isComposerModalOpen, selectedConversationId]);
-
   // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
   useEffect(() => {
     if (!chatThreadRef.current) return;
@@ -891,7 +880,7 @@ export default function InboxV2() {
       if (result.data.status === "sent" || result.data.status === "duplicate") {
         setSendStatus("sent");
         setJustSentMessage(null);
-        setDetailForceSyncTick((prev) => prev + 1);
+        void detailQuery.refetch();
 
         setComposerText("");
         setSelectedDraftId(null);
@@ -2229,7 +2218,7 @@ export default function InboxV2() {
                   type="button"
                   className="V2Inbox__button V2Inbox__button--small"
                   onClick={() => {
-                    setDetailForceSyncTick((prev) => prev + 1);
+                    void detailQuery.refetch();
                     void listQuery.refetch();
                     void notesQuery.refetch();
                   }}

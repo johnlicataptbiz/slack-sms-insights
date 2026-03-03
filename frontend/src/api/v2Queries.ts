@@ -387,15 +387,15 @@ export const useV2InboxConversations = (params: InboxListParams) => {
 
 export const useV2InboxConversationDetail = (
   conversationId: string | null,
-  options?: { forceSyncTick?: number; refetchIntervalMs?: number },
+  options?: { forceSync?: boolean; refetchIntervalMs?: number },
 ) => {
-  const forceSyncTick = options?.forceSyncTick ?? 0;
+  const forceSync = options?.forceSync ?? false;
   const refetchIntervalMs = options?.refetchIntervalMs ?? false;
   return useQuery({
-    queryKey: ['v2', 'inbox', 'conversation', conversationId, forceSyncTick],
+    queryKey: ['v2', 'inbox', 'conversation', conversationId, forceSync],
     enabled: Boolean(conversationId),
     queryFn: async () => {
-      const query = forceSyncTick > 0 ? `?sync=1&t=${forceSyncTick}` : '';
+      const query = forceSync ? '?sync=1' : '';
       const response = await client.get<unknown>(`/api/v2/inbox/conversations/${conversationId}${query}`);
       assertInboxConversationDetailEnvelope(response);
       return response as ApiEnvelope<InboxConversationDetailV2>;

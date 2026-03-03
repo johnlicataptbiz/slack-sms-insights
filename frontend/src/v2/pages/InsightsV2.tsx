@@ -526,12 +526,12 @@ export function InsightsV2() {
             </div>
 
             <div className="V2WeeklySummary__extras">
-              <V2Panel title="Monday Pipeline" caption="Current pipeline status">
+              <V2Panel title="Monday Pipeline">
                 <V2PipelineVisual
                   stages={[
-                    { label: 'Total Calls', value: weekly?.mondayPipeline?.totalCalls ?? 0, color: 'var(--v2-accent)' },
+                    { label: 'Calls', value: weekly?.mondayPipeline?.totalCalls ?? 0, color: 'var(--v2-accent)' },
                     { label: 'Booked', value: weekly?.mondayPipeline?.booked ?? 0, color: 'var(--v2-positive)' },
-                    { label: 'No-Show', value: weekly?.mondayPipeline?.noShow ?? 0, color: 'var(--v2-warning)' },
+                    { label: 'No-show', value: weekly?.mondayPipeline?.noShow ?? 0, color: 'var(--v2-warning)' },
                     { label: 'Cancelled', value: (weekly?.mondayPipeline as any)?.cancelled ?? 0, color: 'var(--v2-critical)' },
                   ]}
                 />

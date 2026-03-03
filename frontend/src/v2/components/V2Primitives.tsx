@@ -608,7 +608,18 @@ export function V2PipelineVisual({
           className="V2PipelineVisual__stage"
           variants={listItemVariants}
         >
-          <div className="V2PipelineVisual__barWrap">
+          <div className="V2PipelineVisual__head">
+            <span className="V2PipelineVisual__label">{stage.label}</span>
+            <motion.div
+              className="V2PipelineVisual__number"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 + i * 0.1 }}
+            >
+              {stage.value}
+            </motion.div>
+          </div>
+          <div className="V2PipelineVisual__track">
             <motion.div
               className="V2PipelineVisual__bar"
               style={{ background: stage.color || 'var(--v2-accent)' }}
@@ -616,16 +627,7 @@ export function V2PipelineVisual({
               animate={{ width: `${(stage.value / max) * 100}%` }}
               transition={{ duration: 0.6, delay: i * 0.1, ease: easing.smooth }}
             />
-            <motion.span
-              className="V2PipelineVisual__number"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 + i * 0.1 }}
-            >
-              {stage.value}
-            </motion.span>
           </div>
-          <span className="V2PipelineVisual__label">{stage.label}</span>
         </motion.div>
       ))}
     </motion.div>

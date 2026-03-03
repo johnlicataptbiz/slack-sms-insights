@@ -236,36 +236,158 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
       employment?: 'full_time' | 'part_time' | 'unknown';
       interest?: 'high' | 'medium' | 'low' | 'unknown';
       revenueMix?: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
+      deliveryModel?: 'brick_and_mortar' | 'mobile' | 'online' | 'hybrid' | 'unknown';
     } = {};
 
     const lowerText = inboundText.toLowerCase();
 
-    // Employment inference
-    if (lowerText.includes('full time') || lowerText.includes('full-time') || lowerText.includes('my practice')) {
-      inferredState.employment = 'full_time';
-    } else if (lowerText.includes('part time') || lowerText.includes('part-time') || lowerText.includes('side gig')) {
-      inferredState.employment = 'part_time';
+    // ── Employment inference (LENIENT: err on over-classifying) ──────────────
+    const fullTimeSignals = [
+      'full time', 'full-time', 'fulltime',
+      'my practice', 'own practice', 'own a practice', 'own my practice',
+      'my clinic', 'own a clinic', 'own my clinic', 'clinic owner',
+      'practice owner', 'i own', 'we own', 'opened my own', 'running my own',
+      'went out on my own', 'on my own', 'solo practice', 'independent practice',
+      'private practice', 'left my job', 'left the hospital', 'left the clinic',
+      'quit my job', 'left employment', 'left my position', 'left outpatient',
+      'left my pt job', 'left my chiro job', 'left my at job',
+      'high volume', 'high-volume', 'insurance mill', 'insurance-based clinic',
+      'working at a clinic', 'work at a clinic', 'employed at',
+      'salary', 'w2', 'on payroll', 'getting paid by',
+    ];
+    const partTimeSignals = [
+      'part time', 'part-time', 'parttime',
+      'side gig', 'side hustle', 'side-gig', 'side-hustle',
+      'moonlighting', 'on the side', 'building on the side',
+      'still employed', 'still working', 'still at my job',
+      'still at the hospital', 'still at the clinic', 'still have my job',
+      'while i still work', 'while working', 'while still employed',
+      'evenings and weekends', 'after hours', 'extra income',
+      'supplementing', 'building while', 'planning to leave',
+      'thinking about leaving', 'want to leave', 'want to quit',
+    ];
+    const fullTimeHits = fullTimeSignals.filter(s => lowerText.includes(s)).length;
+    const partTimeHits = partTimeSignals.filter(s => lowerText.includes(s)).length;
+    if (fullTimeHits > 0 || partTimeHits > 0) {
+      inferredState.employment = fullTimeHits >= partTimeHits ? 'full_time' : 'part_time';
     }
 
-    // Interest inference
-    if (
-      lowerText.includes('very interested') ||
-      lowerText.includes('definitely') ||
-      lowerText.includes('love to') ||
-      lowerText.includes("let's do it")
-    ) {
-      inferredState.interest = 'high';
-    } else if (lowerText.includes('interested') || lowerText.includes('maybe') || lowerText.includes('tell me more')) {
-      inferredState.interest = 'medium';
-    } else if (lowerText.includes('not interested') || lowerText.includes('no thanks') || lowerText.includes('stop')) {
-      inferredState.interest = 'low';
+    // ── Interest inference (LENIENT: err on over-classifying) ─────────────────
+    const highInterestSignals = [
+      'very interested', 'super interested', 'extremely interested',
+      'definitely', 'absolutely', 'for sure', '100%',
+      'love to', "let's do it", 'lets do it', 'count me in',
+      'ready to go', 'ready to start', 'sign me up', 'book the call',
+      'sounds great', 'sounds amazing', 'sounds perfect', 'yes please',
+      'im in', "i'm in", 'hit me up', 'reach out to me',
+      'when can we', 'how do i get started', 'how do i sign up',
+      'i want to', 'i need this', 'this is exactly what i need',
+      'this is perfect', 'this is amazing', 'this is great',
+      'excited', 'pumped', 'stoked', 'fired up',
+      'lets talk', "let's talk", 'set up a call', 'schedule a call',
+    ];
+    const mediumInterestSignals = [
+      'interested', 'could be', 'might be', 'maybe', 'possibly',
+      'tell me more', 'what does', 'how would', 'explain',
+      'learn more', 'more info', 'more information', 'sounds interesting',
+      'considering', 'thinking about', 'looking into', 'exploring',
+      'curious', 'want to learn', 'want to know', 'want to hear',
+      'still deciding', 'on the fence', 'not sure yet',
+      "haven't decided", 'havent decided', 'open to it', 'open to',
+      'what would', 'how much', 'what is the cost', 'what does it cost',
+      'what are the details', 'tell me about', 'what is this',
+    ];
+    const lowInterestSignals = [
+      'not interested', 'no thanks', 'not for me',
+      'stop contacting', 'stop messaging', 'remove me', 'take me off',
+      'unsubscribe', 'do not contact', 'leave me alone',
+      'not the right time', 'not right now', 'not at this time',
+      'not ready', 'not convinced', 'not a good fit', 'not a fit',
+      "doesn't fit", "doesn't work", "doesn't apply",
+      'too busy', 'no time for this', "don't have time",
+    ];
+    const highHits = highInterestSignals.filter(s => lowerText.includes(s)).length;
+    const mediumHits = mediumInterestSignals.filter(s => lowerText.includes(s)).length;
+    const lowHits = lowInterestSignals.filter(s => lowerText.includes(s)).length;
+    if (highHits > 0 || mediumHits > 0 || lowHits > 0) {
+      if (lowHits > highHits && lowHits > mediumHits) {
+        inferredState.interest = 'low';
+      } else if (highHits >= mediumHits) {
+        inferredState.interest = 'high';
+      } else {
+        inferredState.interest = 'medium';
+      }
     }
 
-    // Revenue mix inference
-    if (lowerText.includes('cash') || lowerText.includes('cash pay') || lowerText.includes('out of pocket')) {
-      inferredState.revenueMix = 'mostly_cash';
-    } else if (lowerText.includes('insurance') || lowerText.includes('in-network') || lowerText.includes('billing')) {
-      inferredState.revenueMix = 'mostly_insurance';
+    // ── Revenue mix inference (LENIENT: err on over-classifying) ─────────────
+    const cashSignals = [
+      'cash', 'cash pay', 'cash patient', 'cash patients', 'cash based', 'cash-based',
+      'out of pocket', 'self-pay', 'self pay', 'private pay',
+      'membership', 'membership model', 'direct primary care', 'dpc',
+      'retainer', 'fee for service', 'fee-for-service',
+      'no insurance', 'without insurance', "don't bill insurance", 'dont bill insurance',
+      'dropped insurance', 'dropped out of network', 'out of network', 'out-of-network',
+      'concierge', 'direct access', 'direct care', 'direct pay',
+      'cash flow', 'cash model', 'cash practice',
+    ];
+    const insuranceSignals = [
+      'insurance', 'in-network', 'in network', 'billing', 'billed',
+      'submit claim', 'claims', 'copay', 'deductible', 'coverage', 'covered',
+      'blue cross', 'bcbs', 'aetna', 'cigna', 'united health', 'humana',
+      'medicare', 'medicaid', 'tricare', 'eob', 'explanation of benefits',
+      'prior auth', 'prior authorization', 'insurance based', 'insurance-based',
+      'insurance dependent', 'insurance reliant', 'insurance heavy',
+      'mostly insurance', 'mainly insurance', 'primarily insurance',
+    ];
+    const cashHits = cashSignals.filter(s => lowerText.includes(s)).length;
+    const insuranceHits = insuranceSignals.filter(s => lowerText.includes(s)).length;
+    if (cashHits > 0 || insuranceHits > 0) {
+      // If both present, lean cash (cash-based is the target market)
+      inferredState.revenueMix = cashHits >= insuranceHits ? 'mostly_cash' : 'mostly_insurance';
+    }
+
+    // ── Delivery model inference (LENIENT: new field) ─────────────────────────
+    const brickMortarSignals = [
+      'clinic', 'office', 'storefront', 'physical location', 'brick and mortar',
+      'brick & mortar', 'building', 'facility', 'treatment room', 'treatment space',
+      'in person', 'in-person', 'face to face', 'face-to-face', 'my space',
+      'my suite', 'my studio', 'my office', 'my clinic', 'my location',
+      'patients come to me', 'patients come in', 'come to my',
+    ];
+    const mobileSignals = [
+      'mobile', 'mobile pt', 'mobile physio', 'mobile chiro',
+      'drive to', 'driving to', 'travel to', 'i travel', 'i go to them',
+      'patient homes', 'home based', 'home-based', 'home visits', 'house calls',
+      'in-home', 'in home', 'at-home', 'at home', 'concierge mobile',
+      'mobile clinic', 'mobile service', 'mobile practice',
+    ];
+    const onlineSignals = [
+      'online', 'telehealth', 'tele health', 'virtual', 'video call',
+      'zoom', 'facetime', 'phone only', 'remote', 'remote pt',
+      'tele-pt', 'digital', 'app based', 'software platform',
+      'no in person', 'not in person', 'never meet in person',
+    ];
+    const hybridSignals = [
+      'hybrid', 'mix of', 'combination of', 'both in person',
+      'some virtual', 'sometimes virtual', 'mix virtual and',
+      'in person and online', 'online and in person',
+      'in clinic and online', 'online and in clinic',
+    ];
+    const brickHits = brickMortarSignals.filter(s => lowerText.includes(s)).length;
+    const mobileHits = mobileSignals.filter(s => lowerText.includes(s)).length;
+    const onlineHits = onlineSignals.filter(s => lowerText.includes(s)).length;
+    const hybridHits = hybridSignals.filter(s => lowerText.includes(s)).length;
+    if (brickHits > 0 || mobileHits > 0 || onlineHits > 0 || hybridHits > 0) {
+      const maxHits = Math.max(brickHits, mobileHits, onlineHits, hybridHits);
+      if (hybridHits === maxHits && hybridHits > 0) {
+        inferredState.deliveryModel = 'hybrid';
+      } else if (onlineHits === maxHits && onlineHits > 0) {
+        inferredState.deliveryModel = 'online';
+      } else if (mobileHits === maxHits && mobileHits > 0) {
+        inferredState.deliveryModel = 'mobile';
+      } else {
+        inferredState.deliveryModel = 'brick_and_mortar';
+      }
     }
 
     // Update if we found anything
@@ -285,6 +407,10 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
       if (inferredState.revenueMix) {
         updates.push(`qualification_revenue_mix = $${paramIndex++}`);
         values.push(inferredState.revenueMix);
+      }
+      if (inferredState.deliveryModel) {
+        updates.push(`qualification_delivery_model = $${paramIndex++}`);
+        values.push(inferredState.deliveryModel);
       }
 
       if (updates.length > 0) {

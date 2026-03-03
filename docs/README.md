@@ -16,6 +16,7 @@ Welcome to the documentation hub for PT Biz SMS Insights — a real-time SMS ana
 | Document | Description | Audience |
 |----------|-------------|----------|
 | [DASHBOARD_OVERVIEW.md](architecture/DASHBOARD_OVERVIEW.md) | System architecture, data flow, and component overview | All developers |
+| [UNIFIED_ANALYTICS.md](architecture/UNIFIED_ANALYTICS.md) | Governed Monday analytics model, views, APIs, and Metabase structure | Analytics + dashboard developers |
 | [API.md](architecture/API.md) | Complete API endpoint reference with TypeScript types | Frontend/backend developers |
 
 ### 🛠️ Development

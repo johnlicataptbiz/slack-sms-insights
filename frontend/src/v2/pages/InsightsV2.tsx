@@ -2,11 +2,18 @@ import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import type { SalesMetricsV2 } from '../../api/v2-types';
-import { useV2MondayLeadInsights, useV2SalesMetrics, useV2WeeklySummary } from '../../api/v2Queries';
+import {
+  useV2MondayBoardCatalog,
+  useV2MondayLeadInsights,
+  useV2MondayScorecards,
+  useV2SalesMetrics,
+  useV2WeeklySummary,
+} from '../../api/v2Queries';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
 
 type InsightsRange = 'today' | '7d' | '30d';
 type VolumeMode = 'all' | 'sequence' | 'manual';
+type InsightsSection = 'executive' | 'lead_funnel' | 'ops_scorecards' | 'data_quality';
 const BUSINESS_TZ = 'America/Chicago';
 
 const fmtInt = (n: number) => n.toLocaleString();
@@ -73,18 +80,27 @@ export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2) => {
 export function InsightsV2() {
   const [range, setRange] = useState<InsightsRange>('7d');
   const [volumeMode, setVolumeMode] = useState<VolumeMode>('all');
+  const [section, setSection] = useState<InsightsSection>('executive');
   const { data: payloadEnvelope, isLoading, error } = useV2SalesMetrics({ range });
   const { data: weeklyEnvelope } = useV2WeeklySummary({});
   const mondayLeadInsightsQuery = useV2MondayLeadInsights({
     range,
     tz: BUSINESS_TZ,
+    scope: 'curated',
     sourceLimit: 6,
     setterLimit: 6,
+  });
+  const mondayBoardCatalogQuery = useV2MondayBoardCatalog({});
+  const mondayScorecardsQuery = useV2MondayScorecards({
+    range,
+    tz: BUSINESS_TZ,
   });
 
   const payload = payloadEnvelope?.data;
   const weekly = weeklyEnvelope?.data;
   const mondayLeadInsights = mondayLeadInsightsQuery.data?.data;
+  const mondayBoardCatalog = mondayBoardCatalogQuery.data?.data;
+  const mondayScorecards = mondayScorecardsQuery.data?.data;
 
   const rangeMeta = useMemo(() => {
     if (!payload) return null;
@@ -262,6 +278,24 @@ export function InsightsV2() {
         }
       />
 
+      <div className="V2ControlsRow" style={{ marginBottom: '0.75rem' }}>
+        <button className="V2Btn" onClick={() => setSection('executive')} aria-pressed={section === 'executive'}>
+          Executive
+        </button>
+        <button className="V2Btn" onClick={() => setSection('lead_funnel')} aria-pressed={section === 'lead_funnel'}>
+          Lead Funnel
+        </button>
+        <button className="V2Btn" onClick={() => setSection('ops_scorecards')} aria-pressed={section === 'ops_scorecards'}>
+          Ops Scorecards
+        </button>
+        <button className="V2Btn" onClick={() => setSection('data_quality')} aria-pressed={section === 'data_quality'}>
+          Data Quality
+        </button>
+      </div>
+
+      {section === 'executive' && (
+        <>
+
       {/* Risk Alert Banner */}
       <AnimatePresence>
         {criticalRiskCount > 0 && (
@@ -400,6 +434,37 @@ export function InsightsV2() {
             </div>
           </div>
         </div>
+      </V2Panel>
+
+      <V2Panel title="Actor Role Snapshot" caption="Actor directory roles mapped to Monday metric ownership.">
+        {mondayScorecardsQuery.isLoading ? (
+          <V2State kind="loading">Loading actor role metrics…</V2State>
+        ) : mondayScorecardsQuery.isError || !mondayScorecards ? (
+          <V2State kind="error">Unable to load actor role metrics.</V2State>
+        ) : (
+          <div className="V2TableWrap">
+            <table className="V2Table">
+              <thead>
+                <tr>
+                  <th>Owner</th>
+                  <th>Role</th>
+                  <th className="is-right">Rows</th>
+                  <th className="is-right">Total Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mondayScorecards.byOwner.slice(0, 8).map((row) => (
+                  <tr key={`${row.metricOwner}:${row.role}`}>
+                    <td>{row.metricOwner}</td>
+                    <td>{row.role}</td>
+                    <td className="is-right">{fmtInt(row.rowCount)}</td>
+                    <td className="is-right">{row.totalValue == null ? 'n/a' : row.totalValue.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </V2Panel>
 
       <div className="V2Grid V2Grid--2-1">
@@ -650,6 +715,140 @@ export function InsightsV2() {
           </div>
         </V2Panel>
       </div>
+        </>
+      )}
+
+      {section === 'lead_funnel' && (
+        <div className="V2Grid">
+          <V2Panel title="Lead Journey Funnel" caption="Curated lead-level Monday boards only.">
+            {mondayLeadInsightsQuery.isLoading ? (
+              <V2State kind="loading">Loading curated lead journey analytics…</V2State>
+            ) : mondayLeadInsightsQuery.isError || !mondayLeadInsights ? (
+              <V2State kind="error">Unable to load lead funnel insights.</V2State>
+            ) : (
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div className="V2SplitStat">
+                  <div><span>Leads</span><strong>{fmtInt(mondayLeadInsights.totals.leads)}</strong></div>
+                  <div><span>Booked</span><strong>{fmtInt(mondayLeadInsights.totals.booked)}</strong></div>
+                  <div><span>Closed Won</span><strong>{fmtInt(mondayLeadInsights.totals.closedWon)}</strong></div>
+                  <div><span>Closed Lost</span><strong>{fmtInt(mondayLeadInsights.totals.closedLost)}</strong></div>
+                </div>
+                <div className="V2TableWrap">
+                  <table className="V2Table">
+                    <thead>
+                      <tr>
+                        <th>Top Source</th>
+                        <th className="is-right">Leads</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mondayLeadInsights.topSources.map((row) => (
+                        <tr key={row.source}>
+                          <td>{row.source}</td>
+                          <td className="is-right">{fmtInt(row.count)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--v2-muted)' }}>
+                  Scope: {mondayLeadInsights.window.scope} · Included boards: {mondayLeadInsights.includedBoards.length} ·
+                  Source coverage: {mondayLeadInsights.dataQuality.sourceCoveragePct.toFixed(1)}%
+                </div>
+              </div>
+            )}
+          </V2Panel>
+        </div>
+      )}
+
+      {section === 'ops_scorecards' && (
+        <div className="V2Grid">
+          <V2Panel title="Monday Ops Scorecards" caption="Aggregate metric boards (sales/marketing/retention).">
+            {mondayScorecardsQuery.isLoading ? (
+              <V2State kind="loading">Loading scorecards…</V2State>
+            ) : mondayScorecardsQuery.isError || !mondayScorecards ? (
+              <V2State kind="error">Unable to load Monday scorecards.</V2State>
+            ) : (
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div className="V2SplitStat">
+                  <div><span>Rows</span><strong>{fmtInt(mondayScorecards.totals.rows)}</strong></div>
+                  <div><span>Boards</span><strong>{fmtInt(mondayScorecards.totals.boards)}</strong></div>
+                  <div><span>Metrics</span><strong>{fmtInt(mondayScorecards.totals.metrics)}</strong></div>
+                </div>
+                <div className="V2TableWrap">
+                  <table className="V2Table">
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        <th className="is-right">Rows</th>
+                        <th className="is-right">Boards</th>
+                        <th className="is-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mondayScorecards.metrics.slice(0, 12).map((row) => (
+                        <tr key={row.metricName}>
+                          <td>{row.metricName}</td>
+                          <td className="is-right">{fmtInt(row.rowCount)}</td>
+                          <td className="is-right">{fmtInt(row.boards)}</td>
+                          <td className="is-right">{row.totalValue == null ? 'n/a' : row.totalValue.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </V2Panel>
+        </div>
+      )}
+
+      {section === 'data_quality' && (
+        <div className="V2Grid">
+          <V2Panel title="Monday Data Quality" caption="Sync health, board coverage, and completeness by board type.">
+            {mondayBoardCatalogQuery.isLoading ? (
+              <V2State kind="loading">Loading data quality catalog…</V2State>
+            ) : mondayBoardCatalogQuery.isError || !mondayBoardCatalog ? (
+              <V2State kind="error">Unable to load board catalog.</V2State>
+            ) : (
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div className="V2SplitStat">
+                  <div><span>Boards</span><strong>{fmtInt(mondayBoardCatalog.totals.boards)}</strong></div>
+                  <div><span>Stale</span><strong>{fmtInt(mondayBoardCatalog.totals.stale)}</strong></div>
+                  <div><span>Errored</span><strong>{fmtInt(mondayBoardCatalog.totals.errored)}</strong></div>
+                  <div><span>Empty</span><strong>{fmtInt(mondayBoardCatalog.totals.empty)}</strong></div>
+                </div>
+                <div className="V2TableWrap">
+                  <table className="V2Table">
+                    <thead>
+                      <tr>
+                        <th>Board</th>
+                        <th>Class</th>
+                        <th className="is-right">Snapshots</th>
+                        <th className="is-right">Attribution</th>
+                        <th className="is-right">Metric Facts</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mondayBoardCatalog.boards.map((row) => (
+                        <tr key={row.boardId}>
+                          <td>{row.boardLabel}</td>
+                          <td>{row.boardClass}</td>
+                          <td className="is-right">{fmtInt(row.snapshotCount)}</td>
+                          <td className="is-right">{fmtInt(row.leadAttributionCount)}</td>
+                          <td className="is-right">{fmtInt(row.metricFactCount)}</td>
+                          <td>{row.syncStatus || 'unknown'}{row.isStale ? ' (stale)' : ''}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </V2Panel>
+        </div>
+      )}
     </div>
   );
 }

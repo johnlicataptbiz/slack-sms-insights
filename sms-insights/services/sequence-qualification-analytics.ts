@@ -161,6 +161,14 @@ export const buildSequenceQualificationBreakdown = async (params: {
         ON lo.contact_key = sc.contact_key
        AND lo.call_date >= ($1::timestamptz AT TIME ZONE $4)::date
        AND lo.call_date < ($2::timestamptz AT TIME ZONE $4)::date
+       AND EXISTS (
+         SELECT 1
+         FROM monday_board_registry br
+         WHERE br.board_id = lo.board_id
+           AND br.active = TRUE
+           AND br.metric_grain = 'lead_item'
+           AND br.include_in_funnel = TRUE
+       )
       GROUP BY sc.sequence_label
     )
     SELECT 

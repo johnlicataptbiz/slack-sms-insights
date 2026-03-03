@@ -8,11 +8,14 @@ import {
   readBoardMappingFromEnv,
 } from './monday-mapping.js';
 import {
+  getMondayBoardRegistry,
   getMondayColumnMapping,
   getMondaySyncState,
   saveMondayColumnMapping,
+  upsertMondayBoardRegistry,
   upsertMondayCallColumnValues,
   upsertMondayCallSnapshot,
+  upsertMondayMetricFacts,
   upsertNormalizedMondayLeadRecords,
   upsertMondaySyncState,
 } from './monday-store.js';
@@ -83,6 +86,40 @@ const resolveSyncBoardIds = (): string[] => {
   return [...new Set(ids)];
 };
 
+const resolveDefaultBoardGovernance = (boardId: string) => {
+  if (boardId === mondayConfig.acqBoardId || boardId === mondayConfig.salesCallsBoardId) {
+    return {
+      boardLabel: 'Acquisition Funnel',
+      boardClass: 'lead_funnel' as const,
+      metricGrain: 'lead_item' as const,
+      includeInFunnel: true,
+      includeInExec: true,
+      ownerTeam: 'sales',
+      notes: 'Auto-classified from primary ACQ board config',
+    };
+  }
+  if (boardId === mondayConfig.myCallsBoardId || boardId === mondayConfig.personalBoardId) {
+    return {
+      boardLabel: 'Personal Calls',
+      boardClass: 'personal_calls' as const,
+      metricGrain: 'lead_item' as const,
+      includeInFunnel: false,
+      includeInExec: true,
+      ownerTeam: 'sales',
+      notes: 'Auto-classified from personal board config',
+    };
+  }
+  return {
+    boardLabel: `Board ${boardId}`,
+    boardClass: 'other' as const,
+    metricGrain: 'aggregate_metric' as const,
+    includeInFunnel: false,
+    includeInExec: true,
+    ownerTeam: 'ops',
+    notes: 'Auto-registered by monday sync',
+  };
+};
+
 export const listMondaySyncBoardIds = (): string[] => resolveSyncBoardIds();
 
 export const syncMondayBoard = async (
@@ -126,6 +163,25 @@ export const syncMondayBoard = async (
     }
     await saveMondayColumnMapping(boardId, mapping, logger);
     const columnsById = new Map(columns.map((column) => [column.id, column]));
+    let boardProfile = await getMondayBoardRegistry(boardId, logger);
+    if (!boardProfile) {
+      const fallback = resolveDefaultBoardGovernance(boardId);
+      await upsertMondayBoardRegistry(
+        {
+          boardId,
+          boardLabel: fallback.boardLabel,
+          boardClass: fallback.boardClass,
+          metricGrain: fallback.metricGrain,
+          includeInFunnel: fallback.includeInFunnel,
+          includeInExec: fallback.includeInExec,
+          active: true,
+          ownerTeam: fallback.ownerTeam,
+          notes: fallback.notes,
+        },
+        logger,
+      );
+      boardProfile = await getMondayBoardRegistry(boardId, logger);
+    }
 
     let cursor = state?.cursor || null;
     let fetchedItems = 0;
@@ -193,23 +249,40 @@ export const syncMondayBoard = async (
           },
           logger,
         );
-        await upsertNormalizedMondayLeadRecords(
-          {
-            boardId,
-            itemId: normalized.itemId,
-            itemName: normalized.itemName,
-            itemUpdatedAt: normalized.updatedAt,
-            callDate: normalized.callDate,
-            contactKey: normalized.contactKey,
-            setter: normalized.setter,
-            stage: normalized.stage,
-            disposition: normalized.disposition,
-            isBooked: normalized.isBooked,
-            columns: normalizedColumnValues,
-            raw: normalized.raw,
-          },
-          logger,
-        );
+        if (boardProfile?.active !== false) {
+          if (boardProfile?.metric_grain === 'lead_item' && boardProfile?.include_in_funnel === true) {
+            await upsertNormalizedMondayLeadRecords(
+              {
+                boardId,
+                itemId: normalized.itemId,
+                itemName: normalized.itemName,
+                itemUpdatedAt: normalized.updatedAt,
+                callDate: normalized.callDate,
+                contactKey: normalized.contactKey,
+                setter: normalized.setter,
+                stage: normalized.stage,
+                disposition: normalized.disposition,
+                isBooked: normalized.isBooked,
+                columns: normalizedColumnValues,
+                raw: normalized.raw,
+              },
+              logger,
+            );
+          } else if (boardProfile?.metric_grain === 'aggregate_metric') {
+            await upsertMondayMetricFacts(
+              {
+                boardId,
+                itemId: normalized.itemId,
+                itemUpdatedAt: normalized.updatedAt,
+                callDate: normalized.callDate,
+                setter: normalized.setter,
+                columns: normalizedColumnValues,
+                raw: normalized.raw,
+              },
+              logger,
+            );
+          }
+        }
         upsertedItems += 1;
       }
 

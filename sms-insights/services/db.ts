@@ -243,6 +243,44 @@ export const initializeSchema = async (): Promise<void> => {
       );
     `);
 
+    // Governance registry for monday boards. This drives curated funnel scope and scorecard routing.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_board_registry (
+        board_id TEXT PRIMARY KEY,
+        board_label TEXT NOT NULL,
+        board_class TEXT NOT NULL CHECK (board_class IN (
+          'lead_funnel',
+          'personal_calls',
+          'sales_scorecard',
+          'marketing_scorecard',
+          'retention_scorecard',
+          'other',
+          'inactive'
+        )),
+        metric_grain TEXT NOT NULL CHECK (metric_grain IN ('lead_item', 'aggregate_metric')),
+        include_in_funnel BOOLEAN NOT NULL DEFAULT FALSE,
+        include_in_exec BOOLEAN NOT NULL DEFAULT FALSE,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        owner_team TEXT,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Name/role dimension used for setter/closer reporting.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS actor_directory (
+        canonical_name TEXT PRIMARY KEY,
+        role TEXT NOT NULL CHECK (role IN ('setter', 'closer', 'other')),
+        aliases TEXT[] NOT NULL DEFAULT '{}',
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        notes TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // Normalized monday snapshots used for weekly aggregation + parity checks.
     await client.query(`
       CREATE TABLE IF NOT EXISTS monday_call_snapshots (
@@ -374,6 +412,24 @@ export const initializeSchema = async (): Promise<void> => {
         raw JSONB,
         synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (board_id, item_id)
+      );
+    `);
+
+    // Aggregate scorecard facts extracted from monday metric boards.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_metric_facts (
+        board_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        metric_date DATE,
+        metric_owner TEXT,
+        metric_name TEXT NOT NULL,
+        metric_value_num DOUBLE PRECISION,
+        metric_value_text TEXT,
+        status_value TEXT,
+        item_updated_at TIMESTAMPTZ NOT NULL,
+        raw JSONB,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, item_id, metric_name, item_updated_at)
       );
     `);
 
@@ -706,6 +762,16 @@ export const initializeSchema = async (): Promise<void> => {
     `);
 
     await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_board_registry_active_class
+      ON monday_board_registry (active, board_class);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_actor_directory_role_active
+      ON actor_directory (role, active);
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_monday_call_snapshots_board_updated
       ON monday_call_snapshots (board_id, updated_at DESC);
     `);
@@ -773,6 +839,21 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_setter_activity_category_activity_date
       ON setter_activity (outcome_category, activity_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_metric_facts_board_date
+      ON monday_metric_facts (board_id, metric_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_metric_facts_metric_name_date
+      ON monday_metric_facts (metric_name, metric_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_metric_facts_owner_date
+      ON monday_metric_facts (metric_owner, metric_date DESC);
     `);
 
     await client.query(`
@@ -874,6 +955,256 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_conversations_contact_key
       ON conversations (contact_key);
+    `);
+
+    // --- seed defaults (idempotent) ---
+
+    await client.query(`
+      INSERT INTO monday_board_registry (
+        board_id, board_label, board_class, metric_grain, include_in_funnel, include_in_exec, active, owner_team, notes
+      )
+      VALUES
+        ('5077164868', 'Acquisition Funnel', 'lead_funnel', 'lead_item', TRUE, TRUE, TRUE, 'sales', 'Primary lead-level funnel board'),
+        ('10029059942', 'My Calls', 'personal_calls', 'lead_item', FALSE, TRUE, TRUE, 'sales', 'Personal calls tracking board'),
+        ('5753238048', 'Lead Gen Scorecard', 'marketing_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'marketing', 'Aggregate lead-generation metrics'),
+        ('5753199181', 'Revenue Scorecard', 'sales_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'sales', 'Aggregate revenue tracking'),
+        ('5753276147', 'Acquisition Channel Scorecard', 'marketing_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'marketing', 'Acquisition KPI scorecard'),
+        ('5753287414', 'Offers and Deals Scorecard', 'sales_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'sales', 'Offer/deal conversion scorecard'),
+        ('5753255244', 'Client Success Scorecard', 'retention_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'client_success', 'Retention/NPS/renewal scorecard'),
+        ('7308299531', 'Leads Goal Scorecard', 'marketing_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'marketing', 'Leads goal vs actual'),
+        ('18243916010', 'Prospect Mix Scorecard', 'marketing_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'marketing', 'Prospect quality summary metrics'),
+        ('7305565062', 'Sets Goal Scorecard', 'sales_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'sales', 'Sets goal vs actual'),
+        ('7305459135', 'NBR Goal Scorecard', 'sales_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'sales', 'NBR goal scorecard'),
+        ('7304979676', 'Calls Goal Scorecard', 'sales_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'sales', 'Calls goal scorecard'),
+        ('25973001', 'Legacy Monday Board', 'other', 'aggregate_metric', FALSE, FALSE, TRUE, 'ops', 'Legacy/unknown board'),
+        ('7306094171', 'Churn Scorecard', 'retention_scorecard', 'aggregate_metric', FALSE, TRUE, TRUE, 'client_success', 'Churn tracking scorecard')
+      ON CONFLICT (board_id) DO NOTHING;
+    `);
+
+    // Backfill registry rows for any boards already synced but not seeded.
+    await client.query(`
+      INSERT INTO monday_board_registry (
+        board_id, board_label, board_class, metric_grain, include_in_funnel, include_in_exec, active, owner_team, notes
+      )
+      SELECT
+        ms.board_id,
+        'Board ' || ms.board_id,
+        'other',
+        'aggregate_metric',
+        FALSE,
+        FALSE,
+        TRUE,
+        'ops',
+        'Auto-registered from monday_sync_state'
+      FROM monday_sync_state ms
+      LEFT JOIN monday_board_registry br ON br.board_id = ms.board_id
+      WHERE br.board_id IS NULL;
+    `);
+
+    await client.query(`
+      INSERT INTO actor_directory (canonical_name, role, aliases, active, notes)
+      VALUES
+        ('John Licata', 'closer', ARRAY['john licata', 'john'], TRUE, 'Default closer'),
+        ('Toni Counts', 'closer', ARRAY['toni counts', 'antonia toni counts', 'toni'], TRUE, 'Default closer'),
+        ('Brandon Erwin', 'setter', ARRAY['brandon erwin', 'brandon'], TRUE, 'Default setter'),
+        ('Jack Licata', 'setter', ARRAY['jack licata', 'jack'], TRUE, 'Default setter')
+      ON CONFLICT (canonical_name) DO NOTHING;
+    `);
+
+    // --- canonical analytics views for metabase + app ---
+    await client.query(`
+      CREATE OR REPLACE VIEW analytics_actor_directory_v AS
+      SELECT canonical_name, role, aliases, active, notes, created_at, updated_at
+      FROM actor_directory
+      WHERE active = TRUE;
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE VIEW analytics_board_registry_v AS
+      WITH snapshots AS (
+        SELECT board_id, COUNT(*)::int AS snapshot_count, MAX(updated_at) AS latest_item_updated_at
+        FROM monday_call_snapshots
+        GROUP BY board_id
+      ),
+      outcomes AS (
+        SELECT board_id, COUNT(*)::int AS lead_outcome_count
+        FROM lead_outcomes
+        GROUP BY board_id
+      ),
+      attribution AS (
+        SELECT board_id, COUNT(*)::int AS lead_attribution_count
+        FROM lead_attribution
+        GROUP BY board_id
+      ),
+      activities AS (
+        SELECT board_id, COUNT(*)::int AS setter_activity_count
+        FROM setter_activity
+        GROUP BY board_id
+      ),
+      metrics AS (
+        SELECT board_id, COUNT(*)::int AS metric_fact_count
+        FROM monday_metric_facts
+        GROUP BY board_id
+      ),
+      coverage AS (
+        SELECT
+          board_id,
+          COUNT(*) FILTER (WHERE column_title = 'Set By:' AND text_value IS NOT NULL AND BTRIM(text_value) <> '')::int AS set_by_populated,
+          COUNT(*) FILTER (
+            WHERE column_title = 'Original Source'
+            AND text_value IS NOT NULL
+            AND BTRIM(text_value) <> ''
+            AND LOWER(BTRIM(text_value)) <> 'unknown'
+          )::int AS source_populated,
+          COUNT(*) FILTER (
+            WHERE column_title = 'Campaign'
+            AND text_value IS NOT NULL
+            AND BTRIM(text_value) <> ''
+            AND LOWER(BTRIM(text_value)) <> 'unknown'
+          )::int AS campaign_populated,
+          COUNT(*) FILTER (WHERE column_title = 'Touchpoints' AND text_value IS NOT NULL AND BTRIM(text_value) <> '')::int AS touchpoints_populated
+        FROM monday_call_column_latest
+        GROUP BY board_id
+      )
+      SELECT
+        br.board_id,
+        br.board_label,
+        br.board_class,
+        br.metric_grain,
+        br.include_in_funnel,
+        br.include_in_exec,
+        br.active,
+        br.owner_team,
+        br.notes,
+        ms.status AS sync_status,
+        ms.last_sync_at,
+        ms.updated_at AS sync_updated_at,
+        ms.error AS sync_error,
+        COALESCE(s.snapshot_count, 0) AS snapshot_count,
+        s.latest_item_updated_at,
+        COALESCE(o.lead_outcome_count, 0) AS lead_outcome_count,
+        COALESCE(a.lead_attribution_count, 0) AS lead_attribution_count,
+        COALESCE(sa.setter_activity_count, 0) AS setter_activity_count,
+        COALESCE(m.metric_fact_count, 0) AS metric_fact_count,
+        COALESCE(c.set_by_populated, 0) AS set_by_populated,
+        COALESCE(c.source_populated, 0) AS source_populated,
+        COALESCE(c.campaign_populated, 0) AS campaign_populated,
+        COALESCE(c.touchpoints_populated, 0) AS touchpoints_populated,
+        br.created_at,
+        br.updated_at
+      FROM monday_board_registry br
+      LEFT JOIN monday_sync_state ms ON ms.board_id = br.board_id
+      LEFT JOIN snapshots s ON s.board_id = br.board_id
+      LEFT JOIN outcomes o ON o.board_id = br.board_id
+      LEFT JOIN attribution a ON a.board_id = br.board_id
+      LEFT JOIN activities sa ON sa.board_id = br.board_id
+      LEFT JOIN metrics m ON m.board_id = br.board_id
+      LEFT JOIN coverage c ON c.board_id = br.board_id;
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE VIEW analytics_lead_funnel_fact_v AS
+      SELECT
+        lo.board_id,
+        lo.item_id,
+        lo.lead_name,
+        lo.contact_key,
+        lo.call_date,
+        lo.setter,
+        lo.set_by,
+        lo.source,
+        la.campaign,
+        la.sequence,
+        lo.stage,
+        lo.outcome_label,
+        lo.outcome_reason,
+        lo.outcome_category,
+        lo.is_booked,
+        lo.item_updated_at,
+        lo.synced_at
+      FROM lead_outcomes lo
+      LEFT JOIN lead_attribution la
+        ON la.board_id = lo.board_id
+       AND la.item_id = lo.item_id
+      JOIN monday_board_registry br
+        ON br.board_id = lo.board_id
+      WHERE br.active = TRUE
+        AND br.metric_grain = 'lead_item'
+        AND br.include_in_funnel = TRUE;
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE VIEW analytics_monday_scorecard_fact_v AS
+      SELECT
+        mf.board_id,
+        br.board_label,
+        br.board_class,
+        mf.item_id,
+        mf.metric_date,
+        mf.metric_owner,
+        mf.metric_name,
+        mf.metric_value_num,
+        mf.metric_value_text,
+        mf.status_value,
+        mf.item_updated_at,
+        mf.synced_at
+      FROM monday_metric_facts mf
+      JOIN monday_board_registry br ON br.board_id = mf.board_id
+      WHERE br.active = TRUE
+        AND br.metric_grain = 'aggregate_metric';
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE VIEW analytics_sequence_outcomes_v AS
+      SELECT
+        laf.board_id,
+        laf.item_id,
+        laf.contact_key,
+        laf.call_date,
+        laf.source,
+        laf.campaign,
+        laf.sequence,
+        laf.setter,
+        laf.set_by,
+        laf.stage,
+        laf.outcome_category,
+        laf.is_booked,
+        laf.item_updated_at
+      FROM analytics_lead_funnel_fact_v laf;
+    `);
+
+    await client.query(`
+      CREATE OR REPLACE VIEW analytics_data_quality_v AS
+      SELECT
+        br.board_id,
+        br.board_label,
+        br.board_class,
+        br.metric_grain,
+        br.include_in_funnel,
+        br.active,
+        br.sync_status,
+        br.last_sync_at,
+        br.snapshot_count,
+        br.lead_outcome_count,
+        br.lead_attribution_count,
+        br.metric_fact_count,
+        CASE
+          WHEN br.lead_attribution_count > 0 THEN ROUND((br.source_populated::numeric / br.lead_attribution_count::numeric) * 100, 2)
+          ELSE 0
+        END AS source_coverage_pct,
+        CASE
+          WHEN br.lead_attribution_count > 0 THEN ROUND((br.campaign_populated::numeric / br.lead_attribution_count::numeric) * 100, 2)
+          ELSE 0
+        END AS campaign_coverage_pct,
+        CASE
+          WHEN br.lead_attribution_count > 0 THEN ROUND((br.set_by_populated::numeric / br.lead_attribution_count::numeric) * 100, 2)
+          ELSE 0
+        END AS set_by_coverage_pct,
+        CASE
+          WHEN br.lead_attribution_count > 0 THEN ROUND((br.touchpoints_populated::numeric / br.lead_attribution_count::numeric) * 100, 2)
+          ELSE 0
+        END AS touchpoints_coverage_pct
+      FROM analytics_board_registry_v br;
     `);
   } finally {
     client.release();

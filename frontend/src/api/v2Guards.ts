@@ -1,10 +1,12 @@
 import type {
   ApiEnvelope,
+  BoardCatalogV2,
   ChannelsV2,
   DraftSuggestionV2,
   InboxSendConfigV2,
   InboxConversationDetailV2,
   InboxConversationListV2,
+  MondayScorecardsV2,
   RunV2,
   RunsListV2,
   SalesMetricsBatchV2,
@@ -167,6 +169,9 @@ export function assertMondayLeadInsightsV2Envelope(value: unknown): asserts valu
   if (!isString(data.window.fromDay)) throw new Error('Invalid v2 monday lead-insights response: window.fromDay');
   if (!isString(data.window.toDay)) throw new Error('Invalid v2 monday lead-insights response: window.toDay');
   if (!isString(data.window.timeZone)) throw new Error('Invalid v2 monday lead-insights response: window.timeZone');
+  if (!isString(data.window.scope)) throw new Error('Invalid v2 monday lead-insights response: window.scope');
+  if (!Array.isArray(data.includedBoards)) throw new Error('Invalid v2 monday lead-insights response: includedBoards');
+  if (!Array.isArray(data.excludedBoards)) throw new Error('Invalid v2 monday lead-insights response: excludedBoards');
 
   if (!isObject(data.totals)) throw new Error('Invalid v2 monday lead-insights response: totals missing');
   if (!isNumber(data.totals.leads)) throw new Error('Invalid v2 monday lead-insights response: totals.leads');
@@ -181,6 +186,30 @@ export function assertMondayLeadInsightsV2Envelope(value: unknown): asserts valu
   if (!Array.isArray(data.mondaySyncState)) {
     throw new Error('Invalid v2 monday lead-insights response: mondaySyncState missing');
   }
+  if (!isObject(data.dataQuality)) throw new Error('Invalid v2 monday lead-insights response: dataQuality missing');
+  if (!isNumber(data.dataQuality.sourceCoveragePct)) {
+    throw new Error('Invalid v2 monday lead-insights response: dataQuality.sourceCoveragePct');
+  }
+}
+
+export function assertMondayBoardCatalogV2Envelope(value: unknown): asserts value is ApiEnvelope<BoardCatalogV2> {
+  if (!isObject(value)) throw new Error('Invalid v2 monday board-catalog response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid v2 monday board-catalog response: data must be object');
+  if (!isString(value.data.generatedAt)) throw new Error('Invalid v2 monday board-catalog response: generatedAt');
+  if (!isObject(value.data.totals)) throw new Error('Invalid v2 monday board-catalog response: totals missing');
+  if (!Array.isArray(value.data.boards)) throw new Error('Invalid v2 monday board-catalog response: boards missing');
+}
+
+export function assertMondayScorecardsV2Envelope(value: unknown): asserts value is ApiEnvelope<MondayScorecardsV2> {
+  if (!isObject(value)) throw new Error('Invalid v2 monday scorecards response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid v2 monday scorecards response: data must be object');
+  if (!isObject(value.data.window)) throw new Error('Invalid v2 monday scorecards response: window missing');
+  if (!isObject(value.data.totals)) throw new Error('Invalid v2 monday scorecards response: totals missing');
+  if (!Array.isArray(value.data.metrics)) throw new Error('Invalid v2 monday scorecards response: metrics missing');
+  if (!Array.isArray(value.data.trendByDay)) throw new Error('Invalid v2 monday scorecards response: trendByDay missing');
+  if (!Array.isArray(value.data.byOwner)) throw new Error('Invalid v2 monday scorecards response: byOwner missing');
 }
 
 const assertInboxConversation = (value: unknown): void => {

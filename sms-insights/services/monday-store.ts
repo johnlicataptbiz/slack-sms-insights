@@ -2,6 +2,15 @@ import type { Logger } from '@slack/bolt';
 import { getPool } from './db.js';
 
 export type MondaySyncStatus = 'idle' | 'running' | 'success' | 'error';
+export type MondayBoardClass =
+  | 'lead_funnel'
+  | 'personal_calls'
+  | 'sales_scorecard'
+  | 'marketing_scorecard'
+  | 'retention_scorecard'
+  | 'other'
+  | 'inactive';
+export type MondayMetricGrain = 'lead_item' | 'aggregate_metric';
 
 export type MondaySyncStateRow = {
   board_id: string;
@@ -9,6 +18,30 @@ export type MondaySyncStateRow = {
   last_sync_at: string | null;
   status: MondaySyncStatus | null;
   error: string | null;
+  updated_at: string;
+};
+
+export type MondayBoardRegistryRow = {
+  board_id: string;
+  board_label: string;
+  board_class: MondayBoardClass;
+  metric_grain: MondayMetricGrain;
+  include_in_funnel: boolean;
+  include_in_exec: boolean;
+  active: boolean;
+  owner_team: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ActorDirectoryRow = {
+  canonical_name: string;
+  role: 'setter' | 'closer' | 'other';
+  aliases: string[];
+  active: boolean;
+  notes: string | null;
+  created_at: string;
   updated_at: string;
 };
 
@@ -34,6 +67,16 @@ export type MondayCallColumnValueInput = {
   columnType?: string | null;
   textValue?: string | null;
   valueJson?: unknown | null;
+};
+
+export type MondayMetricFactInput = {
+  boardId: string;
+  itemId: string;
+  itemUpdatedAt: Date;
+  callDate?: string | null;
+  setter?: string | null;
+  columns: MondayCallColumnValueInput[];
+  raw?: unknown | null;
 };
 
 export type MondayCallColumnValuesUpsertInput = {
@@ -126,6 +169,16 @@ const parseIsoDate = (candidate: string | null | undefined): string | null => {
   return parsed.toISOString().slice(0, 10);
 };
 
+const parseNumericMetric = (value: string | null | undefined): number | null => {
+  const text = normalizeText(value);
+  if (!text) return null;
+  const normalized = text.replace(/,/g, '').replace(/\$/g, '').replace(/%/g, '').trim();
+  if (!normalized) return null;
+  if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
+  const numeric = Number.parseFloat(normalized);
+  return Number.isFinite(numeric) ? numeric : null;
+};
+
 const parseDateFromColumn = (column: MondayCallColumnValueInput | null): string | null => {
   if (!column) return null;
   const fromText = parseIsoDate(column.textValue ?? null);
@@ -188,6 +241,117 @@ export const getMondaySyncState = async (
   } catch (error) {
     logger?.warn?.('Failed to read monday sync state', error);
     return null;
+  }
+};
+
+export const getMondayBoardRegistry = async (
+  boardId: string,
+  logger?: Pick<Logger, 'warn'>,
+): Promise<MondayBoardRegistryRow | null> => {
+  const pool = getDb();
+  if (!pool) return null;
+  try {
+    const result = await pool.query<MondayBoardRegistryRow>(
+      'SELECT * FROM monday_board_registry WHERE board_id = $1 LIMIT 1',
+      [boardId],
+    );
+    return result.rows[0] || null;
+  } catch (error) {
+    logger?.warn?.('Failed to read monday board registry row', error);
+    return null;
+  }
+};
+
+export const upsertMondayBoardRegistry = async (
+  params: {
+    boardId: string;
+    boardLabel: string;
+    boardClass: MondayBoardClass;
+    metricGrain: MondayMetricGrain;
+    includeInFunnel?: boolean;
+    includeInExec?: boolean;
+    active?: boolean;
+    ownerTeam?: string | null;
+    notes?: string | null;
+  },
+  logger?: Pick<Logger, 'warn'>,
+): Promise<void> => {
+  const pool = getDb();
+  if (!pool) return;
+  try {
+    await pool.query(
+      `
+      INSERT INTO monday_board_registry (
+        board_id,
+        board_label,
+        board_class,
+        metric_grain,
+        include_in_funnel,
+        include_in_exec,
+        active,
+        owner_team,
+        notes,
+        updated_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CURRENT_TIMESTAMP)
+      ON CONFLICT (board_id)
+      DO UPDATE SET
+        board_label = EXCLUDED.board_label,
+        board_class = EXCLUDED.board_class,
+        metric_grain = EXCLUDED.metric_grain,
+        include_in_funnel = EXCLUDED.include_in_funnel,
+        include_in_exec = EXCLUDED.include_in_exec,
+        active = EXCLUDED.active,
+        owner_team = EXCLUDED.owner_team,
+        notes = EXCLUDED.notes,
+        updated_at = CURRENT_TIMESTAMP
+      `,
+      [
+        params.boardId,
+        params.boardLabel,
+        params.boardClass,
+        params.metricGrain,
+        params.includeInFunnel === true,
+        params.includeInExec === true,
+        params.active !== false,
+        params.ownerTeam ?? null,
+        params.notes ?? null,
+      ],
+    );
+  } catch (error) {
+    logger?.warn?.('Failed to upsert monday board registry row', error);
+  }
+};
+
+export const listMondayBoardRegistry = async (
+  logger?: Pick<Logger, 'warn'>,
+): Promise<MondayBoardRegistryRow[]> => {
+  const pool = getDb();
+  if (!pool) return [];
+  try {
+    const result = await pool.query<MondayBoardRegistryRow>(
+      'SELECT * FROM monday_board_registry ORDER BY board_label ASC, board_id ASC',
+    );
+    return result.rows;
+  } catch (error) {
+    logger?.warn?.('Failed to list monday board registry', error);
+    return [];
+  }
+};
+
+export const listMondayActorDirectory = async (
+  logger?: Pick<Logger, 'warn'>,
+): Promise<ActorDirectoryRow[]> => {
+  const pool = getDb();
+  if (!pool) return [];
+  try {
+    const result = await pool.query<ActorDirectoryRow>(
+      'SELECT * FROM actor_directory WHERE active = TRUE ORDER BY role ASC, canonical_name ASC',
+    );
+    return result.rows;
+  } catch (error) {
+    logger?.warn?.('Failed to list actor directory', error);
+    return [];
   }
 };
 
@@ -664,6 +828,171 @@ export const upsertNormalizedMondayLeadRecords = async (
       // no-op
     }
     logger?.warn?.('Failed to upsert normalized monday lead records', error);
+  }
+};
+
+const IGNORED_SCORECARD_METRIC_TITLES = new Set([
+  'subitems',
+  'date',
+  'metric owner',
+  'playbook',
+  'progress',
+  'plan to correct',
+]);
+
+export const upsertMondayMetricFacts = async (
+  input: MondayMetricFactInput,
+  logger?: Pick<Logger, 'warn'>,
+): Promise<void> => {
+  const pool = getDb();
+  if (!pool) return;
+
+  const metricDate =
+    parseIsoDate(input.callDate) ||
+    parseDateFromColumn(findColumnBySignals(input.columns, ['date', 'week', 'day', 'period'])) ||
+    null;
+  const metricOwner = normalizeText(input.setter) || findTextBySignals(input.columns, ['metric owner', 'owner', 'setter']);
+
+  const payload = input.columns
+    .map((column) => {
+      const metricName = normalizeText(column.columnTitle);
+      const metricNameNormalized = normalizeForMatch(metricName);
+      if (!metricName || IGNORED_SCORECARD_METRIC_TITLES.has(metricNameNormalized)) return null;
+
+      const metricText = normalizeText(column.textValue);
+      const metricNumber = parseNumericMetric(metricText);
+      const statusValue =
+        metricText && (column.columnType === 'status' || column.columnType === 'dropdown' || metricNumber === null)
+          ? metricText
+          : null;
+
+      if (!metricText && !column.valueJson) return null;
+
+      return {
+        metric_name: metricName,
+        metric_value_num: metricNumber,
+        metric_value_text: metricText,
+        status_value: statusValue,
+        raw: {
+          columnId: column.columnId,
+          columnTitle: column.columnTitle ?? null,
+          columnType: column.columnType ?? null,
+          textValue: column.textValue ?? null,
+          valueJson: column.valueJson ?? null,
+        },
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+  if (!payload.length) return;
+
+  try {
+    await pool.query(
+      `
+      WITH incoming AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS t(
+          metric_name TEXT,
+          metric_value_num DOUBLE PRECISION,
+          metric_value_text TEXT,
+          status_value TEXT,
+          raw JSONB
+        )
+      )
+      INSERT INTO monday_metric_facts (
+        board_id,
+        item_id,
+        metric_date,
+        metric_owner,
+        metric_name,
+        metric_value_num,
+        metric_value_text,
+        status_value,
+        item_updated_at,
+        raw,
+        synced_at
+      )
+      SELECT
+        $2,
+        $3,
+        $4::date,
+        $5,
+        incoming.metric_name,
+        incoming.metric_value_num,
+        incoming.metric_value_text,
+        incoming.status_value,
+        $6,
+        incoming.raw,
+        CURRENT_TIMESTAMP
+      FROM incoming
+      ON CONFLICT (board_id, item_id, metric_name, item_updated_at)
+      DO UPDATE SET
+        metric_date = EXCLUDED.metric_date,
+        metric_owner = EXCLUDED.metric_owner,
+        metric_value_num = EXCLUDED.metric_value_num,
+        metric_value_text = EXCLUDED.metric_value_text,
+        status_value = EXCLUDED.status_value,
+        raw = EXCLUDED.raw,
+        synced_at = CURRENT_TIMESTAMP
+      `,
+      [
+        JSON.stringify(payload),
+        input.boardId,
+        input.itemId,
+        metricDate,
+        metricOwner,
+        input.itemUpdatedAt,
+      ],
+    );
+  } catch (error) {
+    logger?.warn?.('Failed to upsert monday metric facts', error);
+  }
+};
+
+export const purgeMondayNormalizedRowsForNonFunnelBoards = async (
+  logger?: Pick<Logger, 'warn'>,
+): Promise<{ leadOutcomesDeleted: number; leadAttributionDeleted: number; setterActivityDeleted: number }> => {
+  const pool = getDb();
+  if (!pool) return { leadOutcomesDeleted: 0, leadAttributionDeleted: 0, setterActivityDeleted: 0 };
+  try {
+    const leadOutcomes = await pool.query<{ count: string }>(`
+      DELETE FROM lead_outcomes lo
+      WHERE EXISTS (
+        SELECT 1
+        FROM monday_board_registry br
+        WHERE br.board_id = lo.board_id
+          AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
+      )
+      RETURNING 1
+    `);
+    const leadAttribution = await pool.query<{ count: string }>(`
+      DELETE FROM lead_attribution la
+      WHERE EXISTS (
+        SELECT 1
+        FROM monday_board_registry br
+        WHERE br.board_id = la.board_id
+          AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
+      )
+      RETURNING 1
+    `);
+    const setterActivity = await pool.query<{ count: string }>(`
+      DELETE FROM setter_activity sa
+      WHERE EXISTS (
+        SELECT 1
+        FROM monday_board_registry br
+        WHERE br.board_id = sa.board_id
+          AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
+      )
+      RETURNING 1
+    `);
+    return {
+      leadOutcomesDeleted: leadOutcomes.rowCount || 0,
+      leadAttributionDeleted: leadAttribution.rowCount || 0,
+      setterActivityDeleted: setterActivity.rowCount || 0,
+    };
+  } catch (error) {
+    logger?.warn?.('Failed to purge non-funnel monday normalized rows', error);
+    return { leadOutcomesDeleted: 0, leadAttributionDeleted: 0, setterActivityDeleted: 0 };
   }
 };
 

@@ -1,0 +1,17 @@
+@theme {
+  --color-brand-jack: #11b8d6;
+  --color-brand-brandon: #13b981;
+  --color-brand-warn: #f59d0d;
+  --color-brand-danger: #ef4c62;
+  --color-brand-ink: #0c1429;
+
+  --radius-control: 0.62rem;
+  --radius-panel: 0.9rem;
+  --radius-chip: 999px;
+
+  --shadow-surface: 0 8px 24px rgba(12, 20, 41, 0.12);
+  --shadow-floating: 0 18px 40px rgba(12, 20, 41, 0.2);
+
+  --spacing-control-x: 0.75rem;
+  --spacing-control-y: 0.55rem;
+}

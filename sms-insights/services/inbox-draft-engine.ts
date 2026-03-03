@@ -2,8 +2,13 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import type { Logger } from '@slack/bolt';
 import { generateAiResponse } from './ai-response.js';
-import type { ConversationStateRow, ConversionExampleRow, InboxMessageRow } from './inbox-store.js';
-import { listConversionExamples } from './inbox-store.js';
+import type {
+  ConversationStateRow,
+  ConversionExampleRow,
+  InboxMessageRow,
+  SetterVoiceExampleRow,
+} from './inbox-store.js';
+import { listConversionExamples, listSetterVoiceExamples } from './inbox-store.js';
 
 const CANONICAL_DOC_PATHS = {
   escalationModel: '/Users/jl/Downloads/PT Biz Lead Messaging Escalation Model.docx',
@@ -15,6 +20,7 @@ const CANONICAL_DOC_PATHS = {
 const OPENAI_MISSING_KEY_MESSAGE = 'Set OPENAI_API_KEY in your environment to enable AI replies.';
 const MAX_EXAMPLES = 6;
 const MAX_RETRIES = 3;
+const MAX_STYLE_ANCHORS = 5;
 
 export type EscalationLevel = 1 | 2 | 3 | 4;
 
@@ -51,12 +57,19 @@ export type DraftGenerationResult = {
   escalationReason: string;
   qualificationStep: number;
   qualificationMissing: string[];
-  retrievedExamples: Array<ConversionExampleRow & { outbound_body: string | null }>;
+  retrievedExamples: Array<
+    ConversionExampleRow & {
+      outbound_body: string | null;
+      outbound_user: string | null;
+    }
+  >;
+  styleAnchors: SetterVoiceExampleRow[];
   promptSnapshotHash: string;
   lint: DraftLintResult;
   attempts: number;
   generationMode: 'ai' | 'contextual_fallback';
   generationWarnings: string[];
+  genericToneDetected: boolean;
 };
 
 export type DraftContactContext = {
@@ -120,6 +133,13 @@ const sanitizeInline = (value: string): string =>
     .replace(/[\u2012\u2013\u2014\u2015-]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+const normalizeOwnerVoice = (ownerLabel: string | null | undefined): string | null => {
+  const lower = (ownerLabel || '').trim().toLowerCase();
+  if (!lower) return null;
+  if (lower.includes('jack')) return 'jack';
+  if (lower.includes('brandon')) return 'brandon';
+  return lower;
+};
 const findLatestMessageByDirection = (
   messages: InboxMessageRow[],
   direction: InboxMessageRow['direction'],
@@ -257,6 +277,22 @@ const hasLineStackingPattern = (text: string): boolean => {
 };
 
 const hasMissingCtaQuestion = (text: string): boolean => !/\?/.test(text);
+
+const hasAiGenericPhrasing = (text: string): boolean => {
+  const normalized = normalize(text);
+  if (!normalized) return true;
+  const genericPatterns = [
+    /\bi hope you(?:'re| are)\s+(?:doing|having)\s+well\b/i,
+    /\bjust wanted to follow up\b/i,
+    /\bquick reminder\b/i,
+    /\bi totally understand\b/i,
+    /\bthat makes complete sense\b/i,
+    /\bwould love to connect\b/i,
+    /\bif you are interested\b/i,
+    /\blet me know if this helps\b/i,
+  ];
+  return genericPatterns.some((pattern) => pattern.test(normalized));
+};
 
 const hasLongParagraph = (text: string): boolean => {
   return text
@@ -423,7 +459,14 @@ const buildPrompt = (params: {
   escalationLevel: EscalationLevel;
   escalationReason: string;
   missingFields: string[];
-  examples: Array<ConversionExampleRow & { outbound_body: string | null }>;
+  examples: Array<
+    ConversionExampleRow & {
+      outbound_body: string | null;
+      outbound_user: string | null;
+    }
+  >;
+  styleAnchors: SetterVoiceExampleRow[];
+  preferredOwnerVoice?: string | null;
   canonical: CanonicalSources;
   previousIssues?: DraftLintIssue[];
   contact?: DraftContactContext;
@@ -474,10 +517,23 @@ const buildPrompt = (params: {
     params.previousIssues && params.previousIssues.length > 0
       ? params.previousIssues.map((issue) => `Issue to fix: ${issue.message}`).join('\n')
       : 'No previous issues.';
+  const styleAnchorsBlock =
+    params.styleAnchors.length > 0
+      ? params.styleAnchors
+          .slice(0, MAX_STYLE_ANCHORS)
+          .map((example, index) => {
+            return `Setter anchor ${index + 1} (${example.aloware_user || 'unknown setter'}, line=${example.line || 'unknown'}):\n${truncate(
+              example.body || '',
+              700,
+            )}`;
+          })
+          .join('\n\n')
+      : 'none';
 
   return [
     'You are PT Biz lead reply drafting assistant.',
     'Generate one SMS reply draft only.',
+    'Goal: sound exactly like the assigned setter when setter anchors are provided.',
     'STRUCTURAL MIRRORING RULES:',
     '1) Mirror structure, pacing, paragraph spacing, question cadence, and CTA placement from examples.',
     '2) Never use em dash or hyphen characters in output.',
@@ -486,7 +542,10 @@ const buildPrompt = (params: {
     '5) Required qualification variables: full/part time, niche, cash vs insurance mix, coaching interest.',
     '6) Follow escalation model and cadence logic before drafting.',
     '7) First sentence must directly acknowledge the lead most recent inbound context.',
+    '8) Avoid generic AI phrases like "I hope you are doing well", "just wanted to follow up", or "quick reminder".',
+    '9) Keep wording concrete and specific to this thread context.',
     '',
+    `Preferred setter voice: ${params.preferredOwnerVoice || 'unknown'}`,
     `Escalation level: ${params.escalationLevel}`,
     `Escalation reason: ${params.escalationReason}`,
     `Missing qualification fields: ${params.missingFields.join(', ') || 'none'}`,
@@ -510,6 +569,8 @@ const buildPrompt = (params: {
     '',
     'Recent conversation window (oldest to newest):',
     truncate(recentThread, 4500),
+    '',
+    `Setter voice anchors:\n${styleAnchorsBlock}`,
     '',
     retrievedExamples ? `Retrieved successful examples:\n${retrievedExamples}` : 'Retrieved successful examples: none',
     '',
@@ -535,15 +596,27 @@ export const generateDraftSuggestion = async (
   const orderedMessages = orderMessagesChronologically(params.messages);
   const escalation = classifyEscalationLevel(orderedMessages, params.state);
   const missingFields = missingQualificationFields(params.state);
+  const preferredOwnerVoice = normalizeOwnerVoice(params.contact?.ownerLabel);
 
   const examples = await listConversionExamples(
     {
       escalationLevel: escalation.level,
       bookedCallLabel: params.bookedCallLabel,
+      preferredOwnerLabel: preferredOwnerVoice,
       limit: MAX_EXAMPLES,
     },
     logger,
   );
+  const styleAnchors = preferredOwnerVoice
+    ? await listSetterVoiceExamples(
+        {
+          ownerLabel: preferredOwnerVoice,
+          escalationLevel: escalation.level,
+          limit: MAX_STYLE_ANCHORS,
+        },
+        logger,
+      )
+    : [];
 
   let bestText = '';
   let bestLint: DraftLintResult = {
@@ -567,6 +640,8 @@ export const generateDraftSuggestion = async (
       escalationReason: escalation.reason,
       missingFields,
       examples,
+      styleAnchors,
+      preferredOwnerVoice,
       canonical,
       previousIssues: lastIssues,
       contact: params.contact,
@@ -616,16 +691,34 @@ export const generateDraftSuggestion = async (
     }
 
     const lint = lintDraft(output);
-    if (bestText.length === 0 || lint.score > bestLint.score) {
+    const genericIssue: DraftLintIssue | null = hasAiGenericPhrasing(output)
+      ? {
+          code: 'missing_cta_question',
+          message: 'Draft sounds generic and not setter specific.',
+          blocking: false,
+        }
+      : null;
+    const effectiveLint: DraftLintResult =
+      genericIssue && attempt < MAX_RETRIES
+        ? {
+            ...lint,
+            passed: false,
+            score: Math.max(0, lint.score - 18),
+            structuralScore: Math.max(0, lint.structuralScore - 10),
+            issues: [...lint.issues, genericIssue],
+          }
+        : lint;
+
+    if (bestText.length === 0 || effectiveLint.score > bestLint.score) {
       bestText = output;
-      bestLint = lint;
+      bestLint = effectiveLint;
     }
 
-    if (lint.passed || usedFallback) {
+    if (effectiveLint.passed || usedFallback) {
       break;
     }
 
-    lastIssues = lint.issues;
+    lastIssues = effectiveLint.issues;
   }
 
   return {
@@ -635,10 +728,12 @@ export const generateDraftSuggestion = async (
     qualificationStep: qualificationStep(params.state),
     qualificationMissing: missingFields,
     retrievedExamples: examples,
+    styleAnchors,
     promptSnapshotHash: lastPromptHash,
     lint: bestLint,
     attempts,
     generationMode,
     generationWarnings,
+    genericToneDetected: hasAiGenericPhrasing(bestText),
   };
 };

@@ -833,6 +833,11 @@ export type DraftAIPerformanceAnalytics = {
   acceptedDrafts: number;
   editedDrafts: number;
   rejectedDrafts: number;
+  genericToneDrafts: number;
+  setterAnchoredDrafts: number;
+  setterAnchorCoverageRate: number;
+  genericToneRate: number;
+  setterLikeRate: number;
   acceptanceRate: number;
   editRate: number;
   avgLintScore: number;

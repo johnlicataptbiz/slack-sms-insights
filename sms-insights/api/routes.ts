@@ -2578,6 +2578,12 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
         escalationReason: draft.escalationReason,
         generationMode: draft.generationMode,
         generationWarnings: draft.generationWarnings,
+        genericToneDetected: draft.genericToneDetected,
+        styleAnchorCount: draft.styleAnchors.length,
+        styleAnchorUsers: draft.styleAnchors
+          .map((anchor) => anchor.aloware_user || '')
+          .filter((value) => value.length > 0)
+          .slice(0, 5),
       },
     },
     logger,

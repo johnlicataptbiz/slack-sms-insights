@@ -80,6 +80,17 @@ export type ConversionExampleRow = {
   created_at: string;
 };
 
+export type SetterVoiceExampleRow = {
+  id: string;
+  conversation_id: string | null;
+  event_ts: string;
+  body: string | null;
+  line: string | null;
+  aloware_user: string | null;
+  from_conversion_example: boolean;
+  escalation_level: 1 | 2 | 3 | 4 | null;
+};
+
 export type InboxConversationListRow = {
   id: string;
   contact_key: string;
@@ -1561,10 +1572,11 @@ export const listConversionExamples = async (
   params: {
     escalationLevel?: 1 | 2 | 3 | 4;
     bookedCallLabel?: string;
+    preferredOwnerLabel?: string | null;
     limit: number;
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<Array<ConversionExampleRow & { outbound_body: string | null }>> => {
+): Promise<Array<ConversionExampleRow & { outbound_body: string | null; outbound_user: string | null }>> => {
   const pool = getDbOrThrow();
   const client = await pool.connect();
   try {
@@ -1580,15 +1592,22 @@ export const listConversionExamples = async (
       where.push(`ce.booked_call_label = $${i++}`);
       values.push(params.bookedCallLabel);
     }
+    if (params.preferredOwnerLabel && params.preferredOwnerLabel.trim().length > 0) {
+      where.push(`LOWER(COALESCE(e.aloware_user, '')) LIKE $${i++}`);
+      values.push(`%${params.preferredOwnerLabel.trim().toLowerCase()}%`);
+    }
 
     values.push(Math.max(1, Math.min(params.limit, 50)));
     const limitPlaceholder = `$${i++}`;
 
-    const result = await client.query<ConversionExampleRow & { outbound_body: string | null }>(
+    const result = await client.query<
+      ConversionExampleRow & { outbound_body: string | null; outbound_user: string | null }
+    >(
       `
       SELECT
         ce.*,
-        e.body AS outbound_body
+        e.body AS outbound_body,
+        e.aloware_user AS outbound_user
       FROM conversion_examples ce
       LEFT JOIN sms_events e
         ON e.id = ce.source_outbound_event_id
@@ -1602,6 +1621,68 @@ export const listConversionExamples = async (
     return result.rows;
   } catch (err) {
     logger?.error('listConversionExamples failed', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+export const listSetterVoiceExamples = async (
+  params: {
+    ownerLabel: string;
+    escalationLevel?: 1 | 2 | 3 | 4;
+    limit: number;
+  },
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<SetterVoiceExampleRow[]> => {
+  const pool = getDbOrThrow();
+  const client = await pool.connect();
+  try {
+    const owner = params.ownerLabel.trim().toLowerCase();
+    if (!owner) return [];
+
+    const values: Array<string | number> = [`%${owner}%`];
+    let i = 2;
+    const where: string[] = [
+      `e.direction = 'outbound'`,
+      `COALESCE(TRIM(e.body), '') <> ''`,
+      `LOWER(COALESCE(e.aloware_user, '')) LIKE $1`,
+    ];
+
+    if (params.escalationLevel) {
+      where.push(`(ce.escalation_level = $${i++} OR ce.escalation_level IS NULL)`);
+      values.push(params.escalationLevel);
+    }
+
+    values.push(Math.max(1, Math.min(params.limit, 30)));
+    const limitPlaceholder = `$${i++}`;
+
+    const result = await client.query<SetterVoiceExampleRow>(
+      `
+      SELECT
+        e.id,
+        e.conversation_id,
+        e.event_ts,
+        e.body,
+        e.line,
+        e.aloware_user,
+        (ce.id IS NOT NULL) AS from_conversion_example,
+        ce.escalation_level
+      FROM sms_events e
+      LEFT JOIN conversion_examples ce
+        ON ce.source_outbound_event_id = e.id
+      WHERE ${where.join(' AND ')}
+      ORDER BY
+        CASE WHEN ce.id IS NOT NULL THEN 0 ELSE 1 END,
+        e.event_ts DESC
+      LIMIT ${limitPlaceholder};
+      `,
+      values,
+    );
+
+    return result.rows;
+  } catch (err) {
+    logger?.error('listSetterVoiceExamples failed', err);
     throw err;
   } finally {
     client.release();

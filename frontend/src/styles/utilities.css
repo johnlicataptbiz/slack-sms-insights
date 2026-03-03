@@ -1,0 +1,32 @@
+@utility tw-surface {
+  border-radius: var(--radius-panel);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--card-foreground));
+  box-shadow: var(--shadow-surface);
+}
+
+@utility tw-field {
+  border-radius: var(--radius-control);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  padding-inline: var(--spacing-control-x);
+  padding-block: var(--spacing-control-y);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+@utility tw-field-sm {
+  padding-inline: 0.55rem;
+  padding-block: 0.35rem;
+  font-size: 0.75rem;
+  line-height: 1.1;
+}
+
+@utility tw-focus-ring {
+  &:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, hsl(var(--ring)) 70%, hsl(var(--border)) 30%);
+    box-shadow: 0 0 0 3px color-mix(in srgb, hsl(var(--ring)) 26%, transparent 74%);
+  }
+}

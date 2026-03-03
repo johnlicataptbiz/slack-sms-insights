@@ -1,5 +1,6 @@
 import * as Select from "@radix-ui/react-select";
 import { CheckIcon, ChevronDownIcon } from "@radix-ui/react-icons";
+import { cn } from "../../lib/utils";
 
 export type V2SelectOption = {
   value: string;
@@ -17,9 +18,6 @@ type V2SelectProps = {
   contentClassName?: string;
   disabled?: boolean;
 };
-
-const joinClasses = (...values: Array<string | undefined | false>): string =>
-  values.filter(Boolean).join(" ");
 
 export function V2Select({
   value,
@@ -40,7 +38,7 @@ export function V2Select({
       disabled={disabled}
     >
       <Select.Trigger
-        className={joinClasses("V2Select__trigger", triggerClassName)}
+        className={cn("V2Select__trigger tw-field tw-focus-ring", triggerClassName)}
         aria-label={ariaLabel}
       >
         <Select.Value placeholder={placeholder} />
@@ -50,7 +48,7 @@ export function V2Select({
       </Select.Trigger>
       <Select.Portal>
         <Select.Content
-          className={joinClasses("V2Select__content", contentClassName)}
+          className={cn("V2Select__content tw-surface", contentClassName)}
           position="popper"
           sideOffset={6}
         >

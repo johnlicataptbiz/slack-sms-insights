@@ -27,6 +27,7 @@ import {
   useV2ConversationNotes,
   useV2CreateTemplate,
   useV2DeleteTemplate,
+  useV2DraftAIPerformance,
   useV2GenerateDraft,
   useV2InboxConversationDetail,
   useV2InboxConversations,
@@ -547,6 +548,10 @@ export default function InboxV2() {
   // Phase 3 hooks
   const stageConversionQuery = useV2StageConversion();
   const objectionFrequencyQuery = useV2ObjectionFrequency();
+  const draftAiPerformanceQuery = useV2DraftAIPerformance({
+    range: "30d",
+    tz: "America/Chicago",
+  });
   const updateObjectionTagsMutation = useV2UpdateObjectionTags();
   const updateCallOutcomeMutation = useV2UpdateCallOutcome();
   const incrementGuardrailOverrideMutation = useV2IncrementGuardrailOverride();
@@ -1693,6 +1698,75 @@ export default function InboxV2() {
                         </div>
                       ));
                   })()}
+                </div>
+              )}
+            </div>
+
+            <div className="V2Inbox__analyticsSection">
+              <h4 className="V2Inbox__analyticsSectionTitle">
+                Draft Voice Quality (30d)
+              </h4>
+              {draftAiPerformanceQuery.isLoading ? (
+                <p className="V2Inbox__analyticsHint">Loading…</p>
+              ) : draftAiPerformanceQuery.isError || !draftAiPerformanceQuery.data ? (
+                <p className="V2Inbox__analyticsHint">Failed to load</p>
+              ) : (
+                <div className="V2Inbox__objectionBars">
+                  <div className="V2Inbox__objectionRow">
+                    <span className="V2Inbox__objectionTag">Setter-like rate</span>
+                    <div className="V2Inbox__objectionBarWrap">
+                      <div
+                        className="V2Inbox__objectionBar"
+                        style={{
+                          width: `${Math.max(0, Math.min(100, draftAiPerformanceQuery.data.data.setterLikeRate))}%`,
+                          background:
+                            "linear-gradient(90deg, #11b8d6, #13b981)",
+                        }}
+                      />
+                    </div>
+                    <span className="V2Inbox__objectionCount">
+                      {draftAiPerformanceQuery.data.data.setterLikeRate.toFixed(
+                        1,
+                      )}
+                      %
+                    </span>
+                  </div>
+                  <div className="V2Inbox__objectionRow">
+                    <span className="V2Inbox__objectionTag">Generic-tone rate</span>
+                    <div className="V2Inbox__objectionBarWrap">
+                      <div
+                        className="V2Inbox__objectionBar"
+                        style={{
+                          width: `${Math.max(0, Math.min(100, draftAiPerformanceQuery.data.data.genericToneRate))}%`,
+                          background: "#ef4c62",
+                        }}
+                      />
+                    </div>
+                    <span className="V2Inbox__objectionCount">
+                      {draftAiPerformanceQuery.data.data.genericToneRate.toFixed(
+                        1,
+                      )}
+                      %
+                    </span>
+                  </div>
+                  <div className="V2Inbox__objectionRow">
+                    <span className="V2Inbox__objectionTag">Style anchor coverage</span>
+                    <div className="V2Inbox__objectionBarWrap">
+                      <div
+                        className="V2Inbox__objectionBar"
+                        style={{
+                          width: `${Math.max(0, Math.min(100, draftAiPerformanceQuery.data.data.setterAnchorCoverageRate))}%`,
+                          background: "#56607a",
+                        }}
+                      />
+                    </div>
+                    <span className="V2Inbox__objectionCount">
+                      {draftAiPerformanceQuery.data.data.setterAnchorCoverageRate.toFixed(
+                        1,
+                      )}
+                      %
+                    </span>
+                  </div>
                 </div>
               )}
             </div>

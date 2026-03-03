@@ -287,6 +287,11 @@ export type DraftAIPerformanceAnalytics = {
   acceptedDrafts: number;
   editedDrafts: number;
   rejectedDrafts: number;
+  genericToneDrafts: number;
+  setterAnchoredDrafts: number;
+  setterAnchorCoverageRate: number;
+  genericToneRate: number;
+  setterLikeRate: number;
   acceptanceRate: number;
   editRate: number;
   avgLintScore: number;
@@ -320,6 +325,8 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     total_drafts: string;
     accepted_drafts: string;
     edited_drafts: string;
+    generic_tone_drafts: string;
+    setter_anchored_drafts: string;
     avg_lint_score: string;
     avg_structural_score: string;
   }>(
@@ -328,6 +335,18 @@ export const getDraftAIPerformanceAnalytics = async (params: {
       COUNT(*)::text AS total_drafts,
       COUNT(CASE WHEN accepted = true THEN 1 END)::text AS accepted_drafts,
       COUNT(CASE WHEN edited = true THEN 1 END)::text AS edited_drafts,
+      COUNT(
+        CASE
+          WHEN COALESCE((raw->>'genericToneDetected')::boolean, false) = true
+          THEN 1
+        END
+      )::text AS generic_tone_drafts,
+      COUNT(
+        CASE
+          WHEN COALESCE((raw->>'styleAnchorCount')::int, 0) > 0
+          THEN 1
+        END
+      )::text AS setter_anchored_drafts,
       COALESCE(AVG(lint_score), 0)::text AS avg_lint_score,
       COALESCE(AVG(structural_score), 0)::text AS avg_structural_score
     FROM draft_suggestions
@@ -340,7 +359,10 @@ export const getDraftAIPerformanceAnalytics = async (params: {
   const totalDrafts = Number.parseInt(overall.total_drafts, 10);
   const acceptedDrafts = Number.parseInt(overall.accepted_drafts, 10);
   const editedDrafts = Number.parseInt(overall.edited_drafts, 10);
+  const genericToneDrafts = Number.parseInt(overall.generic_tone_drafts, 10);
+  const setterAnchoredDrafts = Number.parseInt(overall.setter_anchored_drafts, 10);
   const rejectedDrafts = Math.max(0, totalDrafts - acceptedDrafts);
+  const setterLikeDrafts = Math.max(0, setterAnchoredDrafts - genericToneDrafts);
 
   // Score by outcome
   const { rows: outcomeRows } = await pool.query<{
@@ -415,6 +437,11 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     acceptedDrafts,
     editedDrafts,
     rejectedDrafts,
+    genericToneDrafts,
+    setterAnchoredDrafts,
+    setterAnchorCoverageRate: totalDrafts > 0 ? (setterAnchoredDrafts / totalDrafts) * 100 : 0,
+    genericToneRate: totalDrafts > 0 ? (genericToneDrafts / totalDrafts) * 100 : 0,
+    setterLikeRate: totalDrafts > 0 ? (setterLikeDrafts / totalDrafts) * 100 : 0,
     acceptanceRate: totalDrafts > 0 ? (acceptedDrafts / totalDrafts) * 100 : 0,
     editRate: totalDrafts > 0 ? (editedDrafts / totalDrafts) * 100 : 0,
     avgLintScore: Number.parseFloat(overall.avg_lint_score),

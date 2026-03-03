@@ -27,6 +27,10 @@ const navItems: NavItem[] = [
 
 const brandLogoUrl = '/bizsmslogo.png';
 const mobileMediaQuery = '(max-width: 1080px)';
+const topQuickLinks = ['/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
+
+const isRouteActive = (pathname: string, to: string) =>
+  pathname === to || pathname.startsWith(`${to}/`);
 
 const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: string) => {
   const doc = document as Document & {
@@ -50,6 +54,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
   );
   const location = useLocation();
   const navigate = useNavigate();
+  const activeNavItem = navItems.find((item) => isRouteActive(location.pathname, item.to));
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -134,14 +139,32 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             </motion.button>
           ) : null}
 
-          <motion.div
-            className="V2Shell__brand"
-            onClick={() => navigateWithTransition(navigate, '/v2/insights')}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <img className="V2Shell__brandLogo" src={brandLogoUrl} alt="PT Biz logo" />
-          </motion.div>
+          <div className="V2Shell__context">
+            <p className="V2Shell__contextEyebrow">PT Biz SMS</p>
+            <p className="V2Shell__contextTitle">
+              {activeNavItem?.label || 'Command Center'}
+            </p>
+          </div>
+
+          {!isMobileViewport ? (
+            <div className="V2Shell__quickLinks" aria-label="Quick navigation">
+              {navItems
+                .filter((item) => topQuickLinks.includes(item.to as (typeof topQuickLinks)[number]))
+                .map((item) => {
+                  const active = isRouteActive(location.pathname, item.to);
+                  return (
+                    <button
+                      key={item.to}
+                      type="button"
+                      className={`V2Shell__quickLink ${active ? 'is-active' : ''}`}
+                      onClick={() => navigateWithTransition(navigate, item.to)}
+                    >
+                      {item.shortLabel}
+                    </button>
+                  );
+                })}
+            </div>
+          ) : null}
         </div>
 
         <div className="V2Shell__topActions">

@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import * as Switch from "@radix-ui/react-switch";
 import * as Tabs from "@radix-ui/react-tabs";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useAutoAnimate } from "@formkit/auto-animate/react";
 import { addHours, format as formatDateFns, formatDistanceToNow, isValid, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
@@ -162,6 +160,11 @@ const humanizeAlowareError = (reason: string | null | undefined): string => {
     if (lower.includes(key)) return label;
   }
   return reason;
+};
+
+const toFiniteNumber = (value: unknown, fallback = 0): number => {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 };
 
 const describeSequenceSync = (sync: AlowareSequenceSyncV2 | null): string => {
@@ -327,7 +330,6 @@ export default function InboxV2() {
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
   const listParentRef = useRef<HTMLDivElement | null>(null);
-  const [listAnimateRef] = useAutoAnimate<HTMLDivElement>();
 
   const [qualificationState, setQualificationState] =
     useState<QualificationStateV2>({
@@ -574,9 +576,28 @@ export default function InboxV2() {
   const incrementGuardrailOverrideMutation = useV2IncrementGuardrailOverride();
 
   const detail = detailQuery.data?.data || null;
-  const contactTags = Array.isArray(detail?.contactCard?.tags)
-    ? detail.contactCard.tags
+  const detailConversation = detail?.conversation || null;
+  const detailContactCard = detail?.contactCard || null;
+  const detailMessages = Array.isArray(detail?.messages) ? detail.messages : [];
+  const detailDrafts = Array.isArray(detail?.drafts) ? detail.drafts : [];
+  const detailMondayTrail = Array.isArray(detail?.mondayTrail)
+    ? detail.mondayTrail
     : [];
+  const contactTags = Array.isArray(detailContactCard?.tags)
+    ? detailContactCard.tags
+    : [];
+  const stageConversionRows = Array.isArray(stageConversionQuery.data)
+    ? stageConversionQuery.data
+    : [];
+  const objectionFrequencyRows = Array.isArray(objectionFrequencyQuery.data)
+    ? objectionFrequencyQuery.data
+    : [];
+  const draftAiPerformance = draftAiPerformanceQuery.data?.data || null;
+  const setterLikeRate = toFiniteNumber(draftAiPerformance?.setterLikeRate);
+  const genericToneRate = toFiniteNumber(draftAiPerformance?.genericToneRate);
+  const setterAnchorCoverageRate = toFiniteNumber(
+    draftAiPerformance?.setterAnchorCoverageRate,
+  );
   const sendConfig = sendConfigQuery.data?.data || null;
   const lineOptions = sendConfig?.lines || [];
   const lineSelectOptions: V2SelectOption[] = [
@@ -629,16 +650,21 @@ export default function InboxV2() {
   }, [lineOptions, selectedLineKey, sendConfig]);
 
   useEffect(() => {
-    if (!detail) return;
+    if (!detailConversation) return;
 
-    setQualificationState(detail.conversation.qualification);
-    setEscalationLevel(detail.conversation.escalation.level);
-    setEscalationReason(detail.conversation.escalation.reason || "");
-    setSequenceIdInput(detail.contactCard.sequenceId || "");
-    assignForm.reset({ ownerLabel: detail.conversation.ownerLabel || "" });
-    setLocalObjectionTags(detail.conversation.objectionTags ?? []);
-    setLocalCallOutcome(detail.conversation.callOutcome ?? null);
-  }, [assignForm, detail]);
+    setQualificationState(detailConversation.qualification);
+    setEscalationLevel(detailConversation.escalation.level);
+    setEscalationReason(detailConversation.escalation.reason || "");
+    setSequenceIdInput(detailContactCard?.sequenceId || "");
+    assignForm.reset({ ownerLabel: detailConversation.ownerLabel || "" });
+    setLocalObjectionTags(detailConversation.objectionTags ?? []);
+    setLocalCallOutcome(detailConversation.callOutcome ?? null);
+  }, [
+    assignForm,
+    detailConversation?.id,
+    detailContactCard?.sequenceId,
+    detailQuery.dataUpdatedAt,
+  ]);
 
   useEffect(() => {
     setDraftPrefillDoneForConversation(null);
@@ -657,7 +683,7 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     if (draftPrefillDoneForConversation === selectedConversationId) return;
 
-    const latestDraft = detail.drafts[0];
+    const latestDraft = detailDrafts[0];
     if (!latestDraft) return;
 
     if (composerText.trim().length === 0) {
@@ -666,7 +692,7 @@ export default function InboxV2() {
     }
     setDraftPrefillDoneForConversation(selectedConversationId);
   }, [
-    detail,
+    detailDrafts,
     composerText,
     selectedConversationId,
     draftPrefillDoneForConversation,
@@ -675,13 +701,13 @@ export default function InboxV2() {
   useEffect(() => {
     if (!isComposerModalOpen || !selectedConversationId || !detail) return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
-  }, [isComposerModalOpen, selectedConversationId, detail?.conversation.id]);
+  }, [isComposerModalOpen, selectedConversationId, detailConversation?.id]);
 
   // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
   useEffect(() => {
     if (!chatThreadRef.current) return;
     chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
-  }, [detail?.messages, justSentMessage]);
+  }, [detailMessages, justSentMessage]);
 
   useEffect(() => {
     if (!isComposerModalOpen) return;
@@ -745,8 +771,8 @@ export default function InboxV2() {
     }
 
     // Phase 2: Double Pitch Protection — detect prior outbound call link with no inbound reply since
-    if (containsCallLink(messageText) && detail?.messages) {
-      const msgs = detail.messages;
+    if (containsCallLink(messageText) && detailMessages.length > 0) {
+      const msgs = detailMessages;
       // Find the last outbound call link index
       let lastCallLinkOutboundIdx = -1;
       for (let i = msgs.length - 1; i >= 0; i--) {
@@ -1330,10 +1356,12 @@ export default function InboxV2() {
         <div
           className={`V2Inbox__needsReplyToggle ${needsReplyOnly ? "is-active" : ""}`}
         >
-          <Switch.Root
+          <button
             id="needs-reply-switch"
-            checked={needsReplyOnly}
-            onCheckedChange={setNeedsReplyOnly}
+            type="button"
+            role="switch"
+            aria-checked={needsReplyOnly}
+            onClick={() => setNeedsReplyOnly((prev) => !prev)}
             style={{
               width: "36px",
               height: "20px",
@@ -1346,9 +1374,12 @@ export default function InboxV2() {
               position: "relative",
               flexShrink: 0,
               transition: "background 0.2s",
+              display: "inline-flex",
+              alignItems: "center",
+              padding: 0,
             }}
           >
-            <Switch.Thumb
+            <span
               style={{
                 display: "block",
                 width: "14px",
@@ -1362,7 +1393,7 @@ export default function InboxV2() {
                   : "translateX(3px)",
               }}
             />
-          </Switch.Root>
+          </button>
           <label
             htmlFor="needs-reply-switch"
             style={{ cursor: "pointer", userSelect: "none" }}
@@ -1418,10 +1449,7 @@ export default function InboxV2() {
           ) : (
             /* Virtual list — only renders visible rows for performance */
             <div
-              ref={(el) => {
-                listParentRef.current = el;
-                listAnimateRef(el);
-              }}
+              ref={listParentRef}
               className="V2Inbox__conversationList V2Inbox__conversationList--enhanced"
               style={{ overflowY: "auto", height: "100%" }}
             >
@@ -1683,8 +1711,7 @@ export default function InboxV2() {
                 <p className="V2Inbox__analyticsHint">Loading…</p>
               ) : stageConversionQuery.isError ? (
                 <p className="V2Inbox__analyticsHint">Failed to load</p>
-              ) : !stageConversionQuery.data ||
-                stageConversionQuery.data.length === 0 ? (
+              ) : stageConversionRows.length === 0 ? (
                 <p className="V2Inbox__analyticsHint">No conversion data yet</p>
               ) : (
                 <table className="V2Inbox__conversionTable">
@@ -1698,7 +1725,7 @@ export default function InboxV2() {
                     </tr>
                   </thead>
                   <tbody>
-                    {stageConversionQuery.data.map((row) => (
+                    {stageConversionRows.map((row) => (
                       <tr key={row.escalation_level}>
                         <td>L{row.escalation_level}</td>
                         <td>{row.total_conversations}</td>
@@ -1733,8 +1760,7 @@ export default function InboxV2() {
                 <p className="V2Inbox__analyticsHint">Loading…</p>
               ) : objectionFrequencyQuery.isError ? (
                 <p className="V2Inbox__analyticsHint">Failed to load</p>
-              ) : !objectionFrequencyQuery.data ||
-                objectionFrequencyQuery.data.length === 0 ? (
+              ) : objectionFrequencyRows.length === 0 ? (
                 <p className="V2Inbox__analyticsHint">
                   No objection tags recorded yet
                 </p>
@@ -1742,11 +1768,11 @@ export default function InboxV2() {
                 <div className="V2Inbox__objectionBars">
                   {(() => {
                     const maxCount = Math.max(
-                      ...objectionFrequencyQuery.data!.map((r) => r.count),
+                      ...objectionFrequencyRows.map((r) => r.count),
                       1,
                     );
-                    return objectionFrequencyQuery
-                      .data!.slice(0, 8)
+                    return objectionFrequencyRows
+                      .slice(0, 8)
                       .map((row) => (
                         <div key={row.tag} className="V2Inbox__objectionRow">
                           <span className="V2Inbox__objectionTag">
@@ -1776,7 +1802,7 @@ export default function InboxV2() {
               </h4>
               {draftAiPerformanceQuery.isLoading ? (
                 <p className="V2Inbox__analyticsHint">Loading…</p>
-              ) : draftAiPerformanceQuery.isError || !draftAiPerformanceQuery.data ? (
+              ) : draftAiPerformanceQuery.isError || !draftAiPerformance ? (
                 <p className="V2Inbox__analyticsHint">Failed to load</p>
               ) : (
                 <div className="V2Inbox__objectionBars">
@@ -1786,16 +1812,14 @@ export default function InboxV2() {
                       <div
                         className="V2Inbox__objectionBar"
                         style={{
-                          width: `${Math.max(0, Math.min(100, draftAiPerformanceQuery.data.data.setterLikeRate))}%`,
+                          width: `${Math.max(0, Math.min(100, setterLikeRate))}%`,
                           background:
                             "linear-gradient(90deg, #11b8d6, #13b981)",
                         }}
                       />
                     </div>
                     <span className="V2Inbox__objectionCount">
-                      {draftAiPerformanceQuery.data.data.setterLikeRate.toFixed(
-                        1,
-                      )}
+                      {setterLikeRate.toFixed(1)}
                       %
                     </span>
                   </div>
@@ -1805,15 +1829,13 @@ export default function InboxV2() {
                       <div
                         className="V2Inbox__objectionBar"
                         style={{
-                          width: `${Math.max(0, Math.min(100, draftAiPerformanceQuery.data.data.genericToneRate))}%`,
+                          width: `${Math.max(0, Math.min(100, genericToneRate))}%`,
                           background: "#ef4c62",
                         }}
                       />
                     </div>
                     <span className="V2Inbox__objectionCount">
-                      {draftAiPerformanceQuery.data.data.genericToneRate.toFixed(
-                        1,
-                      )}
+                      {genericToneRate.toFixed(1)}
                       %
                     </span>
                   </div>
@@ -1823,15 +1845,16 @@ export default function InboxV2() {
                       <div
                         className="V2Inbox__objectionBar"
                         style={{
-                          width: `${Math.max(0, Math.min(100, draftAiPerformanceQuery.data.data.setterAnchorCoverageRate))}%`,
+                          width: `${Math.max(
+                            0,
+                            Math.min(100, setterAnchorCoverageRate),
+                          )}%`,
                           background: "#56607a",
                         }}
                       />
                     </div>
                     <span className="V2Inbox__objectionCount">
-                      {draftAiPerformanceQuery.data.data.setterAnchorCoverageRate.toFixed(
-                        1,
-                      )}
+                      {setterAnchorCoverageRate.toFixed(1)}
                       %
                     </span>
                   </div>
@@ -2015,26 +2038,26 @@ export default function InboxV2() {
                 {detail ? (
                   <>
                     <h3>
-                      {detail.contactCard.name ||
-                        detail.contactCard.phone ||
-                        detail.contactCard.contactKey}
+                      {detailContactCard?.name ||
+                        detailContactCard?.phone ||
+                        detailContactCard?.contactKey}
                     </h3>
                     <p className="V2Inbox__composerMeta">
-                      {detail.contactCard.phone} · Owner:{" "}
-                      {detail.conversation.ownerLabel || "Unassigned"} · Stage:
-                      L{detail.conversation.escalation.level}
+                      {detailContactCard?.phone || "n/a"} · Owner:{" "}
+                      {detailConversation?.ownerLabel || "Unassigned"} · Stage:
+                      L{detailConversation?.escalation.level ?? "?"}
                     </p>
                     <div className="V2Inbox__statusRow">
                       <span
-                        className={`V2Inbox__statusBadge V2Inbox__statusBadge--${detail.conversation.status}`}
+                        className={`V2Inbox__statusBadge V2Inbox__statusBadge--${detailConversation?.status || "open"}`}
                       >
-                        {detail.conversation.status === "open"
+                        {detailConversation?.status === "open"
                           ? "● Open"
-                          : detail.conversation.status === "closed"
+                          : detailConversation?.status === "closed"
                             ? "✓ Closed"
                             : "⊘ DNC"}
                       </span>
-                      {detail.conversation.status !== "closed" && (
+                      {detailConversation?.status !== "closed" && (
                         <button
                           type="button"
                           className="V2Inbox__button V2Inbox__button--small"
@@ -2045,7 +2068,7 @@ export default function InboxV2() {
                           Close
                         </button>
                       )}
-                      {detail.conversation.status === "closed" && (
+                      {detailConversation?.status === "closed" && (
                         <button
                           type="button"
                           className="V2Inbox__button V2Inbox__button--small"
@@ -2056,7 +2079,7 @@ export default function InboxV2() {
                           Reopen
                         </button>
                       )}
-                      {detail.conversation.status !== "dnc" && (
+                      {detailConversation?.status !== "dnc" && (
                         <button
                           type="button"
                           className="V2Inbox__button V2Inbox__button--small V2Inbox__button--danger"
@@ -2067,7 +2090,7 @@ export default function InboxV2() {
                           DNC
                         </button>
                       )}
-                      {detail.conversation.status === "dnc" && (
+                      {detailConversation?.status === "dnc" && (
                         <button
                           type="button"
                           className="V2Inbox__button V2Inbox__button--small"
@@ -2127,7 +2150,7 @@ export default function InboxV2() {
                       >
                         {snoozeMutation.isPending ? "…" : "Snooze"}
                       </button>
-                      {detail.conversation.escalation.nextFollowupDueAt && (
+                      {detailConversation?.escalation.nextFollowupDueAt && (
                         <button
                           type="button"
                           className="V2Inbox__button V2Inbox__button--small"
@@ -2199,15 +2222,15 @@ export default function InboxV2() {
                     <div className="V2Inbox__composerPrimary">
                     {/* Conversation Thread - Chat Style */}
                     <div className="V2Inbox__chatThread" ref={chatThreadRef}>
-                      {detail.messages.map((message) => {
+                      {detailMessages.map((message) => {
                         const leadLabel =
-                          detail.contactCard.name ||
-                          detail.contactCard.phone ||
+                          detailContactCard?.name ||
+                          detailContactCard?.phone ||
                           "Lead";
                         // For outbound messages: prefer inferring from message body (e.g., "Jack with PT Biz")
                         // Fall back to alowareUser field, then to default setter
                         const defaultSetter =
-                          displaySetterName(detail.conversation.ownerLabel) ||
+                          displaySetterName(detailConversation?.ownerLabel) ||
                           "Setter";
                         let speaker: string;
                         if (message.direction === "inbound") {
@@ -2313,7 +2336,7 @@ export default function InboxV2() {
                             const nextText = event.target.value;
                             setComposerText(nextText);
                             if (selectedDraftId) {
-                              const selectedDraft = detail.drafts.find(
+                              const selectedDraft = detailDrafts.find(
                                 (draft) => draft.id === selectedDraftId,
                               );
                               if (
@@ -2397,7 +2420,7 @@ export default function InboxV2() {
                               ariaLabel="Select send line"
                             />
                           )}
-                          {detail.drafts.length > 0 && (
+                          {detailDrafts.length > 0 && (
                             <V2Select
                               triggerClassName="V2Inbox__chatDraftSelect"
                               value={selectedDraftId || DRAFT_NONE_VALUE}
@@ -2406,7 +2429,7 @@ export default function InboxV2() {
                                   setSelectedDraftId(null);
                                   return;
                                 }
-                                const draft = detail.drafts.find(
+                                const draft = detailDrafts.find(
                                   (d) => d.id === value,
                                 );
                                 if (!draft) return;
@@ -2416,11 +2439,11 @@ export default function InboxV2() {
                               options={[
                                 {
                                   value: DRAFT_NONE_VALUE,
-                                  label: `Drafts (${detail.drafts.length})`,
+                                  label: `Drafts (${detailDrafts.length})`,
                                 },
-                                ...detail.drafts.slice(0, 5).map((draft) => ({
+                                ...detailDrafts.slice(0, 5).map((draft) => ({
                                   value: draft.id,
-                                  label: `${shorten(draft.text, 40)} (L${draft.lintScore.toFixed(0)})`,
+                                  label: `${shorten(draft.text, 40)} (L${toFiniteNumber(draft.lintScore).toFixed(0)})`,
                                 })),
                               ]}
                               ariaLabel="Use a saved draft"
@@ -3018,15 +3041,15 @@ export default function InboxV2() {
                           >
                             <div>
                               <strong>Lead Source:</strong>{" "}
-                              {detail.contactCard.leadSource || "n/a"}
+                              {detailContactCard?.leadSource || "n/a"}
                             </div>
                             <div>
                               <strong>Current Sequence:</strong>{" "}
-                              {detail.contactCard.sequenceId || "n/a"}
+                              {detailContactCard?.sequenceId || "n/a"}
                             </div>
                             <div>
                               <strong>Disposition:</strong>{" "}
-                              {detail.contactCard.dispositionStatusId || "n/a"}
+                              {detailContactCard?.dispositionStatusId || "n/a"}
                             </div>
                             <div>
                               <strong>Tags:</strong>{" "}
@@ -3036,46 +3059,50 @@ export default function InboxV2() {
                             </div>
                             <div>
                               <strong>Text Authorized:</strong>{" "}
-                              {detail.contactCard.textAuthorized == null
+                              {detailContactCard?.textAuthorized == null
                                 ? "n/a"
-                                : detail.contactCard.textAuthorized
+                                : detailContactCard.textAuthorized
                                   ? "yes"
                                   : "no"}
                             </div>
                             <div>
                               <strong>Blocked:</strong>{" "}
-                              {detail.contactCard.isBlocked == null
+                              {detailContactCard?.isBlocked == null
                                 ? "n/a"
-                                : detail.contactCard.isBlocked
+                                : detailContactCard.isBlocked
                                   ? "yes"
                                   : "no"}
                             </div>
                             <div>
                               <strong>Carrier / Line:</strong>{" "}
-                              {detail.contactCard.lrnCarrier || "n/a"} /{" "}
-                              {detail.contactCard.lrnLineType || "n/a"}
+                              {detailContactCard?.lrnCarrier || "n/a"} /{" "}
+                              {detailContactCard?.lrnLineType || "n/a"}
                             </div>
                             <div>
                               <strong>Unread:</strong>{" "}
-                              {detail.contactCard.unreadCount ?? 0}
+                              {detailContactCard?.unreadCount ?? 0}
                             </div>
                             <div>
                               <strong>SMS In/Out:</strong>{" "}
-                              {detail.contactCard.inboundSmsCount ?? 0}/
-                              {detail.contactCard.outboundSmsCount ?? 0}
+                              {detailContactCard?.inboundSmsCount ?? 0}/
+                              {detailContactCard?.outboundSmsCount ?? 0}
                             </div>
                             <div>
                               <strong>Calls In/Out:</strong>{" "}
-                              {detail.contactCard.inboundCallCount ?? 0}/
-                              {detail.contactCard.outboundCallCount ?? 0}
+                              {detailContactCard?.inboundCallCount ?? 0}/
+                              {detailContactCard?.outboundCallCount ?? 0}
                             </div>
                             <div>
                               <strong>Last Engagement:</strong>{" "}
-                              {fmtDateTime(detail.contactCard.lastEngagementAt)}
+                              {fmtDateTime(
+                                detailContactCard?.lastEngagementAt || null,
+                              )}
                             </div>
                             <div>
                               <strong>LRN Checked:</strong>{" "}
-                              {fmtDateTime(detail.contactCard.lrnLastCheckedAt)}
+                              {fmtDateTime(
+                                detailContactCard?.lrnLastCheckedAt || null,
+                              )}
                             </div>
                           </div>
                         </div>
@@ -3222,13 +3249,13 @@ export default function InboxV2() {
                           </div>
                         </div>
 
-                        {detail && detail.mondayTrail.length > 0 && (
+                        {detail && detailMondayTrail.length > 0 && (
                           <div className="V2Panel V2Inbox__sidePanel">
                             <p className="V2Panel__title">
                               📅 Monday Booked Calls
                             </p>
                             <div className="V2Inbox__mondayTrail">
-                              {detail.mondayTrail.map((snap) => (
+                              {detailMondayTrail.map((snap) => (
                                 <div
                                   key={snap.itemId}
                                   className="V2Inbox__mondayTrailRow"

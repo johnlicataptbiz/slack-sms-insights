@@ -80,6 +80,7 @@
   align-items: center;
   gap: 0.9rem;
   min-width: 0;
+  flex: 1;
 }
 
 .V2Shell__menuButton {
@@ -118,6 +119,64 @@
   transform: none;
 }
 
+.V2Shell__context {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.V2Shell__contextEyebrow {
+  margin: 0;
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--v2-muted);
+  font-weight: 800;
+}
+
+.V2Shell__contextTitle {
+  margin: 0;
+  font-family: var(--v2-font-display);
+  font-size: 1.14rem;
+  line-height: 1.15;
+  color: var(--v2-base-800);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.V2Shell__quickLinks {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: 0.8rem;
+}
+
+.V2Shell__quickLink {
+  border: 1px solid rgba(8, 12, 29, 0.12);
+  border-radius: 999px;
+  padding: 0.36rem 0.72rem;
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--v2-base-800);
+  font: 700 0.74rem/1 var(--v2-font-ui);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.V2Shell__quickLink:hover {
+  transform: translateY(-1px);
+  border-color: rgba(17, 184, 214, 0.46);
+  background: rgba(17, 184, 214, 0.12);
+}
+
+.V2Shell__quickLink.is-active {
+  border-color: rgba(17, 184, 214, 0.5);
+  background: rgba(17, 184, 214, 0.18);
+  color: var(--v2-base-800);
+}
+
 .V2Shell__modeButton {
   border: 1px solid rgba(8, 12, 29, 0.16);
   border-radius: 999px;
@@ -132,6 +191,7 @@
   display: flex;
   align-items: center;
   gap: var(--v2-space-2);
+  flex-shrink: 0;
 }
 
 .V2Shell__defsButton {
@@ -1791,6 +1851,19 @@
 
   .V2Shell__topStart {
     gap: 0.45rem;
+  }
+
+  .V2Shell__contextTitle {
+    font-size: 0.94rem;
+  }
+
+  .V2Shell__contextEyebrow {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+  }
+
+  .V2Shell__quickLinks {
+    display: none;
   }
 
   .V2Shell__body {

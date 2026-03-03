@@ -336,6 +336,7 @@ export default function InboxV2() {
       fullOrPartTime: "unknown",
       niche: "",
       revenueMix: "unknown",
+      deliveryModel: "unknown",
       coachingInterest: "unknown",
       progressStep: 0,
     });

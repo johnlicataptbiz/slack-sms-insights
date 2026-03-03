@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { client } from './client';
 import {
@@ -462,12 +462,14 @@ export const useV2UpdateQualification = () => {
       fullOrPartTime?: QualificationStateV2['fullOrPartTime'];
       niche?: string | null;
       revenueMix?: QualificationStateV2['revenueMix'];
+      deliveryModel?: QualificationStateV2['deliveryModel'];
       coachingInterest?: QualificationStateV2['coachingInterest'];
     }) => {
       return client.post<ApiEnvelope<QualificationStateV2>>(`/api/v2/inbox/conversations/${params.conversationId}/qualification`, {
         fullOrPartTime: params.fullOrPartTime,
         niche: params.niche,
         revenueMix: params.revenueMix,
+        deliveryModel: params.deliveryModel,
         coachingInterest: params.coachingInterest,
       });
     },
@@ -1244,6 +1246,12 @@ export type SequenceQualificationItem = {
   mostlyInsurance: QualField;
   balancedMix: QualField;
   unknownRevenue: QualField;
+  // Delivery model
+  brickAndMortar: QualField;
+  mobile: QualField;
+  online: QualField;
+  hybrid: QualField;
+  unknownDelivery: QualField;
   // Coaching interest
   highInterest: QualField;
   mediumInterest: QualField;

@@ -280,6 +280,7 @@ export type QualificationStateV2 = {
   fullOrPartTime: 'full_time' | 'part_time' | 'unknown';
   niche: string | null;
   revenueMix: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
+  deliveryModel: 'brick_and_mortar' | 'mobile' | 'online' | 'hybrid' | 'unknown';
   coachingInterest: 'high' | 'medium' | 'low' | 'unknown';
   progressStep: number;
 };

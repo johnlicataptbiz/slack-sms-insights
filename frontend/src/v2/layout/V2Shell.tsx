@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { Drawer } from 'vaul';
 
 import { client } from '../../api/client';
-import { uiModeStorageKey } from '../../uiMode';
 import { V2_TERM_DEFINITIONS, V2_TERM_GROUPS, v2Copy } from '../copy';
 import { springs, easing, listContainerVariants, listItemVariants } from '../utils/motion';
 import { CommandPalette, CommandPaletteTrigger } from '../components/CommandPalette';
@@ -27,7 +26,7 @@ const navItems: NavItem[] = [
 
 const brandLogoUrl = '/bizsmslogo.png';
 const mobileMediaQuery = '(max-width: 1080px)';
-const topQuickLinks = ['/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
+const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
 
 const isRouteActive = (pathname: string, to: string) =>
   pathname === to || pathname.startsWith(`${to}/`);
@@ -168,8 +167,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="V2Shell__topActions">
-          {/* ⌘K Command Palette Trigger */}
-          <CommandPaletteTrigger onClick={() => setIsCmdOpen(true)} />
+          {!isMobileViewport ? <CommandPaletteTrigger onClick={() => setIsCmdOpen(true)} /> : null}
 
           <motion.button
             className="V2Shell__defsButton"
@@ -184,18 +182,6 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             whileTap={{ scale: 0.95 }}
           >
             {v2Copy.actions.kpiDefinitions}
-          </motion.button>
-          <motion.button
-            className="V2Shell__modeButton"
-            type="button"
-            onClick={() => {
-              localStorage.setItem(uiModeStorageKey, 'legacy');
-              navigate('/legacy?ui=legacy');
-            }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {v2Copy.actions.legacyUi}
           </motion.button>
           <motion.button
             className="V2Shell__modeButton"
@@ -378,10 +364,6 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         open={isCmdOpen}
         onOpenChange={setIsCmdOpen}
         onSignOut={() => void handleLogout()}
-        onToggleLegacy={() => {
-          localStorage.setItem(uiModeStorageKey, 'legacy');
-          navigate('/legacy?ui=legacy');
-        }}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, type ReactNode, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { ColumnDef, ColumnPinningState, VisibilityState } from '@tanstack/react-table';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
@@ -19,6 +19,15 @@ import { useToast } from '../hooks/useToast';
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
 const WINNER_MIN_SENDS = 100;
+const executiveSectionsStorageKey = 'v2_sequences_executive_sections_v1';
+type ExecutiveSectionKey = 'leadMagnet' | 'attribution' | 'compliance' | 'timing';
+type ExecutiveSectionState = Record<ExecutiveSectionKey, boolean>;
+const defaultExecutiveSectionState: ExecutiveSectionState = {
+  leadMagnet: false,
+  attribution: false,
+  compliance: false,
+  timing: false,
+};
 
 type Mode = '7d' | '30d';
 type Sort =
@@ -143,6 +152,41 @@ const renderVersion = (label: string, version: string): React.ReactNode => {
 const toAuditId = (label: string) =>
   `audit-${label.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
 
+function ExecutiveSection({
+  id,
+  title,
+  meta,
+  children,
+  isOpen,
+  onToggle,
+}: {
+  id: ExecutiveSectionKey;
+  title: string;
+  meta: string;
+  children: ReactNode;
+  isOpen: boolean;
+  onToggle: (id: ExecutiveSectionKey, open: boolean) => void;
+}) {
+  return (
+    <details
+      className="V2ExecutiveSection"
+      open={isOpen}
+      onToggle={(event) => onToggle(id, event.currentTarget.open)}
+    >
+      <summary className="V2ExecutiveSection__summary">
+        <div className="V2ExecutiveSection__titleWrap">
+          <p className="V2ExecutiveSection__title">{title}</p>
+          <p className="V2ExecutiveSection__meta">{meta}</p>
+        </div>
+        <span className="V2ExecutiveSection__chevron" aria-hidden="true">
+          ▾
+        </span>
+      </summary>
+      <div className="V2ExecutiveSection__body">{children}</div>
+    </details>
+  );
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type AuditRow = SalesMetricsV2['sequences'][0]['bookedAuditRows'][0];
@@ -179,6 +223,7 @@ type VersionDiffContext = {
   previous: MergedSeqRow | null;
   currentCanonicalBody: string | null;
   previousCanonicalBody: string | null;
+  usingVariantPair: boolean;
 };
 
 type VersionTimelineItem = {
@@ -224,6 +269,48 @@ const toVersionSortKey = (row: MergedSeqRow): number[] | null => {
   return parseVersionParts(extractVersionDisplay(row.label) || row.version);
 };
 
+const getTopBodyVariants = (row: SequenceVersionHistoryRowV2 | null | undefined): string[] => {
+  if (!row) return [];
+  const candidates = [row.canonicalBody, ...(row.sampleBodies || [])]
+    .map((value) => (value || '').trim())
+    .filter((value) => value.length > 0);
+  const unique: string[] = [];
+  for (const value of candidates) {
+    if (!unique.includes(value)) unique.push(value);
+    if (unique.length >= 2) break;
+  }
+  return unique;
+};
+
+const pickDiffPair = (
+  previousVariants: string[],
+  currentVariants: string[],
+): { previous: string | null; current: string | null; usingVariantPair: boolean } => {
+  const prev0 = previousVariants[0] || null;
+  const curr0 = currentVariants[0] || null;
+  if (!prev0 || !curr0) {
+    return { previous: prev0, current: curr0, usingVariantPair: false };
+  }
+
+  if (prev0 !== curr0) {
+    return { previous: prev0, current: curr0, usingVariantPair: false };
+  }
+
+  const variantCandidates: Array<[string | null, string | null]> = [
+    [prev0, currentVariants[1] || null],
+    [previousVariants[1] || null, curr0],
+    [previousVariants[1] || null, currentVariants[1] || null],
+  ];
+
+  for (const [prev, curr] of variantCandidates) {
+    if (prev && curr && prev !== curr) {
+      return { previous: prev, current: curr, usingVariantPair: true };
+    }
+  }
+
+  return { previous: prev0, current: curr0, usingVariantPair: false };
+};
+
 export const computeSequenceHeaderMetrics = (
   payload: SalesMetricsV2,
   sequenceRows: SalesMetricsV2['sequences'],
@@ -254,13 +341,30 @@ export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('7d');
   const [sort, setSort] = useState<Sort>('messagesSent');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [query, setQuery] = useState('');
+  const [showManualRow, setShowManualRow] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     firstSeenAt: false,
+    uniqueContacted: false,
     bookingRatePct: false,
   });
   const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
     left: ['label'],
     right: ['expand'],
+  });
+  const [executiveSections, setExecutiveSections] = useState<ExecutiveSectionState>(() => {
+    if (typeof window === 'undefined') return defaultExecutiveSectionState;
+    try {
+      const raw = localStorage.getItem(executiveSectionsStorageKey);
+      if (!raw) return defaultExecutiveSectionState;
+      const parsed = JSON.parse(raw) as Partial<ExecutiveSectionState>;
+      return {
+        ...defaultExecutiveSectionState,
+        ...parsed,
+      };
+    } catch {
+      return defaultExecutiveSectionState;
+    }
   });
   const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
   const [decisionPendingLabel, setDecisionPendingLabel] = useState<string | null>(null);
@@ -271,6 +375,32 @@ export default function SequencesV2() {
   const sequenceQualQuery = useV2SequenceQualification({ range: mode, tz: BUSINESS_TZ });
   const sequenceVersionHistoryQuery = useV2SequenceVersionHistory({ lookbackDays: 365 });
   const updateSequenceDecisionMutation = useV2UpdateSequenceVersionDecision();
+
+  const updateExecutiveSections = (next: ExecutiveSectionState) => {
+    setExecutiveSections(next);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(executiveSectionsStorageKey, JSON.stringify(next));
+    } catch {
+      // noop
+    }
+  };
+
+  const setExecutiveSectionOpen = (key: ExecutiveSectionKey, open: boolean) => {
+    updateExecutiveSections({
+      ...executiveSections,
+      [key]: open,
+    });
+  };
+
+  const setAllExecutiveSections = (open: boolean) => {
+    updateExecutiveSections({
+      leadMagnet: open,
+      attribution: open,
+      compliance: open,
+      timing: open,
+    });
+  };
 
   const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading || sequenceQualQuery.isLoading;
   const isError = salesMetricsQuery.isError || scoreboardQuery.isError || sequenceQualQuery.isError;
@@ -374,12 +504,14 @@ export default function SequencesV2() {
         const previous = idx > 0 ? (ordered[idx - 1] ?? null) : null;
         const currentHistory = versionHistoryByLabel.get(current.label);
         const previousHistory = previous ? versionHistoryByLabel.get(previous.label) : null;
-        const currentCanonicalBody = currentHistory?.canonicalBody?.trim() || null;
-        const previousCanonicalBody = previousHistory?.canonicalBody?.trim() || null;
+        const currentVariants = getTopBodyVariants(currentHistory);
+        const previousVariants = getTopBodyVariants(previousHistory);
+        const diffPair = pickDiffPair(previousVariants, currentVariants);
         result.set(current.label, {
           previous,
-          currentCanonicalBody,
-          previousCanonicalBody,
+          currentCanonicalBody: diffPair.current,
+          previousCanonicalBody: diffPair.previous,
+          usingVariantPair: diffPair.usingVariantPair,
         });
       });
     }
@@ -433,10 +565,23 @@ export default function SequencesV2() {
     return result;
   }, [mergedRows, versionHistoryByLabel]);
 
+  const filteredRows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return mergedRows.filter((row) => {
+      if (!showManualRow && row.isManual) return false;
+      if (!needle) return true;
+      return (
+        row.label.toLowerCase().includes(needle) ||
+        row.leadMagnet.toLowerCase().includes(needle) ||
+        row.version.toLowerCase().includes(needle)
+      );
+    });
+  }, [mergedRows, query, showManualRow]);
+
   // Sort — manual/unattributed always last
   const sortedRows = useMemo(() => {
     const dir = sortDir === 'asc' ? 1 : -1;
-    return [...mergedRows].sort((a, b) => {
+    return [...filteredRows].sort((a, b) => {
       if (a.isManual && !b.isManual) return 1;
       if (!a.isManual && b.isManual) return -1;
       switch (sort) {
@@ -456,7 +601,7 @@ export default function SequencesV2() {
           return 0;
       }
     });
-  }, [mergedRows, sort, sortDir]);
+  }, [filteredRows, sort, sortDir]);
 
   // KPI totals
   const kpis = useMemo(() => {
@@ -793,6 +938,22 @@ export default function SequencesV2() {
         subtitle={`Performance across all active sequences · ${mode === '7d' ? 'Last 7 days' : 'Last 30 days'}`}
         right={
           <div className="V2ControlsRow">
+            <div className="V2ExecToggles">
+              <button
+                type="button"
+                className="V2ExecToggles__btn"
+                onClick={() => setAllExecutiveSections(true)}
+              >
+                Expand all
+              </button>
+              <button
+                type="button"
+                className="V2ExecToggles__btn"
+                onClick={() => setAllExecutiveSections(false)}
+              >
+                Collapse all
+              </button>
+            </div>
             <div className="V2ModeToggle">
               <button
                 type="button"
@@ -871,10 +1032,33 @@ export default function SequencesV2() {
         ) : (
           <>
             <div className="V2TableActions">
-              <label>
-                Columns
-                <span className="V2TableActions__hint">Pinning keeps Sequence and expand control in view.</span>
-              </label>
+              <div className="V2TableActions__header">
+                <label>
+                  Sequence Controls
+                  <span className="V2TableActions__hint">Use search + columns to reduce noise and horizontal scrolling.</span>
+                </label>
+                <div className="V2TableActions__summary">
+                  Showing <strong>{fmtInt(sortedRows.length)}</strong> of <strong>{fmtInt(mergedRows.length)}</strong>
+                </div>
+              </div>
+              <div className="V2TableActions__inputs">
+                <input
+                  type="text"
+                  className="V2TableActions__search"
+                  placeholder="Search sequence, version, or lead magnet…"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  aria-label="Search sequences"
+                />
+                <label className="V2TableActions__toggle">
+                  <input
+                    type="checkbox"
+                    checked={showManualRow}
+                    onChange={(event) => setShowManualRow(event.target.checked)}
+                  />
+                  Include manual/direct row
+                </label>
+              </div>
               <div className="V2TableActions__chips">
                 {columnLabels.map((columnLabel) => {
                   const column = table.getColumn(columnLabel.id);
@@ -939,8 +1123,10 @@ export default function SequencesV2() {
                   const previousVersionRow = versionDiff?.previous ?? null;
                   const previousDiffText = versionDiff?.previousCanonicalBody ?? '';
                   const currentDiffText = versionDiff?.currentCanonicalBody ?? '';
-                  const canRenderTextDiff =
+                  const hasDiffInputs =
                     previousDiffText.trim().length > 0 && currentDiffText.trim().length > 0;
+                  const canRenderTextDiff =
+                    hasDiffInputs && previousDiffText.trim() !== currentDiffText.trim();
                   const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
                   const isHighBooking = row.canonicalBookedCalls >= 2 && !row.isManual;
                   const rowClass = [
@@ -1041,6 +1227,11 @@ export default function SequencesV2() {
                                       ? `Comparing against previous ${previousVersionRow.version || 'version'} in ${row.leadMagnet}`
                                       : 'No earlier version found for this lead magnet yet.'}
                                   </p>
+                                  {versionDiff?.usingVariantPair ? (
+                                    <p className="V2SeqVersionDiff__caption">
+                                      Diff uses top message variants because primary canonical texts matched.
+                                    </p>
+                                  ) : null}
                                 </header>
                                 {versionTimeline.length > 1 && (
                                   <div className="V2SeqVersionDiff__timeline">
@@ -1216,6 +1407,10 @@ export default function SequencesV2() {
                                             },
                                           }}
                                         />
+                                      ) : hasDiffInputs ? (
+                                        <p className="V2SeqVersionDiff__empty">
+                                          No copy change between these two versions.
+                                        </p>
                                       ) : (
                                         <p className="V2SeqVersionDiff__empty">
                                           We need both the previous and current sent sequence texts to show a diff.
@@ -1321,204 +1516,236 @@ export default function SequencesV2() {
 
       {/* ── Lead Magnet Comparison ── */}
       {leadMagnetRows.length > 0 && (
-        <V2Panel
+        <ExecutiveSection
+          id="leadMagnet"
           title="Lead Magnet Comparison"
-          caption="Legacy vs v2 sequences by lead magnet · weekly window"
+          meta="Expanded analysis panel · weekly window"
+          isOpen={executiveSections.leadMagnet}
+          onToggle={setExecutiveSectionOpen}
         >
-          <div className="V2TableWrap">
-            <table className="V2Table">
-              <thead>
-                <tr>
-                  <th>Lead Magnet</th>
-                  <th className="is-right">Legacy Sent</th>
-                  <th className="is-right">Legacy Contacts</th>
-                  <th className="is-right">Legacy Reply Rate</th>
-                  <th className="is-right">Legacy Booked</th>
-                  <th className="is-right">Legacy Booking Rate</th>
-                  <th className="is-right">v2 Sent</th>
-                  <th className="is-right">v2 Contacts</th>
-                  <th className="is-right">v2 Reply Rate</th>
-                  <th className="is-right">v2 Booked</th>
-                  <th className="is-right">v2 Booking Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leadMagnetRows.map((row) => (
-                  <tr key={row.leadMagnet}>
-                    <td>{row.leadMagnet}</td>
-                    <td className="is-right">
-                      {row.legacy ? fmtInt(row.legacy.messagesSent) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right V2Table__dim">
-                      {row.legacy ? fmtInt(row.legacy.uniqueContacted) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right">
-                      {row.legacy ? fmtPct(row.legacy.replyRatePct) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right">
-                      {row.legacy ? fmtInt(row.legacy.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right V2Table__dim">
-                      {row.legacy ? fmtPct(row.legacy.bookingRatePct) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right">
-                      {row.v2 ? fmtInt(row.v2.messagesSent) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right V2Table__dim">
-                      {row.v2 ? fmtInt(row.v2.uniqueContacted) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right">
-                      {row.v2 ? fmtPct(row.v2.replyRatePct) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right">
-                      {row.v2 ? fmtInt(row.v2.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
-                    </td>
-                    <td className="is-right V2Table__dim">
-                      {row.v2 ? fmtPct(row.v2.bookingRatePct) : <span className="V2Table__dim">—</span>}
-                    </td>
+          <V2Panel
+            title="Lead Magnet Comparison"
+            caption="Legacy vs v2 sequences by lead magnet · weekly window"
+          >
+            <div className="V2TableWrap">
+              <table className="V2Table">
+                <thead>
+                  <tr>
+                    <th>Lead Magnet</th>
+                    <th className="is-right">Legacy Sent</th>
+                    <th className="is-right">Legacy Contacts</th>
+                    <th className="is-right">Legacy Reply Rate</th>
+                    <th className="is-right">Legacy Booked</th>
+                    <th className="is-right">Legacy Booking Rate</th>
+                    <th className="is-right">v2 Sent</th>
+                    <th className="is-right">v2 Contacts</th>
+                    <th className="is-right">v2 Reply Rate</th>
+                    <th className="is-right">v2 Booked</th>
+                    <th className="is-right">v2 Booking Rate</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </V2Panel>
+                </thead>
+                <tbody>
+                  {leadMagnetRows.map((row) => (
+                    <tr key={row.leadMagnet}>
+                      <td>{row.leadMagnet}</td>
+                      <td className="is-right">
+                        {row.legacy ? fmtInt(row.legacy.messagesSent) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right V2Table__dim">
+                        {row.legacy ? fmtInt(row.legacy.uniqueContacted) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right">
+                        {row.legacy ? fmtPct(row.legacy.replyRatePct) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right">
+                        {row.legacy ? fmtInt(row.legacy.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right V2Table__dim">
+                        {row.legacy ? fmtPct(row.legacy.bookingRatePct) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right">
+                        {row.v2 ? fmtInt(row.v2.messagesSent) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right V2Table__dim">
+                        {row.v2 ? fmtInt(row.v2.uniqueContacted) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right">
+                        {row.v2 ? fmtPct(row.v2.replyRatePct) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right">
+                        {row.v2 ? fmtInt(row.v2.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
+                      </td>
+                      <td className="is-right V2Table__dim">
+                        {row.v2 ? fmtPct(row.v2.bookingRatePct) : <span className="V2Table__dim">—</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </V2Panel>
+        </ExecutiveSection>
       )}
 
       {/* ── Booking Attribution (Monthly) ── */}
       {monthlyBookings && (
-        <V2Panel
+        <ExecutiveSection
+          id="attribution"
           title="Booking Attribution (Monthly)"
-          caption="How booked calls are attributed across setters and conversation types · monthly scoreboard window"
+          meta="Expanded analysis panel · monthly scoreboard window"
+          isOpen={executiveSections.attribution}
+          onToggle={setExecutiveSectionOpen}
         >
-          <div className="V2SeqAttribution">
-            <div className="V2SeqAttribution__grid">
-              <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
-                <span className="V2SeqAttribution__label">Total Booked</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.total)}</span>
+          <V2Panel
+            title="Booking Attribution (Monthly)"
+            caption="How booked calls are attributed across setters and conversation types · monthly scoreboard window"
+          >
+            <div className="V2SeqAttribution">
+              <div className="V2SeqAttribution__grid">
+                <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
+                  <span className="V2SeqAttribution__label">Total Booked</span>
+                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.total)}</span>
+                </div>
+                <div className="V2SeqAttribution__item">
+                  <span className="V2SeqAttribution__label">Jack</span>
+                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.jack)}</span>
+                </div>
+                <div className="V2SeqAttribution__item">
+                  <span className="V2SeqAttribution__label">Brandon</span>
+                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.brandon)}</span>
+                </div>
+                <div className="V2SeqAttribution__item">
+                  <span className="V2SeqAttribution__label">Self-Booked</span>
+                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.selfBooked)}</span>
+                </div>
+                <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
+                  <span className="V2SeqAttribution__label">From Sequences</span>
+                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
+                </div>
+                <div className="V2SeqAttribution__item">
+                  <span className="V2SeqAttribution__label">From Direct Outreach</span>
+                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
+                </div>
               </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">Jack</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.jack)}</span>
-              </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">Brandon</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.brandon)}</span>
-              </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">Self-Booked</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.selfBooked)}</span>
-              </div>
-              <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
-                <span className="V2SeqAttribution__label">From Sequences</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
-              </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">From Direct Outreach</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
-              </div>
+              <p className="V2SeqAttribution__note">
+                A sequence gets credit when it started the first outbound contact with a lead, even if manual follow-ups came before the booking.
+              </p>
             </div>
-            <p className="V2SeqAttribution__note">
-              A sequence gets credit when it started the first outbound contact with a lead, even if manual follow-ups came before the booking.
-            </p>
-          </div>
-        </V2Panel>
+          </V2Panel>
+        </ExecutiveSection>
       )}
 
       {/* ── Compliance Panel ── */}
       {compliance && (
-        <V2Panel
+        <ExecutiveSection
+          id="compliance"
           title="Opt-Out Health"
-          caption="Opt-out rates and top opt-out sequences · weekly window"
+          meta="Expanded analysis panel · weekly window"
+          isOpen={executiveSections.compliance}
+          onToggle={setExecutiveSectionOpen}
         >
-          <div className="V2SeqCompliance">
-            <div className="V2SeqCompliance__rates">
-              <div className="V2SeqCompliance__rate">
-                <span className="V2SeqCompliance__rateLabel">Weekly Opt-Out Rate</span>
-                <span
-                  className={`V2SeqCompliance__rateValue${compliance.optOutRateWeeklyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
-                >
-                  {fmtPct(compliance.optOutRateWeeklyPct)}
-                </span>
-              </div>
-              <div className="V2SeqCompliance__rate">
-                <span className="V2SeqCompliance__rateLabel">Monthly Opt-Out Rate</span>
-                <span
-                  className={`V2SeqCompliance__rateValue${compliance.optOutRateMonthlyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
-                >
-                  {fmtPct(compliance.optOutRateMonthlyPct)}
-                </span>
-              </div>
-            </div>
-            {compliance.topOptOutSequences.length > 0 && (
-              <div className="V2SeqCompliance__topList">
-                <p className="V2SeqCompliance__topTitle">Highest Opt-Out Sequences</p>
-                <div className="V2TableWrap">
-                  <table className="V2Table">
-                    <thead>
-                      <tr>
-                        <th>Sequence</th>
-                        <th className="is-right">Opt-Outs</th>
-                        <th className="is-right">Opt-Out Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {compliance.topOptOutSequences.map((seq) => (
-                        <tr key={seq.label}>
-                          <td>{seq.label}</td>
-                          <td className="is-right">{fmtInt(seq.optOuts)}</td>
-                          <td className={`is-right${seq.optOutRatePct >= 5 ? ' V2Table__cell--warn' : ''}`}>
-                            {fmtPct(seq.optOutRatePct)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+          <V2Panel
+            title="Opt-Out Health"
+            caption="Opt-out rates and top opt-out sequences · weekly window"
+          >
+            <div className="V2SeqCompliance">
+              <div className="V2SeqCompliance__rates">
+                <div className="V2SeqCompliance__rate">
+                  <span className="V2SeqCompliance__rateLabel">Weekly Opt-Out Rate</span>
+                  <span
+                    className={`V2SeqCompliance__rateValue${compliance.optOutRateWeeklyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
+                  >
+                    {fmtPct(compliance.optOutRateWeeklyPct)}
+                  </span>
+                </div>
+                <div className="V2SeqCompliance__rate">
+                  <span className="V2SeqCompliance__rateLabel">Monthly Opt-Out Rate</span>
+                  <span
+                    className={`V2SeqCompliance__rateValue${compliance.optOutRateMonthlyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
+                  >
+                    {fmtPct(compliance.optOutRateMonthlyPct)}
+                  </span>
                 </div>
               </div>
-            )}
-          </div>
-        </V2Panel>
+              {compliance.topOptOutSequences.length > 0 && (
+                <div className="V2SeqCompliance__topList">
+                  <p className="V2SeqCompliance__topTitle">Highest Opt-Out Sequences</p>
+                  <div className="V2TableWrap">
+                    <table className="V2Table">
+                      <thead>
+                        <tr>
+                          <th>Sequence</th>
+                          <th className="is-right">Opt-Outs</th>
+                          <th className="is-right">Opt-Out Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {compliance.topOptOutSequences.map((seq) => (
+                          <tr key={seq.label}>
+                            <td>{seq.label}</td>
+                            <td className="is-right">{fmtInt(seq.optOuts)}</td>
+                            <td className={`is-right${seq.optOutRatePct >= 5 ? ' V2Table__cell--warn' : ''}`}>
+                              {fmtPct(seq.optOutRatePct)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </V2Panel>
+        </ExecutiveSection>
       )}
 
       {/* ── Timing Panel ── */}
       {timing && (
-        <V2Panel
+        <ExecutiveSection
+          id="timing"
           title="Reply Timing"
-          caption="Median time to first reply and reply rate by day of week · weekly window"
+          meta="Expanded analysis panel · weekly window"
+          isOpen={executiveSections.timing}
+          onToggle={setExecutiveSectionOpen}
         >
-          <div className="V2SeqTiming">
-            {timing.medianTimeToFirstReplyMinutes !== null && (
-              <div className="V2SeqTiming__median">
-                <span className="V2SeqTiming__medianLabel">Median Time to First Reply</span>
-                <span className="V2SeqTiming__medianValue">
-                  {fmtMins(timing.medianTimeToFirstReplyMinutes)}
-                </span>
-              </div>
-            )}
-            {timing.replyRateByDayOfWeek.length > 0 && (
-              <div className="V2SeqTiming__chart">
-                <p className="V2SeqTiming__chartTitle">Reply Rate by Day of Week</p>
-                {timing.replyRateByDayOfWeek.map((day) => {
-                  const barPct = Math.min(day.replyRatePct, 100);
-                  return (
-                    <div key={day.dayOfWeek} className="V2SeqTiming__row">
-                      <span className="V2SeqTiming__day">{day.dayOfWeek}</span>
-                      <div className="V2SeqTiming__barWrap">
-                        <div
-                          className="V2SeqTiming__bar"
-                          style={{ width: `${barPct}%` }}
-                          title={`${fmtPct(day.replyRatePct)} reply rate · ${fmtInt(day.outboundCount)} sent · ${fmtInt(day.replyCount)} replied`}
-                        />
+          <V2Panel
+            title="Reply Timing"
+            caption="Median time to first reply and reply rate by day of week · weekly window"
+          >
+            <div className="V2SeqTiming">
+              {timing.medianTimeToFirstReplyMinutes !== null && (
+                <div className="V2SeqTiming__median">
+                  <span className="V2SeqTiming__medianLabel">Median Time to First Reply</span>
+                  <span className="V2SeqTiming__medianValue">
+                    {fmtMins(timing.medianTimeToFirstReplyMinutes)}
+                  </span>
+                </div>
+              )}
+              {timing.replyRateByDayOfWeek.length > 0 && (
+                <div className="V2SeqTiming__chart">
+                  <p className="V2SeqTiming__chartTitle">Reply Rate by Day of Week</p>
+                  {timing.replyRateByDayOfWeek.map((day) => {
+                    const barPct = Math.min(day.replyRatePct, 100);
+                    return (
+                      <div key={day.dayOfWeek} className="V2SeqTiming__row">
+                        <span className="V2SeqTiming__day">{day.dayOfWeek}</span>
+                        <div className="V2SeqTiming__barWrap">
+                          <div
+                            className="V2SeqTiming__bar"
+                            style={{ width: `${barPct}%` }}
+                            title={`${fmtPct(day.replyRatePct)} reply rate · ${fmtInt(day.outboundCount)} sent · ${fmtInt(day.replyCount)} replied`}
+                          />
+                        </div>
+                        <span className="V2SeqTiming__pct">{fmtPct(day.replyRatePct)}</span>
+                        <span className="V2SeqTiming__vol">{fmtInt(day.outboundCount)} sent</span>
                       </div>
-                      <span className="V2SeqTiming__pct">{fmtPct(day.replyRatePct)}</span>
-                      <span className="V2SeqTiming__vol">{fmtInt(day.outboundCount)} sent</span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </V2Panel>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </V2Panel>
+        </ExecutiveSection>
       )}
     </div>
   );

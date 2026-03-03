@@ -3,8 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 
 import { ApiError, client } from './api/client';
 import { PasswordGate } from './components/PasswordGate';
-import LegacyApp from './legacy/LegacyApp';
-import { parseUiMode, type UiMode, uiModeStorageKey } from './uiMode';
+import { parseUiMode, type UiMode } from './uiMode';
 
 const postAuthRedirectKey = 'ptbizsms-post-auth-redirect';
 const getCurrentUrl = () => {
@@ -15,55 +14,7 @@ import V2App from './v2/V2App';
 
 const resolveUiMode = (): UiMode => {
   const envMode = parseUiMode(import.meta.env.VITE_UI_VERSION);
-  if (typeof window === 'undefined') return envMode || 'v2';
-
-  const queryMode = parseUiMode(new URLSearchParams(window.location.search).get('ui'));
-  if (queryMode) return queryMode;
-
-  const stored = parseUiMode(localStorage.getItem(uiModeStorageKey));
-  if (stored) return stored;
-
   return envMode || 'v2';
-};
-
-const ModeSync = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const query = new URLSearchParams(location.search);
-    const queryMode = parseUiMode(query.get('ui'));
-    if (!queryMode) return;
-
-    localStorage.setItem(uiModeStorageKey, queryMode);
-
-    const isOnV2 = location.pathname.startsWith('/v2');
-    const isOnLegacy = location.pathname.startsWith('/legacy');
-
-    if (queryMode === 'v2' && isOnLegacy) {
-      navigate('/v2/insights', { replace: true });
-      return;
-    }
-    if (queryMode === 'legacy' && isOnV2) {
-      navigate('/legacy', { replace: true });
-      return;
-    }
-
-    query.delete('ui');
-    const nextSearch = query.toString();
-    if (nextSearch !== location.search.replace(/^\?/, '')) {
-      navigate(
-        {
-          pathname: location.pathname,
-          search: nextSearch ? `?${nextSearch}` : '',
-          hash: location.hash,
-        },
-        { replace: true },
-      );
-    }
-  }, [location.hash, location.pathname, location.search, navigate]);
-
-  return null;
 };
 
 const DefaultRoute = () => {
@@ -159,10 +110,10 @@ export default function App() {
 
   if (authState === 'unauthenticated') {
     // Preserve deep links (e.g. /v2/insights?ui=v2) through the password gate.
-    // Without this, after unlock the app can fall through to DefaultRoute and bounce to legacy.
+    // Keep the deep link so unlock returns to the intended v2 page.
     if (typeof window !== 'undefined') {
       const current = getCurrentUrl();
-      if (current !== '/' && current !== '/legacy' && current !== '/v2') {
+      if (current !== '/' && current !== '/v2') {
         sessionStorage.setItem(postAuthRedirectKey, current);
       }
     }
@@ -178,11 +129,10 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <ModeSync />
       <PostAuthRedirect />
       <Routes>
-        <Route path="/legacy" element={<LegacyApp />} />
-        <Route path="/legacy/*" element={<LegacyApp />} />
+        <Route path="/legacy" element={<Navigate to="/v2/insights" replace />} />
+        <Route path="/legacy/*" element={<Navigate to="/v2/insights" replace />} />
         <Route path="/v2/*" element={<V2App />} />
         <Route path="*" element={<DefaultRoute />} />
       </Routes>

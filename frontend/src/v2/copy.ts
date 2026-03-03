@@ -9,7 +9,6 @@ export const v2Copy = {
     attribution: 'Attribution',
   },
   actions: {
-    legacyUi: 'Legacy UI',
     kpiDefinitions: 'KPI Definitions',
     close: 'Close',
   },

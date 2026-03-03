@@ -14,12 +14,11 @@ type CommandItem = {
 
 type Props = {
   onSignOut: () => void;
-  onToggleLegacy: () => void;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 };
 
-export function CommandPalette({ onSignOut, onToggleLegacy, open: controlledOpen, onOpenChange }: Props) {
+export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
@@ -69,7 +68,6 @@ export function CommandPalette({ onSignOut, onToggleLegacy, open: controlledOpen
     { id: 'nav-sequences', label: 'Sequences', icon: '⟐', group: 'Navigate', action: () => go('/v2/sequences'), keywords: ['sequences', 'qualification', 'campaigns'] },
     { id: 'nav-attribution', label: 'Attribution', icon: '⊕', group: 'Navigate', action: () => go('/v2/attribution'), keywords: ['attribution', 'source'] },
     // Actions
-    { id: 'action-legacy', label: 'Switch to Legacy UI', icon: '⇄', group: 'Actions', action: () => { setOpen(false); onToggleLegacy(); }, keywords: ['legacy', 'old', 'switch'] },
     { id: 'action-signout', label: 'Sign Out', icon: '→', group: 'Actions', action: () => { setOpen(false); onSignOut(); }, keywords: ['logout', 'sign out'] },
   ];
 

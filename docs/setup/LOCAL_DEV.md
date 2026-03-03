@@ -89,6 +89,8 @@ cp .env.sample .env
 # Optional monday mapping overrides (JSON):
 # - MONDAY_ACQ_COLUMN_MAP_JSON={"callDateColumnId":"date4","setterColumnId":"people","stageColumnId":"status","outcomeColumnId":"text_mkrrha4q","phoneColumnId":"phone","contactIdColumnId":"text_mkrqz1wd"}
 # - MONDAY_PERSONAL_COLUMN_MAP_JSON={"callDateColumnId":"date4","contactNameColumnId":"name","phoneColumnId":"phone","setterColumnId":"person","stageColumnId":"status","firstConversionColumnId":"text_first_conversion","lineColumnId":"text_line","sourceColumnId":"text_source","slackLinkColumnId":"link","notesColumnId":"long_text"}
+# Optional extra monday boards to read-sync:
+# - MONDAY_SYNC_EXTRA_BOARD_IDS=5753238048,5753199181,5753276147,5753287414
 ```
 
 ### 3. Start backend + API server

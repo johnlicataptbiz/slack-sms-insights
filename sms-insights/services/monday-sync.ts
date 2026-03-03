@@ -18,6 +18,11 @@ import {
 } from './monday-store.js';
 
 const parseBool = (value: string | undefined): boolean => value?.trim().toLowerCase() === 'true';
+const parseCsv = (value: string | undefined): string[] =>
+  (value || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 
 export const mondayConfig = {
   syncEnabled: parseBool(process.env.MONDAY_SYNC_ENABLED),
@@ -32,6 +37,8 @@ export const mondayConfig = {
     process.env.MONDAY_MY_CALLS_BOARD_ID ||
     '10029059942'
   ).trim(),
+  syncBoardIds: parseCsv(process.env.MONDAY_SYNC_BOARD_IDS),
+  extraBoardIds: parseCsv(process.env.MONDAY_SYNC_EXTRA_BOARD_IDS),
   backfillDays: Number.parseInt(process.env.MONDAY_SYNC_BACKFILL_DAYS || '90', 10),
   maxPagesPerRun: Number.parseInt(process.env.MONDAY_SYNC_MAX_PAGES || '20', 10),
   pollIntervalMs: Number.parseInt(process.env.MONDAY_SYNC_INTERVAL_MS || `${15 * 60 * 1000}`, 10),
@@ -66,7 +73,11 @@ const parseColumnValueJson = (value: string | null): unknown | null => {
 };
 
 const resolveSyncBoardIds = (): string[] => {
-  const ids = [mondayConfig.acqBoardId, mondayConfig.salesCallsBoardId]
+  const baseIds =
+    mondayConfig.syncBoardIds.length > 0
+      ? mondayConfig.syncBoardIds
+      : [mondayConfig.acqBoardId, mondayConfig.salesCallsBoardId];
+  const ids = [...baseIds, ...mondayConfig.extraBoardIds]
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
   return [...new Set(ids)];

@@ -76,6 +76,8 @@ railway variables set MONDAY_PERSONAL_SYNC_ENABLED=true
 railway variables set MONDAY_ACQ_BOARD_ID=5077164868
 railway variables set MONDAY_MY_CALLS_BOARD_ID=10029059942
 railway variables set MONDAY_PERSONAL_BOARD_ID=10029059942
+# Optional: add additional Monday boards to ingest (comma-separated IDs)
+railway variables set MONDAY_SYNC_EXTRA_BOARD_IDS=
 railway variables set MONDAY_PERSONAL_SETTER_BUCKET=jack
 railway variables set MONDAY_PERSONAL_SETTER_MONDAY_USER_ID=YOUR_MONDAY_USER_ID
 railway variables set MONDAY_PERSONAL_PUSH_LOOKBACK_DAYS=14

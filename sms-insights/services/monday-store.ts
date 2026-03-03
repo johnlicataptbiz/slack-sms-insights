@@ -67,6 +67,16 @@ export type MondayWeeklyReportRow = {
 };
 
 export type MondayBookedCallPushStatus = 'pending' | 'synced' | 'error' | 'skipped';
+export type MondayOutcomeCategory =
+  | 'closed_won'
+  | 'closed_lost'
+  | 'bad_timing'
+  | 'bad_fit'
+  | 'no_show'
+  | 'cancelled'
+  | 'booked'
+  | 'other'
+  | 'unknown';
 
 export type MondayBookedCallPushRow = {
   board_id: string;
@@ -81,7 +91,88 @@ export type MondayBookedCallPushRow = {
   updated_at: string;
 };
 
+export type MondayNormalizedLeadInput = {
+  boardId: string;
+  itemId: string;
+  itemName?: string | null;
+  itemUpdatedAt: Date;
+  callDate?: string | null;
+  contactKey?: string | null;
+  setter?: string | null;
+  stage?: string | null;
+  disposition?: MondayCallDisposition | null;
+  isBooked?: boolean;
+  columns: MondayCallColumnValueInput[];
+  raw?: unknown | null;
+};
+
 const getDb = () => getPool();
+
+const normalizeText = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+};
+
+const normalizeForMatch = (value: string | null | undefined): string => (value || '').trim().toLowerCase();
+
+const parseIsoDate = (candidate: string | null | undefined): string | null => {
+  const text = normalizeText(candidate);
+  if (!text) return null;
+  const direct = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  if (direct?.[1]) return direct[1];
+  const parsed = new Date(text);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+};
+
+const parseDateFromColumn = (column: MondayCallColumnValueInput | null): string | null => {
+  if (!column) return null;
+  const fromText = parseIsoDate(column.textValue ?? null);
+  if (fromText) return fromText;
+  if (!column.valueJson || typeof column.valueJson !== 'object') return null;
+  const payload = column.valueJson as Record<string, unknown>;
+  const fromDate = typeof payload.date === 'string' ? parseIsoDate(payload.date) : null;
+  if (fromDate) return fromDate;
+  const fromChangedAt = typeof payload.changed_at === 'string' ? parseIsoDate(payload.changed_at) : null;
+  if (fromChangedAt) return fromChangedAt;
+  return null;
+};
+
+const findColumnBySignals = (columns: MondayCallColumnValueInput[], signals: string[]): MondayCallColumnValueInput | null => {
+  const normalizedSignals = signals.map((signal) => signal.toLowerCase());
+  for (const column of columns) {
+    const haystack = `${normalizeForMatch(column.columnTitle)} ${normalizeForMatch(column.columnId)} ${normalizeForMatch(column.columnType)}`;
+    if (normalizedSignals.some((signal) => haystack.includes(signal))) {
+      return column;
+    }
+  }
+  return null;
+};
+
+const findTextBySignals = (columns: MondayCallColumnValueInput[], signals: string[]): string | null => {
+  return normalizeText(findColumnBySignals(columns, signals)?.textValue ?? null);
+};
+
+const classifyOutcomeCategory = (
+  stage: string | null,
+  outcomeLabel: string | null,
+  outcomeReason: string | null,
+  disposition: MondayCallDisposition | null | undefined,
+  isBooked: boolean,
+): MondayOutcomeCategory => {
+  const text = `${stage || ''} ${outcomeLabel || ''} ${outcomeReason || ''}`.toLowerCase();
+
+  if (/\bbad timing\b/.test(text)) return 'bad_timing';
+  if (/\bbad fit\b/.test(text)) return 'bad_fit';
+  if (/\bclosed won\b|\bwon\b|\bsale\b|\bsigned\b|\benrolled\b/.test(text)) return 'closed_won';
+  if (/\bclosed lost\b|\blost\b/.test(text)) return 'closed_lost';
+  if (disposition === 'no_show' || /\bno[\s-]?show\b/.test(text)) return 'no_show';
+  if (disposition === 'cancelled' || /\bcancel|cancelled|canceled|resched/i.test(text)) return 'cancelled';
+  if (disposition === 'booked' || isBooked || /\bbooked|appointment|strategy call\b/.test(text)) return 'booked';
+  if (!text.trim()) return 'unknown';
+  return 'other';
+};
 
 export const getMondaySyncState = async (
   boardId: string,
@@ -350,6 +441,229 @@ export const upsertMondayCallColumnValues = async (
       // no-op
     }
     logger?.warn?.('Failed to upsert monday call column values', error);
+  }
+};
+
+export const upsertNormalizedMondayLeadRecords = async (
+  input: MondayNormalizedLeadInput,
+  logger?: Pick<Logger, 'warn'>,
+): Promise<void> => {
+  const pool = getDb();
+  if (!pool) return;
+
+  const outcomeLabel = findTextBySignals(input.columns, ['outcome', 'result', 'disposition', 'status']) || input.stage || null;
+  const outcomeReason = findTextBySignals(input.columns, ['reason', 'lost reason', 'disqual', 'close reason', 'notes']);
+  const source = findTextBySignals(input.columns, ['lead source', 'source', 'channel', 'utm']);
+  const setBy = findTextBySignals(input.columns, ['set by', 'booked by', 'setter']);
+  const setter = normalizeText(input.setter) || setBy;
+  const stage = normalizeText(input.stage);
+  const campaign = findTextBySignals(input.columns, ['campaign', 'offer', 'adset', 'ad set', 'funnel']);
+  const sequence = findTextBySignals(input.columns, ['sequence', 'cadence']);
+  const leadStatus = findTextBySignals(input.columns, ['lead status', 'status']) || stage;
+
+  const firstTouchDate =
+    parseDateFromColumn(findColumnBySignals(input.columns, ['first touch', 'created date', 'lead date', 'inbound date'])) || null;
+  const callDate =
+    normalizeText(input.callDate) ||
+    parseDateFromColumn(findColumnBySignals(input.columns, ['call date', 'appointment date', 'meeting date'])) ||
+    null;
+  const closedDate = parseDateFromColumn(findColumnBySignals(input.columns, ['closed date', 'won date', 'lost date', 'decision date']));
+
+  const outcomeCategory = classifyOutcomeCategory(stage, outcomeLabel, outcomeReason, input.disposition, input.isBooked === true);
+  const activityDate = callDate || closedDate || firstTouchDate || input.itemUpdatedAt.toISOString().slice(0, 10);
+
+  try {
+    await pool.query('BEGIN');
+
+    await pool.query(
+      `
+      INSERT INTO lead_outcomes (
+        board_id,
+        item_id,
+        lead_name,
+        contact_key,
+        call_date,
+        setter,
+        set_by,
+        source,
+        stage,
+        outcome_label,
+        outcome_reason,
+        outcome_category,
+        is_booked,
+        item_updated_at,
+        raw,
+        synced_at
+      )
+      VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,CURRENT_TIMESTAMP)
+      ON CONFLICT (board_id, item_id)
+      DO UPDATE SET
+        lead_name = EXCLUDED.lead_name,
+        contact_key = EXCLUDED.contact_key,
+        call_date = EXCLUDED.call_date,
+        setter = EXCLUDED.setter,
+        set_by = EXCLUDED.set_by,
+        source = EXCLUDED.source,
+        stage = EXCLUDED.stage,
+        outcome_label = EXCLUDED.outcome_label,
+        outcome_reason = EXCLUDED.outcome_reason,
+        outcome_category = EXCLUDED.outcome_category,
+        is_booked = EXCLUDED.is_booked,
+        item_updated_at = EXCLUDED.item_updated_at,
+        raw = EXCLUDED.raw,
+        synced_at = CURRENT_TIMESTAMP
+      `,
+      [
+        input.boardId,
+        input.itemId,
+        normalizeText(input.itemName),
+        normalizeText(input.contactKey),
+        callDate,
+        setter,
+        setBy,
+        source,
+        stage,
+        outcomeLabel,
+        outcomeReason,
+        outcomeCategory,
+        input.isBooked === true,
+        input.itemUpdatedAt,
+        JSON.stringify(input.raw ?? null),
+      ],
+    );
+
+    await pool.query(
+      `
+      INSERT INTO lead_attribution (
+        board_id,
+        item_id,
+        lead_name,
+        contact_key,
+        source,
+        setter,
+        set_by,
+        campaign,
+        sequence,
+        lead_status,
+        first_touch_date,
+        call_date,
+        closed_date,
+        item_updated_at,
+        raw,
+        synced_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date,$12::date,$13::date,$14,$15::jsonb,CURRENT_TIMESTAMP)
+      ON CONFLICT (board_id, item_id)
+      DO UPDATE SET
+        lead_name = EXCLUDED.lead_name,
+        contact_key = EXCLUDED.contact_key,
+        source = EXCLUDED.source,
+        setter = EXCLUDED.setter,
+        set_by = EXCLUDED.set_by,
+        campaign = EXCLUDED.campaign,
+        sequence = EXCLUDED.sequence,
+        lead_status = EXCLUDED.lead_status,
+        first_touch_date = EXCLUDED.first_touch_date,
+        call_date = EXCLUDED.call_date,
+        closed_date = EXCLUDED.closed_date,
+        item_updated_at = EXCLUDED.item_updated_at,
+        raw = EXCLUDED.raw,
+        synced_at = CURRENT_TIMESTAMP
+      `,
+      [
+        input.boardId,
+        input.itemId,
+        normalizeText(input.itemName),
+        normalizeText(input.contactKey),
+        source,
+        setter,
+        setBy,
+        campaign,
+        sequence,
+        leadStatus,
+        firstTouchDate,
+        callDate,
+        closedDate,
+        input.itemUpdatedAt,
+        JSON.stringify(input.raw ?? null),
+      ],
+    );
+
+    await pool.query(
+      `
+      INSERT INTO setter_activity (
+        board_id,
+        item_id,
+        activity_date,
+        setter,
+        set_by,
+        source,
+        stage,
+        outcome_category,
+        is_booked,
+        is_closed_won,
+        is_closed_lost,
+        is_bad_timing,
+        is_bad_fit,
+        is_no_show,
+        is_cancelled,
+        item_updated_at,
+        raw,
+        synced_at
+      )
+      VALUES (
+        $1,$2,$3::date,$4,$5,$6,$7,$8,$9,
+        $10,$11,$12,$13,$14,$15,
+        $16,$17::jsonb,CURRENT_TIMESTAMP
+      )
+      ON CONFLICT (board_id, item_id)
+      DO UPDATE SET
+        activity_date = EXCLUDED.activity_date,
+        setter = EXCLUDED.setter,
+        set_by = EXCLUDED.set_by,
+        source = EXCLUDED.source,
+        stage = EXCLUDED.stage,
+        outcome_category = EXCLUDED.outcome_category,
+        is_booked = EXCLUDED.is_booked,
+        is_closed_won = EXCLUDED.is_closed_won,
+        is_closed_lost = EXCLUDED.is_closed_lost,
+        is_bad_timing = EXCLUDED.is_bad_timing,
+        is_bad_fit = EXCLUDED.is_bad_fit,
+        is_no_show = EXCLUDED.is_no_show,
+        is_cancelled = EXCLUDED.is_cancelled,
+        item_updated_at = EXCLUDED.item_updated_at,
+        raw = EXCLUDED.raw,
+        synced_at = CURRENT_TIMESTAMP
+      `,
+      [
+        input.boardId,
+        input.itemId,
+        activityDate,
+        setter,
+        setBy,
+        source,
+        stage,
+        outcomeCategory,
+        input.isBooked === true,
+        outcomeCategory === 'closed_won',
+        outcomeCategory === 'closed_lost',
+        outcomeCategory === 'bad_timing',
+        outcomeCategory === 'bad_fit',
+        outcomeCategory === 'no_show',
+        outcomeCategory === 'cancelled',
+        input.itemUpdatedAt,
+        JSON.stringify(input.raw ?? null),
+      ],
+    );
+
+    await pool.query('COMMIT');
+  } catch (error) {
+    try {
+      await pool.query('ROLLBACK');
+    } catch {
+      // no-op
+    }
+    logger?.warn?.('Failed to upsert normalized monday lead records', error);
   }
 };
 

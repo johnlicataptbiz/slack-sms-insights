@@ -15,6 +15,7 @@
     "backfill:booked-calls": "node --import tsx ./scripts/backfill-booked-calls.ts",
     "backfill:contact-profiles": "node --import tsx ./scripts/backfill-contact-profiles.ts",
     "backfill:contact-profiles-lrn": "node --import tsx ./scripts/backfill-contact-profiles-lrn.ts",
+    "check:monday:lead-normalization": "node --import tsx ./scripts/check-monday-lead-normalization.ts",
     "sync:monday": "node --import tsx ./scripts/sync-monday.ts",
     "regenerate:runs": "node --import tsx ./scripts/regenerate-daily-runs.ts",
     "prisma:generate": "prisma generate --config prisma.config.ts",

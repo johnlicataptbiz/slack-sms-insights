@@ -13,6 +13,7 @@ import {
   saveMondayColumnMapping,
   upsertMondayCallColumnValues,
   upsertMondayCallSnapshot,
+  upsertNormalizedMondayLeadRecords,
   upsertMondaySyncState,
 } from './monday-store.js';
 
@@ -24,6 +25,7 @@ export const mondayConfig = {
   personalSyncEnabled: parseBool(process.env.MONDAY_PERSONAL_SYNC_ENABLED),
   outboundEnabled: parseBool(process.env.MONDAY_OUTBOUND_ENABLED),
   acqBoardId: (process.env.MONDAY_ACQ_BOARD_ID || '5077164868').trim(),
+  salesCallsBoardId: (process.env.MONDAY_SALES_CALLS_BOARD_ID || process.env.MONDAY_ACQ_BOARD_ID || '5077164868').trim(),
   myCallsBoardId: (process.env.MONDAY_MY_CALLS_BOARD_ID || '10029059942').trim(),
   personalBoardId: (
     process.env.MONDAY_PERSONAL_BOARD_ID ||
@@ -62,6 +64,15 @@ const parseColumnValueJson = (value: string | null): unknown | null => {
     return value;
   }
 };
+
+const resolveSyncBoardIds = (): string[] => {
+  const ids = [mondayConfig.acqBoardId, mondayConfig.salesCallsBoardId]
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  return [...new Set(ids)];
+};
+
+export const listMondaySyncBoardIds = (): string[] => resolveSyncBoardIds();
 
 export const syncMondayBoard = async (
   boardId: string,
@@ -152,21 +163,39 @@ export const syncMondayBoard = async (
           },
           logger,
         );
+        const normalizedColumnValues = item.columnValues.map((columnValue) => {
+          const metadata = columnsById.get(columnValue.id);
+          return {
+            columnId: columnValue.id,
+            columnTitle: metadata?.title || null,
+            columnType: metadata?.type || columnValue.type || null,
+            textValue: columnValue.text?.trim() || null,
+            valueJson: parseColumnValueJson(columnValue.value),
+          };
+        });
         await upsertMondayCallColumnValues(
           {
             boardId,
             itemId: normalized.itemId,
             itemUpdatedAt: normalized.updatedAt,
-            values: item.columnValues.map((columnValue) => {
-              const metadata = columnsById.get(columnValue.id);
-              return {
-                columnId: columnValue.id,
-                columnTitle: metadata?.title || null,
-                columnType: metadata?.type || columnValue.type || null,
-                textValue: columnValue.text?.trim() || null,
-                valueJson: parseColumnValueJson(columnValue.value),
-              };
-            }),
+            values: normalizedColumnValues,
+          },
+          logger,
+        );
+        await upsertNormalizedMondayLeadRecords(
+          {
+            boardId,
+            itemId: normalized.itemId,
+            itemName: normalized.itemName,
+            itemUpdatedAt: normalized.updatedAt,
+            callDate: normalized.callDate,
+            contactKey: normalized.contactKey,
+            setter: normalized.setter,
+            stage: normalized.stage,
+            disposition: normalized.disposition,
+            isBooked: normalized.isBooked,
+            columns: normalizedColumnValues,
+            raw: normalized.raw,
           },
           logger,
         );
@@ -228,6 +257,12 @@ export const syncMondayAcquisitionsBoard = async (
   return syncMondayBoard(mondayConfig.acqBoardId, logger);
 };
 
+export const syncMondaySalesCallsBoard = async (
+  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+): Promise<MondaySyncResult> => {
+  return syncMondayBoard(mondayConfig.salesCallsBoardId, logger);
+};
+
 export const runMondayMaintenanceCycle = async (
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<void> => {
@@ -238,9 +273,11 @@ export const runMondayMaintenanceCycle = async (
   mondayCycleInFlight = true;
 
   try {
-    const syncResult = await syncMondayAcquisitionsBoard(logger);
-    if (syncResult.status === 'error') {
-      logger?.warn?.('Monday sync cycle failed', syncResult.error);
+    for (const boardId of resolveSyncBoardIds()) {
+      const syncResult = await syncMondayBoard(boardId, logger);
+      if (syncResult.status === 'error') {
+        logger?.warn?.('Monday sync cycle failed', { boardId, error: syncResult.error });
+      }
     }
 
     if (mondayConfig.outboundEnabled && mondayConfig.writebackEnabled) {
@@ -279,7 +316,7 @@ export const startMondaySyncJobs = (logger?: Pick<Logger, 'info' | 'debug' | 'wa
     writebackEnabled: weeklyWritebackEnabled,
     personalSyncEnabled: personalWritebackEnabled,
     outboundEnabled: mondayConfig.outboundEnabled,
-    boardId: mondayConfig.acqBoardId,
+    boardIds: resolveSyncBoardIds(),
     personalBoardId: mondayConfig.personalBoardId,
     intervalMs: mondayConfig.pollIntervalMs,
   });

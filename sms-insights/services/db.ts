@@ -304,6 +304,79 @@ export const initializeSchema = async (): Promise<void> => {
       );
     `);
 
+    // Normalized read-only monday lead outcome records (sales lifecycle outcome focus).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS lead_outcomes (
+        board_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        lead_name TEXT,
+        contact_key TEXT,
+        call_date DATE,
+        setter TEXT,
+        set_by TEXT,
+        source TEXT,
+        stage TEXT,
+        outcome_label TEXT,
+        outcome_reason TEXT,
+        outcome_category TEXT NOT NULL DEFAULT 'unknown'
+          CHECK (outcome_category IN ('closed_won', 'closed_lost', 'bad_timing', 'bad_fit', 'no_show', 'cancelled', 'booked', 'other', 'unknown')),
+        is_booked BOOLEAN NOT NULL DEFAULT FALSE,
+        item_updated_at TIMESTAMPTZ NOT NULL,
+        raw JSONB,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, item_id)
+      );
+    `);
+
+    // Normalized read-only monday lead attribution records (source + setter lineage).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS lead_attribution (
+        board_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        lead_name TEXT,
+        contact_key TEXT,
+        source TEXT,
+        setter TEXT,
+        set_by TEXT,
+        campaign TEXT,
+        sequence TEXT,
+        lead_status TEXT,
+        first_touch_date DATE,
+        call_date DATE,
+        closed_date DATE,
+        item_updated_at TIMESTAMPTZ NOT NULL,
+        raw JSONB,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, item_id)
+      );
+    `);
+
+    // Normalized read-only per-item activity projection for setter performance rollups.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS setter_activity (
+        board_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        activity_date DATE,
+        setter TEXT,
+        set_by TEXT,
+        source TEXT,
+        stage TEXT,
+        outcome_category TEXT NOT NULL DEFAULT 'unknown'
+          CHECK (outcome_category IN ('closed_won', 'closed_lost', 'bad_timing', 'bad_fit', 'no_show', 'cancelled', 'booked', 'other', 'unknown')),
+        is_booked BOOLEAN NOT NULL DEFAULT FALSE,
+        is_closed_won BOOLEAN NOT NULL DEFAULT FALSE,
+        is_closed_lost BOOLEAN NOT NULL DEFAULT FALSE,
+        is_bad_timing BOOLEAN NOT NULL DEFAULT FALSE,
+        is_bad_fit BOOLEAN NOT NULL DEFAULT FALSE,
+        is_no_show BOOLEAN NOT NULL DEFAULT FALSE,
+        is_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
+        item_updated_at TIMESTAMPTZ NOT NULL,
+        raw JSONB,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, item_id)
+      );
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS monday_booked_call_pushes (
         board_id TEXT NOT NULL,
@@ -659,6 +732,41 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_monday_weekly_reports_week_start
       ON monday_weekly_reports (week_start DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_lead_outcomes_board_call_date
+      ON lead_outcomes (board_id, call_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_lead_outcomes_category_call_date
+      ON lead_outcomes (outcome_category, call_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_lead_outcomes_setter_call_date
+      ON lead_outcomes (setter, call_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_lead_attribution_board_call_date
+      ON lead_attribution (board_id, call_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_lead_attribution_source
+      ON lead_attribution (source);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_setter_activity_setter_activity_date
+      ON setter_activity (setter, activity_date DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_setter_activity_category_activity_date
+      ON setter_activity (outcome_category, activity_date DESC);
     `);
 
     await client.query(`

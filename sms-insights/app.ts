@@ -212,8 +212,9 @@ app.error(async (error) => {
 
     // 🕒 Daily Report Cron — fires at 6:00 AM CT every day via user token
     if (slackStarted) {
-      const { startDailyReportCron } = await import('./services/cron-scheduler.js');
+      const { startDailyReportCron, startLrnRefreshCron } = await import('./services/cron-scheduler.js');
       await startDailyReportCron(app);
+      startLrnRefreshCron(app);
     }
 
     // monday read-sync/writeback maintenance jobs (feature-flag gated).

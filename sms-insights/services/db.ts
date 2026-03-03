@@ -262,6 +262,38 @@ export const initializeSchema = async (): Promise<void> => {
       );
     `);
 
+    // Per-column latest values for Monday call items (read-only analytics surface).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_call_column_latest (
+        board_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        column_id TEXT NOT NULL,
+        column_title TEXT,
+        column_type TEXT,
+        text_value TEXT,
+        value_json JSONB,
+        item_updated_at TIMESTAMPTZ NOT NULL,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, item_id, column_id)
+      );
+    `);
+
+    // Append-only per-column history to preserve state transitions over time.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS monday_call_column_history (
+        board_id TEXT NOT NULL,
+        item_id TEXT NOT NULL,
+        column_id TEXT NOT NULL,
+        column_title TEXT,
+        column_type TEXT,
+        text_value TEXT,
+        value_json JSONB,
+        item_updated_at TIMESTAMPTZ NOT NULL,
+        synced_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (board_id, item_id, column_id, item_updated_at)
+      );
+    `);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS monday_weekly_reports (
         week_start DATE PRIMARY KEY,
@@ -300,6 +332,27 @@ export const initializeSchema = async (): Promise<void> => {
         email TEXT,
         timezone TEXT,
         niche TEXT,
+        lead_source TEXT,
+        sequence_id TEXT,
+        disposition_status_id TEXT,
+        tags JSONB,
+        text_authorized BOOLEAN,
+        is_blocked BOOLEAN,
+        cnam_city TEXT,
+        cnam_state TEXT,
+        cnam_country TEXT,
+        last_engagement_at TIMESTAMPTZ,
+        inbound_sms_count INTEGER,
+        outbound_sms_count INTEGER,
+        inbound_call_count INTEGER,
+        outbound_call_count INTEGER,
+        unread_count INTEGER,
+        lrn_line_type TEXT,
+        lrn_carrier TEXT,
+        lrn_city TEXT,
+        lrn_state TEXT,
+        lrn_country TEXT,
+        lrn_last_checked_at TIMESTAMPTZ,
         revenue_mix_category TEXT NOT NULL DEFAULT 'unknown' CHECK (revenue_mix_category IN ('mostly_cash', 'mostly_insurance', 'balanced', 'unknown')),
         employment_status TEXT NOT NULL DEFAULT 'unknown' CHECK (employment_status IN ('full_time', 'part_time', 'unknown')),
         coaching_interest TEXT NOT NULL DEFAULT 'unknown' CHECK (coaching_interest IN ('high', 'medium', 'low', 'unknown')),
@@ -308,6 +361,90 @@ export const initializeSchema = async (): Promise<void> => {
         created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS lead_source TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS sequence_id TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS disposition_status_id TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS tags JSONB;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS text_authorized BOOLEAN;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS cnam_city TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS cnam_state TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS cnam_country TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS last_engagement_at TIMESTAMPTZ;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS inbound_sms_count INTEGER;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS outbound_sms_count INTEGER;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS inbound_call_count INTEGER;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS outbound_call_count INTEGER;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS unread_count INTEGER;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS lrn_line_type TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS lrn_carrier TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS lrn_city TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS lrn_state TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS lrn_country TEXT;
+    `);
+    await client.query(`
+      ALTER TABLE inbox_contact_profiles
+      ADD COLUMN IF NOT EXISTS lrn_last_checked_at TIMESTAMPTZ;
     `);
 
     // Per-conversation qualification + escalation state machine.
@@ -500,6 +637,26 @@ export const initializeSchema = async (): Promise<void> => {
     `);
 
     await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_call_column_latest_board_item
+      ON monday_call_column_latest (board_id, item_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_call_column_latest_board_column
+      ON monday_call_column_latest (board_id, column_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_call_column_history_board_column_updated
+      ON monday_call_column_history (board_id, column_id, item_updated_at DESC);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_monday_call_column_history_board_item_updated
+      ON monday_call_column_history (board_id, item_id, item_updated_at DESC);
+    `);
+
+    await client.query(`
       CREATE INDEX IF NOT EXISTS idx_monday_weekly_reports_week_start
       ON monday_weekly_reports (week_start DESC);
     `);
@@ -512,6 +669,21 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_inbox_contact_profiles_contact_key
       ON inbox_contact_profiles (contact_key);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_inbox_contact_profiles_lead_source
+      ON inbox_contact_profiles (lead_source);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_inbox_contact_profiles_sequence_id
+      ON inbox_contact_profiles (sequence_id);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_inbox_contact_profiles_last_engagement_at
+      ON inbox_contact_profiles (last_engagement_at DESC);
     `);
 
     await client.query(`

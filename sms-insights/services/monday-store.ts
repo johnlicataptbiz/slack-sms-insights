@@ -28,6 +28,21 @@ export type MondayCallSnapshotInput = {
   raw?: unknown | null;
 };
 
+export type MondayCallColumnValueInput = {
+  columnId: string;
+  columnTitle?: string | null;
+  columnType?: string | null;
+  textValue?: string | null;
+  valueJson?: unknown | null;
+};
+
+export type MondayCallColumnValuesUpsertInput = {
+  boardId: string;
+  itemId: string;
+  itemUpdatedAt: Date;
+  values: MondayCallColumnValueInput[];
+};
+
 export type MondayCallSnapshotRow = {
   board_id: string;
   item_id: string;
@@ -215,6 +230,126 @@ export const upsertMondayCallSnapshot = async (
     );
   } catch (error) {
     logger?.warn?.('Failed to upsert monday call snapshot', error);
+  }
+};
+
+export const upsertMondayCallColumnValues = async (
+  input: MondayCallColumnValuesUpsertInput,
+  logger?: Pick<Logger, 'warn'>,
+): Promise<void> => {
+  const pool = getDb();
+  if (!pool) return;
+  if (!input.values.length) return;
+
+  const payload = input.values.map((value) => ({
+    column_id: value.columnId,
+    column_title: value.columnTitle ?? null,
+    column_type: value.columnType ?? null,
+    text_value: value.textValue ?? null,
+    value_json: value.valueJson ?? null,
+  }));
+
+  try {
+    await pool.query('BEGIN');
+    await pool.query(
+      `
+      WITH incoming AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS t(
+          column_id TEXT,
+          column_title TEXT,
+          column_type TEXT,
+          text_value TEXT,
+          value_json JSONB
+        )
+      )
+      INSERT INTO monday_call_column_latest (
+        board_id,
+        item_id,
+        column_id,
+        column_title,
+        column_type,
+        text_value,
+        value_json,
+        item_updated_at,
+        synced_at
+      )
+      SELECT
+        $2,
+        $3,
+        incoming.column_id,
+        incoming.column_title,
+        incoming.column_type,
+        incoming.text_value,
+        incoming.value_json,
+        $4,
+        CURRENT_TIMESTAMP
+      FROM incoming
+      ON CONFLICT (board_id, item_id, column_id)
+      DO UPDATE SET
+        column_title = EXCLUDED.column_title,
+        column_type = EXCLUDED.column_type,
+        text_value = EXCLUDED.text_value,
+        value_json = EXCLUDED.value_json,
+        item_updated_at = EXCLUDED.item_updated_at,
+        synced_at = CURRENT_TIMESTAMP
+      `,
+      [JSON.stringify(payload), input.boardId, input.itemId, input.itemUpdatedAt],
+    );
+
+    await pool.query(
+      `
+      WITH incoming AS (
+        SELECT *
+        FROM jsonb_to_recordset($1::jsonb) AS t(
+          column_id TEXT,
+          column_title TEXT,
+          column_type TEXT,
+          text_value TEXT,
+          value_json JSONB
+        )
+      )
+      INSERT INTO monday_call_column_history (
+        board_id,
+        item_id,
+        column_id,
+        column_title,
+        column_type,
+        text_value,
+        value_json,
+        item_updated_at,
+        synced_at
+      )
+      SELECT
+        $2,
+        $3,
+        incoming.column_id,
+        incoming.column_title,
+        incoming.column_type,
+        incoming.text_value,
+        incoming.value_json,
+        $4,
+        CURRENT_TIMESTAMP
+      FROM incoming
+      ON CONFLICT (board_id, item_id, column_id, item_updated_at)
+      DO UPDATE SET
+        column_title = EXCLUDED.column_title,
+        column_type = EXCLUDED.column_type,
+        text_value = EXCLUDED.text_value,
+        value_json = EXCLUDED.value_json,
+        synced_at = CURRENT_TIMESTAMP
+      `,
+      [JSON.stringify(payload), input.boardId, input.itemId, input.itemUpdatedAt],
+    );
+
+    await pool.query('COMMIT');
+  } catch (error) {
+    try {
+      await pool.query('ROLLBACK');
+    } catch {
+      // no-op
+    }
+    logger?.warn?.('Failed to upsert monday call column values', error);
   }
 };
 

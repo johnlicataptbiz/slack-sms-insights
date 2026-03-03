@@ -29,6 +29,11 @@ import {
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import { getPool } from '../services/db.js';
+import {
+  disenrollConversationContactFromSequence,
+  enrollConversationContactToSequence,
+  syncQualificationToAloware,
+} from '../services/aloware-contact-sync.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
 import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
 import { generateDraftSuggestion } from '../services/inbox-draft-engine.js';
@@ -2949,12 +2954,32 @@ const handlePostInboxQualificationV2: RequestHandler = async (req, res, logger, 
     logger,
   );
 
+  const profileForSync = await getInboxContactProfileByKey(conversation.contact_key, logger);
+  let alowareQualificationSync: { status: 'synced' | 'skipped'; reason: string } | null = null;
+  try {
+    alowareQualificationSync = await syncQualificationToAloware(
+      {
+        contactPhone: conversation.contact_phone,
+        profile: profileForSync,
+        fullOrPartTime,
+        niche,
+        revenueMix,
+        coachingInterest,
+      },
+      logger,
+    );
+  } catch (error) {
+    logger?.warn?.('Failed to sync qualification update to Aloware contact', error);
+    alowareQualificationSync = { status: 'skipped', reason: 'sync_error' };
+  }
+
   const payload = {
     fullOrPartTime: nextState.qualification_full_or_part_time,
     niche: nextState.qualification_niche,
     revenueMix: nextState.qualification_revenue_mix,
     coachingInterest: nextState.qualification_coaching_interest,
     progressStep: nextState.qualification_progress_step,
+    alowareSync: alowareQualificationSync,
   };
 
   sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
@@ -3043,17 +3068,154 @@ const handlePostInboxStatusV2: RequestHandler = async (req, res, logger, origin)
     return sendJson(res, 400, { error: 'status must be one of: open, closed, dnc' }, origin);
   }
 
+  const conversation = await getConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
   const updated = await updateConversationStatus(conversationId, status, logger);
   if (!updated) {
     return sendJson(res, 404, { error: 'Conversation not found' }, origin);
   }
 
+  let alowareSequenceSync: { status: 'synced' | 'skipped'; reason: string } | null = null;
+  if (status === 'dnc') {
+    const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
+    try {
+      alowareSequenceSync = await disenrollConversationContactFromSequence(
+        {
+          contactPhone: conversation.contact_phone,
+          contactId: conversation.contact_id,
+          alowareContactId: profile?.aloware_contact_id || null,
+        },
+        logger,
+      );
+    } catch (error) {
+      logger?.warn?.('Failed to auto-disenroll Aloware sequence on DNC status update', error);
+      alowareSequenceSync = { status: 'skipped', reason: 'sync_error' };
+    }
+  }
+
   sendJson(
     res,
     200,
-    toEnvelope({ data: { id: updated.id, status: updated.status }, timeZone: DEFAULT_BUSINESS_TIMEZONE }),
+    toEnvelope(
+      {
+        data: { id: updated.id, status: updated.status, alowareSequenceSync },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      },
+    ),
     origin,
   );
+};
+
+const handlePostInboxSequenceEnrollV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  let body: { sequenceId?: unknown; forceEnroll?: unknown } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+
+  const sequenceIdRaw = body.sequenceId;
+  const sequenceId =
+    typeof sequenceIdRaw === 'number'
+      ? sequenceIdRaw
+      : typeof sequenceIdRaw === 'string' && sequenceIdRaw.trim().length > 0
+        ? sequenceIdRaw.trim()
+        : null;
+  if (sequenceId === null) {
+    return sendJson(res, 400, { error: 'sequenceId is required' }, origin);
+  }
+
+  const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
+
+  try {
+    const result = await enrollConversationContactToSequence(
+      {
+        sequenceId,
+        forceEnroll: body.forceEnroll === true,
+        contactPhone: conversation.contact_phone,
+        contactId: conversation.contact_id,
+        alowareContactId: profile?.aloware_contact_id || null,
+      },
+      logger,
+    );
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: {
+          conversationId,
+          sequenceId,
+          alowareSequenceSync: result,
+        },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.warn?.('Failed to enroll conversation contact into Aloware sequence', error);
+    sendJson(res, 502, { error: 'Aloware sequence enroll failed' }, origin);
+  }
+};
+
+const handlePostInboxSequenceDisenrollV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
+  try {
+    const result = await disenrollConversationContactFromSequence(
+      {
+        contactPhone: conversation.contact_phone,
+        contactId: conversation.contact_id,
+        alowareContactId: profile?.aloware_contact_id || null,
+      },
+      logger,
+    );
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: {
+          conversationId,
+          alowareSequenceSync: result,
+        },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.warn?.('Failed to disenroll conversation contact from Aloware sequence', error);
+    sendJson(res, 502, { error: 'Aloware sequence disenroll failed' }, origin);
+  }
 };
 
 const handlePostInboxDraftFeedbackV2: RequestHandler = async (req, res, logger, origin) => {
@@ -3635,6 +3797,16 @@ const apiRoutes: ApiRoute[] = [
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/status',
     handler: handlePostInboxStatusV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/sequence-enroll',
+    handler: handlePostInboxSequenceEnrollV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/sequence-disenroll',
+    handler: handlePostInboxSequenceDisenrollV2,
   },
   {
     method: 'POST',

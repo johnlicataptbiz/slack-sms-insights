@@ -11,6 +11,7 @@ import {
   getMondayColumnMapping,
   getMondaySyncState,
   saveMondayColumnMapping,
+  upsertMondayCallColumnValues,
   upsertMondayCallSnapshot,
   upsertMondaySyncState,
 } from './monday-store.js';
@@ -53,6 +54,15 @@ const cutoffDate = (daysBack: number): Date => {
   return value;
 };
 
+const parseColumnValueJson = (value: string | null): unknown | null => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+};
+
 export const syncMondayBoard = async (
   boardId: string,
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
@@ -93,6 +103,7 @@ export const syncMondayBoard = async (
       logger?.info?.('Using MONDAY_ACQ_COLUMN_MAP_JSON override for monday sync mapping', { boardId });
     }
     await saveMondayColumnMapping(boardId, mapping, logger);
+    const columnsById = new Map(columns.map((column) => [column.id, column]));
 
     let cursor = state?.cursor || null;
     let fetchedItems = 0;
@@ -100,7 +111,19 @@ export const syncMondayBoard = async (
     let pageCount = 0;
 
     while (pageCount < mondayConfig.maxPagesPerRun) {
-      const page = await queryBoardItems(boardId, cursor, logger);
+      let page;
+      try {
+        page = await queryBoardItems(boardId, cursor, logger);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const isExpiredCursor = Boolean(cursor) && /cursor.*expired/i.test(message);
+        if (!isExpiredCursor) throw error;
+
+        logger?.warn?.('Monday cursor expired; restarting board pagination from first page', { boardId });
+        cursor = null;
+        page = await queryBoardItems(boardId, cursor, logger);
+      }
+
       fetchedItems += page.items.length;
       pageCount += 1;
 
@@ -126,6 +149,24 @@ export const syncMondayBoard = async (
             isBooked: normalized.isBooked,
             contactKey: normalized.contactKey,
             raw: normalized.raw,
+          },
+          logger,
+        );
+        await upsertMondayCallColumnValues(
+          {
+            boardId,
+            itemId: normalized.itemId,
+            itemUpdatedAt: normalized.updatedAt,
+            values: item.columnValues.map((columnValue) => {
+              const metadata = columnsById.get(columnValue.id);
+              return {
+                columnId: columnValue.id,
+                columnTitle: metadata?.title || null,
+                columnType: metadata?.type || columnValue.type || null,
+                textValue: columnValue.text?.trim() || null,
+                valueJson: parseColumnValueJson(columnValue.value),
+              };
+            }),
           },
           logger,
         );

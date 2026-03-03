@@ -13,6 +13,8 @@
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
     "backfill:slack": "node --import tsx ./scripts/backfill-slack-events.ts",
     "backfill:booked-calls": "node --import tsx ./scripts/backfill-booked-calls.ts",
+    "backfill:contact-profiles": "node --import tsx ./scripts/backfill-contact-profiles.ts",
+    "backfill:contact-profiles-lrn": "node --import tsx ./scripts/backfill-contact-profiles-lrn.ts",
     "sync:monday": "node --import tsx ./scripts/sync-monday.ts",
     "regenerate:runs": "node --import tsx ./scripts/regenerate-daily-runs.ts",
     "prisma:generate": "prisma generate --config prisma.config.ts",

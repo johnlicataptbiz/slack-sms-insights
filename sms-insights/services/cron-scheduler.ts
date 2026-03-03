@@ -1,5 +1,6 @@
 import type { App } from '@slack/bolt';
 import { logDailyRun } from './daily-run-logger.js';
+import { getDefaultLrnBackfillOptions, runLrnBackfill } from './lrn-refresh.js';
 import { generateAndPostReport } from './report-poster.js';
 
 const DAILY_REPORT_CHANNEL_ID = 'C09ULGH1BEC'; // #alowaresmsupdates
@@ -7,9 +8,13 @@ const DAILY_REPORT_CHANNEL_NAME = 'alowaresmsupdates';
 const CHECK_INTERVAL_MS = 60_000; // check every minute
 const REPORT_HOUR_CT = 6;
 const REPORT_MINUTE_CT = 0;
+const LRN_REFRESH_DEFAULT_HOUR_CT = 2;
+const LRN_REFRESH_DEFAULT_MINUTE_CT = 15;
 
 let lastRunDate: string | null = null;
 let cronIntervalId: ReturnType<typeof setInterval> | null = null;
+let lastLrnRefreshDate: string | null = null;
+let lrnIntervalId: ReturnType<typeof setInterval> | null = null;
 
 /**
  * Returns the current date/hour/minute in America/Chicago timezone.
@@ -96,6 +101,72 @@ export const startDailyReportCron = async (app: App): Promise<void> => {
   }, CHECK_INTERVAL_MS);
 };
 
+const parseBool = (value: string | undefined, fallback = false): boolean => {
+  const normalized = (value || '').trim().toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === 'true' || normalized === '1' || normalized === 'yes';
+};
+
+const parseIntOr = (value: string | undefined, fallback: number): number => {
+  const parsed = Number.parseInt((value || '').trim(), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const isLrnRefreshEnabled = (): boolean => parseBool(process.env.ALOWARE_LRN_REFRESH_CRON_ENABLED, false);
+
+export const startLrnRefreshCron = (app: App): void => {
+  if (!isLrnRefreshEnabled()) {
+    app.logger.info('[cron] LRN refresh cron disabled (ALOWARE_LRN_REFRESH_CRON_ENABLED=false)');
+    return;
+  }
+
+  const targetHour = Math.max(0, Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)));
+  const targetMinute = Math.max(
+    0,
+    Math.min(59, parseIntOr(process.env.ALOWARE_LRN_REFRESH_MINUTE_CT, LRN_REFRESH_DEFAULT_MINUTE_CT)),
+  );
+  const defaultOptions = getDefaultLrnBackfillOptions();
+  const limit = Math.max(1, parseIntOr(process.env.ALOWARE_LRN_REFRESH_LIMIT, defaultOptions.limit));
+  const delayMs = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_DELAY_MS, defaultOptions.delayMs));
+  const staleDays = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_STALE_DAYS, defaultOptions.staleDays));
+  const forceAll = parseBool(process.env.ALOWARE_LRN_REFRESH_FORCE_ALL, false);
+
+  app.logger.info(
+    `[cron] LRN refresh cron started — fires at ${targetHour}:${String(targetMinute).padStart(2, '0')} CT ` +
+      `(limit=${limit}, delayMs=${delayMs}, staleDays=${staleDays}, forceAll=${forceAll})`,
+  );
+
+  lrnIntervalId = setInterval(() => {
+    void (async () => {
+      const { date, hour, minute } = getCTDateParts();
+      if (hour !== targetHour || minute !== targetMinute) return;
+      if (lastLrnRefreshDate === date) return;
+
+      lastLrnRefreshDate = date;
+      app.logger.info(`[cron] Triggering nightly LRN refresh for ${date}`);
+
+      try {
+        const summary = await runLrnBackfill(
+          {
+            dryRun: false,
+            limit,
+            offset: 0,
+            delayMs,
+            staleDays,
+            forceAll,
+          },
+          app.logger,
+        );
+        app.logger.info('[cron] ✅ LRN refresh completed', summary);
+      } catch (error) {
+        app.logger.error('[cron] LRN refresh failed:', error);
+        // Reset so it retries on next tick
+        lastLrnRefreshDate = null;
+      }
+    })();
+  }, CHECK_INTERVAL_MS);
+};
+
 /**
  * Stops the cron interval. Useful for graceful shutdown or tests.
  */
@@ -103,5 +174,9 @@ export const stopDailyReportCron = (): void => {
   if (cronIntervalId !== null) {
     clearInterval(cronIntervalId);
     cronIntervalId = null;
+  }
+  if (lrnIntervalId !== null) {
+    clearInterval(lrnIntervalId);
+    lrnIntervalId = null;
   }
 };

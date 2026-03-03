@@ -168,9 +168,20 @@ export type UpsertAlowareContactInput = {
   name?: string;
   firstName?: string;
   lastName?: string;
+  companyName?: string;
+  leadSource?: string;
   email?: string;
   timezone?: string;
+  address?: string;
+  website?: string;
   notes?: string;
+  csf1?: string;
+  csf2?: string;
+  lineId?: string | number;
+  sequenceId?: string | number;
+  tagId?: string | number;
+  dispositionStatusId?: string | number;
+  forceUpdateSequence?: boolean;
   userId?: string | number;
   userEmail?: string;
   forceUpdate?: boolean;
@@ -191,9 +202,20 @@ export const upsertAlowareContact = async (
     name: input.name,
     first_name: input.firstName,
     last_name: input.lastName,
+    company_name: input.companyName,
+    lead_source: input.leadSource,
     email: input.email,
     timezone: input.timezone,
+    address: input.address,
+    website: input.website,
     notes: input.notes,
+    csf1: input.csf1,
+    csf2: input.csf2,
+    line_id: input.lineId,
+    sequence_id: input.sequenceId,
+    tag_id: input.tagId,
+    disposition_status_id: input.dispositionStatusId,
+    force_update_sequence: input.forceUpdateSequence,
     user_id: input.userId,
     user_email: input.userEmail,
     force_update: input.forceUpdate ?? true,
@@ -276,4 +298,155 @@ export const sendAlowareSms = async (
   }
 
   return { message: 'Message sent.' };
+};
+
+export type AlowareSequenceSource = 'phone_number' | 'aloware' | 'hubspot' | 'zoho' | 'guesty' | 'pipedrive';
+
+export type EnrollAlowareSequenceInput = {
+  sequenceId: string | number;
+  source: AlowareSequenceSource;
+  id?: string | number;
+  phoneNumber?: string;
+  forceEnroll?: boolean;
+};
+
+export type DisenrollAlowareSequenceInput = {
+  source: AlowareSequenceSource;
+  id?: string | number;
+  phoneNumber?: string;
+};
+
+const coerceSourceId = (value: string | number | undefined): string | number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length > 0) return value.trim();
+  return null;
+};
+
+const buildSequenceIdentityPayload = (input: {
+  source: AlowareSequenceSource;
+  id?: string | number;
+  phoneNumber?: string;
+}): { source: AlowareSequenceSource; id?: string | number; phone_number?: string } => {
+  if (input.source === 'phone_number') {
+    const phone = normalizePhone(input.phoneNumber || '');
+    if (!phone) {
+      throw new AlowareClientError('phone_number is required when source=phone_number', 400, input);
+    }
+    return { source: input.source, phone_number: phone };
+  }
+
+  const sourceId = coerceSourceId(input.id);
+  if (sourceId === null) {
+    throw new AlowareClientError(`id is required when source=${input.source}`, 400, input);
+  }
+
+  return { source: input.source, id: sourceId };
+};
+
+export const enrollAlowareContactToSequence = async (
+  input: EnrollAlowareSequenceInput,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<unknown> => {
+  const token = getApiToken();
+  if (!token) {
+    throw new AlowareClientError('ALOWARE_API_TOKEN is not configured', 500, null);
+  }
+
+  const sequenceId =
+    typeof input.sequenceId === 'number'
+      ? input.sequenceId
+      : Number.isFinite(Number.parseInt(String(input.sequenceId), 10))
+        ? Number.parseInt(String(input.sequenceId), 10)
+        : String(input.sequenceId).trim();
+  if (!sequenceId) {
+    throw new AlowareClientError('sequence_id is required', 400, input);
+  }
+
+  const identity = buildSequenceIdentityPayload(input);
+  const payload = {
+    api_token: token,
+    sequence_id: sequenceId,
+    force_enroll: input.forceEnroll === true,
+    ...identity,
+  };
+
+  return requestAloware(
+    '/api/v1/webhook/sequence-enroll',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    logger,
+  );
+};
+
+export const disenrollAlowareContactFromSequence = async (
+  input: DisenrollAlowareSequenceInput,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<unknown> => {
+  const token = getApiToken();
+  if (!token) {
+    throw new AlowareClientError('ALOWARE_API_TOKEN is not configured', 500, null);
+  }
+
+  const identity = buildSequenceIdentityPayload(input);
+  const payload = {
+    api_token: token,
+    ...identity,
+  };
+
+  return requestAloware(
+    '/api/v1/webhook/sequence-disenroll',
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    },
+    logger,
+  );
+};
+
+export type AlowareLrnLookupResult = {
+  sid?: string;
+  line_type?: string;
+  carrier?: string;
+  cnam_city?: string;
+  cnam_state?: string;
+  cnam_country?: string;
+  data?: Record<string, unknown>;
+  [key: string]: unknown;
+};
+
+export const lookupAlowareNumberLrn = async (
+  phoneNumber: string,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+): Promise<AlowareLrnLookupResult | null> => {
+  const token = getApiToken();
+  if (!token) return null;
+
+  const phone = normalizePhone(phoneNumber);
+  if (!phone) return null;
+
+  try {
+    const payload = await requestAloware(
+      '/api/v1/webhook/lookup',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          api_token: token,
+          phone_number: phone,
+        }),
+      },
+      logger,
+    );
+
+    if (isObject(payload)) {
+      return payload as AlowareLrnLookupResult;
+    }
+    return null;
+  } catch (error) {
+    if (error instanceof AlowareClientError && (error.status === 404 || error.status === 400 || error.status === 402)) {
+      return null;
+    }
+    throw error;
+  }
 };

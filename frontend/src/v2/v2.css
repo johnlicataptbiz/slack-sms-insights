@@ -4930,27 +4930,27 @@ display: inline-block;
 }
 
 .V2Inbox__convEscTag[data-tone='red'] {
-  background: rgba(239, 76, 98, 0.1);
-  color: var(--v2-critical);
-  border-color: rgba(239, 76, 98, 0.28);
+  background: rgba(239, 76, 98, 0.14);
+  color: #7f1122;
+  border-color: rgba(127, 17, 34, 0.34);
 }
 
 .V2Inbox__convEscTag[data-tone='orange'] {
-  background: rgba(245, 157, 13, 0.1);
-  color: var(--v2-warning);
-  border-color: rgba(245, 157, 13, 0.28);
+  background: rgba(245, 157, 13, 0.14);
+  color: #6f4200;
+  border-color: rgba(111, 66, 0, 0.32);
 }
 
 .V2Inbox__convEscTag[data-tone='yellow'] {
-  background: rgba(230, 176, 31, 0.1);
-  color: #b8880a;
-  border-color: rgba(230, 176, 31, 0.28);
+  background: rgba(230, 176, 31, 0.16);
+  color: #5c4600;
+  border-color: rgba(92, 70, 0, 0.34);
 }
 
 .V2Inbox__convEscTag[data-tone='green'] {
-  background: rgba(19, 185, 129, 0.1);
-  color: var(--v2-positive);
-  border-color: rgba(19, 185, 129, 0.28);
+  background: rgba(19, 185, 129, 0.16);
+  color: #0d573d;
+  border-color: rgba(13, 87, 61, 0.34);
 }
 
 .V2Inbox__convOwnerTag {
@@ -4959,7 +4959,11 @@ display: inline-block;
   gap: 0.26rem;
   font-size: 0.72rem;
   font-weight: 700;
-  color: var(--c, var(--v2-muted));
+  color: var(--v2-base-800);
+  background: rgba(7, 19, 36, 0.06);
+  border: 1px solid rgba(7, 19, 36, 0.14);
+  border-radius: 999px;
+  padding: 0.1rem 0.4rem;
 }
 
 .V2Inbox__convOwnerDot {
@@ -4973,11 +4977,11 @@ display: inline-block;
 .V2Inbox__convReplyTag {
   font-size: 0.67rem;
   font-weight: 700;
-  color: var(--v2-warning);
-  background: rgba(245, 157, 13, 0.1);
+  color: #663d00;
+  background: rgba(245, 157, 13, 0.16);
   padding: 0.12rem 0.42rem;
   border-radius: 999px;
-  border: 1px solid rgba(245, 157, 13, 0.22);
+  border: 1px solid rgba(102, 61, 0, 0.3);
 }
 
 /* Analytics Column */

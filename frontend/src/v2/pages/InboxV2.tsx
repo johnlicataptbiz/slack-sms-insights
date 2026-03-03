@@ -681,7 +681,8 @@ export default function InboxV2() {
   const rowVirtualizer = useVirtualizer({
     count: sortedConversations.length,
     getScrollElement: () => listParentRef.current,
-    estimateSize: () => 96,
+    estimateSize: () => 132,
+    measureElement: (element) => element.getBoundingClientRect().height,
     overscan: 8,
   });
 
@@ -2187,6 +2188,7 @@ export default function InboxV2() {
                     return (
                       <div
                         key={virtualItem.key}
+                        ref={rowVirtualizer.measureElement}
                         style={{
                           position: "absolute",
                           top: 0,

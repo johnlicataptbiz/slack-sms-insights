@@ -527,6 +527,7 @@ export const initializeSchema = async (): Promise<void> => {
         qualification_full_or_part_time TEXT NOT NULL DEFAULT 'unknown' CHECK (qualification_full_or_part_time IN ('full_time', 'part_time', 'unknown')),
         qualification_niche TEXT,
         qualification_revenue_mix TEXT NOT NULL DEFAULT 'unknown' CHECK (qualification_revenue_mix IN ('mostly_cash', 'mostly_insurance', 'balanced', 'unknown')),
+        qualification_delivery_model TEXT NOT NULL DEFAULT 'unknown' CHECK (qualification_delivery_model IN ('brick_and_mortar', 'mobile', 'online', 'hybrid', 'unknown')),
         qualification_coaching_interest TEXT NOT NULL DEFAULT 'unknown' CHECK (qualification_coaching_interest IN ('high', 'medium', 'low', 'unknown')),
         qualification_progress_step INTEGER NOT NULL DEFAULT 0,
         escalation_level INTEGER NOT NULL DEFAULT 1 CHECK (escalation_level BETWEEN 1 AND 4),

@@ -4,6 +4,7 @@ import { getPool } from './db.js';
 
 export type RevenueMixCategory = 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
 export type EmploymentStatus = 'full_time' | 'part_time' | 'unknown';
+export type DeliveryModel = 'brick_and_mortar' | 'mobile' | 'online' | 'hybrid' | 'unknown';
 export type CoachingInterest = 'high' | 'medium' | 'low' | 'unknown';
 
 export type InboxContactProfileRow = {

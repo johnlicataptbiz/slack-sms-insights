@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Briefcase, DollarSign, Target, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
+import { Users, Briefcase, DollarSign, Target, ChevronDown, ChevronUp, TrendingUp, Building2 } from 'lucide-react';
 import type { SequenceQualificationItem } from '../../api/v2Queries';
 
 if (typeof document !== 'undefined') {
@@ -18,8 +18,9 @@ type Props = {
 const computeWithQualData = (item: SequenceQualificationItem): number => {
   const knownEmployment = item.fullTime.count + item.partTime.count;
   const knownRevenue = item.mostlyCash.count + item.mostlyInsurance.count + item.balancedMix.count;
+  const knownDelivery = item.brickAndMortar.count + item.mobile.count + item.online.count + item.hybrid.count;
   const knownInterest = item.highInterest.count + item.mediumInterest.count + item.lowInterest.count;
-  return Math.max(knownEmployment, knownRevenue, knownInterest);
+  return Math.max(knownEmployment, knownRevenue, knownDelivery, knownInterest);
 };
 
 /** Collect non-null sample quotes from all fields */
@@ -30,6 +31,10 @@ const collectSampleQuotes = (item: SequenceQualificationItem): string[] => {
     item.mostlyCash.sampleQuote,
     item.mostlyInsurance.sampleQuote,
     item.balancedMix.sampleQuote,
+    item.brickAndMortar.sampleQuote,
+    item.mobile.sampleQuote,
+    item.online.sampleQuote,
+    item.hybrid.sampleQuote,
     item.highInterest.sampleQuote,
     item.mediumInterest.sampleQuote,
     item.lowInterest.sampleQuote,
@@ -161,6 +166,48 @@ const SequenceCard: React.FC<{
                     icon={<DollarSign size={16} />}
                     color="#f59e0b"
                     sampleQuote={item.balancedMix.sampleQuote}
+                  />
+                </div>
+              </div>
+
+              {/* Delivery Model */}
+              <div className="metric-section">
+                <h4>
+                  <Building2 size={16} />
+                  Clinic Setup
+                </h4>
+                <div className="metric-row">
+                  <MetricCard
+                    label="Brick & Mortar"
+                    count={item.brickAndMortar.count}
+                    pct={item.brickAndMortar.pct}
+                    icon={<Building2 size={16} />}
+                    color="#6366f1"
+                    sampleQuote={item.brickAndMortar.sampleQuote}
+                  />
+                  <MetricCard
+                    label="Mobile"
+                    count={item.mobile.count}
+                    pct={item.mobile.pct}
+                    icon={<Building2 size={16} />}
+                    color="#0ea5e9"
+                    sampleQuote={item.mobile.sampleQuote}
+                  />
+                  <MetricCard
+                    label="Online"
+                    count={item.online.count}
+                    pct={item.online.pct}
+                    icon={<Building2 size={16} />}
+                    color="#14b8a6"
+                    sampleQuote={item.online.sampleQuote}
+                  />
+                  <MetricCard
+                    label="Hybrid"
+                    count={item.hybrid.count}
+                    pct={item.hybrid.pct}
+                    icon={<Building2 size={16} />}
+                    color="#f97316"
+                    sampleQuote={item.hybrid.sampleQuote}
                   />
                 </div>
               </div>

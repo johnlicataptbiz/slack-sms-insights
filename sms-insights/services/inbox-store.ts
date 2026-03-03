@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { getPool } from './db.js';
 import type {
   CoachingInterest,
+  DeliveryModel,
   EmploymentStatus,
   InboxContactProfileRow,
   RevenueMixCategory,
@@ -15,6 +16,7 @@ export type ConversationStateRow = {
   qualification_full_or_part_time: EmploymentStatus;
   qualification_niche: string | null;
   qualification_revenue_mix: RevenueMixCategory;
+  qualification_delivery_model: DeliveryModel;
   qualification_coaching_interest: CoachingInterest;
   qualification_progress_step: number;
   escalation_level: 1 | 2 | 3 | 4;
@@ -117,6 +119,7 @@ export type InboxConversationListRow = {
   state_qualification_full_or_part_time: EmploymentStatus | null;
   state_qualification_niche: string | null;
   state_qualification_revenue_mix: RevenueMixCategory | null;
+  state_qualification_delivery_model: DeliveryModel | null;
   state_qualification_coaching_interest: CoachingInterest | null;
   state_qualification_progress_step: number | null;
   state_escalation_level: number | null;
@@ -309,6 +312,7 @@ export type UpdateConversationStateInput = {
   fullOrPartTime?: EmploymentStatus;
   niche?: string | null;
   revenueMix?: RevenueMixCategory;
+  deliveryModel?: DeliveryModel;
   coachingInterest?: CoachingInterest;
   progressStep?: number;
   escalationLevel?: 1 | 2 | 3 | 4;
@@ -347,8 +351,9 @@ export const updateConversationState = async (
           ELSE $3::text
         END,
         qualification_revenue_mix = COALESCE($4::text, qualification_revenue_mix),
-        qualification_coaching_interest = COALESCE($5::text, qualification_coaching_interest),
-        qualification_progress_step = COALESCE($6::integer, qualification_progress_step),
+        qualification_delivery_model = COALESCE($5::text, qualification_delivery_model),
+        qualification_coaching_interest = COALESCE($6::text, qualification_coaching_interest),
+        qualification_progress_step = COALESCE($7::integer, qualification_progress_step),
         escalation_level = COALESCE($7::integer, escalation_level),
         escalation_reason = CASE
           WHEN $8::text IS NULL THEN escalation_reason
@@ -373,6 +378,7 @@ export const updateConversationState = async (
         input.fullOrPartTime ?? null,
         input.niche ?? null,
         input.revenueMix ?? null,
+        input.deliveryModel ?? null,
         input.coachingInterest ?? null,
         Number.isFinite(input.progressStep as number) ? input.progressStep : null,
         input.escalationLevel ?? null,
@@ -507,6 +513,7 @@ export const listInboxConversations = async (
         s.qualification_full_or_part_time AS state_qualification_full_or_part_time,
         s.qualification_niche AS state_qualification_niche,
         s.qualification_revenue_mix AS state_qualification_revenue_mix,
+        s.qualification_delivery_model AS state_qualification_delivery_model,
         s.qualification_coaching_interest AS state_qualification_coaching_interest,
         s.qualification_progress_step AS state_qualification_progress_step,
         s.escalation_level AS state_escalation_level,
@@ -620,6 +627,7 @@ export const getInboxConversationById = async (
         s.qualification_full_or_part_time AS state_qualification_full_or_part_time,
         s.qualification_niche AS state_qualification_niche,
         s.qualification_revenue_mix AS state_qualification_revenue_mix,
+        s.qualification_delivery_model AS state_qualification_delivery_model,
         s.qualification_coaching_interest AS state_qualification_coaching_interest,
         s.qualification_progress_step AS state_qualification_progress_step,
         s.escalation_level AS state_escalation_level,

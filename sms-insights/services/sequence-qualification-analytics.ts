@@ -20,6 +20,12 @@ export type SequenceQualificationBreakdown = {
   mostlyInsurance: QualificationMetric;
   balancedMix: QualificationMetric;
   unknownRevenue: QualificationMetric;
+  // Delivery model
+  brickAndMortar: QualificationMetric;
+  mobile: QualificationMetric;
+  online: QualificationMetric;
+  hybrid: QualificationMetric;
+  unknownDelivery: QualificationMetric;
   // Coaching interest
   highInterest: QualificationMetric;
   mediumInterest: QualificationMetric;
@@ -63,6 +69,11 @@ export const buildSequenceQualificationBreakdown = async (params: {
     mostly_insurance_count: number;
     balanced_mix_count: number;
     unknown_revenue_count: number;
+    brick_and_mortar_count: number;
+    mobile_count: number;
+    online_count: number;
+    hybrid_count: number;
+    unknown_delivery_count: number;
     high_interest_count: number;
     medium_interest_count: number;
     low_interest_count: number;
@@ -88,6 +99,7 @@ export const buildSequenceQualificationBreakdown = async (params: {
         cs.conversation_id,
         cs.qualification_full_or_part_time,
         cs.qualification_revenue_mix,
+        cs.qualification_delivery_model,
         cs.qualification_coaching_interest,
         cs.qualification_niche
       FROM sequence_first_touch sft
@@ -105,6 +117,11 @@ export const buildSequenceQualificationBreakdown = async (params: {
       COUNT(*) FILTER (WHERE qualification_revenue_mix = 'mostly_insurance') as mostly_insurance_count,
       COUNT(*) FILTER (WHERE qualification_revenue_mix = 'balanced') as balanced_mix_count,
       COUNT(*) FILTER (WHERE qualification_revenue_mix = 'unknown') as unknown_revenue_count,
+      COUNT(*) FILTER (WHERE qualification_delivery_model = 'brick_and_mortar') as brick_and_mortar_count,
+      COUNT(*) FILTER (WHERE qualification_delivery_model = 'mobile') as mobile_count,
+      COUNT(*) FILTER (WHERE qualification_delivery_model = 'online') as online_count,
+      COUNT(*) FILTER (WHERE qualification_delivery_model = 'hybrid') as hybrid_count,
+      COUNT(*) FILTER (WHERE qualification_delivery_model = 'unknown') as unknown_delivery_count,
       COUNT(*) FILTER (WHERE qualification_coaching_interest = 'high') as high_interest_count,
       COUNT(*) FILTER (WHERE qualification_coaching_interest = 'medium') as medium_interest_count,
       COUNT(*) FILTER (WHERE qualification_coaching_interest = 'low') as low_interest_count,
@@ -130,6 +147,10 @@ export const buildSequenceQualificationBreakdown = async (params: {
       cashQuote,
       insuranceQuote,
       balancedQuote,
+      brickAndMortarQuote,
+      mobileQuote,
+      onlineQuote,
+      hybridQuote,
       highInterestQuote,
       mediumInterestQuote,
       lowInterestQuote,
@@ -140,6 +161,10 @@ export const buildSequenceQualificationBreakdown = async (params: {
       fetchSampleQuote(pool, row.sequence_label, 'mostly_cash', 'qualification_revenue_mix', from, to),
       fetchSampleQuote(pool, row.sequence_label, 'mostly_insurance', 'qualification_revenue_mix', from, to),
       fetchSampleQuote(pool, row.sequence_label, 'balanced', 'qualification_revenue_mix', from, to),
+      fetchSampleQuote(pool, row.sequence_label, 'brick_and_mortar', 'qualification_delivery_model', from, to),
+      fetchSampleQuote(pool, row.sequence_label, 'mobile', 'qualification_delivery_model', from, to),
+      fetchSampleQuote(pool, row.sequence_label, 'online', 'qualification_delivery_model', from, to),
+      fetchSampleQuote(pool, row.sequence_label, 'hybrid', 'qualification_delivery_model', from, to),
       fetchSampleQuote(pool, row.sequence_label, 'high', 'qualification_coaching_interest', from, to),
       fetchSampleQuote(pool, row.sequence_label, 'medium', 'qualification_coaching_interest', from, to),
       fetchSampleQuote(pool, row.sequence_label, 'low', 'qualification_coaching_interest', from, to),
@@ -182,6 +207,31 @@ export const buildSequenceQualificationBreakdown = async (params: {
       unknownRevenue: {
         count: Number(row.unknown_revenue_count),
         pct: (Number(row.unknown_revenue_count) / total) * 100,
+        sampleQuote: null,
+      },
+      brickAndMortar: {
+        count: Number(row.brick_and_mortar_count),
+        pct: (Number(row.brick_and_mortar_count) / total) * 100,
+        sampleQuote: brickAndMortarQuote,
+      },
+      mobile: {
+        count: Number(row.mobile_count),
+        pct: (Number(row.mobile_count) / total) * 100,
+        sampleQuote: mobileQuote,
+      },
+      online: {
+        count: Number(row.online_count),
+        pct: (Number(row.online_count) / total) * 100,
+        sampleQuote: onlineQuote,
+      },
+      hybrid: {
+        count: Number(row.hybrid_count),
+        pct: (Number(row.hybrid_count) / total) * 100,
+        sampleQuote: hybridQuote,
+      },
+      unknownDelivery: {
+        count: Number(row.unknown_delivery_count),
+        pct: (Number(row.unknown_delivery_count) / total) * 100,
         sampleQuote: null,
       },
       highInterest: {

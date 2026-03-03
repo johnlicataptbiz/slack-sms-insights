@@ -491,6 +491,23 @@ export type ScoreboardV2 = {
   };
 };
 
+export type SequenceVersionHistoryRowV2 = {
+  label: string;
+  leadMagnet: string;
+  version: string;
+  status: 'active' | 'testing' | 'rewrite' | 'archived';
+  canonicalBody: string | null;
+  sampleBodies: string[];
+  sentCount: number;
+  firstSeenAt: string | null;
+  lastSeenAt: string | null;
+};
+
+export type SequenceVersionHistoryV2 = {
+  items: SequenceVersionHistoryRowV2[];
+  lookbackDays: number;
+};
+
 // ─── Phase 3: Inbox Analytics Types ──────────────────────────────────────────
 
 export type CallOutcomeV2 = 'not_a_fit' | 'too_early' | 'budget' | 'joined' | 'ghosted';

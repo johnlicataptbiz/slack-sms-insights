@@ -11,6 +11,7 @@ import {
   assertRunsListV2Envelope,
   assertSalesMetricsBatchV2Envelope,
   assertSalesMetricsV2Envelope,
+  assertSequenceVersionHistoryV2Envelope,
   assertScoreboardV2Envelope,
   assertSendMessageResultEnvelope,
   assertWeeklySummaryV2Envelope,
@@ -29,6 +30,7 @@ import type {
   RunsListV2,
   SalesMetricsBatchV2,
   SalesMetricsV2,
+  SequenceVersionHistoryV2,
   ScoreboardV2,
   SendMessageResultV2,
   StageConversionRowV2,
@@ -232,6 +234,42 @@ export const useV2Channels = () => {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2SequenceVersionHistory = (params?: { lookbackDays?: number }) => {
+  const lookbackDays = Number.isFinite(params?.lookbackDays) ? Math.trunc(params?.lookbackDays ?? 365) : 365;
+  return useQuery({
+    queryKey: ['v2', 'sequences', 'version-history', lookbackDays],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/sequences/version-history?lookbackDays=${lookbackDays}`);
+      assertSequenceVersionHistoryV2Envelope(response);
+      return response as ApiEnvelope<SequenceVersionHistoryV2>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2UpdateSequenceVersionDecision = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      label: string;
+      status: 'active' | 'testing' | 'rewrite' | 'archived';
+      updatedBy?: string;
+    }) => {
+      return client.post<ApiEnvelope<{ label: string; status: string; updatedBy: string | null; updatedAt: string }>>(
+        '/api/v2/sequences/version-decisions',
+        params,
+      );
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'sequences', 'version-history'] });
+    },
   });
 };
 

@@ -80,6 +80,12 @@ import { findSendLineOption, listSendLineOptions } from '../services/send-line-c
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
 import { buildSequenceQualificationBreakdown } from '../services/sequence-qualification-analytics.js';
 import {
+  isSequenceVersionStatus,
+  listSequenceVersionDecisions,
+  upsertSequenceVersionDecision,
+} from '../services/sequence-version-decisions.js';
+import { getSequenceVersionHistory } from '../services/sequence-version-history.js';
+import {
   createDashboardSession,
   type DashboardSession,
   type DashboardSessionUser,
@@ -1094,6 +1100,96 @@ const handleGetSequenceQualificationV2: RequestHandler = async (req, res, logger
       500,
       {
         error: 'Failed to fetch sequence qualification data',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
+const handleGetSequenceVersionHistoryV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const lookbackDaysRaw = Number.parseInt(url.searchParams.get('lookbackDays') || '365', 10);
+  const lookbackDays = Number.isFinite(lookbackDaysRaw) ? lookbackDaysRaw : 365;
+  try {
+    const [items, decisions] = await Promise.all([
+      getSequenceVersionHistory({ lookbackDays }, logger),
+      listSequenceVersionDecisions(logger),
+    ]);
+    const statusByLabel = new Map<string, string>();
+    for (const decision of decisions) {
+      statusByLabel.set(decision.sequence_label, decision.status);
+    }
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: {
+          items: items.map((item) => ({
+            ...item,
+            status: statusByLabel.get(item.label) || 'testing',
+          })),
+          lookbackDays,
+        },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch sequence version history:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to fetch sequence version history',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
+const handlePostSequenceVersionDecisionV2: RequestHandler = async (req, res, logger, origin) => {
+  let body: { label?: string; status?: string; updatedBy?: string } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+
+  const label = body.label?.trim() || '';
+  const status = body.status?.trim() || '';
+  if (!label) {
+    return sendJson(res, 400, { error: 'label is required' }, origin);
+  }
+  if (!isSequenceVersionStatus(status)) {
+    return sendJson(res, 400, { error: 'status must be one of: active, testing, rewrite, archived' }, origin);
+  }
+
+  try {
+    const decision = await upsertSequenceVersionDecision(label, status, body.updatedBy?.trim() || null, logger);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: {
+          label: decision.sequence_label,
+          status: decision.status,
+          updatedBy: decision.updated_by,
+          updatedAt: decision.updated_at,
+        },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to save sequence version decision:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to save sequence version decision',
         details: error instanceof Error ? error.message : String(error),
       },
       origin,
@@ -3504,6 +3600,8 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
   { method: 'GET', path: '/api/v2/scoreboard', handler: handleGetScoreboardV2 },
   { method: 'GET', path: '/api/v2/sequences/qualification', handler: handleGetSequenceQualificationV2 },
+  { method: 'GET', path: '/api/v2/sequences/version-history', handler: handleGetSequenceVersionHistoryV2 },
+  { method: 'POST', path: '/api/v2/sequences/version-decisions', handler: handlePostSequenceVersionDecisionV2 },
   { method: 'GET', path: '/api/v2/inbox/send-config', handler: handleGetInboxSendConfigV2 },
   { method: 'POST', path: '/api/v2/inbox/send-config/default', handler: handlePostInboxSendDefaultV2 },
   { method: 'GET', path: '/api/v2/inbox/conversations', handler: handleGetInboxConversationsV2 },

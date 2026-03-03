@@ -9,6 +9,7 @@ import type {
   RunsListV2,
   SalesMetricsBatchV2,
   SalesMetricsV2,
+  SequenceVersionHistoryV2,
   ScoreboardV2,
   SendMessageResultV2,
   WeeklyManagerSummaryV2,
@@ -278,5 +279,17 @@ export function assertScoreboardV2Envelope(value: unknown): asserts value is Api
   if (!isObject(data.provenance)) throw new Error('Invalid scoreboard response: provenance missing');
   if (data.provenance.attributionModel !== 'sequence_initiated_conversation') {
     throw new Error('Invalid scoreboard response: provenance.attributionModel');
+  }
+}
+
+export function assertSequenceVersionHistoryV2Envelope(
+  value: unknown,
+): asserts value is ApiEnvelope<SequenceVersionHistoryV2> {
+  if (!isObject(value)) throw new Error('Invalid sequence version history response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid sequence version history response: data must be object');
+  if (!Array.isArray(value.data.items)) throw new Error('Invalid sequence version history response: items must be array');
+  if (!isNumber(value.data.lookbackDays)) {
+    throw new Error('Invalid sequence version history response: lookbackDays must be number');
   }
 }

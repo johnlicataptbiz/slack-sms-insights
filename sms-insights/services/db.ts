@@ -403,6 +403,16 @@ export const initializeSchema = async (): Promise<void> => {
       );
     `);
 
+    // Sequence version operating decisions (for Sequences V2 workflow actions).
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS sequence_version_decisions (
+        sequence_label TEXT PRIMARY KEY,
+        status TEXT NOT NULL CHECK (status IN ('active', 'testing', 'rewrite', 'archived')),
+        updated_by TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
     // --- indexes ---
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_setter_feedback_dedupe_created_at
@@ -527,6 +537,11 @@ export const initializeSchema = async (): Promise<void> => {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_conversion_examples_booked_escalation
       ON conversion_examples (booked_call_label, escalation_level);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sequence_version_decisions_status_updated
+      ON sequence_version_decisions (status, updated_at DESC);
     `);
 
     // Enforce "one open needs_reply per conversation" at the DB level.

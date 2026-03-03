@@ -1,14 +1,24 @@
 import { Fragment, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import type { ColumnDef, ColumnPinningState, VisibilityState } from '@tanstack/react-table';
+import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import DiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
 
-import { useV2SalesMetrics, useV2Scoreboard, useV2SequenceQualification } from '../../api/v2Queries';
+import {
+  useV2SalesMetrics,
+  useV2Scoreboard,
+  useV2SequenceQualification,
+  useV2SequenceVersionHistory,
+  useV2UpdateSequenceVersionDecision,
+} from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
-import type { SalesMetricsV2, ScoreboardLeadMagnetRow } from '../../api/v2-types';
+import type { SalesMetricsV2, ScoreboardLeadMagnetRow, SequenceVersionHistoryRowV2 } from '../../api/v2-types';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
 import { useToast } from '../hooks/useToast';
 
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
+const WINNER_MIN_SENDS = 100;
 
 type Mode = '7d' | '30d';
 type Sort =
@@ -18,6 +28,20 @@ type Sort =
   | 'optOutRatePct'
   | 'uniqueContacted'
   | 'bookingRatePct';
+
+type ColumnId =
+  | 'label'
+  | 'version'
+  | 'firstSeenAt'
+  | 'messagesSent'
+  | 'uniqueContacted'
+  | 'repliesReceived'
+  | 'replyRatePct'
+  | 'canonicalBookedCalls'
+  | 'bookingRatePct'
+  | 'optOutRatePct'
+  | 'optOuts'
+  | 'expand';
 
 // ─── SMS Reply Reason Labels ─────────────────────────────────────────────────
 
@@ -46,6 +70,16 @@ const shorten = (text: string, max: number): string => {
   const truncated = text.slice(0, max);
   const lastSpace = truncated.lastIndexOf(' ');
   return `${lastSpace > max * 0.7 ? truncated.slice(0, lastSpace) : truncated}…`;
+};
+
+const fmtSignedInt = (n: number): string => {
+  if (n === 0) return '0';
+  return `${n > 0 ? '+' : ''}${fmtInt(n)}`;
+};
+
+const fmtSignedPctPoints = (n: number): string => {
+  if (n === 0) return '0.0 pp';
+  return `${n > 0 ? '+' : ''}${n.toFixed(1)} pp`;
 };
 
 /**
@@ -115,6 +149,7 @@ type AuditRow = SalesMetricsV2['sequences'][0]['bookedAuditRows'][0];
 
 type MergedSeqRow = {
   label: string;
+  leadMagnet: string;
   // metadata from scoreboard (window-independent)
   version: string;
   // all numeric fields exclusively from sales-metrics (respects mode toggle)
@@ -138,6 +173,55 @@ type MergedSeqRow = {
   bookingRatePct: number;
   // pre-computed derived fields
   smsReplyPct: number | null;
+};
+
+type VersionDiffContext = {
+  previous: MergedSeqRow | null;
+  currentCanonicalBody: string | null;
+  previousCanonicalBody: string | null;
+};
+
+type VersionTimelineItem = {
+  label: string;
+  versionLabel: string;
+  status: 'active' | 'testing' | 'rewrite' | 'archived';
+  firstSeenAt: string | null;
+  messagesSent: number;
+  replyRatePct: number;
+  bookedCalls: number;
+  bookingRatePct: number;
+  isCurrent: boolean;
+  isWinner: boolean;
+  winnerLowConfidence: boolean;
+};
+
+const parseVersionParts = (value: string): number[] | null => {
+  const match = value.toLowerCase().match(/v(\d+(?:\.\d+)*)/);
+  if (!match) return null;
+  const raw = match[1] ?? '';
+  if (!raw) return null;
+  const parts = raw
+    .split('.')
+    .map((part) => Number(part))
+    .filter((part) => Number.isFinite(part));
+  return parts.length > 0 ? parts : null;
+};
+
+const compareVersionParts = (a: number[] | null, b: number[] | null): number => {
+  if (!a && !b) return 0;
+  if (!a) return -1;
+  if (!b) return 1;
+  const maxLen = Math.max(a.length, b.length);
+  for (let i = 0; i < maxLen; i += 1) {
+    const av = a[i] ?? 0;
+    const bv = b[i] ?? 0;
+    if (av !== bv) return av - bv;
+  }
+  return 0;
+};
+
+const toVersionSortKey = (row: MergedSeqRow): number[] | null => {
+  return parseVersionParts(extractVersionDisplay(row.label) || row.version);
 };
 
 export const computeSequenceHeaderMetrics = (
@@ -170,18 +254,58 @@ export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('7d');
   const [sort, setSort] = useState<Sort>('messagesSent');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    firstSeenAt: false,
+    bookingRatePct: false,
+  });
+  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
+    left: ['label'],
+    right: ['expand'],
+  });
   const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
+  const [decisionPendingLabel, setDecisionPendingLabel] = useState<string | null>(null);
   const toast = useToast();
 
   const salesMetricsQuery = useV2SalesMetrics({ range: mode, tz: BUSINESS_TZ });
   const scoreboardQuery = useV2Scoreboard({ tz: BUSINESS_TZ });
   const sequenceQualQuery = useV2SequenceQualification({ range: mode, tz: BUSINESS_TZ });
+  const sequenceVersionHistoryQuery = useV2SequenceVersionHistory({ lookbackDays: 365 });
+  const updateSequenceDecisionMutation = useV2UpdateSequenceVersionDecision();
 
   const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading || sequenceQualQuery.isLoading;
   const isError = salesMetricsQuery.isError || scoreboardQuery.isError || sequenceQualQuery.isError;
 
   const salesMetrics = salesMetricsQuery.data?.data;
   const scoreboard = scoreboardQuery.data?.data;
+  const versionHistory = sequenceVersionHistoryQuery.data?.data?.items ?? [];
+
+  const versionHistoryByLabel = useMemo(() => {
+    const map = new Map<string, SequenceVersionHistoryRowV2>();
+    for (const row of versionHistory) {
+      map.set(row.label, row);
+    }
+    return map;
+  }, [versionHistory]);
+
+  const updateSequenceStatus = async (
+    label: string,
+    status: 'active' | 'testing' | 'rewrite' | 'archived',
+  ) => {
+    try {
+      setDecisionPendingLabel(label);
+      await updateSequenceDecisionMutation.mutateAsync({
+        label,
+        status,
+        updatedBy: 'dashboard',
+      });
+      toast.success(`Updated ${label} to ${status}.`, { duration: 2200 });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to update version status';
+      toast.error(message, { duration: 2800 });
+    } finally {
+      setDecisionPendingLabel(null);
+    }
+  };
 
   // Build scoreboard lookup by label for leadMagnet / version / uniqueContacted / bookingRatePct
   const scoreboardByLabel = useMemo(() => {
@@ -200,6 +324,7 @@ export default function SequencesV2() {
       const sb = scoreboardByLabel.get(seq.label);
       return {
         label: seq.label,
+        leadMagnet: sb?.leadMagnet ?? 'Unknown',
         version: sb?.version ?? '',
         firstSeenAt: seq.firstSeenAt,
         messagesSent: seq.messagesSent,
@@ -225,6 +350,88 @@ export default function SequencesV2() {
       };
     });
   }, [salesMetrics?.sequences, scoreboardByLabel]);
+
+  const versionDiffByLabel = useMemo(() => {
+    const grouped = new Map<string, MergedSeqRow[]>();
+    for (const row of mergedRows) {
+      const key = row.leadMagnet || 'Unknown';
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(row);
+      grouped.set(key, bucket);
+    }
+
+    const result = new Map<string, VersionDiffContext>();
+    for (const rows of grouped.values()) {
+      const ordered = [...rows].sort((a, b) => {
+        const v = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
+        if (v !== 0) return v;
+        const aTs = a.firstSeenAt ? new Date(a.firstSeenAt).getTime() : 0;
+        const bTs = b.firstSeenAt ? new Date(b.firstSeenAt).getTime() : 0;
+        return aTs - bTs;
+      });
+
+      ordered.forEach((current, idx) => {
+        const previous = idx > 0 ? (ordered[idx - 1] ?? null) : null;
+        const currentHistory = versionHistoryByLabel.get(current.label);
+        const previousHistory = previous ? versionHistoryByLabel.get(previous.label) : null;
+        const currentCanonicalBody = currentHistory?.canonicalBody?.trim() || null;
+        const previousCanonicalBody = previousHistory?.canonicalBody?.trim() || null;
+        result.set(current.label, {
+          previous,
+          currentCanonicalBody,
+          previousCanonicalBody,
+        });
+      });
+    }
+    return result;
+  }, [mergedRows, versionHistoryByLabel]);
+
+  const versionTimelineByLabel = useMemo(() => {
+    const grouped = new Map<string, MergedSeqRow[]>();
+    for (const row of mergedRows) {
+      const key = row.leadMagnet || 'Unknown';
+      const bucket = grouped.get(key) ?? [];
+      bucket.push(row);
+      grouped.set(key, bucket);
+    }
+
+    const result = new Map<string, VersionTimelineItem[]>();
+    for (const rows of grouped.values()) {
+      const ordered = [...rows].sort((a, b) => {
+        const v = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
+        if (v !== 0) return v;
+        const aTs = a.firstSeenAt ? new Date(a.firstSeenAt).getTime() : 0;
+        const bTs = b.firstSeenAt ? new Date(b.firstSeenAt).getTime() : 0;
+        return aTs - bTs;
+      });
+
+      const winner = [...ordered].sort((a, b) => {
+        const aRate = a.messagesSent > 0 ? (a.canonicalBookedCalls / a.messagesSent) * 100 : 0;
+        const bRate = b.messagesSent > 0 ? (b.canonicalBookedCalls / b.messagesSent) * 100 : 0;
+        if (bRate !== aRate) return bRate - aRate;
+        if (b.canonicalBookedCalls !== a.canonicalBookedCalls) return b.canonicalBookedCalls - a.canonicalBookedCalls;
+        return b.messagesSent - a.messagesSent;
+      })[0] ?? null;
+
+      ordered.forEach((current) => {
+        const items: VersionTimelineItem[] = ordered.map((r) => ({
+          label: r.label,
+          versionLabel: extractVersionDisplay(r.label) || r.version || r.label,
+          status: versionHistoryByLabel.get(r.label)?.status ?? 'testing',
+          firstSeenAt: r.firstSeenAt,
+          messagesSent: r.messagesSent,
+          replyRatePct: r.replyRatePct,
+          bookedCalls: r.canonicalBookedCalls,
+          bookingRatePct: r.messagesSent > 0 ? (r.canonicalBookedCalls / r.messagesSent) * 100 : 0,
+          isCurrent: r.label === current.label,
+          isWinner: winner ? r.label === winner.label : false,
+          winnerLowConfidence: winner ? winner.messagesSent < WINNER_MIN_SENDS : false,
+        }));
+        result.set(current.label, items);
+      });
+    }
+    return result;
+  }, [mergedRows, versionHistoryByLabel]);
 
   // Sort — manual/unattributed always last
   const sortedRows = useMemo(() => {
@@ -296,11 +503,271 @@ export default function SequencesV2() {
 
   const sortArrow = (col: Sort) =>
     sort === col ? <span className="V2Table__sortArrow">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span> : null;
+  const columnSortMap: Record<Sort, ColumnId> = {
+    messagesSent: 'messagesSent',
+    replyRatePct: 'replyRatePct',
+    canonicalBookedCalls: 'canonicalBookedCalls',
+    optOutRatePct: 'optOutRatePct',
+    uniqueContacted: 'uniqueContacted',
+    bookingRatePct: 'bookingRatePct',
+  };
+  const sortColumnId = columnSortMap[sort];
+  const columnLabels: Array<{ id: ColumnId; label: string }> = [
+    { id: 'label', label: 'Sequence Name' },
+    { id: 'version', label: 'Script Version' },
+    { id: 'firstSeenAt', label: 'Live Since' },
+    { id: 'messagesSent', label: 'Texts Sent' },
+    { id: 'uniqueContacted', label: 'Contacts' },
+    { id: 'repliesReceived', label: 'Leads Replied' },
+    { id: 'replyRatePct', label: 'Reply %' },
+    { id: 'canonicalBookedCalls', label: 'Calls Booked' },
+    { id: 'bookingRatePct', label: 'Booking %' },
+    { id: 'optOutRatePct', label: 'Stop %' },
+    { id: 'optOuts', label: 'Stops' },
+  ];
 
   const leadMagnetRows: ScoreboardLeadMagnetRow[] = scoreboard?.leadMagnetComparison ?? [];
   const monthlyBookings = scoreboard?.monthly.bookings;
   const compliance = scoreboard?.compliance;
   const timing = scoreboard?.timing;
+  const columns = useMemo<ColumnDef<MergedSeqRow, unknown>[]>(
+    () => [
+      {
+        id: 'label',
+        accessorKey: 'label',
+        header: 'Sequence Name',
+        cell: ({ row }) => (
+          <span className="V2Table__seqName" title={row.original.label}>
+            {row.original.label}
+          </span>
+        ),
+        enableHiding: false,
+      },
+      {
+        id: 'version',
+        accessorKey: 'version',
+        header: 'Script Version',
+        cell: ({ row }) => renderVersion(row.original.label, row.original.version),
+      },
+      {
+        id: 'firstSeenAt',
+        accessorKey: 'firstSeenAt',
+        header: 'Live Since',
+        cell: ({ row }) => <span className="V2Table__dim">{fmtDay(row.original.firstSeenAt)}</span>,
+      },
+      {
+        id: 'messagesSent',
+        accessorKey: 'messagesSent',
+        header: () => (
+          <button
+            type="button"
+            className="V2Table__sortBtn"
+            onClick={() => handleSortClick('messagesSent')}
+          >
+            Texts Sent{sortArrow('messagesSent')}
+          </button>
+        ),
+        cell: ({ row }) => fmtInt(row.original.messagesSent),
+      },
+      {
+        id: 'uniqueContacted',
+        accessorKey: 'uniqueContacted',
+        header: () => (
+          <button
+            type="button"
+            className="V2Table__sortBtn"
+            title="Unique people reached by this sequence · weekly window"
+            onClick={() => handleSortClick('uniqueContacted')}
+          >
+            Contacts{sortArrow('uniqueContacted')}
+          </button>
+        ),
+        cell: ({ row }) =>
+          row.original.uniqueContacted > 0 ? fmtInt(row.original.uniqueContacted) : <span className="V2Table__dim">—</span>,
+      },
+      {
+        id: 'repliesReceived',
+        accessorKey: 'repliesReceived',
+        header: 'Leads Replied',
+        cell: ({ row }) => fmtInt(row.original.repliesReceived),
+      },
+      {
+        id: 'replyRatePct',
+        accessorKey: 'replyRatePct',
+        header: () => (
+          <button
+            type="button"
+            className="V2Table__sortBtn"
+            onClick={() => handleSortClick('replyRatePct')}
+          >
+            Reply %{sortArrow('replyRatePct')}
+          </button>
+        ),
+        cell: ({ row }) => (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+            <span>{fmtPct(row.original.replyRatePct)}</span>
+            <div style={{ width: '40px' }}>
+              <V2ProgressBar
+                value={row.original.replyRatePct}
+                max={25}
+                height={4}
+                color={
+                  row.original.replyRatePct >= 10
+                    ? 'var(--v2-positive)'
+                    : row.original.replyRatePct < 5
+                      ? 'var(--v2-warning)'
+                      : 'var(--v2-accent)'
+                }
+              />
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'canonicalBookedCalls',
+        accessorKey: 'canonicalBookedCalls',
+        header: () => (
+          <button
+            type="button"
+            className="V2Table__sortBtn"
+            onClick={() => handleSortClick('canonicalBookedCalls')}
+          >
+            Calls Booked{sortArrow('canonicalBookedCalls')}
+          </button>
+        ),
+        cell: ({ row }) => (
+          <div className="V2SeqRepSplit">
+            <strong>{fmtInt(row.original.canonicalBookedCalls)}</strong>
+            {row.original.canonicalBookedCalls > 0 && (
+              <div className="V2SeqRepSplit__badges">
+                {row.original.canonicalBookedJack > 0 && (
+                  <span
+                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--jack"
+                    title={`Jack: ${row.original.canonicalBookedJack}`}
+                  >
+                    J·{row.original.canonicalBookedJack}
+                  </span>
+                )}
+                {row.original.canonicalBookedBrandon > 0 && (
+                  <span
+                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--brandon"
+                    title={`Brandon: ${row.original.canonicalBookedBrandon}`}
+                  >
+                    B·{row.original.canonicalBookedBrandon}
+                  </span>
+                )}
+                {row.original.canonicalBookedSelf > 0 && (
+                  <span
+                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--self"
+                    title={`Self-booked: ${row.original.canonicalBookedSelf}`}
+                  >
+                    S·{row.original.canonicalBookedSelf}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        ),
+      },
+      {
+        id: 'bookingRatePct',
+        accessorKey: 'bookingRatePct',
+        header: () => (
+          <button
+            type="button"
+            className="V2Table__sortBtn"
+            title="Booked calls ÷ unique contacts · weekly window"
+            onClick={() => handleSortClick('bookingRatePct')}
+          >
+            Booking %{sortArrow('bookingRatePct')}
+          </button>
+        ),
+        cell: ({ row }) =>
+          row.original.bookingRatePct > 0 ? fmtPct(row.original.bookingRatePct) : <span className="V2Table__dim">—</span>,
+      },
+      {
+        id: 'optOutRatePct',
+        accessorKey: 'optOutRatePct',
+        header: () => (
+          <button
+            type="button"
+            className="V2Table__sortBtn"
+            onClick={() => handleSortClick('optOutRatePct')}
+          >
+            Stop %{sortArrow('optOutRatePct')}
+          </button>
+        ),
+        cell: ({ row }) => {
+          const isHighOptOut = row.original.optOutRatePct >= 5 && row.original.messagesSent >= 10;
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+              <span className={isHighOptOut ? 'V2Table__cell--warn' : ''}>{fmtPct(row.original.optOutRatePct)}</span>
+              <div style={{ width: '40px' }}>
+                <V2ProgressBar
+                  value={row.original.optOutRatePct}
+                  max={10}
+                  height={4}
+                  color={isHighOptOut ? 'var(--v2-critical)' : 'var(--v2-muted)'}
+                />
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'optOuts',
+        accessorKey: 'optOuts',
+        header: 'Stops',
+        cell: ({ row }) => fmtInt(row.original.optOuts),
+      },
+      {
+        id: 'expand',
+        header: '',
+        enableHiding: false,
+        cell: ({ row }) => {
+          const expanded = expandedLabels.has(row.original.label);
+          return (
+            <button
+              type="button"
+              className="V2Table__expandBtn"
+              onClick={() => toggleExpanded(row.original.label)}
+              aria-expanded={expanded}
+              aria-controls={toAuditId(row.original.label)}
+              title={expanded ? 'Collapse audit' : 'Expand audit'}
+            >
+              {expanded ? '▲' : '▼'}
+            </button>
+          );
+        },
+      },
+    ],
+    [expandedLabels, sort, sortDir],
+  );
+  const table = useReactTable({
+    data: sortedRows,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    state: {
+      columnVisibility,
+      columnPinning,
+    },
+    onColumnVisibilityChange: setColumnVisibility,
+    onColumnPinningChange: setColumnPinning,
+  });
+  const getPinnedStyles = (column: any): React.CSSProperties => {
+    const isPinned = column.getIsPinned();
+    if (!isPinned) return {};
+    return {
+      position: 'sticky',
+      [isPinned]: `${isPinned === 'left' ? column.getStart('left') : column.getAfter('right')}px`,
+      zIndex: 2,
+      background: 'var(--v2-surface-1)',
+      boxShadow:
+        isPinned === 'left'
+          ? '1px 0 0 rgba(7, 19, 36, 0.08)'
+          : '-1px 0 0 rgba(7, 19, 36, 0.08)',
+    };
+  };
 
   if (isLoading) {
     return (
@@ -402,61 +869,59 @@ export default function SequencesV2() {
         {sortedRows.length === 0 ? (
           <V2State kind="empty">No sequence data for this window.</V2State>
         ) : (
-          <div className="V2TableWrap">
+          <>
+            <div className="V2TableActions">
+              <label>
+                Columns
+                <span className="V2TableActions__hint">Pinning keeps Sequence and expand control in view.</span>
+              </label>
+              <div className="V2TableActions__chips">
+                {columnLabels.map((columnLabel) => {
+                  const column = table.getColumn(columnLabel.id);
+                  if (!column || !column.getCanHide()) return null;
+                  return (
+                    <button
+                      key={columnLabel.id}
+                      type="button"
+                      className={`V2TableActions__chip${column.getIsVisible() ? ' is-active' : ''}`}
+                      onClick={() => column.toggleVisibility(!column.getIsVisible())}
+                    >
+                      {columnLabel.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="V2TableWrap V2TableWrap--sequences">
             <table className="V2Table V2Table--sequences">
               <thead>
-                <tr>
-                  <th className="V2Table__col--label">Sequence</th>
-                  <th className="V2Table__col--version">Version</th>
-                  <th className="V2Table__col--date">First Seen</th>
-                  <th
-                    className="is-right is-sortable"
-                    onClick={() => handleSortClick('messagesSent')}
-                    aria-sort={sort === 'messagesSent' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  >
-                    Sent{sortArrow('messagesSent')}
-                  </th>
-                  <th
-                    className="is-right is-sortable"
-                    onClick={() => handleSortClick('uniqueContacted')}
-                    title="Unique people reached by this sequence · weekly window"
-                    aria-sort={sort === 'uniqueContacted' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  >
-                    Contacts{sortArrow('uniqueContacted')}
-                  </th>
-                  <th className="is-right" title="Total reply messages received">Replied</th>
-                  <th
-                    className="is-right is-sortable"
-                    onClick={() => handleSortClick('replyRatePct')}
-                    aria-sort={sort === 'replyRatePct' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  >
-                    Reply Rate{sortArrow('replyRatePct')}
-                  </th>
-                  <th
-                    className="is-right is-sortable"
-                    onClick={() => handleSortClick('canonicalBookedCalls')}
-                    aria-sort={sort === 'canonicalBookedCalls' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  >
-                    Booked{sortArrow('canonicalBookedCalls')}
-                  </th>
-                  <th
-                    className="is-right is-sortable"
-                    onClick={() => handleSortClick('bookingRatePct')}
-                    title="Booked calls ÷ unique contacts · weekly window"
-                    aria-sort={sort === 'bookingRatePct' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  >
-                    Booking Rate{sortArrow('bookingRatePct')}
-                  </th>
-                  <th
-                    className="is-right is-sortable"
-                    onClick={() => handleSortClick('optOutRatePct')}
-                    aria-sort={sort === 'optOutRatePct' ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-                  >
-                    Opt-Out Rate{sortArrow('optOutRatePct')}
-                  </th>
-                  <th className="is-right">Opt-Outs</th>
-                  <th className="is-center V2Table__col--expand" />
-                </tr>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <tr key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <th
+                        key={header.id}
+                        className={`
+                          ${header.column.id === 'label' ? 'V2Table__col--label' : ''}
+                          ${header.column.id === 'version' ? 'V2Table__col--version' : ''}
+                          ${header.column.id === 'firstSeenAt' ? 'V2Table__col--date' : ''}
+                          ${header.column.id === 'expand' ? 'is-center V2Table__col--expand' : ''}
+                          ${['messagesSent','uniqueContacted','repliesReceived','replyRatePct','canonicalBookedCalls','bookingRatePct','optOutRatePct','optOuts'].includes(header.column.id) ? 'is-right' : ''}
+                          ${header.column.id === sortColumnId ? 'is-sortable' : ''}
+                        `}
+                        style={getPinnedStyles(header.column)}
+                        aria-sort={
+                          header.column.id === sortColumnId
+                            ? sortDir === 'asc'
+                              ? 'ascending'
+                              : 'descending'
+                            : 'none'
+                        }
+                      >
+                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      </th>
+                    ))}
+                  </tr>
+                ))}
               </thead>
               <motion.tbody
                 initial="hidden"
@@ -466,8 +931,16 @@ export default function SequencesV2() {
                   show: { opacity: 1, transition: { staggerChildren: 0.03 } }
                 }}
               >
-                {sortedRows.map((row) => {
+                {table.getRowModel().rows.map((tableRow) => {
+                  const row = tableRow.original;
                   const expanded = expandedLabels.has(row.label);
+                  const versionDiff = versionDiffByLabel.get(row.label);
+                  const versionTimeline = versionTimelineByLabel.get(row.label) ?? [];
+                  const previousVersionRow = versionDiff?.previous ?? null;
+                  const previousDiffText = versionDiff?.previousCanonicalBody ?? '';
+                  const currentDiffText = versionDiff?.currentCanonicalBody ?? '';
+                  const canRenderTextDiff =
+                    previousDiffText.trim().length > 0 && currentDiffText.trim().length > 0;
                   const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
                   const isHighBooking = row.canonicalBookedCalls >= 2 && !row.isManual;
                   const rowClass = [
@@ -488,101 +961,21 @@ export default function SequencesV2() {
                           show: { opacity: 1, y: 0 }
                         }}
                       >
-                        <td className="V2Table__col--label">
-                          <span className="V2Table__seqName" title={row.label}>
-                            {row.label}
-                          </span>
-                        </td>
-                        <td className="V2Table__col--version">
-                          {renderVersion(row.label, row.version)}
-                        </td>
-                        <td className="V2Table__col--date V2Table__dim">
-                          {fmtDay(row.firstSeenAt)}
-                        </td>
-                        <td className="is-right">{fmtInt(row.messagesSent)}</td>
-                        <td className="is-right V2Table__dim">
-                          {row.uniqueContacted > 0
-                            ? fmtInt(row.uniqueContacted)
-                            : <span className="V2Table__dim">—</span>}
-                        </td>
-                        <td className="is-right">{fmtInt(row.repliesReceived)}</td>
-                        <td className="is-right">
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-                            <span>{fmtPct(row.replyRatePct)}</span>
-                            <div style={{ width: '40px' }}>
-                              <V2ProgressBar 
-                                value={row.replyRatePct} 
-                                max={25} 
-                                height={4} 
-                                color={row.replyRatePct >= 10 ? 'var(--v2-positive)' : row.replyRatePct < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)'} 
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="is-right">
-                          <div className="V2SeqRepSplit">
-                            <strong>{fmtInt(row.canonicalBookedCalls)}</strong>
-                            {row.canonicalBookedCalls > 0 && (
-                              <div className="V2SeqRepSplit__badges">
-                                {row.canonicalBookedJack > 0 && (
-                                  <span
-                                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--jack"
-                                    title={`Jack: ${row.canonicalBookedJack}`}
-                                  >
-                                    J·{row.canonicalBookedJack}
-                                  </span>
-                                )}
-                                {row.canonicalBookedBrandon > 0 && (
-                                  <span
-                                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--brandon"
-                                    title={`Brandon: ${row.canonicalBookedBrandon}`}
-                                  >
-                                    B·{row.canonicalBookedBrandon}
-                                  </span>
-                                )}
-                                {row.canonicalBookedSelf > 0 && (
-                                  <span
-                                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--self"
-                                    title={`Self-booked: ${row.canonicalBookedSelf}`}
-                                  >
-                                    S·{row.canonicalBookedSelf}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="is-right V2Table__dim">
-                          {row.bookingRatePct > 0
-                            ? fmtPct(row.bookingRatePct)
-                            : <span className="V2Table__dim">—</span>}
-                        </td>
-                        <td className={`is-right${isHighOptOut ? ' V2Table__cell--warn' : ''}`}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-                            <span>{fmtPct(row.optOutRatePct)}</span>
-                            <div style={{ width: '40px' }}>
-                              <V2ProgressBar 
-                                value={row.optOutRatePct} 
-                                max={10} 
-                                height={4} 
-                                color={isHighOptOut ? 'var(--v2-critical)' : 'var(--v2-muted)'} 
-                              />
-                            </div>
-                          </div>
-                        </td>
-                        <td className="is-right">{fmtInt(row.optOuts)}</td>
-                        <td className="is-center">
-                          <button
-                            type="button"
-                            className="V2Table__expandBtn"
-                            onClick={() => toggleExpanded(row.label)}
-                            aria-expanded={expanded}
-                            aria-controls={toAuditId(row.label)}
-                            title={expanded ? 'Collapse audit' : 'Expand audit'}
+                        {tableRow.getVisibleCells().map((cell) => (
+                          <td
+                            key={cell.id}
+                            className={`
+                              ${cell.column.id === 'label' ? 'V2Table__col--label' : ''}
+                              ${cell.column.id === 'version' ? 'V2Table__col--version' : ''}
+                              ${cell.column.id === 'firstSeenAt' ? 'V2Table__col--date V2Table__dim' : ''}
+                              ${cell.column.id === 'expand' ? 'is-center' : ''}
+                              ${['messagesSent','uniqueContacted','repliesReceived','replyRatePct','canonicalBookedCalls','bookingRatePct','optOutRatePct','optOuts'].includes(cell.column.id) ? 'is-right' : ''}
+                            `}
+                            style={getPinnedStyles(cell.column)}
                           >
-                            {expanded ? '▲' : '▼'}
-                          </button>
-                        </td>
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
                       </motion.tr>
 
                       <AnimatePresence>
@@ -594,7 +987,7 @@ export default function SequencesV2() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                           >
-                            <td colSpan={12} style={{ padding: 0 }}>
+                            <td colSpan={table.getVisibleLeafColumns().length} style={{ padding: 0 }}>
                               <motion.div 
                                 className="V2SeqAudit"
                                 initial={{ height: 0, opacity: 0 }}
@@ -639,6 +1032,202 @@ export default function SequencesV2() {
                                   </span>
                                 </div>
                               </div>
+
+                              <section className="V2SeqVersionDiff">
+                                <header className="V2SeqVersionDiff__header">
+                                  <h4 className="V2SeqVersionDiff__title">Sequence Script Changes</h4>
+                                  <p className="V2SeqVersionDiff__caption">
+                                    {previousVersionRow
+                                      ? `Comparing against previous ${previousVersionRow.version || 'version'} in ${row.leadMagnet}`
+                                      : 'No earlier version found for this lead magnet yet.'}
+                                  </p>
+                                </header>
+                                {versionTimeline.length > 1 && (
+                                  <div className="V2SeqVersionDiff__timeline">
+                                    <p className="V2SeqVersionDiff__copyLabel">Version Timeline</p>
+                                    <div className="V2SeqVersionDiff__timelineList">
+                                      {versionTimeline.map((item) => (
+                                        <article
+                                          key={item.label}
+                                          className={`V2SeqVersionDiff__timelineItem${item.isCurrent ? ' is-current' : ''}${item.isWinner && item.winnerLowConfidence ? ' is-low-confidence' : ''}`}
+                                        >
+                                          <p className="V2SeqVersionDiff__timelineVersion">
+                                            {item.versionLabel}
+                                            <span className={`V2SeqVersionDiff__timelineBadge is-status is-${item.status}`}>
+                                              {item.status}
+                                            </span>
+                                            {item.isWinner && !item.winnerLowConfidence && (
+                                              <span className="V2SeqVersionDiff__timelineBadge is-winner">Winner</span>
+                                            )}
+                                            {item.isWinner && item.winnerLowConfidence && (
+                                              <span className="V2SeqVersionDiff__timelineBadge is-low-confidence">Leading (low confidence)</span>
+                                            )}
+                                          </p>
+                                          <p className="V2SeqVersionDiff__timelineMeta">
+                                            {fmtDay(item.firstSeenAt)} · {fmtInt(item.messagesSent)} sent · {fmtPct(item.replyRatePct)} reply ·{' '}
+                                            {fmtInt(item.bookedCalls)} booked · {fmtPct(item.bookingRatePct)} booked rate
+                                          </p>
+                                          <div className="V2SeqVersionDiff__timelineActions">
+                                            <button
+                                              type="button"
+                                              className="V2SeqVersionDiff__timelineAction"
+                                              onClick={() => void updateSequenceStatus(item.label, 'active')}
+                                              disabled={decisionPendingLabel === item.label || item.status === 'active'}
+                                            >
+                                              Promote
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="V2SeqVersionDiff__timelineAction"
+                                              onClick={() => void updateSequenceStatus(item.label, 'rewrite')}
+                                              disabled={decisionPendingLabel === item.label || item.status === 'rewrite'}
+                                            >
+                                              Rewrite
+                                            </button>
+                                            <button
+                                              type="button"
+                                              className="V2SeqVersionDiff__timelineAction"
+                                              onClick={() => void updateSequenceStatus(item.label, 'archived')}
+                                              disabled={decisionPendingLabel === item.label || item.status === 'archived'}
+                                            >
+                                              Archive
+                                            </button>
+                                          </div>
+                                        </article>
+                                      ))}
+                                    </div>
+                                    <p className="V2SeqVersionDiff__note">
+                                      Winner uses highest booked rate. Confidence requires at least {fmtInt(WINNER_MIN_SENDS)} sent.
+                                    </p>
+                                  </div>
+                                )}
+                                {previousVersionRow ? (
+                                  <>
+                                    <div className="V2SeqVersionDiff__metrics">
+                                      <div className="V2SeqVersionDiff__metric">
+                                        <span className="V2SeqVersionDiff__metricLabel">Texts Sent</span>
+                                        <strong className="V2SeqVersionDiff__metricValue">
+                                          {fmtSignedInt(row.messagesSent - previousVersionRow.messagesSent)}
+                                        </strong>
+                                      </div>
+                                      <div className="V2SeqVersionDiff__metric">
+                                        <span className="V2SeqVersionDiff__metricLabel">Reply %</span>
+                                        <strong className="V2SeqVersionDiff__metricValue">
+                                          {fmtSignedPctPoints(row.replyRatePct - previousVersionRow.replyRatePct)}
+                                        </strong>
+                                      </div>
+                                      <div className="V2SeqVersionDiff__metric">
+                                        <span className="V2SeqVersionDiff__metricLabel">Calls Booked</span>
+                                        <strong className="V2SeqVersionDiff__metricValue">
+                                          {fmtSignedInt(row.canonicalBookedCalls - previousVersionRow.canonicalBookedCalls)}
+                                        </strong>
+                                      </div>
+                                      <div className="V2SeqVersionDiff__metric">
+                                        <span className="V2SeqVersionDiff__metricLabel">Stop %</span>
+                                        <strong
+                                          className={`V2SeqVersionDiff__metricValue ${
+                                            row.optOutRatePct - previousVersionRow.optOutRatePct <= 0
+                                              ? 'is-positive'
+                                              : 'is-negative'
+                                          }`}
+                                        >
+                                          {fmtSignedPctPoints(row.optOutRatePct - previousVersionRow.optOutRatePct)}
+                                        </strong>
+                                      </div>
+                                    </div>
+                                    <div className="V2SeqVersionDiff__copyGrid">
+                                      <article className="V2SeqVersionDiff__copyCard">
+                                        <p className="V2SeqVersionDiff__copyLabel">
+                                          Before ({previousVersionRow.version || previousVersionRow.label})
+                                        </p>
+                                        {versionDiff?.previousCanonicalBody ? (
+                                          <blockquote className="V2SeqVersionDiff__quote">
+                                            {shorten(versionDiff.previousCanonicalBody, 220)}
+                                          </blockquote>
+                                        ) : (
+                                          <p className="V2SeqVersionDiff__empty">Previous version text not found yet.</p>
+                                        )}
+                                      </article>
+                                      <article className="V2SeqVersionDiff__copyCard">
+                                        <p className="V2SeqVersionDiff__copyLabel">After ({row.version || row.label})</p>
+                                        {versionDiff?.currentCanonicalBody ? (
+                                          <blockquote className="V2SeqVersionDiff__quote">
+                                            {shorten(versionDiff.currentCanonicalBody, 220)}
+                                          </blockquote>
+                                        ) : (
+                                          <p className="V2SeqVersionDiff__empty">Current version text not found yet.</p>
+                                        )}
+                                      </article>
+                                    </div>
+                                    <div className="V2SeqVersionDiff__diff">
+                                      <p className="V2SeqVersionDiff__copyLabel">Copy Diff (Before vs After)</p>
+                                      {canRenderTextDiff ? (
+                                        <DiffViewer
+                                          oldValue={previousDiffText}
+                                          newValue={currentDiffText}
+                                          splitView
+                                          compareMethod={DiffMethod.WORDS}
+                                          disableWordDiff={false}
+                                          extraLinesSurroundingDiff={1}
+                                          hideLineNumbers={false}
+                                          showDiffOnly
+                                          hideSummary
+                                          leftTitle={`Before (${previousVersionRow.version || previousVersionRow.label})`}
+                                          rightTitle={`After (${row.version || row.label})`}
+                                          useDarkTheme={false}
+                                          styles={{
+                                            diffContainer: {
+                                              borderRadius: '10px',
+                                              border: '1px solid rgba(7, 19, 36, 0.1)',
+                                              overflow: 'hidden',
+                                            },
+                                            titleBlock: {
+                                              background: 'rgba(7, 19, 36, 0.03)',
+                                              borderBottom: '1px solid rgba(7, 19, 36, 0.08)',
+                                              color: 'var(--v2-text)',
+                                              fontWeight: 700,
+                                            },
+                                            marker: {
+                                              minWidth: '22px',
+                                              textAlign: 'center',
+                                            },
+                                            contentText: {
+                                              fontSize: '0.76rem',
+                                              lineHeight: '1.4',
+                                              fontFamily: 'var(--v2-font-sans)',
+                                            },
+                                            gutter: {
+                                              minWidth: '28px',
+                                            },
+                                            diffAdded: {
+                                              background: 'rgba(19, 185, 129, 0.16)',
+                                            },
+                                            diffRemoved: {
+                                              background: 'rgba(224, 62, 62, 0.16)',
+                                            },
+                                            wordAdded: {
+                                              background: 'rgba(19, 185, 129, 0.34)',
+                                            },
+                                            wordRemoved: {
+                                              background: 'rgba(224, 62, 62, 0.34)',
+                                            },
+                                            highlightedGutter: {
+                                              background: 'rgba(17, 184, 214, 0.10)',
+                                            },
+                                          }}
+                                        />
+                                      ) : (
+                                        <p className="V2SeqVersionDiff__empty">
+                                          We need both the previous and current sent sequence texts to show a diff.
+                                        </p>
+                                      )}
+                                    </div>
+                                    <p className="V2SeqVersionDiff__note">
+                                      Diff is based only on actual sequence texts that were sent to leads.
+                                    </p>
+                                  </>
+                                ) : null}
+                              </section>
 
                               {/* Per-booking audit rows */}
                               {row.bookedAuditRows.length === 0 ? (
@@ -725,7 +1314,8 @@ export default function SequencesV2() {
                 })}
               </motion.tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </V2Panel>
 

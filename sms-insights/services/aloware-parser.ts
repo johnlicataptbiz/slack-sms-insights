@@ -36,6 +36,45 @@ export const extractAttachmentField = (
   return '';
 };
 
+const extractAttachmentFieldByAliases = (
+  attachments: LeadWatcherAttachment[] | undefined,
+  aliases: string[],
+): string => {
+  if (!attachments) return '';
+  const normalizedAliases = aliases.map((alias) => sanitize(alias).toLowerCase());
+  for (const attachment of attachments) {
+    for (const field of attachment.fields || []) {
+      const title = sanitize(field.title || '').toLowerCase();
+      if (!title) continue;
+      if (normalizedAliases.some((alias) => title.includes(alias))) {
+        const value = sanitize(stripSlackLinkMarkup(field.value || ''));
+        if (value) return value;
+      }
+    }
+  }
+  return '';
+};
+
+const extractFromFallback = (
+  attachments: LeadWatcherAttachment[] | undefined,
+  labels: string[],
+): string => {
+  const fallbackText = (attachments || [])
+    .map((attachment) => attachment.fallback || '')
+    .join('\n');
+  if (!fallbackText) return '';
+
+  for (const label of labels) {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = fallbackText.match(new RegExp(`\\*?${escaped}\\*?\\s*:\\s*([^\\n]+)`, 'i'));
+    if (match?.[1]) {
+      const value = sanitize(stripSlackLinkMarkup(match[1]));
+      if (value) return value;
+    }
+  }
+  return '';
+};
+
 export const extractContact = (text: string): { name: string; phone: string } => {
   const cleaned = sanitize(stripSlackLinkMarkup(text));
 
@@ -77,36 +116,65 @@ export const parseAlowareMessage = (text: string, attachments?: LeadWatcherAttac
 
   // 1. Direction
   const attachmentRef = attachments?.[0];
-  const combinedText = `${text} ${attachmentRef?.fallback || ''} ${attachmentRef?.title || ''}`.toLowerCase();
+  const attachmentTitles = (attachments || [])
+    .map((attachment) => attachment.title || '')
+    .join(' ');
+  const attachmentTexts = (attachments || [])
+    .map((attachment) => attachment.text || '')
+    .join(' ');
+  const combinedText = `${text} ${attachmentRef?.fallback || ''} ${attachmentRef?.title || ''} ${attachmentTitles} ${attachmentTexts}`.toLowerCase();
 
   if (/\b(received|inbound|incoming)\b/i.test(combinedText)) {
     fields.direction = 'inbound';
   } else if (/\b(sent|outbound|outgoing)\b/i.test(combinedText)) {
     fields.direction = 'outbound';
+  } else if (/\b(sms from|message from)\b/i.test(combinedText)) {
+    fields.direction = 'inbound';
+  } else if (/\b(sms to|message to)\b/i.test(combinedText)) {
+    fields.direction = 'outbound';
   }
 
   // 2. Body
-  const attachmentBody = extractAttachmentField(attachments, 'message');
+  const attachmentBody =
+    extractAttachmentFieldByAliases(attachments, ['message', 'body', 'content', 'sms message']) ||
+    extractFromFallback(attachments, ['Message', 'Body', 'Text']);
   if (attachmentBody) {
     fields.body = attachmentBody;
   } else {
-    const bodyMatch = text.match(/Message([\s\S]*)$/i);
+    const bodyMatch = text.match(/(?:Message|Body|Text)([\s\S]*)$/i);
     fields.body = bodyMatch?.[1] ? sanitize(bodyMatch[1]).replace(/^[:\-\s]+/, '') : sanitize(text);
   }
 
   // 3. Contact
-  const contactField = extractAttachmentField(attachments, 'contact');
+  const contactField =
+    extractAttachmentFieldByAliases(attachments, ['contact', 'lead']) ||
+    extractFromFallback(attachments, ['Contact', 'Lead', 'Name']);
+  const fallbackPhone = extractFromFallback(attachments, ['Phone', 'Phone Number', 'Mobile Phone']);
   const { name, phone } = extractContact(contactField || text);
   fields.contactName = name;
-  fields.contactPhone = phone;
+  fields.contactPhone = phone || sanitize(fallbackPhone).replace(/\D/g, '');
 
   // 4. Other fields
-  fields.line = extractAttachmentField(attachments, 'line');
-  fields.sequence = extractAttachmentField(attachments, 'sequence');
-  fields.user = extractAttachmentField(attachments, 'user');
+  fields.line =
+    extractAttachmentFieldByAliases(attachments, ['line', 'from number', 'sending number']) ||
+    extractFromFallback(attachments, ['Line']);
+  fields.sequence =
+    extractAttachmentFieldByAliases(attachments, ['sequence', 'campaign']) ||
+    extractFromFallback(attachments, ['Sequence', 'Campaign']);
+  fields.user =
+    extractAttachmentFieldByAliases(attachments, ['user', 'rep', 'agent', 'owner', 'sender']) ||
+    extractFromFallback(attachments, ['User', 'Rep', 'Agent', 'Owner']);
+
+  if (fields.direction === 'unknown' && fields.user) {
+    fields.direction = 'outbound';
+  }
 
   // 5. Raw Contact Link (to get Aloware ID)
-  const contactFieldValue = attachments?.[0]?.fields?.find((f) => f.title?.toLowerCase() === 'contact')?.value || '';
+  const contactFieldValue =
+    attachments
+      ?.flatMap((attachment) => attachment.fields || [])
+      .find((field) => sanitize(field.title || '').toLowerCase().includes('contact'))
+      ?.value || '';
   const idMatch = contactFieldValue.match(/contacts\/(\d+)/);
   if (idMatch?.[1]) {
     fields.contactId = idMatch[1];

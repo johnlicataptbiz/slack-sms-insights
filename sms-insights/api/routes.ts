@@ -30,6 +30,7 @@ import { getConversationById, listSmsEventsForConversation } from '../services/c
 import { getCronStatusSnapshot } from '../services/cron-scheduler.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import { getPool } from '../services/db.js';
+import { getAlowareIngestHealthSnapshot } from '../services/aloware-ingest-monitor.js';
 import {
   disenrollConversationContactFromSequence,
   enrollConversationContactToSequence,
@@ -709,6 +710,7 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
   const prismaRuntime = await getPrismaRuntimeStatus();
   const streamTokenConfig = getStreamTokenSecretConfigStatus();
   const slackAuthRuntime = getSlackAuthRuntimeStatus();
+  const alowareIngest = getAlowareIngestHealthSnapshot();
   const buildSha = getBuildSha();
   const hasBuildSha = buildSha !== 'unknown';
   const criticalFailure = dbStatus === 'error' || streamTokenConfig.status === 'error';
@@ -739,6 +741,20 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
           status: slackAuthRuntime.status,
           detail: slackAuthRuntime.detail,
           updatedAt: slackAuthRuntime.updatedAt,
+        },
+        aloware_ingest: {
+          status:
+            alowareIngest.totals.seen === 0
+              ? 'warn'
+              : alowareIngest.totals.skipRatePct >= 20
+                ? 'warn'
+                : 'ok',
+          detail: `seen=${alowareIngest.totals.seen} ingested=${alowareIngest.totals.ingested} skipped=${alowareIngest.totals.skipped} skipRate=${alowareIngest.totals.skipRatePct}%`,
+          metadata: {
+            startedAt: alowareIngest.startedAt,
+            byReason: alowareIngest.byReason,
+            recentSamples: alowareIngest.recentSamples,
+          },
         },
         stream_token_config: {
           status: streamTokenConfig.status,

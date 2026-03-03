@@ -1,4 +1,10 @@
 import type { App } from '@slack/bolt';
+import {
+  maybeLogAlowareIngestWarnings,
+  recordAlowareIngestSeen,
+  recordAlowareIngestSkip,
+  recordAlowareIngestSuccess,
+} from '../../services/aloware-ingest-monitor.js';
 import { parseAlowareMessage } from '../../services/aloware-parser.js';
 import { isAlowareChannel } from '../../services/aloware-policy.js';
 import { upsertConversationFromEvent } from '../../services/conversation-projector.js';
@@ -31,19 +37,48 @@ const register = (app: App) => {
     const text = (message as any).text as string | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: Slack message event payload is a union; we narrow via runtime checks.
     const attachments = (message as any).attachments as any[] | undefined;
+    const firstAttachmentTitle = attachments?.[0]?.title as string | undefined;
+    recordAlowareIngestSeen();
 
     const parsed = parseAlowareMessage(text || '', attachments);
 
     // Only ingest messages that look like SMS events.
-    if (parsed.direction === 'unknown') return;
-    if (!parsed.contactId && !parsed.contactPhone) return;
+    if (parsed.direction === 'unknown') {
+      recordAlowareIngestSkip({
+        reason: 'unknown_direction',
+        channelId,
+        text,
+        attachmentTitle: firstAttachmentTitle,
+      });
+      maybeLogAlowareIngestWarnings(logger);
+      return;
+    }
+    if (!parsed.contactId && !parsed.contactPhone) {
+      recordAlowareIngestSkip({
+        reason: 'missing_contact',
+        channelId,
+        text,
+        attachmentTitle: firstAttachmentTitle,
+      });
+      maybeLogAlowareIngestWarnings(logger);
+      return;
+    }
 
     // biome-ignore lint/suspicious/noExplicitAny: Slack message event payload is a union; we narrow via runtime checks.
     const slackTeamId = (message as any).team as string | undefined; // may be undefined in some events
     // biome-ignore lint/suspicious/noExplicitAny: Slack message event payload is a union; we narrow via runtime checks.
     const slackMessageTs = (message as any).ts as string | undefined;
 
-    if (!channelId || !slackMessageTs) return;
+    if (!channelId || !slackMessageTs) {
+      recordAlowareIngestSkip({
+        reason: 'missing_channel_or_ts',
+        channelId,
+        text,
+        attachmentTitle: firstAttachmentTitle,
+      });
+      maybeLogAlowareIngestWarnings(logger);
+      return;
+    }
 
     const eventRow = await insertSmsEvent(
       {
@@ -64,7 +99,11 @@ const register = (app: App) => {
       logger,
     );
 
-    if (!eventRow) return;
+    if (!eventRow) {
+      maybeLogAlowareIngestWarnings(logger);
+      return;
+    }
+    recordAlowareIngestSuccess();
 
     const conversation = await upsertConversationFromEvent(eventRow, logger);
     if (!conversation) return;

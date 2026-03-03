@@ -74,6 +74,7 @@ import {
   getVolumeByDayMetrics,
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
+import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
 import { getPrismaRuntimeStatus } from '../services/prisma.js';
 import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
@@ -100,7 +101,7 @@ import {
   getDashboardSessionTtlSeconds,
 } from '../services/session-store.js';
 import { getStreamTokenSecretConfigStatus, mintStreamToken, verifyStreamToken } from '../services/stream-token.js';
-import { DEFAULT_BUSINESS_TIMEZONE, resolveMetricsRange } from '../services/time-range.js';
+import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone, resolveMetricsRange } from '../services/time-range.js';
 import { getUserSendPreferences, upsertUserSendPreferences } from '../services/user-send-preferences.js';
 import { getWeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 import {
@@ -3708,6 +3709,65 @@ const handleGetCronStatus: RequestHandler = async (_req, res, _logger, origin) =
   sendJson(res, 200, toEnvelope({ data, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
 };
 
+const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  const fromDay = dayKeyInTimeZone(resolved.from, resolved.timeZone);
+  const toDay = dayKeyInTimeZone(resolved.to, resolved.timeZone);
+  if (!fromDay || !toDay) {
+    return sendJson(res, 400, { error: 'Failed to resolve timezone day range' }, origin);
+  }
+  const boardId = (url.searchParams.get('boardId') || '').trim() || null;
+  const sourceLimitRaw = Number.parseInt(url.searchParams.get('sourceLimit') || '12', 10);
+  const setterLimitRaw = Number.parseInt(url.searchParams.get('setterLimit') || '12', 10);
+  const sourceLimit = Number.isFinite(sourceLimitRaw) ? Math.max(1, Math.min(50, sourceLimitRaw)) : 12;
+  const setterLimit = Number.isFinite(setterLimitRaw) ? Math.max(1, Math.min(50, setterLimitRaw)) : 12;
+
+  try {
+    const data = await getMondayLeadInsights(
+      {
+        fromDay,
+        toDay,
+        timeZone: resolved.timeZone,
+        boardId,
+        sourceLimit,
+        setterLimit,
+      },
+      logger,
+    );
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch monday lead insights:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch monday lead insights', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
 const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
@@ -3873,7 +3933,9 @@ const apiRoutes: ApiRoute[] = [
   { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },
   { method: 'GET', path: '/api/v2/admin/audit-logs', handler: handleGetAuditLogsV2 },
   { method: 'GET', path: '/api/v2/admin/cron-status', handler: handleGetCronStatus },
+  { method: 'GET', path: '/api/v2/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
   { method: 'GET', path: '/api/admin/cron-status', handler: handleGetCronStatus },
+  { method: 'GET', path: '/api/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },

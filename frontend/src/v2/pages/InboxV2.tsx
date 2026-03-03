@@ -559,6 +559,9 @@ export default function InboxV2() {
 
   const detailQuery = useV2InboxConversationDetail(selectedConversationId, {
     forceSyncTick: detailForceSyncTick,
+    ...(isComposerModalOpen && selectedConversationId
+      ? { refetchIntervalMs: 7000 }
+      : {}),
   });
 
   const generateDraftMutation = useV2GenerateDraft();
@@ -721,6 +724,16 @@ export default function InboxV2() {
     if (!isComposerModalOpen || !selectedConversationId || !detail) return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
   }, [isComposerModalOpen, selectedConversationId, detailConversation?.id]);
+
+  useEffect(() => {
+    if (!isComposerModalOpen || !selectedConversationId) return;
+    // Keep qualification/sidebar data synced from active thread text while composing.
+    setDetailForceSyncTick(Date.now());
+    const timer = window.setInterval(() => {
+      setDetailForceSyncTick(Date.now());
+    }, 7000);
+    return () => window.clearInterval(timer);
+  }, [isComposerModalOpen, selectedConversationId]);
 
   // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
   useEffect(() => {

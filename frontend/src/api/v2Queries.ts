@@ -387,9 +387,10 @@ export const useV2InboxConversations = (params: InboxListParams) => {
 
 export const useV2InboxConversationDetail = (
   conversationId: string | null,
-  options?: { forceSyncTick?: number },
+  options?: { forceSyncTick?: number; refetchIntervalMs?: number },
 ) => {
   const forceSyncTick = options?.forceSyncTick ?? 0;
+  const refetchIntervalMs = options?.refetchIntervalMs ?? false;
   return useQuery({
     queryKey: ['v2', 'inbox', 'conversation', conversationId, forceSyncTick],
     enabled: Boolean(conversationId),
@@ -404,6 +405,8 @@ export const useV2InboxConversationDetail = (
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchOnWindowFocus: true,
+    refetchInterval: refetchIntervalMs,
+    refetchIntervalInBackground: false,
   });
 };
 

@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import { resolveBusinessDayRange, resolveMetricsRange } from '../../services/time-range.js';
 
 describe('time-range resolver', () => {
-  it('resolves today/7d/30d ranges in America/Chicago consistently', () => {
+  it('resolves today/7d/30d/90d/180d/365d ranges in America/Chicago consistently', () => {
     const now = new Date('2026-01-15T15:30:00.000Z');
 
     const today = resolveMetricsRange({ range: 'today', tz: 'America/Chicago', now });
@@ -21,6 +21,21 @@ describe('time-range resolver', () => {
     assert.equal(thirty.mode, 'range');
     assert.equal(thirty.from.toISOString(), '2025-12-17T06:00:00.000Z');
     assert.equal(thirty.to.toISOString(), now.toISOString());
+
+    const ninety = resolveMetricsRange({ range: '90d', tz: 'America/Chicago', now });
+    assert.equal(ninety.mode, 'range');
+    assert.equal(ninety.from.toISOString(), '2025-10-18T05:00:00.000Z');
+    assert.equal(ninety.to.toISOString(), now.toISOString());
+
+    const oneEighty = resolveMetricsRange({ range: '180d', tz: 'America/Chicago', now });
+    assert.equal(oneEighty.mode, 'range');
+    assert.equal(oneEighty.from.toISOString(), '2025-07-20T05:00:00.000Z');
+    assert.equal(oneEighty.to.toISOString(), now.toISOString());
+
+    const threeSixtyFive = resolveMetricsRange({ range: '365d', tz: 'America/Chicago', now });
+    assert.equal(threeSixtyFive.mode, 'range');
+    assert.equal(threeSixtyFive.from.toISOString(), '2025-01-16T06:00:00.000Z');
+    assert.equal(threeSixtyFive.to.toISOString(), now.toISOString());
   });
 
   it('resolves an explicit day window without shifting day boundaries', () => {

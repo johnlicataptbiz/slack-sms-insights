@@ -11,6 +11,23 @@ export type QualificationMetric = {
 export type SequenceQualificationBreakdown = {
   sequenceLabel: string;
   totalConversations: number;
+  mondayOutcomes: {
+    linkedContacts: number;
+    totalOutcomes: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    noShow: number;
+    cancelled: number;
+    badTiming: number;
+    badFit: number;
+    other: number;
+    unknown: number;
+    bookedPct: number;
+    closedWonPct: number;
+    noShowPct: number;
+    cancelledPct: number;
+  };
   // Employment status
   fullTime: QualificationMetric;
   partTime: QualificationMetric;
@@ -62,6 +79,17 @@ export const buildSequenceQualificationBreakdown = async (params: {
   const result = await pool.query<{
     sequence_label: string;
     total_conversations: number;
+    monday_linked_contacts: number;
+    monday_total_outcomes: number;
+    monday_booked_count: number;
+    monday_closed_won_count: number;
+    monday_closed_lost_count: number;
+    monday_no_show_count: number;
+    monday_cancelled_count: number;
+    monday_bad_timing_count: number;
+    monday_bad_fit_count: number;
+    monday_other_count: number;
+    monday_unknown_count: number;
     full_time_count: number;
     part_time_count: number;
     unknown_employment_count: number;
@@ -104,34 +132,74 @@ export const buildSequenceQualificationBreakdown = async (params: {
         cs.qualification_niche
       FROM sequence_first_touch sft
       JOIN conversation_state cs ON cs.conversation_id = sft.conversation_id
-      WHERE cs.updated_at >= $1::timestamptz
-        AND cs.updated_at < $2::timestamptz
+    ),
+    sequence_contacts AS (
+      SELECT DISTINCT
+        sft.sequence_label,
+        c.contact_key
+      FROM sequence_first_touch sft
+      JOIN conversations c ON c.id = sft.conversation_id
+      WHERE c.contact_key IS NOT NULL
+        AND c.contact_key != ''
+    ),
+    monday_outcomes_by_sequence AS (
+      SELECT
+        sc.sequence_label,
+        COUNT(DISTINCT lo.contact_key)::int AS monday_linked_contacts,
+        COUNT(lo.item_id)::int AS monday_total_outcomes,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'booked')::int AS monday_booked_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'closed_won')::int AS monday_closed_won_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'closed_lost')::int AS monday_closed_lost_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'no_show')::int AS monday_no_show_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'cancelled')::int AS monday_cancelled_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'bad_timing')::int AS monday_bad_timing_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'bad_fit')::int AS monday_bad_fit_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'other')::int AS monday_other_count,
+        COUNT(*) FILTER (WHERE lo.outcome_category = 'unknown')::int AS monday_unknown_count
+      FROM sequence_contacts sc
+      LEFT JOIN lead_outcomes lo
+        ON lo.contact_key = sc.contact_key
+       AND lo.call_date >= ($1::timestamptz AT TIME ZONE $4)::date
+       AND lo.call_date < ($2::timestamptz AT TIME ZONE $4)::date
+      GROUP BY sc.sequence_label
     )
     SELECT 
-      sequence_label,
+      cwq.sequence_label,
       COUNT(*) as total_conversations,
-      COUNT(*) FILTER (WHERE qualification_full_or_part_time = 'full_time') as full_time_count,
-      COUNT(*) FILTER (WHERE qualification_full_or_part_time = 'part_time') as part_time_count,
-      COUNT(*) FILTER (WHERE qualification_full_or_part_time = 'unknown') as unknown_employment_count,
-      COUNT(*) FILTER (WHERE qualification_revenue_mix = 'mostly_cash') as mostly_cash_count,
-      COUNT(*) FILTER (WHERE qualification_revenue_mix = 'mostly_insurance') as mostly_insurance_count,
-      COUNT(*) FILTER (WHERE qualification_revenue_mix = 'balanced') as balanced_mix_count,
-      COUNT(*) FILTER (WHERE qualification_revenue_mix = 'unknown') as unknown_revenue_count,
-      COUNT(*) FILTER (WHERE qualification_delivery_model = 'brick_and_mortar') as brick_and_mortar_count,
-      COUNT(*) FILTER (WHERE qualification_delivery_model = 'mobile') as mobile_count,
-      COUNT(*) FILTER (WHERE qualification_delivery_model = 'online') as online_count,
-      COUNT(*) FILTER (WHERE qualification_delivery_model = 'hybrid') as hybrid_count,
-      COUNT(*) FILTER (WHERE qualification_delivery_model = 'unknown') as unknown_delivery_count,
-      COUNT(*) FILTER (WHERE qualification_coaching_interest = 'high') as high_interest_count,
-      COUNT(*) FILTER (WHERE qualification_coaching_interest = 'medium') as medium_interest_count,
-      COUNT(*) FILTER (WHERE qualification_coaching_interest = 'low') as low_interest_count,
-      COUNT(*) FILTER (WHERE qualification_coaching_interest = 'unknown') as unknown_interest_count
-    FROM conversations_with_qualification
-    GROUP BY sequence_label
+      COALESCE(MAX(mos.monday_linked_contacts), 0)::int AS monday_linked_contacts,
+      COALESCE(MAX(mos.monday_total_outcomes), 0)::int AS monday_total_outcomes,
+      COALESCE(MAX(mos.monday_booked_count), 0)::int AS monday_booked_count,
+      COALESCE(MAX(mos.monday_closed_won_count), 0)::int AS monday_closed_won_count,
+      COALESCE(MAX(mos.monday_closed_lost_count), 0)::int AS monday_closed_lost_count,
+      COALESCE(MAX(mos.monday_no_show_count), 0)::int AS monday_no_show_count,
+      COALESCE(MAX(mos.monday_cancelled_count), 0)::int AS monday_cancelled_count,
+      COALESCE(MAX(mos.monday_bad_timing_count), 0)::int AS monday_bad_timing_count,
+      COALESCE(MAX(mos.monday_bad_fit_count), 0)::int AS monday_bad_fit_count,
+      COALESCE(MAX(mos.monday_other_count), 0)::int AS monday_other_count,
+      COALESCE(MAX(mos.monday_unknown_count), 0)::int AS monday_unknown_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_full_or_part_time = 'full_time') as full_time_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_full_or_part_time = 'part_time') as part_time_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_full_or_part_time = 'unknown') as unknown_employment_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_revenue_mix = 'mostly_cash') as mostly_cash_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_revenue_mix = 'mostly_insurance') as mostly_insurance_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_revenue_mix = 'balanced') as balanced_mix_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_revenue_mix = 'unknown') as unknown_revenue_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_delivery_model = 'brick_and_mortar') as brick_and_mortar_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_delivery_model = 'mobile') as mobile_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_delivery_model = 'online') as online_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_delivery_model = 'hybrid') as hybrid_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_delivery_model = 'unknown') as unknown_delivery_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_coaching_interest = 'high') as high_interest_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_coaching_interest = 'medium') as medium_interest_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_coaching_interest = 'low') as low_interest_count,
+      COUNT(*) FILTER (WHERE cwq.qualification_coaching_interest = 'unknown') as unknown_interest_count
+    FROM conversations_with_qualification cwq
+    LEFT JOIN monday_outcomes_by_sequence mos ON mos.sequence_label = cwq.sequence_label
+    GROUP BY cwq.sequence_label
     HAVING COUNT(*) >= $3
     ORDER BY total_conversations DESC
     `,
-    [from, to, minConversations],
+    [from, to, minConversations, timezone],
   );
 
   // Fetch sample quotes for each category
@@ -139,6 +207,12 @@ export const buildSequenceQualificationBreakdown = async (params: {
 
   for (const row of result.rows) {
     const total = Number(row.total_conversations);
+    const mondayTotalOutcomes = Number(row.monday_total_outcomes);
+    const mondayBooked = Number(row.monday_booked_count);
+    const mondayClosedWon = Number(row.monday_closed_won_count);
+    const mondayNoShow = Number(row.monday_no_show_count);
+    const mondayCancelled = Number(row.monday_cancelled_count);
+    const mondayPct = (count: number): number => (mondayTotalOutcomes > 0 ? (count / mondayTotalOutcomes) * 100 : 0);
 
     // Get sample quotes for each qualification category
     const [
@@ -174,6 +248,23 @@ export const buildSequenceQualificationBreakdown = async (params: {
     breakdowns.push({
       sequenceLabel: row.sequence_label,
       totalConversations: total,
+      mondayOutcomes: {
+        linkedContacts: Number(row.monday_linked_contacts),
+        totalOutcomes: mondayTotalOutcomes,
+        booked: mondayBooked,
+        closedWon: mondayClosedWon,
+        closedLost: Number(row.monday_closed_lost_count),
+        noShow: mondayNoShow,
+        cancelled: mondayCancelled,
+        badTiming: Number(row.monday_bad_timing_count),
+        badFit: Number(row.monday_bad_fit_count),
+        other: Number(row.monday_other_count),
+        unknown: Number(row.monday_unknown_count),
+        bookedPct: mondayPct(mondayBooked),
+        closedWonPct: mondayPct(mondayClosedWon),
+        noShowPct: mondayPct(mondayNoShow),
+        cancelledPct: mondayPct(mondayCancelled),
+      },
       fullTime: {
         count: Number(row.full_time_count),
         pct: (Number(row.full_time_count) / total) * 100,
@@ -297,6 +388,8 @@ async function fetchSampleQuote(
       AND se.direction = 'inbound'
       AND se.body IS NOT NULL
       AND se.body != ''
+      AND se.event_ts >= $1::timestamptz
+      AND se.event_ts < $2::timestamptz
     ORDER BY se.event_ts DESC
     LIMIT 1
     `,

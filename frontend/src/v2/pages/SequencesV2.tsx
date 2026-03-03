@@ -29,7 +29,7 @@ const defaultExecutiveSectionState: ExecutiveSectionState = {
   timing: false,
 };
 
-type Mode = '7d' | '30d';
+type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
 type Sort =
   | 'messagesSent'
   | 'replyRatePct'
@@ -138,6 +138,14 @@ const BUCKET_LABELS: Record<'jack' | 'brandon' | 'selfBooked', string> = {
   jack: 'Jack',
   brandon: 'Brandon',
   selfBooked: 'Self-booked',
+};
+
+const MODE_LABELS: Record<Mode, string> = {
+  '7d': 'Last 7 days',
+  '30d': 'Last 30 days',
+  '90d': 'Last 90 days',
+  '180d': 'Last 180 days',
+  '365d': 'Last 365 days',
 };
 
 // ─── JSX Helpers ─────────────────────────────────────────────────────────────
@@ -935,7 +943,7 @@ export default function SequencesV2() {
       {/* ── Header ── */}
       <V2PageHeader
         title="Sequences"
-        subtitle={`Performance across all active sequences · ${mode === '7d' ? 'Last 7 days' : 'Last 30 days'}`}
+        subtitle={`Performance across all active sequences · ${MODE_LABELS[mode]}`}
         right={
           <div className="V2ControlsRow">
             <div className="V2ExecToggles">
@@ -968,6 +976,27 @@ export default function SequencesV2() {
                 onClick={() => setMode('30d')}
               >
                 30d
+              </button>
+              <button
+                type="button"
+                className={`V2ModeToggle__btn${mode === '90d' ? ' is-active' : ''}`}
+                onClick={() => setMode('90d')}
+              >
+                90d
+              </button>
+              <button
+                type="button"
+                className={`V2ModeToggle__btn${mode === '180d' ? ' is-active' : ''}`}
+                onClick={() => setMode('180d')}
+              >
+                180d
+              </button>
+              <button
+                type="button"
+                className={`V2ModeToggle__btn${mode === '365d' ? ' is-active' : ''}`}
+                onClick={() => setMode('365d')}
+              >
+                365d
               </button>
             </div>
           </div>

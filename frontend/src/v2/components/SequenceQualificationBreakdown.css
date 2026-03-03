@@ -243,6 +243,12 @@
   font-weight: 600;
 }
 
+.metric-note {
+  font-size: 0.78rem;
+  color: var(--v2-muted);
+  margin-top: 0.25rem;
+}
+
 .niche-tags {
   display: flex;
   flex-wrap: wrap;
@@ -284,6 +290,26 @@
   line-height: 1.5;
   color: var(--v2-text);
   font-style: italic;
+}
+
+.quote-source {
+  display: inline-flex;
+  margin-top: 0.55rem;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--v2-accent-strong);
+  background: rgba(17, 184, 214, 0.12);
+  border: 1px solid rgba(17, 184, 214, 0.25);
+}
+
+.quotes-empty {
+  font-size: 0.8rem;
+  color: var(--v2-muted);
+  padding: 0.4rem 0.2rem;
 }
 
 .quote-date {

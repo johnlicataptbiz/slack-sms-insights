@@ -1,7 +1,7 @@
 const DEFAULT_BUSINESS_TIMEZONE = 'America/Chicago';
 const ISO_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export type SupportedRange = 'today' | '7d' | '30d';
+export type SupportedRange = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
 export type ResolvedMetricsRange =
   | {
       mode: 'day';
@@ -153,14 +153,25 @@ export const resolveMetricsRange = (params: {
 
   const range = (params.range || '').trim() as SupportedRange | '';
   if (range) {
-    if (range !== 'today' && range !== '7d' && range !== '30d') {
-      throw new Error('Invalid range. Expected one of: today, 7d, 30d');
+    if (range !== 'today' && range !== '7d' && range !== '30d' && range !== '90d' && range !== '180d' && range !== '365d') {
+      throw new Error('Invalid range. Expected one of: today, 7d, 30d, 90d, 180d, 365d');
     }
 
     const today = dayKeyInTimeZone(now, timeZone);
     if (!today) throw new Error('Failed to resolve current day for timezone');
 
-    const startDay = range === 'today' ? today : range === '7d' ? shiftIsoDay(today, -6) : shiftIsoDay(today, -29);
+    const startDay =
+      range === 'today'
+        ? today
+        : range === '7d'
+          ? shiftIsoDay(today, -6)
+          : range === '30d'
+            ? shiftIsoDay(today, -29)
+            : range === '90d'
+              ? shiftIsoDay(today, -89)
+              : range === '180d'
+                ? shiftIsoDay(today, -179)
+                : shiftIsoDay(today, -364);
     const from = resolveBusinessDayRange(startDay, timeZone).from;
     const to = now;
     return { mode: 'range', range, from, to, timeZone };

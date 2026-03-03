@@ -93,12 +93,12 @@ export const salesMetricsSchema = z.object({
   to: z.string().optional(),
   /**
    * Rolling window shorthand.
-   * Must match the values accepted by resolveMetricsRange ('today' | '7d' | '30d').
+   * Must match the values accepted by resolveMetricsRange
+   * ('today' | '7d' | '30d' | '90d' | '180d' | '365d').
    * Defaults to '7d' when no day/from/to/range is provided (preserves backward compat).
-   * NOTE: '1d' and '90d' were previously listed here but are not handled by
-   * resolveMetricsRange and would have thrown at runtime.
+   * NOTE: '1d' is intentionally not supported.
    */
-  range: z.enum(['today', '7d', '30d']).default('7d'),
+  range: z.enum(['today', '7d', '30d', '90d', '180d', '365d']).default('7d'),
   /** IANA timezone string (e.g. America/Chicago). Defaults to DEFAULT_BUSINESS_TIMEZONE. */
   tz: z.string().optional(),
 });

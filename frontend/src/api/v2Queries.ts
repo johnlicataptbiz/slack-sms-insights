@@ -43,7 +43,7 @@ import type {
 export type SalesMetricsQueryParams =
   | { from: string; to: string; tz?: string }
   | { day: string; tz?: string }
-  | { range: 'today' | '7d' | '30d'; tz?: string };
+  | { range: 'today' | '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string };
 
 const buildSalesMetricsSearchParams = (params: SalesMetricsQueryParams): URLSearchParams => {
   const searchParams = new URLSearchParams();
@@ -1237,6 +1237,23 @@ type QualField = { count: number; pct: number; sampleQuote: string | null };
 export type SequenceQualificationItem = {
   sequenceLabel: string;
   totalConversations: number;
+  mondayOutcomes?: {
+    linkedContacts: number;
+    totalOutcomes: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    noShow: number;
+    cancelled: number;
+    badTiming: number;
+    badFit: number;
+    other: number;
+    unknown: number;
+    bookedPct: number;
+    closedWonPct: number;
+    noShowPct: number;
+    cancelledPct: number;
+  };
   // Employment
   fullTime: QualField;
   partTime: QualField;
@@ -1270,7 +1287,7 @@ export type SequenceQualificationBreakdown = {
   };
 };
 
-export const useV2SequenceQualification = (params: { range: '7d' | '30d'; tz?: string }) => {
+export const useV2SequenceQualification = (params: { range: '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string }) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);

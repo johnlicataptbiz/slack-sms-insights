@@ -48,7 +48,6 @@ import {
   useV2InboxTemplates,
   useV2IncrementGuardrailOverride,
   useV2ObjectionFrequency,
-  useV2SetterAssistPerformance,
   useV2OverrideEscalation,
   useV2SendInboxMessage,
   useV2SetDefaultSendLine,
@@ -178,11 +177,6 @@ const inferSetterIntent = (messageBody: string | null | undefined): SetterIntent
     return "how_to";
   }
   return "unknown";
-};
-
-type SetterStarterChip = {
-  label: string;
-  template: string;
 };
 
 const createClientIdempotencyKey = (): string => {
@@ -480,7 +474,6 @@ export default function InboxV2() {
   const [composerText, setComposerText] = useState("");
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
-  const [selectedSetterChipLabel, setSelectedSetterChipLabel] = useState<string | null>(null);
   const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
     useState<string | null>(null);
   const [selectedLineKey, setSelectedLineKey] = useState("");
@@ -824,7 +817,6 @@ export default function InboxV2() {
   // Phase 3 hooks
   const stageConversionQuery = useV2StageConversion();
   const objectionFrequencyQuery = useV2ObjectionFrequency();
-  const setterAssistPerformanceQuery = useV2SetterAssistPerformance();
   const draftAiPerformanceQuery = useV2DraftAIPerformance({
     range: "30d",
     tz: "America/Chicago",
@@ -887,139 +879,6 @@ export default function InboxV2() {
       action: "Use a clear question that advances qualification.",
     };
   }, [inferredIntent]);
-  const setterStarterChips = useMemo<SetterStarterChip[]>(() => {
-    if (inferredIntent === "ready") {
-      return [
-        {
-          label: "Book now",
-          template:
-            "Awesome {{first_name}} - let’s lock it in. Are you more open this week or next week for a quick call?",
-        },
-        {
-          label: "Time options",
-          template:
-            "{{first_name}}, want to do a quick fit call? Send me 2 times that work and I’ll match one.",
-        },
-        {
-          label: "Commitment check",
-          template:
-            "Before we book, what outcome would make this call a win for you?",
-        },
-      ];
-    }
-    if (inferredIntent === "pricing") {
-      return [
-        {
-          label: "ROI reframe",
-          template:
-            "Totally fair question {{first_name}} - quick context: most clinic owners care less about cost and more about speed to results. What would this need to produce for it to feel worth it?",
-        },
-        {
-          label: "Budget qualifier",
-          template:
-            "What budget range were you hoping to stay in so I can point you to the right path?",
-        },
-        {
-          label: "Case proof",
-          template:
-            "Happy to share a similar clinic example first - cash-based or insurance-heavy model for you?",
-        },
-      ];
-    }
-    if (inferredIntent === "timing") {
-      return [
-        {
-          label: "Low-friction next step",
-          template:
-            "No pressure {{first_name}} - would it help if I send a 2-minute breakdown now and we revisit when timing is better?",
-        },
-        {
-          label: "Calendar anchor",
-          template:
-            "Makes sense. Should I follow up next week or next month so this doesn’t get lost?",
-        },
-        {
-          label: "Priority probe",
-          template:
-            "What would need to change for this to become a priority sooner?",
-        },
-      ];
-    }
-    if (inferredIntent === "insurance") {
-      return [
-        {
-          label: "Payer mix",
-          template:
-            "Quick one {{first_name}} - are you mostly insurance, mostly cash, or a blend right now?",
-        },
-        {
-          label: "Model bridge",
-          template:
-            "Got it. We can map this to your exact reimbursement setup so it’s practical, not generic. Want that?",
-        },
-        {
-          label: "Specific blocker",
-          template:
-            "What part feels most risky on the insurance side - authorization, reimbursement rate, or visit volume?",
-        },
-      ];
-    }
-    if (inferredIntent === "skeptical") {
-      return [
-        {
-          label: "Trust opener",
-          template:
-            "Totally get the hesitation {{first_name}}. Want me to share one concrete result from a clinic similar to yours?",
-        },
-        {
-          label: "Permission ask",
-          template:
-            "If it helps, I can keep this simple and practical. Open to a quick 2-minute explanation?",
-        },
-        {
-          label: "Concern isolate",
-          template:
-            "What’s your biggest concern right now so I can address that directly?",
-        },
-      ];
-    }
-    if (inferredIntent === "how_to") {
-      return [
-        {
-          label: "2-step answer",
-          template:
-            "Great question {{first_name}} - short answer: step 1 is [current baseline], step 2 is [first implementation]. Want the exact version for your clinic?",
-        },
-        {
-          label: "Current stage check",
-          template:
-            "So I tailor this right - where are you currently stuck in the process?",
-        },
-        {
-          label: "Offer walk-through",
-          template:
-            "Happy to walk you through it live in 10 minutes. This week or next week better?",
-        },
-      ];
-    }
-    return [
-      {
-        label: "Discovery question",
-        template:
-          "Hey {{first_name}} - quick one: what’s the #1 bottleneck in your clinic this month?",
-      },
-      {
-        label: "Objection bridge",
-        template:
-          "{{first_name}}, most clinic owners we help had the same concern before they saw how this applies to their setup. Want a 2-min breakdown?",
-      },
-      {
-        label: "Soft CTA",
-        template:
-          "If it helps, we can map this to your situation live. Does this week or next week work better?",
-      },
-    ];
-  }, [inferredIntent]);
   const detailDrafts = Array.isArray(detail?.drafts) ? detail.drafts : [];
   const detailMondayTrail = Array.isArray(detail?.mondayTrail)
     ? detail.mondayTrail
@@ -1032,9 +891,6 @@ export default function InboxV2() {
     : [];
   const objectionFrequencyRows = Array.isArray(objectionFrequencyQuery.data)
     ? objectionFrequencyQuery.data
-    : [];
-  const setterAssistRows = Array.isArray(setterAssistPerformanceQuery.data)
-    ? setterAssistPerformanceQuery.data
     : [];
   const draftAiPerformance = draftAiPerformanceQuery.data?.data || null;
   const setterLikeRate = toFiniteNumber(draftAiPerformance?.setterLikeRate);
@@ -1121,7 +977,6 @@ export default function InboxV2() {
     setShowDoublePitchWarning(false);
     setSequenceIdInput("");
     setLastSequenceSync(null);
-    setSelectedSetterChipLabel(null);
     noteForm.reset({ text: "" });
     snoozeForm.reset({ snoozedUntil: "" });
   }, [selectedConversationId]);
@@ -1239,7 +1094,6 @@ export default function InboxV2() {
       });
       setComposerText(result.data.text);
       setSelectedDraftId(result.data.id);
-      setSelectedSetterChipLabel(null);
       setDraftPrefillDoneForConversation(selectedConversationId);
       if (result.data.generationMode === "contextual_fallback") {
         const firstWarning =
@@ -1322,21 +1176,6 @@ export default function InboxV2() {
   const onAppendEmoji = (emojiData: EmojiClickData) => {
     setComposerText((prev) => `${prev}${emojiData.emoji}`);
     setSendStatus((prev) => (prev === "sent" || prev === "error" ? "idle" : prev));
-    pendingIdempotencyRef.current = null;
-    window.requestAnimationFrame(() => composerRef.current?.focus());
-  };
-
-  const applyStarter = (template: string, chipLabel: string) => {
-    const firstName =
-      (detailContactCard?.name || "")
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)[0] || "there";
-    const resolved = template.replace(/\{\{first_name\}\}/g, firstName);
-    setComposerText(resolved);
-    setSelectedSetterChipLabel(chipLabel);
-    setSendStatus("idle");
-    setSelectedDraftId(null);
     pendingIdempotencyRef.current = null;
     window.requestAnimationFrame(() => composerRef.current?.focus());
   };
@@ -1442,14 +1281,6 @@ export default function InboxV2() {
           : {}),
         ...(sendFromNumber ? { fromNumber: sendFromNumber } : {}),
         ...(selectedDraftId ? { draftId: selectedDraftId } : {}),
-        ...(selectedSetterChipLabel
-          ? {
-              setterAssist: {
-                chipLabel: selectedSetterChipLabel,
-                intent: inferredIntent,
-              },
-            }
-          : {}),
       });
       const lineSummary = formatSendLineLabel(result.data.lineSelection);
 
@@ -1460,7 +1291,6 @@ export default function InboxV2() {
 
         setComposerText("");
         setSelectedDraftId(null);
-        setSelectedSetterChipLabel(null);
         pendingIdempotencyRef.current = null;
         if (result.data.status === "duplicate") {
           toast.info("Send deduped: message was already processed.");
@@ -1545,7 +1375,6 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     setComposerText("");
     setSelectedDraftId(null);
-    setSelectedSetterChipLabel(null);
     setDraftPrefillDoneForConversation(selectedConversationId);
     setFlashMessage("Draft cleared.");
   };
@@ -2602,55 +2431,6 @@ export default function InboxV2() {
               )}
             </div>
 
-            <div className="V2Inbox__analyticsSection">
-              <h4 className="V2Inbox__analyticsSectionTitle">
-                Setter Chip Performance (30d)
-              </h4>
-              {setterAssistPerformanceQuery.isLoading ? (
-                <p className="V2Inbox__analyticsHint">Loading…</p>
-              ) : setterAssistPerformanceQuery.isError ? (
-                <p className="V2Inbox__analyticsHint">Failed to load</p>
-              ) : setterAssistRows.length === 0 ? (
-                <p className="V2Inbox__analyticsHint">
-                  No tracked chip sends yet
-                </p>
-              ) : (
-                <table className="V2Inbox__conversionTable">
-                  <thead>
-                    <tr>
-                      <th>Chip</th>
-                      <th>Sent</th>
-                      <th>Replies</th>
-                      <th>Reply %</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {setterAssistRows.slice(0, 8).map((row) => (
-                      <tr key={row.chip_label}>
-                        <td>{row.chip_label}</td>
-                        <td>{row.sent_count}</td>
-                        <td>{row.replied_count}</td>
-                        <td>
-                          <span
-                            className="V2Inbox__conversionRate"
-                            style={{
-                              color:
-                                Number(row.reply_rate_pct) >= 45
-                                  ? "var(--v2-positive)"
-                                  : Number(row.reply_rate_pct) >= 25
-                                    ? "var(--v2-warning)"
-                                    : "var(--v2-critical)",
-                            }}
-                          >
-                            {Number(row.reply_rate_pct).toFixed(1)}%
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
           </div>
         </div>
       </section>
@@ -3132,20 +2912,6 @@ export default function InboxV2() {
                         <p className="V2Inbox__setterAssistAction">
                           {setterAssistSummary.action}
                         </p>
-                        <div className="V2Inbox__setterAssistChips">
-                          {setterStarterChips.map((chip) => (
-                            <button
-                              key={chip.label}
-                              type="button"
-                              className="V2Inbox__setterChip"
-                              onClick={() =>
-                                applyStarter(chip.template, chip.label)
-                              }
-                            >
-                              {chip.label}
-                            </button>
-                          ))}
-                        </div>
                       </div>
 
                       {/* Double Pitch Protection Banner */}
@@ -3328,7 +3094,6 @@ export default function InboxV2() {
                                 if (!draft) return;
                                 setComposerText(draft.text);
                                 setSelectedDraftId(draft.id);
-                                setSelectedSetterChipLabel(null);
                               }}
                               options={[
                                 {

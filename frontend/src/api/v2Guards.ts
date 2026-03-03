@@ -12,6 +12,7 @@ import type {
   SequenceVersionHistoryV2,
   ScoreboardV2,
   SendMessageResultV2,
+  MondayLeadInsightsV2,
   WeeklyManagerSummaryV2,
 } from './v2-types';
 
@@ -154,6 +155,32 @@ export function assertWeeklySummaryV2Envelope(value: unknown): asserts value is 
   if (!Array.isArray(data.topWins)) throw new Error('Invalid v2 weekly-summary response: topWins missing');
   if (!Array.isArray(data.atRiskFlags)) throw new Error('Invalid v2 weekly-summary response: atRiskFlags missing');
   if (!Array.isArray(data.actionsNextWeek)) throw new Error('Invalid v2 weekly-summary response: actionsNextWeek missing');
+}
+
+export function assertMondayLeadInsightsV2Envelope(value: unknown): asserts value is ApiEnvelope<MondayLeadInsightsV2> {
+  if (!isObject(value)) throw new Error('Invalid v2 monday lead-insights response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid v2 monday lead-insights response: data must be object');
+
+  const data = value.data;
+  if (!isObject(data.window)) throw new Error('Invalid v2 monday lead-insights response: window missing');
+  if (!isString(data.window.fromDay)) throw new Error('Invalid v2 monday lead-insights response: window.fromDay');
+  if (!isString(data.window.toDay)) throw new Error('Invalid v2 monday lead-insights response: window.toDay');
+  if (!isString(data.window.timeZone)) throw new Error('Invalid v2 monday lead-insights response: window.timeZone');
+
+  if (!isObject(data.totals)) throw new Error('Invalid v2 monday lead-insights response: totals missing');
+  if (!isNumber(data.totals.leads)) throw new Error('Invalid v2 monday lead-insights response: totals.leads');
+  if (!isNumber(data.totals.booked)) throw new Error('Invalid v2 monday lead-insights response: totals.booked');
+
+  if (!Array.isArray(data.outcomesByCategory)) {
+    throw new Error('Invalid v2 monday lead-insights response: outcomesByCategory missing');
+  }
+  if (!Array.isArray(data.topSources)) throw new Error('Invalid v2 monday lead-insights response: topSources missing');
+  if (!Array.isArray(data.topSetters)) throw new Error('Invalid v2 monday lead-insights response: topSetters missing');
+  if (!Array.isArray(data.activityByDay)) throw new Error('Invalid v2 monday lead-insights response: activityByDay missing');
+  if (!Array.isArray(data.mondaySyncState)) {
+    throw new Error('Invalid v2 monday lead-insights response: mondaySyncState missing');
+  }
 }
 
 const assertInboxConversation = (value: unknown): void => {

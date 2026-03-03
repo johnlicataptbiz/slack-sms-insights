@@ -220,6 +220,62 @@ export type WeeklyManagerSummaryV2 = {
   actionsNextWeek: string[];
 };
 
+export type MondayLeadInsightsV2 = {
+  window: {
+    fromDay: string;
+    toDay: string;
+    timeZone: string;
+    boardId: string | null;
+  };
+  totals: {
+    leads: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    badTiming: number;
+    badFit: number;
+    noShow: number;
+    cancelled: number;
+  };
+  outcomesByCategory: Array<{
+    category: string;
+    count: number;
+  }>;
+  topSources: Array<{
+    source: string;
+    count: number;
+  }>;
+  topSetters: Array<{
+    setter: string;
+    leads: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    badTiming: number;
+    badFit: number;
+    noShow: number;
+    cancelled: number;
+  }>;
+  activityByDay: Array<{
+    day: string;
+    leads: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    badTiming: number;
+    badFit: number;
+    noShow: number;
+    cancelled: number;
+  }>;
+  mondaySyncState: Array<{
+    boardId: string;
+    status: string | null;
+    lastSyncAt: string | null;
+    updatedAt: string | null;
+    error: string | null;
+  }>;
+};
+
 export type QualificationStateV2 = {
   fullOrPartTime: 'full_time' | 'part_time' | 'unknown';
   niche: string | null;

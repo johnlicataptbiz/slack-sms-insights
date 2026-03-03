@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import type { SalesMetricsV2 } from '../../api/v2-types';
-import { useV2SalesMetrics, useV2WeeklySummary } from '../../api/v2Queries';
+import { useV2MondayLeadInsights, useV2SalesMetrics, useV2WeeklySummary } from '../../api/v2Queries';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
 
 type InsightsRange = 'today' | '7d' | '30d';
 type VolumeMode = 'all' | 'sequence' | 'manual';
+const BUSINESS_TZ = 'America/Chicago';
 
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -74,9 +75,16 @@ export function InsightsV2() {
   const [volumeMode, setVolumeMode] = useState<VolumeMode>('all');
   const { data: payloadEnvelope, isLoading, error } = useV2SalesMetrics({ range });
   const { data: weeklyEnvelope } = useV2WeeklySummary({});
+  const mondayLeadInsightsQuery = useV2MondayLeadInsights({
+    range,
+    tz: BUSINESS_TZ,
+    sourceLimit: 6,
+    setterLimit: 6,
+  });
 
   const payload = payloadEnvelope?.data;
   const weekly = weeklyEnvelope?.data;
+  const mondayLeadInsights = mondayLeadInsightsQuery.data?.data;
 
   const rangeMeta = useMemo(() => {
     if (!payload) return null;
@@ -505,6 +513,85 @@ export function InsightsV2() {
                 ? `Matched ${breakdown.bookedAttribution.matchedCalls} of ${breakdown.bookedAttribution.totalCalls} calls to a source`
                 : 'n/a'}
             </div>
+          </V2Panel>
+
+          <V2Panel title="Sales Call Outcomes (Monday)" caption="Historical lead outcomes from synced Monday boards.">
+            {mondayLeadInsightsQuery.isLoading ? (
+              <V2State kind="loading">Loading historical sales outcomes…</V2State>
+            ) : mondayLeadInsightsQuery.isError || !mondayLeadInsights ? (
+              <V2State kind="error">Unable to load Monday lead insights.</V2State>
+            ) : (
+              <div style={{ display: 'grid', gap: '0.75rem' }}>
+                <div className="V2SplitStat">
+                  <div>
+                    <span>Leads</span>
+                    <strong>{fmtInt(mondayLeadInsights.totals.leads)}</strong>
+                  </div>
+                  <div>
+                    <span>Booked</span>
+                    <strong>{fmtInt(mondayLeadInsights.totals.booked)}</strong>
+                  </div>
+                  <div>
+                    <span>No-Show</span>
+                    <strong>{fmtInt(mondayLeadInsights.totals.noShow)}</strong>
+                  </div>
+                  <div>
+                    <span>Closed Won</span>
+                    <strong>{fmtInt(mondayLeadInsights.totals.closedWon)}</strong>
+                  </div>
+                </div>
+
+                <div className="V2TableWrap">
+                  <table className="V2Table">
+                    <thead>
+                      <tr>
+                        <th>Top Source</th>
+                        <th className="is-right">Leads</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mondayLeadInsights.topSources.map((row) => (
+                        <tr key={row.source}>
+                          <td>{row.source}</td>
+                          <td className="is-right">{fmtInt(row.count)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="V2TableWrap">
+                  <table className="V2Table">
+                    <thead>
+                      <tr>
+                        <th>Top Setter</th>
+                        <th className="is-right">Leads</th>
+                        <th className="is-right">Booked</th>
+                        <th className="is-right">No-Show</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mondayLeadInsights.topSetters.map((row) => (
+                        <tr key={row.setter}>
+                          <td>{row.setter}</td>
+                          <td className="is-right">{fmtInt(row.leads)}</td>
+                          <td className="is-right">{fmtInt(row.booked)}</td>
+                          <td className="is-right">{fmtInt(row.noShow)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div style={{ fontSize: '0.78rem', color: 'var(--v2-muted)' }}>
+                  Window: {mondayLeadInsights.window.fromDay} to {mondayLeadInsights.window.toDay} ({mondayLeadInsights.window.timeZone}) ·
+                  Last sync:{' '}
+                  {fmtDateTime(
+                    mondayLeadInsights.mondaySyncState[0]?.lastSyncAt ?? mondayLeadInsights.mondaySyncState[0]?.updatedAt ?? null,
+                  )}
+                </div>
+              </div>
+            )}
           </V2Panel>
         </div>
       </div>

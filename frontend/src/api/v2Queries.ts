@@ -9,6 +9,7 @@ import {
   assertInboxConversationListEnvelope,
   assertRunV2Envelope,
   assertRunsListV2Envelope,
+  assertMondayLeadInsightsV2Envelope,
   assertSalesMetricsBatchV2Envelope,
   assertSalesMetricsV2Envelope,
   assertSequenceVersionHistoryV2Envelope,
@@ -24,6 +25,7 @@ import type {
   InboxSendConfigV2,
   InboxConversationDetailV2,
   InboxConversationListV2,
+  MondayLeadInsightsV2,
   ObjectionFrequencyRowV2,
   QualificationStateV2,
   RunV2,
@@ -295,6 +297,51 @@ export const useV2WeeklySummary = (params: { weekStart?: string; tz?: string }) 
     staleTime: 5 * 60 * 1000,      // 5 minutes
     gcTime: 30 * 60 * 1000,        // 30 minutes
     retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
+  });
+};
+
+type MondayLeadInsightsQueryParams = {
+  range?: 'today' | '7d' | '30d';
+  day?: string;
+  from?: string;
+  to?: string;
+  tz?: string;
+  boardId?: string;
+  sourceLimit?: number;
+  setterLimit?: number;
+};
+
+const toMondayLeadInsightsSearchParams = (params: MondayLeadInsightsQueryParams): URLSearchParams => {
+  const search = new URLSearchParams();
+  if (params.day) {
+    search.set('day', params.day);
+  } else if (params.from && params.to) {
+    search.set('from', params.from);
+    search.set('to', params.to);
+  } else {
+    search.set('range', params.range || '30d');
+  }
+  if (params.tz) search.set('tz', params.tz);
+  if (params.boardId) search.set('boardId', params.boardId);
+  if (Number.isFinite(params.sourceLimit)) search.set('sourceLimit', String(params.sourceLimit));
+  if (Number.isFinite(params.setterLimit)) search.set('setterLimit', String(params.setterLimit));
+  return search;
+};
+
+export const useV2MondayLeadInsights = (params: MondayLeadInsightsQueryParams) => {
+  const search = toMondayLeadInsightsSearchParams(params);
+  return useQuery({
+    queryKey: ['v2', 'admin', 'monday', 'lead-insights', params],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/admin/monday/lead-insights?${search.toString()}`);
+      assertMondayLeadInsightsV2Envelope(response);
+      return response as ApiEnvelope<MondayLeadInsightsV2>;
+    },
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchOnWindowFocus: false,
   });

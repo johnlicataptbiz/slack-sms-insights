@@ -260,6 +260,29 @@ export type InboxContactCardV2 = {
   timezone: string | null;
   niche: string | null;
   dnc: boolean;
+  leadSource: string | null;
+  sequenceId: string | null;
+  dispositionStatusId: string | null;
+  tags: string[];
+  textAuthorized: boolean | null;
+  isBlocked: boolean | null;
+  cnamCity: string | null;
+  cnamState: string | null;
+  cnamCountry: string | null;
+  lrnLineType: string | null;
+  lrnCarrier: string | null;
+  lrnLastCheckedAt: string | null;
+  lastEngagementAt: string | null;
+  unreadCount: number | null;
+  inboundSmsCount: number | null;
+  outboundSmsCount: number | null;
+  inboundCallCount: number | null;
+  outboundCallCount: number | null;
+};
+
+export type AlowareSequenceSyncV2 = {
+  status: 'synced' | 'skipped';
+  reason: string;
 };
 
 export type DraftSuggestionV2 = {

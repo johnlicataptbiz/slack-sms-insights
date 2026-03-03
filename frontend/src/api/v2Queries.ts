@@ -18,6 +18,7 @@ import {
   assertWeeklySummaryV2Envelope,
 } from './v2Guards';
 import type {
+  AlowareSequenceSyncV2,
   ApiEnvelope,
   CallOutcomeV2,
   ChannelsV2,
@@ -558,10 +559,56 @@ export const useV2UpdateConversationStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (params: { conversationId: string; status: 'open' | 'closed' | 'dnc' }) => {
-      return client.post<ApiEnvelope<{ id: string; status: 'open' | 'closed' | 'dnc' }>>(
+      return client.post<
+        ApiEnvelope<{
+          id: string;
+          status: 'open' | 'closed' | 'dnc';
+          alowareSequenceSync: AlowareSequenceSyncV2 | null;
+        }>
+      >(
         `/api/v2/inbox/conversations/${params.conversationId}/status`,
         { status: params.status },
       );
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+export const useV2EnrollConversationToSequence = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string; sequenceId: string | number; forceEnroll?: boolean }) => {
+      return client.post<
+        ApiEnvelope<{
+          conversationId: string;
+          sequenceId: string | number;
+          alowareSequenceSync: AlowareSequenceSyncV2 | null;
+        }>
+      >(`/api/v2/inbox/conversations/${params.conversationId}/sequence-enroll`, {
+        sequenceId: params.sequenceId,
+        forceEnroll: params.forceEnroll,
+      });
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+    },
+  });
+};
+
+export const useV2DisenrollConversationFromSequence = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { conversationId: string }) => {
+      return client.post<
+        ApiEnvelope<{
+          conversationId: string;
+          alowareSequenceSync: AlowareSequenceSyncV2 | null;
+        }>
+      >(`/api/v2/inbox/conversations/${params.conversationId}/sequence-disenroll`, {});
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });

@@ -27,7 +27,9 @@ import {
   useV2ConversationNotes,
   useV2CreateTemplate,
   useV2DeleteTemplate,
+  useV2DisenrollConversationFromSequence,
   useV2DraftAIPerformance,
+  useV2EnrollConversationToSequence,
   useV2GenerateDraft,
   useV2InboxConversationDetail,
   useV2InboxConversations,
@@ -46,7 +48,11 @@ import {
   useV2UpdateQualification,
 } from "../../api/v2Queries";
 import { CALL_OUTCOME_LABELS } from "../../api/v2-types";
-import type { CallOutcomeV2, QualificationStateV2 } from "../../api/v2-types";
+import type {
+  AlowareSequenceSyncV2,
+  CallOutcomeV2,
+  QualificationStateV2,
+} from "../../api/v2-types";
 import { V2Select, type V2SelectOption } from "../components/V2Select";
 import { V2State } from "../components/V2Primitives";
 import { useToast } from "../hooks/useToast";
@@ -156,6 +162,12 @@ const humanizeAlowareError = (reason: string | null | undefined): string => {
     if (lower.includes(key)) return label;
   }
   return reason;
+};
+
+const describeSequenceSync = (sync: AlowareSequenceSyncV2 | null): string => {
+  if (!sync) return "No sync event yet";
+  const reason = sync.reason ? sync.reason.replace(/_/g, " ") : "ok";
+  return `${sync.status === "synced" ? "Synced" : "Skipped"} · ${reason}`;
 };
 
 const formatSendLineLabel = (params: {
@@ -330,6 +342,9 @@ export default function InboxV2() {
 
   // Phase 2 — Team Collaboration
   const [showTemplates, setShowTemplates] = useState(false);
+  const [sequenceIdInput, setSequenceIdInput] = useState("");
+  const [lastSequenceSync, setLastSequenceSync] =
+    useState<AlowareSequenceSyncV2 | null>(null);
   const assignForm = useForm<AssignFormValues>({
     resolver: zodResolver(assignSchema),
     defaultValues: { ownerLabel: "" },
@@ -535,6 +550,8 @@ export default function InboxV2() {
   const qualificationMutation = useV2UpdateQualification();
   const escalationMutation = useV2OverrideEscalation();
   const statusMutation = useV2UpdateConversationStatus();
+  const sequenceEnrollMutation = useV2EnrollConversationToSequence();
+  const sequenceDisenrollMutation = useV2DisenrollConversationFromSequence();
 
   // Phase 2 hooks
   const notesQuery = useV2ConversationNotes(selectedConversationId);
@@ -614,6 +631,7 @@ export default function InboxV2() {
     setQualificationState(detail.conversation.qualification);
     setEscalationLevel(detail.conversation.escalation.level);
     setEscalationReason(detail.conversation.escalation.reason || "");
+    setSequenceIdInput(detail.contactCard.sequenceId || "");
     assignForm.reset({ ownerLabel: detail.conversation.ownerLabel || "" });
     setLocalObjectionTags(detail.conversation.objectionTags ?? []);
     setLocalCallOutcome(detail.conversation.callOutcome ?? null);
@@ -625,6 +643,8 @@ export default function InboxV2() {
     // next conversation's thread when the user switches contacts.
     setJustSentMessage(null);
     setShowDoublePitchWarning(false);
+    setSequenceIdInput("");
+    setLastSequenceSync(null);
     noteForm.reset({ text: "" });
     snoozeForm.reset({ snoozedUntil: "" });
   }, [selectedConversationId]);
@@ -918,14 +938,59 @@ export default function InboxV2() {
   const onUpdateStatus = async (status: "open" | "closed" | "dnc") => {
     if (!selectedConversationId) return;
     try {
-      await statusMutation.mutateAsync({
+      const result = await statusMutation.mutateAsync({
         conversationId: selectedConversationId,
         status,
       });
+      const sync = result.data.alowareSequenceSync || null;
+      if (sync) {
+        setLastSequenceSync(sync);
+      }
       toast.success(`Conversation marked as ${status.toUpperCase()}`);
+      if (sync) {
+        setFlashMessage(`Aloware sync: ${describeSequenceSync(sync)}`);
+      }
     } catch (error) {
       toast.error(
         `Status update failed: ${String((error as Error)?.message || error)}`,
+      );
+    }
+  };
+
+  const onEnrollToSequence = async () => {
+    if (!selectedConversationId) return;
+    const sequenceId = sequenceIdInput.trim();
+    if (!sequenceId) {
+      setFlashMessage("Enter a sequence ID before enrolling.");
+      return;
+    }
+    try {
+      const result = await sequenceEnrollMutation.mutateAsync({
+        conversationId: selectedConversationId,
+        sequenceId,
+      });
+      const sync = result.data.alowareSequenceSync || null;
+      setLastSequenceSync(sync);
+      setFlashMessage(`Sequence enroll: ${describeSequenceSync(sync)}`);
+    } catch (error) {
+      setFlashMessage(
+        `Sequence enroll failed: ${String((error as Error)?.message || error)}`,
+      );
+    }
+  };
+
+  const onDisenrollFromSequence = async () => {
+    if (!selectedConversationId) return;
+    try {
+      const result = await sequenceDisenrollMutation.mutateAsync({
+        conversationId: selectedConversationId,
+      });
+      const sync = result.data.alowareSequenceSync || null;
+      setLastSequenceSync(sync);
+      setFlashMessage(`Sequence disenroll: ${describeSequenceSync(sync)}`);
+    } catch (error) {
+      setFlashMessage(
+        `Sequence disenroll failed: ${String((error as Error)?.message || error)}`,
       );
     }
   };
@@ -2561,6 +2626,22 @@ export default function InboxV2() {
                         Notes
                       </Tabs.Trigger>
                       <Tabs.Trigger
+                        value="contact"
+                        style={{
+                          padding: "0.45rem 0.7rem",
+                          fontSize: "0.72rem",
+                          fontWeight: 500,
+                          background: "none",
+                          border: "none",
+                          borderBottom: "2px solid transparent",
+                          cursor: "pointer",
+                          color: "var(--v2-muted)",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        Contact
+                      </Tabs.Trigger>
+                      <Tabs.Trigger
                         value="outcome"
                         style={{
                           padding: "0.45rem 0.7rem",
@@ -2847,6 +2928,152 @@ export default function InboxV2() {
                             >
                               {addNoteMutation.isPending ? "Saving…" : "+ Note"}
                             </button>
+                          </div>
+                        </div>
+                      </Tabs.Content>
+
+                      {/* ── Contact Tab ── */}
+                      <Tabs.Content value="contact">
+                        <div className="V2Panel V2Inbox__sidePanel">
+                          <p className="V2Panel__title">Aloware Contact Sync</p>
+                          <p
+                            className="V2Panel__caption"
+                            style={{
+                              fontSize: "0.75rem",
+                              marginBottom: "0.5rem",
+                              color: "var(--v2-muted)",
+                            }}
+                          >
+                            Use the current sequence ID or enter a new one.
+                          </p>
+
+                          <div
+                            style={{
+                              fontSize: "0.75rem",
+                              marginBottom: "0.6rem",
+                              color:
+                                (lastSequenceSync?.status || null) === "synced"
+                                  ? "var(--v2-positive)"
+                                  : "var(--v2-muted)",
+                            }}
+                          >
+                            {describeSequenceSync(lastSequenceSync)}
+                          </div>
+
+                          <label className="V2Control">
+                            <span>Sequence ID</span>
+                            <input
+                              type="text"
+                              value={sequenceIdInput}
+                              onChange={(e) => setSequenceIdInput(e.target.value)}
+                              placeholder="e.g. 12345"
+                            />
+                          </label>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "0.5rem",
+                              marginTop: "0.6rem",
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                              onClick={onEnrollToSequence}
+                              disabled={
+                                sequenceEnrollMutation.isPending ||
+                                !sequenceIdInput.trim()
+                              }
+                            >
+                              {sequenceEnrollMutation.isPending
+                                ? "Enrolling…"
+                                : "Enroll"}
+                            </button>
+                            <button
+                              type="button"
+                              className="V2Inbox__button V2Inbox__button--small"
+                              onClick={onDisenrollFromSequence}
+                              disabled={sequenceDisenrollMutation.isPending}
+                            >
+                              {sequenceDisenrollMutation.isPending
+                                ? "Disenrolling…"
+                                : "Disenroll"}
+                            </button>
+                          </div>
+
+                          <div
+                            style={{
+                              marginTop: "0.8rem",
+                              borderTop: "1px solid rgba(17, 184, 214, 0.12)",
+                              paddingTop: "0.65rem",
+                              display: "grid",
+                              gap: "0.35rem",
+                              fontSize: "0.75rem",
+                            }}
+                          >
+                            <div>
+                              <strong>Lead Source:</strong>{" "}
+                              {detail.contactCard.leadSource || "n/a"}
+                            </div>
+                            <div>
+                              <strong>Current Sequence:</strong>{" "}
+                              {detail.contactCard.sequenceId || "n/a"}
+                            </div>
+                            <div>
+                              <strong>Disposition:</strong>{" "}
+                              {detail.contactCard.dispositionStatusId || "n/a"}
+                            </div>
+                            <div>
+                              <strong>Tags:</strong>{" "}
+                              {detail.contactCard.tags.length > 0
+                                ? detail.contactCard.tags.join(", ")
+                                : "n/a"}
+                            </div>
+                            <div>
+                              <strong>Text Authorized:</strong>{" "}
+                              {detail.contactCard.textAuthorized == null
+                                ? "n/a"
+                                : detail.contactCard.textAuthorized
+                                  ? "yes"
+                                  : "no"}
+                            </div>
+                            <div>
+                              <strong>Blocked:</strong>{" "}
+                              {detail.contactCard.isBlocked == null
+                                ? "n/a"
+                                : detail.contactCard.isBlocked
+                                  ? "yes"
+                                  : "no"}
+                            </div>
+                            <div>
+                              <strong>Carrier / Line:</strong>{" "}
+                              {detail.contactCard.lrnCarrier || "n/a"} /{" "}
+                              {detail.contactCard.lrnLineType || "n/a"}
+                            </div>
+                            <div>
+                              <strong>Unread:</strong>{" "}
+                              {detail.contactCard.unreadCount ?? 0}
+                            </div>
+                            <div>
+                              <strong>SMS In/Out:</strong>{" "}
+                              {detail.contactCard.inboundSmsCount ?? 0}/
+                              {detail.contactCard.outboundSmsCount ?? 0}
+                            </div>
+                            <div>
+                              <strong>Calls In/Out:</strong>{" "}
+                              {detail.contactCard.inboundCallCount ?? 0}/
+                              {detail.contactCard.outboundCallCount ?? 0}
+                            </div>
+                            <div>
+                              <strong>Last Engagement:</strong>{" "}
+                              {fmtDateTime(detail.contactCard.lastEngagementAt)}
+                            </div>
+                            <div>
+                              <strong>LRN Checked:</strong>{" "}
+                              {fmtDateTime(detail.contactCard.lrnLastCheckedAt)}
+                            </div>
                           </div>
                         </div>
                       </Tabs.Content>

@@ -2540,6 +2540,13 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       ensuredState.guardrail_override_count ?? conversation.state_guardrail_override_count ?? 0,
   };
 
+  const contactTags = Array.isArray(profile?.tags)
+    ? profile.tags
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map((tag) => tag.trim())
+        .filter((tag) => tag.length > 0)
+    : [];
+
   const payload = {
     conversation: toInboxConversationV2(mergedRow),
     contactCard: {
@@ -2552,6 +2559,24 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       timezone: profile?.timezone || conversation.profile_timezone || null,
       niche: profile?.niche || conversation.profile_niche || ensuredState.qualification_niche || null,
       dnc: conversation.status === 'dnc' || profile?.dnc === true,
+      leadSource: profile?.lead_source || null,
+      sequenceId: profile?.sequence_id || null,
+      dispositionStatusId: profile?.disposition_status_id || null,
+      tags: contactTags,
+      textAuthorized: profile?.text_authorized ?? null,
+      isBlocked: profile?.is_blocked ?? null,
+      cnamCity: profile?.cnam_city || null,
+      cnamState: profile?.cnam_state || null,
+      cnamCountry: profile?.cnam_country || null,
+      lrnLineType: profile?.lrn_line_type || null,
+      lrnCarrier: profile?.lrn_carrier || null,
+      lrnLastCheckedAt: profile?.lrn_last_checked_at || null,
+      lastEngagementAt: profile?.last_engagement_at || null,
+      unreadCount: profile?.unread_count ?? null,
+      inboundSmsCount: profile?.inbound_sms_count ?? null,
+      outboundSmsCount: profile?.outbound_sms_count ?? null,
+      inboundCallCount: profile?.inbound_call_count ?? null,
+      outboundCallCount: profile?.outbound_call_count ?? null,
     },
     messages: messages.map((msg) => ({
       id: msg.id,

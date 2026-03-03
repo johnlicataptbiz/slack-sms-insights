@@ -41,6 +41,7 @@ import {
   useV2DisenrollConversationFromSequence,
   useV2DraftAIPerformance,
   useV2EnrollConversationToSequence,
+  useV2GenerateCrmNotes,
   useV2GenerateDraft,
   useV2InboxConversationDetail,
   useV2InboxConversationsInfinite,
@@ -472,6 +473,8 @@ export default function InboxV2() {
   >(null);
   const [isComposerModalOpen, setIsComposerModalOpen] = useState(false);
   const [composerText, setComposerText] = useState("");
+  const [crmNotesText, setCrmNotesText] = useState("");
+  const [crmNotesCopied, setCrmNotesCopied] = useState(false);
   const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
   const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
@@ -796,6 +799,7 @@ export default function InboxV2() {
   });
 
   const generateDraftMutation = useV2GenerateDraft();
+  const generateCrmNotesMutation = useV2GenerateCrmNotes();
   const sendMutation = useV2SendInboxMessage();
   const sendConfigQuery = useV2InboxSendConfig();
   const setDefaultLineMutation = useV2SetDefaultSendLine();
@@ -977,6 +981,8 @@ export default function InboxV2() {
     setShowDoublePitchWarning(false);
     setSequenceIdInput("");
     setLastSequenceSync(null);
+    setCrmNotesText("");
+    setCrmNotesCopied(false);
     noteForm.reset({ text: "" });
     snoozeForm.reset({ snoozedUntil: "" });
   }, [selectedConversationId]);
@@ -1113,6 +1119,57 @@ export default function InboxV2() {
         `Draft generation failed: ${String((error as Error)?.message || error)}`,
       );
     }
+  };
+
+  const copyCrmNotesToClipboard = async (text: string): Promise<boolean> => {
+    const value = text.trim();
+    if (!value) return false;
+    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      return false;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const onGenerateCrmNotes = async () => {
+    if (!selectedConversationId) return;
+    setFlashMessage(null);
+    try {
+      const result = await generateCrmNotesMutation.mutateAsync({
+        conversationId: selectedConversationId,
+      });
+      const nextText = result.data.text || "";
+      setCrmNotesText(nextText);
+      const copied = await copyCrmNotesToClipboard(nextText);
+      setCrmNotesCopied(copied);
+      if (copied) {
+        toast.success("CRM notes generated and copied.");
+      } else {
+        toast.success("CRM notes generated.");
+      }
+      if (copied) {
+        window.setTimeout(() => setCrmNotesCopied(false), 2000);
+      }
+    } catch (error) {
+      const message = `CRM notes failed: ${String((error as Error)?.message || error)}`;
+      setFlashMessage(message);
+      toast.error(message);
+    }
+  };
+
+  const onCopyCrmNotes = async () => {
+    const copied = await copyCrmNotesToClipboard(crmNotesText);
+    setCrmNotesCopied(copied);
+    if (copied) {
+      toast.success("CRM notes copied.");
+      window.setTimeout(() => setCrmNotesCopied(false), 2000);
+      return;
+    }
+    toast.error("Copy failed. Select text and copy manually.");
   };
 
   const onSend = async () => {
@@ -2913,6 +2970,27 @@ export default function InboxV2() {
                           {setterAssistSummary.action}
                         </p>
                       </div>
+                      {crmNotesText ? (
+                        <div className="V2Inbox__crmNotesCard">
+                          <div className="V2Inbox__crmNotesHeader">
+                            <p>CRM Notes</p>
+                            <button
+                              type="button"
+                              className="V2Inbox__button V2Inbox__button--small"
+                              onClick={() => void onCopyCrmNotes()}
+                            >
+                              {crmNotesCopied ? "Copied" : "Copy"}
+                            </button>
+                          </div>
+                          <textarea
+                            className="V2Inbox__crmNotesText"
+                            value={crmNotesText}
+                            readOnly
+                            rows={12}
+                            onFocus={(event) => event.currentTarget.select()}
+                          />
+                        </div>
+                      ) : null}
 
                       {/* Double Pitch Protection Banner */}
                       {showDoublePitchWarning && (
@@ -3014,6 +3092,18 @@ export default function InboxV2() {
                             title="Generate AI draft"
                           >
                             {generateDraftMutation.isPending ? "..." : "✨"}
+                          </button>
+                          <button
+                            type="button"
+                            className="V2Inbox__button V2Inbox__button--secondary V2Inbox__button--small"
+                            onClick={onGenerateCrmNotes}
+                            disabled={
+                              generateCrmNotesMutation.isPending ||
+                              sendMutation.isPending
+                            }
+                            title="Generate CRM notes from full thread and copy"
+                          >
+                            {generateCrmNotesMutation.isPending ? "..." : "CRM"}
                           </button>
                           <button
                             type="button"

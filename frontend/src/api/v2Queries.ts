@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { client } from './client';
 import {
+  assertCrmNotesSuggestionEnvelope,
   assertMondayBoardCatalogV2Envelope,
   assertDraftSuggestionEnvelope,
   assertChannelsV2Envelope,
@@ -25,6 +26,7 @@ import type {
   BoardCatalogV2,
   CallOutcomeV2,
   ChannelsV2,
+  CrmNotesSuggestionV2,
   DraftSuggestionV2,
   InboxSendConfigV2,
   InboxConversationDetailV2,
@@ -538,6 +540,19 @@ export const useV2GenerateDraft = () => {
       void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
       void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
       void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'analytics', 'setter-assist-performance'] });
+    },
+  });
+};
+
+export const useV2GenerateCrmNotes = () => {
+  return useMutation({
+    mutationFn: async (params: { conversationId: string }) => {
+      const response = await client.post<unknown>(
+        `/api/v2/inbox/conversations/${params.conversationId}/crm-notes`,
+        {},
+      );
+      assertCrmNotesSuggestionEnvelope(response);
+      return response as ApiEnvelope<CrmNotesSuggestionV2>;
     },
   });
 };

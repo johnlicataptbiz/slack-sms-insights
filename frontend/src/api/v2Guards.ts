@@ -266,6 +266,24 @@ export function assertDraftSuggestionEnvelope(value: unknown): asserts value is 
   }
 }
 
+export function assertCrmNotesSuggestionEnvelope(
+  value: unknown,
+): asserts value is ApiEnvelope<{ conversationId: string; text: string; generationMode: string; generationWarnings: string[]; promptSnapshotHash: string; createdAt: string }> {
+  if (!isObject(value)) throw new Error('Invalid CRM notes response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid CRM notes response: data must be object');
+  if (!isString(value.data.conversationId)) throw new Error('Invalid CRM notes response: conversationId missing');
+  if (!isString(value.data.text)) throw new Error('Invalid CRM notes response: text missing');
+  if (!isString(value.data.generationMode)) throw new Error('Invalid CRM notes response: generationMode missing');
+  if (!Array.isArray(value.data.generationWarnings)) {
+    throw new Error('Invalid CRM notes response: generationWarnings missing');
+  }
+  if (!isString(value.data.promptSnapshotHash)) {
+    throw new Error('Invalid CRM notes response: promptSnapshotHash missing');
+  }
+  if (!isString(value.data.createdAt)) throw new Error('Invalid CRM notes response: createdAt missing');
+}
+
 export function assertSendMessageResultEnvelope(value: unknown): asserts value is ApiEnvelope<SendMessageResultV2> {
   if (!isObject(value)) throw new Error('Invalid send response: not an object');
   assertEnvelopeMeta(value.meta);

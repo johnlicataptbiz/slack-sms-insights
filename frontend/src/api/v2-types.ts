@@ -531,6 +531,15 @@ export type DraftSuggestionV2 = {
   createdAt: string;
 };
 
+export type CrmNotesSuggestionV2 = {
+  conversationId: string;
+  text: string;
+  generationMode: 'ai' | 'contextual_fallback';
+  generationWarnings: string[];
+  promptSnapshotHash: string;
+  createdAt: string;
+};
+
 export type SendMessageResultV2 = {
   status: 'sent' | 'blocked' | 'failed' | 'duplicate';
   reason: string;

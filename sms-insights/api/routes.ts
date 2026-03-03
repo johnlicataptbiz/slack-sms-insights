@@ -37,6 +37,7 @@ import {
 } from '../services/aloware-contact-sync.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
 import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
+import { generateCrmNotesSuggestion } from '../services/inbox-crm-notes-engine.js';
 import { generateDraftSuggestion } from '../services/inbox-draft-engine.js';
 import { sendInboxMessage } from '../services/inbox-send.js';
 import {
@@ -2768,6 +2769,74 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
   sendJson(res, 200, toEnvelope({ data: payload, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
 };
 
+const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const conversationId = getConversationIdFromPath(req);
+  if (!conversationId) {
+    return sendJson(res, 400, { error: 'Missing conversation ID' }, origin);
+  }
+
+  const conversation = await getInboxConversationById(conversationId, logger);
+  if (!conversation) {
+    return sendJson(res, 404, { error: 'Conversation not found' }, origin);
+  }
+
+  const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
+  const ownerLabel = toInboxConversationV2(conversation).ownerLabel || null;
+
+  let messages = await listMessagesForConversation(conversationId, 250, logger);
+  if (messages.length === 0) {
+    const legacy = await listSmsEventsForConversation(
+      {
+        id: conversationId,
+        contact_id: conversation.contact_id,
+        contact_phone: conversation.contact_phone,
+      },
+      250,
+      logger,
+    );
+    messages = legacy.map((event) => ({
+      id: event.id,
+      conversation_id: conversationId,
+      event_ts: event.event_ts,
+      direction: event.direction,
+      body: event.body,
+      sequence: null,
+      line: null,
+      aloware_user: null,
+      slack_channel_id: event.slack_channel_id,
+      slack_message_ts: event.slack_message_ts,
+    }));
+    messages.sort((a, b) => {
+      const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
+      if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
+      return a.id.localeCompare(b.id);
+    });
+  }
+
+  const mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
+
+  const result = await generateCrmNotesSuggestion(
+    {
+      conversationId,
+      contactName: profile?.name || conversation.profile_name || null,
+      contactPhone: profile?.phone || conversation.profile_phone || conversation.contact_phone || null,
+      contactEmail: profile?.email || conversation.profile_email || null,
+      leadSource: profile?.lead_source || null,
+      timezone: profile?.timezone || conversation.profile_timezone || null,
+      ownerLabel,
+      mondayTrail,
+      messages,
+    },
+    logger,
+  );
+
+  sendJson(res, 200, toEnvelope({ data: result, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+};
+
 const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) => {
   if (!isV2InboxEnabled()) {
     return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
@@ -3997,6 +4066,11 @@ const apiRoutes: ApiRoute[] = [
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/draft',
     handler: handlePostInboxDraftV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/conversations/:id/crm-notes',
+    handler: handlePostInboxCrmNotesV2,
   },
   {
     method: 'POST',

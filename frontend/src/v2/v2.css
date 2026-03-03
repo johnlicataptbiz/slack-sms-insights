@@ -3280,20 +3280,41 @@
   color: var(--v2-text);
 }
 
-.V2Inbox__setterAssistChips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
+.V2Inbox__crmNotesCard {
+  border: 1px solid rgba(86, 96, 122, 0.24);
+  background: linear-gradient(165deg, rgba(86, 96, 122, 0.08), rgba(255, 255, 255, 0.96));
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  gap: 0.45rem;
 }
 
-.V2Inbox__setterChip {
-  border: 1px solid rgba(7, 19, 36, 0.15);
-  background: rgba(255, 255, 255, 0.95);
+.V2Inbox__crmNotesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.V2Inbox__crmNotesHeader p {
+  margin: 0;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
   color: var(--v2-base-800);
-  border-radius: 999px;
-  padding: 0.25rem 0.5rem;
-  font: 700 0.67rem/1.15 var(--v2-font-ui);
-  cursor: pointer;
+}
+
+.V2Inbox__crmNotesText {
+  width: 100%;
+  border: 1px solid rgba(7, 19, 36, 0.15);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--v2-text);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  font: 500 0.77rem/1.45 var(--v2-font-ui);
+  resize: vertical;
+  min-height: 180px;
 }
 
 .V2Inbox__chatInputRow {

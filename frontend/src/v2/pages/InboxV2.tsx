@@ -574,6 +574,9 @@ export default function InboxV2() {
   const incrementGuardrailOverrideMutation = useV2IncrementGuardrailOverride();
 
   const detail = detailQuery.data?.data || null;
+  const contactTags = Array.isArray(detail?.contactCard?.tags)
+    ? detail.contactCard.tags
+    : [];
   const sendConfig = sendConfigQuery.data?.data || null;
   const lineOptions = sendConfig?.lines || [];
   const lineSelectOptions: V2SelectOption[] = [
@@ -3027,8 +3030,8 @@ export default function InboxV2() {
                             </div>
                             <div>
                               <strong>Tags:</strong>{" "}
-                              {detail.contactCard.tags.length > 0
-                                ? detail.contactCard.tags.join(", ")
+                              {contactTags.length > 0
+                                ? contactTags.join(", ")
                                 : "n/a"}
                             </div>
                             <div>

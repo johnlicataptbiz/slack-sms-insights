@@ -121,13 +121,15 @@ select {
   padding: 0 24px;
   margin-bottom: 18px;
   color: var(--color-text-light);
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   position: relative;
   z-index: 1;
 }
 
 .AppShell__logoMark {
-  width: 220px;
+  width: 252px;
   max-width: 100%;
   height: auto;
   display: block;

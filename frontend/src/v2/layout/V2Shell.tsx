@@ -25,8 +25,7 @@ const navItems: NavItem[] = [
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: '⟐' },
 ];
 
-const brandLogoUrl =
-  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/Untitled.png';
+const brandLogoUrl = '/bizsmslogo.png';
 const mobileMediaQuery = '(max-width: 1080px)';
 
 const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: string) => {
@@ -195,6 +194,9 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
+          <div className="V2Shell__sidebarBrand">
+            <img className="V2Shell__sidebarLogo" src={brandLogoUrl} alt="PT Biz SMS" />
+          </div>
           <nav className="V2Shell__nav" aria-label="V2 primary navigation">
             <motion.div
               variants={listContainerVariants}

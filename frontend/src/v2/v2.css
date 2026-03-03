@@ -180,8 +180,29 @@
   transition: width 220ms ease, padding 220ms ease, transform 260ms ease;
 }
 
+.V2Shell__sidebarBrand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: -0.1rem 0 0.9rem;
+  padding: 0 0.2rem;
+}
+
+.V2Shell__sidebarLogo {
+  display: block;
+  width: 170px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
 .V2Shell__sidebar.is-collapsed {
   padding: var(--v2-space-3) var(--v2-space-2);
+}
+
+.V2Shell__sidebar.is-collapsed .V2Shell__sidebarLogo {
+  width: 44px;
 }
 
 .V2Shell__nav {

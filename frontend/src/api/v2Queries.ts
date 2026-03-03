@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { client } from './client';
 import {
@@ -382,6 +382,39 @@ export const useV2InboxConversations = (params: InboxListParams) => {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     refetchOnWindowFocus: true,  // Refresh when user returns to tab
+  });
+};
+
+type InboxInfiniteListParams = Omit<InboxListParams, 'limit' | 'offset'> & {
+  pageSize?: number;
+};
+
+export const useV2InboxConversationsInfinite = (params: InboxInfiniteListParams) => {
+  const pageSize = Math.max(1, Math.min(params.pageSize ?? 75, 200));
+  return useInfiniteQuery({
+    queryKey: ['v2', 'inbox', 'conversations', 'infinite', params],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const offset = Number(pageParam ?? 0);
+      const search = toInboxListSearchParams({
+        ...params,
+        limit: pageSize,
+        offset: Number.isFinite(offset) ? offset : 0,
+      });
+      const response = await client.get<unknown>(`/api/v2/inbox/conversations?${search.toString()}`);
+      assertInboxConversationListEnvelope(response);
+      return response as ApiEnvelope<InboxConversationListV2>;
+    },
+    getNextPageParam: (lastPage) => {
+      const { count, offset } = lastPage.data.pagination;
+      if (count < pageSize) return undefined;
+      return offset + count;
+    },
+    staleTime: 10 * 1000,
+    gcTime: 60 * 1000,
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: true,
   });
 };
 

@@ -4590,10 +4590,34 @@ display: inline-block;
 }
 
 .V2Inbox__convTime {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
   font-size: 0.7rem;
   color: var(--v2-muted);
-  white-space: nowrap;
   flex-shrink: 0;
+  text-align: right;
+}
+
+.V2Inbox__convTime time,
+.V2Inbox__convTime small {
+  white-space: nowrap;
+}
+
+.V2Inbox__convTime small {
+  opacity: 0.78;
+  font-size: 0.65rem;
+}
+
+.V2Inbox__listPagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.2rem 0.1rem 0;
+  color: var(--v2-muted);
+  font-size: 0.74rem;
 }
 
 /* Row 2: direction indicator + preview */

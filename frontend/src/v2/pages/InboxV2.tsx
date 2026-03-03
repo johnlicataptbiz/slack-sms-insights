@@ -1,9 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { addHours, format as formatDateFns, formatDistanceToNow, isValid, parseISO } from "date-fns";
+import {
+  addHours,
+  format as formatDateFns,
+  formatDistanceToNow,
+  isToday,
+  isValid,
+  isYesterday,
+  parseISO,
+} from "date-fns";
 import { useForm } from "react-hook-form";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { z } from "zod";
@@ -30,7 +38,7 @@ import {
   useV2EnrollConversationToSequence,
   useV2GenerateDraft,
   useV2InboxConversationDetail,
-  useV2InboxConversations,
+  useV2InboxConversationsInfinite,
   useV2InboxSendConfig,
   useV2InboxTemplates,
   useV2IncrementGuardrailOverride,
@@ -74,6 +82,15 @@ const timeAgo = (value: string | null): string => {
   const date = parseDateValue(value);
   if (!date) return value;
   return formatDistanceToNow(date, { addSuffix: true });
+};
+
+const formatListTimestamp = (value: string | null): string => {
+  if (!value) return "";
+  const date = parseDateValue(value);
+  if (!date) return value;
+  if (isToday(date)) return formatDateFns(date, "p");
+  if (isYesterday(date)) return `Yesterday ${formatDateFns(date, "p")}`;
+  return formatDateFns(date, "MMM d, p");
 };
 
 const shorten = (value: string | null, max = 100): string => {
@@ -435,15 +452,26 @@ export default function InboxV2() {
     },
   ];
 
-  const listQuery = useV2InboxConversations({
+  const listQuery = useV2InboxConversationsInfinite({
     ...(statusFilter ? { status: statusFilter } : {}),
     needsReplyOnly,
     search,
-    limit: 75,
-    offset: 0,
+    pageSize: 75,
   });
 
-  const conversationsRaw = listQuery.data?.data.items || [];
+  const conversationsRaw = useMemo(() => {
+    const pages = listQuery.data?.pages || [];
+    const seen = new Set<string>();
+    const merged: typeof pages[number]["data"]["items"] = [];
+    for (const page of pages) {
+      for (const item of page.data.items) {
+        if (seen.has(item.id)) continue;
+        seen.add(item.id);
+        merged.push(item);
+      }
+    }
+    return merged;
+  }, [listQuery.data]);
   const conversations = conversationsRaw.filter((conversation) => {
     if (ownerFilter === "all") return true;
     const owner = (conversation.ownerLabel || "").toLowerCase();
@@ -480,6 +508,34 @@ export default function InboxV2() {
     estimateSize: () => 96,
     overscan: 8,
   });
+
+  useEffect(() => {
+    const element = listParentRef.current;
+    if (!element) return;
+
+    const maybeLoadNextPage = () => {
+      if (!listQuery.hasNextPage || listQuery.isFetchingNextPage || listQuery.isLoading) {
+        return;
+      }
+      const distanceFromBottom =
+        element.scrollHeight - element.scrollTop - element.clientHeight;
+      if (distanceFromBottom < 320) {
+        void listQuery.fetchNextPage();
+      }
+    };
+
+    element.addEventListener("scroll", maybeLoadNextPage, { passive: true });
+    maybeLoadNextPage();
+    return () => {
+      element.removeEventListener("scroll", maybeLoadNextPage);
+    };
+  }, [
+    listQuery.fetchNextPage,
+    listQuery.hasNextPage,
+    listQuery.isFetchingNextPage,
+    listQuery.isLoading,
+    conversations.length,
+  ]);
   const composerLayoutStorageId = isNarrowComposerViewport
     ? "v2-inbox-composer-layout-vertical"
     : "v2-inbox-composer-layout-horizontal";
@@ -1467,7 +1523,8 @@ export default function InboxV2() {
           <div className="V2Inbox__listHeader">
             <h2>Conversations</h2>
             <span className="V2Inbox__listCount">
-              {totalConversations} total
+              {totalConversations}
+              {listQuery.hasNextPage ? "+" : ""} shown
             </span>
           </div>
 
@@ -1493,51 +1550,52 @@ export default function InboxV2() {
               <p>Try adjusting your filters or search terms</p>
             </div>
           ) : (
-            /* Virtual list — only renders visible rows for performance */
-            <div
-              ref={listParentRef}
-              className="V2Inbox__conversationList V2Inbox__conversationList--enhanced"
-              style={{ overflowY: "auto", height: "100%" }}
-            >
+            <>
+              {/* Virtual list — only renders visible rows for performance */}
               <div
-                style={{
-                  height: `${rowVirtualizer.getTotalSize()}px`,
-                  position: "relative",
-                  width: "100%",
-                }}
+                ref={listParentRef}
+                className="V2Inbox__conversationList V2Inbox__conversationList--enhanced"
+                style={{ overflowY: "auto", height: "100%" }}
               >
-                {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-                  const conversation = conversations[virtualItem.index];
-                  if (!conversation) return null;
-                  const isActive = selectedConversationId === conversation.id;
-                  const hasUnread = conversation.openNeedsReplyCount > 0;
-                  const isUrgent =
-                    conversation.escalation.level <= 2 && hasUnread;
-                  const setterName = displaySetterName(conversation.ownerLabel);
-                  const setterColor = getSetterColor(conversation.ownerLabel);
+                <div
+                  style={{
+                    height: `${rowVirtualizer.getTotalSize()}px`,
+                    position: "relative",
+                    width: "100%",
+                  }}
+                >
+                  {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+                    const conversation = conversations[virtualItem.index];
+                    if (!conversation) return null;
+                    const isActive = selectedConversationId === conversation.id;
+                    const hasUnread = conversation.openNeedsReplyCount > 0;
+                    const isUrgent =
+                      conversation.escalation.level <= 2 && hasUnread;
+                    const setterName = displaySetterName(conversation.ownerLabel);
+                    const setterColor = getSetterColor(conversation.ownerLabel);
 
-                  return (
-                    <div
-                      key={virtualItem.key}
-                      style={{
-                        position: "absolute",
-                        top: 0,
-                        left: 0,
-                        width: "100%",
-                        transform: `translateY(${virtualItem.start}px)`,
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className={`V2Inbox__convCard ${isActive ? "is-active" : ""} ${hasUnread ? "has-unread" : ""} ${isUrgent ? "is-urgent" : ""}`}
-                        onClick={() => {
-                          setSelectedConversationId(conversation.id);
-                          setComposerText("");
-                          setSelectedDraftId(null);
-                          setDraftPrefillDoneForConversation(null);
-                          setIsComposerModalOpen(true);
+                    return (
+                      <div
+                        key={virtualItem.key}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          transform: `translateY(${virtualItem.start}px)`,
                         }}
                       >
+                        <button
+                          type="button"
+                          className={`V2Inbox__convCard ${isActive ? "is-active" : ""} ${hasUnread ? "has-unread" : ""} ${isUrgent ? "is-urgent" : ""}`}
+                          onClick={() => {
+                            setSelectedConversationId(conversation.id);
+                            setComposerText("");
+                            setSelectedDraftId(null);
+                            setDraftPrefillDoneForConversation(null);
+                            setIsComposerModalOpen(true);
+                          }}
+                        >
                         {/* Row 1: name + time */}
                         <div className="V2Inbox__convRow">
                           <div className="V2Inbox__convNameWrap">
@@ -1557,7 +1615,15 @@ export default function InboxV2() {
                             </span>
                           </div>
                           <span className="V2Inbox__convTime">
-                            {timeAgo(conversation.lastMessage.createdAt)}
+                            <time
+                              dateTime={conversation.lastMessage.createdAt || undefined}
+                              title={fmtDateTime(conversation.lastMessage.createdAt)}
+                            >
+                              {timeAgo(conversation.lastMessage.createdAt) || "just now"}
+                            </time>
+                            <small>
+                              {formatListTimestamp(conversation.lastMessage.createdAt)}
+                            </small>
                           </span>
                         </div>
 
@@ -1603,12 +1669,28 @@ export default function InboxV2() {
                             </span>
                           )}
                         </div>
-                      </button>
-                    </div>
-                  );
-                })}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+              <div className="V2Inbox__listPagination">
+                {listQuery.isFetchingNextPage ? (
+                  <span>Loading more conversations...</span>
+                ) : listQuery.hasNextPage ? (
+                  <button
+                    type="button"
+                    className="V2Inbox__button V2Inbox__button--small"
+                    onClick={() => void listQuery.fetchNextPage()}
+                  >
+                    Load more
+                  </button>
+                ) : (
+                  <span>All caught up</span>
+                )}
+              </div>
+            </>
           )}
         </div>
 

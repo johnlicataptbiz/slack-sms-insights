@@ -47,6 +47,62 @@ const extractVersionDisplay = (label: string): string => {
   return match?.[1] ?? '';
 };
 
+const normalizeSequenceLabel = (label: string): string => label.trim().replace(/\s+/g, ' ').toLowerCase();
+
+const EXPLICIT_AB_VERSION_PATTERN = /\b(?:version\s*([AB])|([AB])\s*version)\b/i;
+const TRAILING_YEAR_VERSION_PATTERN = /\s*-\s*20\d{2}\s*v?\d+(?:\.\d+)*\s*$/i;
+const TRAILING_GENERIC_VERSION_PATTERN = /\s*v?\d+(?:\.\d+){1,}\s*$/i;
+const TRAILING_YEAR_PATTERN = /\s*-\s*20\d{2}\s*$/i;
+const V2_PATTERN = /\bv2\b/i;
+const LEGACY_PATTERN = /\blegacy\b/i;
+
+const parseLeadMagnetAndVersionFallback = (label: string): { leadMagnet: string; version: string } => {
+  const normalized = label.trim().replace(/\s+/g, ' ');
+  const normalizedLower = normalized.toLowerCase();
+
+  if (!normalized) {
+    return { leadMagnet: NOT_CAPTURED_LABEL, version: '' };
+  }
+
+  const isManualSequence =
+    normalizedLower === MANUAL_LABEL.toLowerCase() ||
+    normalizedLower === 'manual' ||
+    normalizedLower === 'manual/direct' ||
+    normalizedLower.startsWith('no sequence');
+
+  if (isManualSequence) {
+    return { leadMagnet: MANUAL_LABEL, version: '' };
+  }
+
+  const abMatch = normalized.match(EXPLICIT_AB_VERSION_PATTERN);
+  const abVersion = (abMatch?.[1] || abMatch?.[2] || '').toUpperCase();
+
+  let base = normalized
+    .replace(EXPLICIT_AB_VERSION_PATTERN, '')
+    .replace(TRAILING_YEAR_VERSION_PATTERN, '')
+    .replace(TRAILING_GENERIC_VERSION_PATTERN, '')
+    .replace(TRAILING_YEAR_PATTERN, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!base) base = normalized;
+
+  let version = '';
+  if (abVersion) {
+    version = `Version ${abVersion}`;
+  } else if (LEGACY_PATTERN.test(normalized)) {
+    version = 'Legacy';
+    base = base.replace(LEGACY_PATTERN, '').replace(/\s+/g, ' ').trim();
+  } else if (V2_PATTERN.test(normalized)) {
+    version = 'V2';
+    base = base.replace(V2_PATTERN, '').replace(/\s+/g, ' ').trim();
+  } else if (TRAILING_YEAR_PATTERN.test(normalized) || TRAILING_YEAR_VERSION_PATTERN.test(normalized)) {
+    version = 'Legacy';
+  }
+
+  return { leadMagnet: base || NOT_CAPTURED_LABEL, version };
+};
+
 const MODE_LABELS: Record<Mode, string> = {
   '7d': 'Last 7 days',
   '30d': 'Last 30 days',
@@ -209,23 +265,35 @@ export default function SequencesV2() {
 
   // Build scoreboard lookup by label for metadata fields (leadMagnet/version).
   const scoreboardByLabel = useMemo(() => {
-    const map = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
+    const exact = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
+    const normalized = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
+
     for (const seq of scoreboard?.sequences ?? []) {
-      map.set(seq.label, seq);
+      exact.set(seq.label, seq);
+      normalized.set(normalizeSequenceLabel(seq.label), seq);
     }
-    return map;
+
+    return { exact, normalized };
   }, [scoreboard?.sequences]);
 
   // Merge: numeric fields from sales-metrics (time-range consistent).
-  // Scoreboard is used only for window-independent metadata (lead magnet/version labels).
+  // Scoreboard is used for window-independent metadata (lead magnet/version labels),
+  // with local parsing fallback to avoid false "Not Captured Yet" buckets.
   const mergedRows = useMemo((): MergedSeqRow[] => {
     const smSeqs = salesMetrics?.sequences ?? [];
     return smSeqs.map((seq) => {
-      const sb = scoreboardByLabel.get(seq.label);
+      const sb =
+        scoreboardByLabel.exact.get(seq.label) ||
+        scoreboardByLabel.normalized.get(normalizeSequenceLabel(seq.label));
+
+      const fallback = parseLeadMagnetAndVersionFallback(seq.label);
+      const resolvedLeadMagnet = sb?.leadMagnet?.trim() || fallback.leadMagnet || NOT_CAPTURED_LABEL;
+      const resolvedVersion = sb?.version?.trim() || fallback.version || '';
+
       return {
         label: seq.label,
-        leadMagnet: sb?.leadMagnet ?? NOT_CAPTURED_LABEL,
-        version: sb?.version ?? '',
+        leadMagnet: resolvedLeadMagnet,
+        version: resolvedVersion,
         firstSeenAt: seq.firstSeenAt,
         messagesSent: seq.messagesSent,
         uniqueContacted: seq.uniqueContacted,

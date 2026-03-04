@@ -1,10 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import {
-  buildContextualFallbackDraft,
-  classifyEscalationLevel,
-  lintDraft,
-} from '../../services/inbox-draft-engine.js';
+import { buildContextualFallbackDraft, classifyEscalationLevel, lintDraft } from '../../services/inbox-draft-engine.js';
 import type { ConversationStateRow, InboxMessageRow } from '../../services/inbox-store.js';
 
 const makeMessage = (params: {

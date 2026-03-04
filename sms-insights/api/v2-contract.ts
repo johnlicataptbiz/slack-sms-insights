@@ -749,7 +749,8 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
     // 1. slackBookedCalls — real Slack booked-calls channel data, attributed to sequences via
     //    fuzzy match on firstConversion. This is the ground truth for actual bookings.
     canonicalBookedCalls: row.slackBookedCalls ?? 0,
-    bookingRatePct: (row.uniqueContacted ?? 0) > 0 ? ((row.slackBookedCalls ?? 0) / (row.uniqueContacted ?? 0)) * 100 : 0,
+    bookingRatePct:
+      (row.uniqueContacted ?? 0) > 0 ? ((row.slackBookedCalls ?? 0) / (row.uniqueContacted ?? 0)) * 100 : 0,
     canonicalBookedAfterSmsReply: row.slackBookedAfterSmsReply ?? 0,
     canonicalBookedJack: row.slackBookedJack ?? 0,
     canonicalBookedBrandon: row.slackBookedBrandon ?? 0,
@@ -918,6 +919,21 @@ export type ScoreboardTimingRow = {
   replyRatePct: number;
 };
 
+export type ScoreboardLeadMagnetAttributionIssue = {
+  label: string;
+  parsedLeadMagnet: string;
+  parsedVersion: string;
+  reason: 'missing_lead_magnet' | 'no_pattern_match';
+};
+
+export type ScoreboardLeadMagnetAttributionDebug = {
+  missingCount: number;
+  missingLabels: string[];
+  parserNoMatchCount: number;
+  parserNoMatchLabels: string[];
+  issues: ScoreboardLeadMagnetAttributionIssue[];
+};
+
 export type ScoreboardV2 = {
   window: {
     weekStart: string;
@@ -948,6 +964,9 @@ export type ScoreboardV2 = {
     optOutRateWeeklyPct: number;
     optOutRateMonthlyPct: number;
     topOptOutSequences: Array<{ label: string; optOuts: number; optOutRatePct: number }>;
+  };
+  debug: {
+    leadMagnetAttribution: ScoreboardLeadMagnetAttributionDebug;
   };
   provenance: {
     attributionModel: 'sequence_initiated_conversation';

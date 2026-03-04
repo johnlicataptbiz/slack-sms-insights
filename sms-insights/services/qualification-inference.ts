@@ -1,5 +1,10 @@
 import type { Logger } from '@slack/bolt';
-import type { CoachingInterest, DeliveryModel, EmploymentStatus, RevenueMixCategory } from './inbox-contact-profiles.js';
+import type {
+  CoachingInterest,
+  DeliveryModel,
+  EmploymentStatus,
+  RevenueMixCategory,
+} from './inbox-contact-profiles.js';
 import type { ConversationStateRow, InboxMessageRow, UpdateConversationStateInput } from './inbox-store.js';
 
 type QualificationSnapshot = {

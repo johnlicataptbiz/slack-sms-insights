@@ -163,7 +163,10 @@ export const getCronStatusSnapshot = (): {
 } => {
   const lrnEnabled = isLrnRefreshEnabled();
   const defaultOptions = getDefaultLrnBackfillOptions();
-  const lrnTargetHour = Math.max(0, Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)));
+  const lrnTargetHour = Math.max(
+    0,
+    Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)),
+  );
   const lrnTargetMinute = Math.max(
     0,
     Math.min(59, parseIntOr(process.env.ALOWARE_LRN_REFRESH_MINUTE_CT, LRN_REFRESH_DEFAULT_MINUTE_CT)),
@@ -206,7 +209,10 @@ export const startLrnRefreshCron = (app: App): void => {
     return;
   }
 
-  const targetHour = Math.max(0, Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)));
+  const targetHour = Math.max(
+    0,
+    Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)),
+  );
   const targetMinute = Math.max(
     0,
     Math.min(59, parseIntOr(process.env.ALOWARE_LRN_REFRESH_MINUTE_CT, LRN_REFRESH_DEFAULT_MINUTE_CT)),

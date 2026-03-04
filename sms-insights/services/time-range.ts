@@ -153,7 +153,14 @@ export const resolveMetricsRange = (params: {
 
   const range = (params.range || '').trim() as SupportedRange | '';
   if (range) {
-    if (range !== 'today' && range !== '7d' && range !== '30d' && range !== '90d' && range !== '180d' && range !== '365d') {
+    if (
+      range !== 'today' &&
+      range !== '7d' &&
+      range !== '30d' &&
+      range !== '90d' &&
+      range !== '180d' &&
+      range !== '365d'
+    ) {
       throw new Error('Invalid range. Expected one of: today, 7d, 30d, 90d, 180d, 365d');
     }
 

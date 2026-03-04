@@ -1,11 +1,16 @@
 import type { Logger } from '@slack/bolt';
 import {
+  type AlowareSequenceSource,
   disenrollAlowareContactFromSequence,
   enrollAlowareContactToSequence,
-  type AlowareSequenceSource,
   upsertAlowareContact,
 } from './aloware-client.js';
-import type { CoachingInterest, EmploymentStatus, InboxContactProfileRow, RevenueMixCategory } from './inbox-contact-profiles.js';
+import type {
+  CoachingInterest,
+  EmploymentStatus,
+  InboxContactProfileRow,
+  RevenueMixCategory,
+} from './inbox-contact-profiles.js';
 
 const parseFlag = (value: string | undefined, fallback: boolean): boolean => {
   if (!value) return fallback;
@@ -69,11 +74,9 @@ const resolveSequenceIdentity = (params: {
   return null;
 };
 
-export const isAlowareContactWriteEnabled = (): boolean =>
-  parseFlag(process.env.ALOWARE_CONTACT_WRITE_ENABLED, false);
+export const isAlowareContactWriteEnabled = (): boolean => parseFlag(process.env.ALOWARE_CONTACT_WRITE_ENABLED, false);
 
-export const isAlowareSequenceSyncEnabled = (): boolean =>
-  parseFlag(process.env.ALOWARE_SEQUENCE_SYNC_ENABLED, false);
+export const isAlowareSequenceSyncEnabled = (): boolean => parseFlag(process.env.ALOWARE_SEQUENCE_SYNC_ENABLED, false);
 
 export const syncQualificationToAloware = async (
   input: {
@@ -177,4 +180,3 @@ export const disenrollConversationContactFromSequence = async (
   );
   return { status: 'synced', reason: 'ok' };
 };
-

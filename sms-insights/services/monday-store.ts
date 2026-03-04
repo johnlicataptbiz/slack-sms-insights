@@ -192,7 +192,10 @@ const parseDateFromColumn = (column: MondayCallColumnValueInput | null): string 
   return null;
 };
 
-const findColumnBySignals = (columns: MondayCallColumnValueInput[], signals: string[]): MondayCallColumnValueInput | null => {
+const findColumnBySignals = (
+  columns: MondayCallColumnValueInput[],
+  signals: string[],
+): MondayCallColumnValueInput | null => {
   const normalizedSignals = signals.map((signal) => signal.toLowerCase());
   for (const column of columns) {
     const haystack = `${normalizeForMatch(column.columnTitle)} ${normalizeForMatch(column.columnId)} ${normalizeForMatch(column.columnType)}`;
@@ -323,9 +326,7 @@ export const upsertMondayBoardRegistry = async (
   }
 };
 
-export const listMondayBoardRegistry = async (
-  logger?: Pick<Logger, 'warn'>,
-): Promise<MondayBoardRegistryRow[]> => {
+export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Promise<MondayBoardRegistryRow[]> => {
   const pool = getDb();
   if (!pool) return [];
   try {
@@ -339,9 +340,7 @@ export const listMondayBoardRegistry = async (
   }
 };
 
-export const listMondayActorDirectory = async (
-  logger?: Pick<Logger, 'warn'>,
-): Promise<ActorDirectoryRow[]> => {
+export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): Promise<ActorDirectoryRow[]> => {
   const pool = getDb();
   if (!pool) return [];
   try {
@@ -615,7 +614,8 @@ export const upsertNormalizedMondayLeadRecords = async (
   const pool = getDb();
   if (!pool) return;
 
-  const outcomeLabel = findTextBySignals(input.columns, ['outcome', 'result', 'disposition', 'status']) || input.stage || null;
+  const outcomeLabel =
+    findTextBySignals(input.columns, ['outcome', 'result', 'disposition', 'status']) || input.stage || null;
   const outcomeReason = findTextBySignals(input.columns, ['reason', 'lost reason', 'disqual', 'close reason', 'notes']);
   const source = findTextBySignals(input.columns, ['lead source', 'source', 'channel', 'utm']);
   const setBy = findTextBySignals(input.columns, ['set by', 'booked by', 'setter']);
@@ -626,14 +626,24 @@ export const upsertNormalizedMondayLeadRecords = async (
   const leadStatus = findTextBySignals(input.columns, ['lead status', 'status']) || stage;
 
   const firstTouchDate =
-    parseDateFromColumn(findColumnBySignals(input.columns, ['first touch', 'created date', 'lead date', 'inbound date'])) || null;
+    parseDateFromColumn(
+      findColumnBySignals(input.columns, ['first touch', 'created date', 'lead date', 'inbound date']),
+    ) || null;
   const callDate =
     normalizeText(input.callDate) ||
     parseDateFromColumn(findColumnBySignals(input.columns, ['call date', 'appointment date', 'meeting date'])) ||
     null;
-  const closedDate = parseDateFromColumn(findColumnBySignals(input.columns, ['closed date', 'won date', 'lost date', 'decision date']));
+  const closedDate = parseDateFromColumn(
+    findColumnBySignals(input.columns, ['closed date', 'won date', 'lost date', 'decision date']),
+  );
 
-  const outcomeCategory = classifyOutcomeCategory(stage, outcomeLabel, outcomeReason, input.disposition, input.isBooked === true);
+  const outcomeCategory = classifyOutcomeCategory(
+    stage,
+    outcomeLabel,
+    outcomeReason,
+    input.disposition,
+    input.isBooked === true,
+  );
   const activityDate = callDate || closedDate || firstTouchDate || input.itemUpdatedAt.toISOString().slice(0, 10);
 
   try {
@@ -851,7 +861,8 @@ export const upsertMondayMetricFacts = async (
     parseIsoDate(input.callDate) ||
     parseDateFromColumn(findColumnBySignals(input.columns, ['date', 'week', 'day', 'period'])) ||
     null;
-  const metricOwner = normalizeText(input.setter) || findTextBySignals(input.columns, ['metric owner', 'owner', 'setter']);
+  const metricOwner =
+    normalizeText(input.setter) || findTextBySignals(input.columns, ['metric owner', 'owner', 'setter']);
 
   const payload = input.columns
     .map((column) => {
@@ -935,14 +946,7 @@ export const upsertMondayMetricFacts = async (
         raw = EXCLUDED.raw,
         synced_at = CURRENT_TIMESTAMP
       `,
-      [
-        JSON.stringify(payload),
-        input.boardId,
-        input.itemId,
-        metricDate,
-        metricOwner,
-        input.itemUpdatedAt,
-      ],
+      [JSON.stringify(payload), input.boardId, input.itemId, metricDate, metricOwner, input.itemUpdatedAt],
     );
   } catch (error) {
     logger?.warn?.('Failed to upsert monday metric facts', error);

@@ -225,7 +225,8 @@ export const listMondayBoardCatalog = async (
       totals: {
         boards: boards.length,
         active: boards.filter((row) => row.active).length,
-        funnelBoards: boards.filter((row) => row.includeInFunnel && row.metricGrain === 'lead_item' && row.active).length,
+        funnelBoards: boards.filter((row) => row.includeInFunnel && row.metricGrain === 'lead_item' && row.active)
+          .length,
         synced: boards.filter((row) => row.syncStatus === 'success').length,
         stale: boards.filter((row) => row.active && row.isStale).length,
         errored: boards.filter((row) => row.syncStatus === 'error').length,
@@ -258,15 +259,30 @@ export const getMondayScorecards = async (
   window: { fromDay: string; toDay: string; timeZone: string };
   filters: { boardClass: string | null; metricOwner: string | null; metricName: string | null };
   totals: { rows: number; boards: number; metrics: number };
-  metrics: Array<{ metricName: string; rowCount: number; boards: number; totalValue: number | null; avgValue: number | null }>;
+  metrics: Array<{
+    metricName: string;
+    rowCount: number;
+    boards: number;
+    totalValue: number | null;
+    avgValue: number | null;
+  }>;
   trendByDay: Array<{ day: string; metricName: string; value: number | null; rowCount: number }>;
-  byOwner: Array<{ metricOwner: string; role: 'setter' | 'closer' | 'other'; rowCount: number; totalValue: number | null }>;
+  byOwner: Array<{
+    metricOwner: string;
+    role: 'setter' | 'closer' | 'other';
+    rowCount: number;
+    totalValue: number | null;
+  }>;
 }> => {
   const pool = getPool();
   if (!pool) {
     return {
       window: { fromDay: params.fromDay, toDay: params.toDay, timeZone: params.timeZone },
-      filters: { boardClass: params.boardClass || null, metricOwner: params.metricOwner || null, metricName: params.metricName || null },
+      filters: {
+        boardClass: params.boardClass || null,
+        metricOwner: params.metricOwner || null,
+        metricName: params.metricName || null,
+      },
       totals: { rows: 0, boards: 0, metrics: 0 },
       metrics: [],
       trendByDay: [],
@@ -292,15 +308,25 @@ export const getMondayScorecards = async (
 
   try {
     const [totals, metrics, trend, owners] = await Promise.all([
-      pool.query<{ rows: number; boards: number; metrics: number }>(`
+      pool.query<{ rows: number; boards: number; metrics: number }>(
+        `
         SELECT
           COUNT(*)::int AS rows,
           COUNT(DISTINCT board_id)::int AS boards,
           COUNT(DISTINCT metric_name)::int AS metrics
         FROM analytics_monday_scorecard_fact_v
         ${whereSql}
-      `, values),
-      pool.query<{ metric_name: string; row_count: number; boards: number; total_value: number | null; avg_value: number | null }>(`
+      `,
+        values,
+      ),
+      pool.query<{
+        metric_name: string;
+        row_count: number;
+        boards: number;
+        total_value: number | null;
+        avg_value: number | null;
+      }>(
+        `
         SELECT
           metric_name,
           COUNT(*)::int AS row_count,
@@ -312,8 +338,11 @@ export const getMondayScorecards = async (
         GROUP BY metric_name
         ORDER BY row_count DESC, metric_name ASC
         LIMIT 50
-      `, values),
-      pool.query<{ day: string; metric_name: string; value: number | null; row_count: number }>(`
+      `,
+        values,
+      ),
+      pool.query<{ day: string; metric_name: string; value: number | null; row_count: number }>(
+        `
         SELECT
           metric_date::text AS day,
           metric_name,
@@ -324,8 +353,16 @@ export const getMondayScorecards = async (
         GROUP BY metric_date, metric_name
         ORDER BY metric_date ASC, metric_name ASC
         LIMIT 1000
-      `, values),
-      pool.query<{ metric_owner: string; role: 'setter' | 'closer' | 'other'; row_count: number; total_value: number | null }>(`
+      `,
+        values,
+      ),
+      pool.query<{
+        metric_owner: string;
+        role: 'setter' | 'closer' | 'other';
+        row_count: number;
+        total_value: number | null;
+      }>(
+        `
         WITH actor_match AS (
           SELECT
             m.metric_owner,
@@ -356,12 +393,18 @@ export const getMondayScorecards = async (
         GROUP BY COALESCE(NULLIF(BTRIM(metric_owner), ''), 'Unassigned'), role
         ORDER BY row_count DESC, metric_owner ASC
         LIMIT 50
-      `, values),
+      `,
+        values,
+      ),
     ]);
 
     return {
       window: { fromDay: params.fromDay, toDay: params.toDay, timeZone: params.timeZone },
-      filters: { boardClass: params.boardClass || null, metricOwner: params.metricOwner || null, metricName: params.metricName || null },
+      filters: {
+        boardClass: params.boardClass || null,
+        metricOwner: params.metricOwner || null,
+        metricName: params.metricName || null,
+      },
       totals: totals.rows[0] || { rows: 0, boards: 0, metrics: 0 },
       metrics: metrics.rows.map((row) => ({
         metricName: row.metric_name,
@@ -387,7 +430,11 @@ export const getMondayScorecards = async (
     logger?.warn?.('Failed to fetch monday scorecards', error);
     return {
       window: { fromDay: params.fromDay, toDay: params.toDay, timeZone: params.timeZone },
-      filters: { boardClass: params.boardClass || null, metricOwner: params.metricOwner || null, metricName: params.metricName || null },
+      filters: {
+        boardClass: params.boardClass || null,
+        metricOwner: params.metricOwner || null,
+        metricName: params.metricName || null,
+      },
       totals: { rows: 0, boards: 0, metrics: 0 },
       metrics: [],
       trendByDay: [],

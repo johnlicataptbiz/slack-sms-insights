@@ -41,7 +41,7 @@ export const getSequenceVersionHistory = async (
       WITH normalized AS (
         SELECT
           TRIM(sequence) AS label,
-          REGEXP_REPLACE(TRIM(body), '\s+', ' ', 'g') AS body,
+          REGEXP_REPLACE(TRIM(body), 's+', ' ', 'g') AS body,
           event_ts
         FROM sms_events
         WHERE direction = 'outbound'

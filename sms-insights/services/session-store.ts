@@ -45,11 +45,7 @@ const getSessionSecret = (): string => {
 
 const toBase64Url = (input: Buffer | string): string => {
   const raw = Buffer.isBuffer(input) ? input : Buffer.from(input, 'utf8');
-  return raw
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '');
+  return raw.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 };
 
 const fromBase64Url = (input: string): Buffer => {

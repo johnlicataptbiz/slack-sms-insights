@@ -55,13 +55,8 @@ const extractAttachmentFieldByAliases = (
   return '';
 };
 
-const extractFromFallback = (
-  attachments: LeadWatcherAttachment[] | undefined,
-  labels: string[],
-): string => {
-  const fallbackText = (attachments || [])
-    .map((attachment) => attachment.fallback || '')
-    .join('\n');
+const extractFromFallback = (attachments: LeadWatcherAttachment[] | undefined, labels: string[]): string => {
+  const fallbackText = (attachments || []).map((attachment) => attachment.fallback || '').join('\n');
   if (!fallbackText) return '';
 
   for (const label of labels) {
@@ -116,13 +111,10 @@ export const parseAlowareMessage = (text: string, attachments?: LeadWatcherAttac
 
   // 1. Direction
   const attachmentRef = attachments?.[0];
-  const attachmentTitles = (attachments || [])
-    .map((attachment) => attachment.title || '')
-    .join(' ');
-  const attachmentTexts = (attachments || [])
-    .map((attachment) => attachment.text || '')
-    .join(' ');
-  const combinedText = `${text} ${attachmentRef?.fallback || ''} ${attachmentRef?.title || ''} ${attachmentTitles} ${attachmentTexts}`.toLowerCase();
+  const attachmentTitles = (attachments || []).map((attachment) => attachment.title || '').join(' ');
+  const attachmentTexts = (attachments || []).map((attachment) => attachment.text || '').join(' ');
+  const combinedText =
+    `${text} ${attachmentRef?.fallback || ''} ${attachmentRef?.title || ''} ${attachmentTitles} ${attachmentTexts}`.toLowerCase();
 
   if (/\b(received|inbound|incoming)\b/i.test(combinedText)) {
     fields.direction = 'inbound';
@@ -173,8 +165,11 @@ export const parseAlowareMessage = (text: string, attachments?: LeadWatcherAttac
   const contactFieldValue =
     attachments
       ?.flatMap((attachment) => attachment.fields || [])
-      .find((field) => sanitize(field.title || '').toLowerCase().includes('contact'))
-      ?.value || '';
+      .find((field) =>
+        sanitize(field.title || '')
+          .toLowerCase()
+          .includes('contact'),
+      )?.value || '';
   const idMatch = contactFieldValue.match(/contacts\/(\d+)/);
   if (idMatch?.[1]) {
     fields.contactId = idMatch[1];

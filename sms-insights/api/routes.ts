@@ -9,6 +9,12 @@ import {
   getQualificationFunnelAnalytics,
 } from '../services/advanced-analytics.js';
 import {
+  disenrollConversationContactFromSequence,
+  enrollConversationContactToSequence,
+  syncQualificationToAloware,
+} from '../services/aloware-contact-sync.js';
+import { getAlowareIngestHealthSnapshot } from '../services/aloware-ingest-monitor.js';
+import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
@@ -24,18 +30,11 @@ import {
   getResponseTimeStats,
   getTimeToBookingStats,
   getTrendAlerts,
-  logAuditEvent,
 } from '../services/comprehensive-fixes.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getCronStatusSnapshot } from '../services/cron-scheduler.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import { getPool } from '../services/db.js';
-import { getAlowareIngestHealthSnapshot } from '../services/aloware-ingest-monitor.js';
-import {
-  disenrollConversationContactFromSequence,
-  enrollConversationContactToSequence,
-  syncQualificationToAloware,
-} from '../services/aloware-contact-sync.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
 import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
 import { generateCrmNotesSuggestion } from '../services/inbox-crm-notes-engine.js';
@@ -48,8 +47,8 @@ import {
   getDraftSuggestionById,
   getInboxConversationById,
   getObjectionFrequencyAnalytics,
-  getSetterAssistPerformanceAnalytics,
   getSendAttemptVolumeCounts,
+  getSetterAssistPerformanceAnalytics,
   getStageConversionAnalytics,
   incrementGuardrailOverride,
   insertConversationNote,
@@ -71,20 +70,20 @@ import {
   upsertConversionExample,
   VALID_CALL_OUTCOMES,
 } from '../services/inbox-store.js';
+import { buildMessageLinkPreviews } from '../services/link-previews.js';
 import {
   getMetricsOverview,
   getSlaMetrics,
   getVolumeByDayMetrics,
   getWorkloadByRepMetrics,
 } from '../services/metrics.js';
-import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
 import {
   getMondayScorecards,
   listMondayBoardCatalog,
   parseBoardIdsQuery,
   parseScope,
 } from '../services/monday-governed-analytics.js';
-import { buildMessageLinkPreviews } from '../services/link-previews.js';
+import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
 import { getPrismaRuntimeStatus } from '../services/prisma.js';
 import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
@@ -483,9 +482,7 @@ const verifyToken = async (req: ApiRequest): Promise<boolean> => {
 
   const token = extractBearerToken(req);
   if (!token) {
-    req.user = { user_id: 'dashboard-anonymous-user', user: 'Dashboard User', team_id: 'ptbizsms' };
-    req.authMode = 'bearer';
-    return true;
+    return false;
   }
 
   // Signed stream token (SSE) path.
@@ -508,9 +505,7 @@ const verifyToken = async (req: ApiRequest): Promise<boolean> => {
     req.authMode = 'bearer';
     return true;
   } catch {
-    req.user = { user_id: 'dashboard-anonymous-user', user: 'Dashboard User', team_id: 'ptbizsms' };
-    req.authMode = 'bearer';
-    return true;
+    return false;
   }
 };
 
@@ -749,12 +744,7 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
           updatedAt: slackAuthRuntime.updatedAt,
         },
         aloware_ingest: {
-          status:
-            alowareIngest.totals.seen === 0
-              ? 'warn'
-              : alowareIngest.totals.skipRatePct >= 20
-                ? 'warn'
-                : 'ok',
+          status: alowareIngest.totals.seen === 0 ? 'warn' : alowareIngest.totals.skipRatePct >= 20 ? 'warn' : 'ok',
           detail: `seen=${alowareIngest.totals.seen} ingested=${alowareIngest.totals.ingested} skipped=${alowareIngest.totals.skipped} skipRate=${alowareIngest.totals.skipRatePct}%`,
           metadata: {
             startedAt: alowareIngest.startedAt,
@@ -3283,12 +3273,10 @@ const handlePostInboxStatusV2: RequestHandler = async (req, res, logger, origin)
   sendJson(
     res,
     200,
-    toEnvelope(
-      {
-        data: { id: updated.id, status: updated.status, alowareSequenceSync },
-        timeZone: DEFAULT_BUSINESS_TIMEZONE,
-      },
-    ),
+    toEnvelope({
+      data: { id: updated.id, status: updated.status, alowareSequenceSync },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
     origin,
   );
 };
@@ -3834,6 +3822,71 @@ const handleGetFollowupSLAV2: RequestHandler = async (req, res, _logger, origin)
   sendJson(res, 200, toEnvelope({ data, timeZone }), origin);
 };
 
+// ─── Phase 4: Sales Metrics Dashboard ──────────────────────────────────────────
+
+const handleGetSalesMetricsDashboardV2: RequestHandler = async (req, res, logger, origin) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: 'Inbox is disabled' }, origin);
+  }
+
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  const fromDay = dayKeyInTimeZone(resolved.from, resolved.timeZone);
+  const toDay = dayKeyInTimeZone(resolved.to, resolved.timeZone);
+  if (!fromDay || !toDay) {
+    return sendJson(res, 400, { error: 'Failed to resolve timezone day range' }, origin);
+  }
+
+  try {
+    // Get the sales metrics summary
+    const from = new Date(resolved.from);
+    const to = new Date(resolved.to);
+    const timeZone = resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE;
+
+    const salesMetrics = await getSalesMetricsSummary({ from, to, timeZone }, logger);
+
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: {
+          summary: salesMetrics.totals,
+          trendByDay: salesMetrics.trendByDay,
+          topSequences: salesMetrics.topSequences,
+          repLeaderboard: salesMetrics.repLeaderboard,
+          timeRange: salesMetrics.timeRange,
+        },
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch sales metrics dashboard data:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to fetch sales metrics dashboard data',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
 // ─── Phase 4: Extended Analytics & Fixes ─────────────────────────────────────
 
 const handleGetGoalsV2: RequestHandler = async (_req, res, _logger, origin) => {
@@ -3958,7 +4011,10 @@ const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, o
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch monday lead insights', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch monday lead insights',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -3986,7 +4042,10 @@ const handleGetMondayBoardCatalogV2: RequestHandler = async (req, res, logger, o
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch monday board catalog', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch monday board catalog',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -4206,7 +4265,11 @@ const apiRoutes: ApiRoute[] = [
   },
   { method: 'GET', path: '/api/v2/inbox/analytics/stage-conversion', handler: handleGetStageConversionV2 },
   { method: 'GET', path: '/api/v2/inbox/analytics/objection-frequency', handler: handleGetObjectionFrequencyV2 },
-  { method: 'GET', path: '/api/v2/inbox/analytics/setter-assist-performance', handler: handleGetSetterAssistPerformanceV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/analytics/setter-assist-performance',
+    handler: handleGetSetterAssistPerformanceV2,
+  },
   { method: 'GET', path: '/api/v2/analytics/line-performance', handler: handleGetLinePerformanceV2 },
   { method: 'GET', path: '/api/v2/analytics/qualification-funnel', handler: handleGetQualificationFunnelV2 },
   { method: 'GET', path: '/api/v2/analytics/draft-ai-performance', handler: handleGetDraftAIPerformanceV2 },
@@ -4216,6 +4279,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/analytics/time-to-booking', handler: handleGetTimeToBookingV2 },
   { method: 'GET', path: '/api/v2/analytics/response-time', handler: handleGetResponseTimeV2 },
   { method: 'GET', path: '/api/v2/analytics/line-balance', handler: handleGetLineBalanceV2 },
+  { method: 'GET', path: '/api/v2/analytics/sales-metrics', handler: handleGetSalesMetricsDashboardV2 },
   { method: 'POST', path: '/api/v2/admin/auto-assign', handler: handlePostAutoAssignV2 },
   { method: 'POST', path: '/api/v2/admin/bulk-infer-qualification', handler: handlePostBulkInferQualificationV2 },
   { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },

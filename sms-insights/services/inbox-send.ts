@@ -8,8 +8,8 @@ import {
   getConversationState,
   getSendAttemptByIdempotency,
   type InsertSendAttemptInput,
-  reserveSendAttemptIdempotency,
   insertSendAttempt,
+  reserveSendAttemptIdempotency,
   type SendAttemptRow,
 } from './inbox-store.js';
 import { insertSmsEvent, linkSmsEventToConversation, type SmsEventRow } from './sms-event-store.js';
@@ -247,9 +247,7 @@ export const sendInboxMessage = async (
         return {
           status: 'duplicate',
           reason:
-            existing.status === 'queued'
-              ? 'idempotency key already in progress'
-              : 'idempotency key already processed',
+            existing.status === 'queued' ? 'idempotency key already in progress' : 'idempotency key already processed',
           sendAttempt: existing,
           outboundEvent: null,
         };

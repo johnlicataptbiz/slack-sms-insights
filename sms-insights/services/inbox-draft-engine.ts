@@ -535,7 +535,7 @@ const hasLongParagraph = (text: string): boolean => {
 
 const hasOverlengthSms = (text: string): boolean => sanitizeInline(text).length > 320;
 
-const hasUnicodeRisk = (text: string): boolean => /[^\u0000-\u007F]/.test(text);
+const hasUnicodeRisk = (text: string): boolean => [...text].some((char) => char.charCodeAt(0) > 0x7f);
 
 const SOFT_DEFERRAL_PATTERNS = [
   /\bkeep this in mind\b/i,
@@ -548,8 +548,7 @@ const SOFT_DEFERRAL_PATTERNS = [
   /\blater\b/i,
 ];
 
-const isSoftDeferral = (text: string): boolean =>
-  SOFT_DEFERRAL_PATTERNS.some((pattern) => pattern.test(text));
+const isSoftDeferral = (text: string): boolean => SOFT_DEFERRAL_PATTERNS.some((pattern) => pattern.test(text));
 
 export const lintDraft = (text: string): DraftLintResult => {
   const issues: DraftLintIssue[] = [];
@@ -689,11 +688,16 @@ const cleanGeneratedVoice = (text: string, ownerVoice: OwnerVoice = null): strin
   let next = text;
   const replacements: Array<[RegExp, string]> = [
     [/\bQuick check so I can keep qualification accurate\.?\s*/gi, 'Quick check. '],
-    [/\bI have your status marked as\b/gi, ownerVoice === 'jack' ? "Got you as" : 'I have you marked as'],
-    [/\bI have your revenue mix noted as\b/gi, ownerVoice === 'jack' ? "Got your mix as" : 'I have your mix as'],
-    [/\bI have your niche noted as\b/gi, ownerVoice === 'jack' ? "Got your niche as" : 'I have your niche as'],
+    [/\bI have your status marked as\b/gi, ownerVoice === 'jack' ? 'Got you as' : 'I have you marked as'],
+    [/\bI have your revenue mix noted as\b/gi, ownerVoice === 'jack' ? 'Got your mix as' : 'I have your mix as'],
+    [/\bI have your niche noted as\b/gi, ownerVoice === 'jack' ? 'Got your niche as' : 'I have your niche as'],
     [/\bWould you say your revenue mix is\b/gi, 'Are you'],
-    [/\bWho is your core niche right now\?/gi, ownerVoice === 'jack' ? 'Who do you mainly want to serve right now?' : 'Who are you mainly trying to serve right now?'],
+    [
+      /\bWho is your core niche right now\?/gi,
+      ownerVoice === 'jack'
+        ? 'Who do you mainly want to serve right now?'
+        : 'Who are you mainly trying to serve right now?',
+    ],
     [/[“”]/g, '"'],
     [/[‘’]/g, "'"],
     [/\u00A0/g, ' '],
@@ -747,7 +751,9 @@ export const buildContextualFallbackDraft = (params: {
   } else if (params.state && params.state.qualification_revenue_mix !== 'unknown') {
     contextBits.push(`Got your mix as ${renderRevenueMixLabel(params.state.qualification_revenue_mix)}.`);
   } else if (params.state && params.state.qualification_coaching_interest !== 'unknown') {
-    contextBits.push(`Got your coaching interest as ${renderCoachingInterestLabel(params.state.qualification_coaching_interest)}.`);
+    contextBits.push(
+      `Got your coaching interest as ${renderCoachingInterestLabel(params.state.qualification_coaching_interest)}.`,
+    );
   }
 
   const matchedQuestion = selectQuestionFromExamples({
@@ -772,7 +778,10 @@ export const buildContextualFallbackDraft = (params: {
         ? 'Quick check.'
         : 'Quick check.';
 
-  return cleanGeneratedVoice([lineOne, ...contextBits.slice(0, 1), escalationBridge, nextQuestion].join(' '), ownerVoice);
+  return cleanGeneratedVoice(
+    [lineOne, ...contextBits.slice(0, 1), escalationBridge, nextQuestion].join(' '),
+    ownerVoice,
+  );
 };
 
 const buildPrompt = (params: {

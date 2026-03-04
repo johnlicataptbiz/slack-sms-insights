@@ -1,9 +1,9 @@
 import { App, LogLevel } from '@slack/bolt';
 import compression from 'compression';
 import 'dotenv/config';
-import { readFileSync } from 'node:fs';
+import { createReadStream, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApiRoute } from './api/routes.js';
 import registerListeners from './listeners/index.js';
@@ -63,6 +63,24 @@ const responseSecurityHeaders: Record<string, string> = {
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+};
+
+const getContentType = (ext: string): string => {
+  const types: Record<string, string> = {
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'text/javascript',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.txt': 'text/plain',
+    '.pdf': 'application/pdf',
+  };
+  return types[ext.toLowerCase()] || 'application/octet-stream';
 };
 
 /** Initialization */
@@ -139,6 +157,29 @@ app.error(async (error) => {
             const handled = await handleApiRoute(req, res, pathname, app.logger);
             if (handled) {
               return;
+            }
+          }
+
+          // Serve static files from public directory
+          if (!pathname.startsWith('/api/') && !pathname.startsWith('/assets/')) {
+            const __filename = fileURLToPath(import.meta.url);
+            const __dirname = join(__filename, '..');
+            const publicDir = join(__dirname, 'public');
+            const filePath = join(publicDir, pathname === '/' ? '/index.html' : pathname);
+
+            try {
+              const stats = statSync(filePath);
+              if (stats.isFile()) {
+                const contentType = getContentType(extname(filePath));
+                res.writeHead(200, {
+                  ...responseSecurityHeaders,
+                  'Content-Type': contentType,
+                });
+                createReadStream(filePath).pipe(res);
+                return;
+              }
+            } catch (_error) {
+              // File doesn't exist, continue to other handlers
             }
           }
 

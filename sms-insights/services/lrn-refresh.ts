@@ -106,7 +106,9 @@ export const runLrnBackfill = async (
   hooks?: LrnBackfillHooks,
 ): Promise<LrnBackfillSummary> => {
   const candidates = await fetchCandidates(options);
-  const uniquePhones = new Set(candidates.map((row) => normalizePhone(row.phone)).filter((phone): phone is string => !!phone));
+  const uniquePhones = new Set(
+    candidates.map((row) => normalizePhone(row.phone)).filter((phone): phone is string => !!phone),
+  );
 
   const summary: LrnBackfillSummary = {
     mode: options.dryRun ? 'dry-run' : 'write',
@@ -143,12 +145,13 @@ export const runLrnBackfill = async (
       }
 
       const data =
-        lookupPayload && lookupPayload.data && typeof lookupPayload.data === 'object'
+        lookupPayload?.data && typeof lookupPayload.data === 'object'
           ? (lookupPayload.data as Record<string, unknown>)
           : null;
 
       const lrnLineType = asString(lookupPayload?.line_type) || asString(data?.line_type);
-      const lrnCarrier = asString(lookupPayload?.carrier) || asString(data?.spid_carrier_name) || asString(data?.carrier);
+      const lrnCarrier =
+        asString(lookupPayload?.carrier) || asString(data?.spid_carrier_name) || asString(data?.carrier);
       const lrnCity = asString(lookupPayload?.cnam_city) || asString(data?.city);
       const lrnState = asString(lookupPayload?.cnam_state) || asString(data?.state);
       const lrnCountry = asString(lookupPayload?.cnam_country) || asString(data?.country);

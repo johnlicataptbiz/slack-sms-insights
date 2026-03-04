@@ -16,8 +16,8 @@ import {
   upsertMondayCallColumnValues,
   upsertMondayCallSnapshot,
   upsertMondayMetricFacts,
-  upsertNormalizedMondayLeadRecords,
   upsertMondaySyncState,
+  upsertNormalizedMondayLeadRecords,
 } from './monday-store.js';
 
 const parseBool = (value: string | undefined): boolean => value?.trim().toLowerCase() === 'true';
@@ -33,7 +33,11 @@ export const mondayConfig = {
   personalSyncEnabled: parseBool(process.env.MONDAY_PERSONAL_SYNC_ENABLED),
   outboundEnabled: parseBool(process.env.MONDAY_OUTBOUND_ENABLED),
   acqBoardId: (process.env.MONDAY_ACQ_BOARD_ID || '5077164868').trim(),
-  salesCallsBoardId: (process.env.MONDAY_SALES_CALLS_BOARD_ID || process.env.MONDAY_ACQ_BOARD_ID || '5077164868').trim(),
+  salesCallsBoardId: (
+    process.env.MONDAY_SALES_CALLS_BOARD_ID ||
+    process.env.MONDAY_ACQ_BOARD_ID ||
+    '5077164868'
+  ).trim(),
   myCallsBoardId: (process.env.MONDAY_MY_CALLS_BOARD_ID || '10029059942').trim(),
   personalBoardId: (
     process.env.MONDAY_PERSONAL_BOARD_ID ||
@@ -189,7 +193,7 @@ export const syncMondayBoard = async (
     let pageCount = 0;
 
     while (pageCount < mondayConfig.maxPagesPerRun) {
-      let page;
+      let page: Awaited<ReturnType<typeof queryBoardItems>>;
       try {
         page = await queryBoardItems(boardId, cursor, logger);
       } catch (error) {

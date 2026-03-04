@@ -1,5 +1,5 @@
 import type { App } from '@slack/bolt';
-import { buildAlowareAnalyticsReportBundle, buildDailySnapshotBlocks } from '../../services/aloware-analytics.js';
+import { buildAlowareAnalyticsReportBundle } from '../../services/aloware-analytics.js';
 import { isAlowareChannel } from '../../services/aloware-policy.js';
 import { buildReportActionBlocks, generateAndPostReport, splitReportText } from '../../services/report-poster.js';
 import { getScoreboardData } from '../../services/scoreboard.js';

@@ -110,7 +110,7 @@ export const enrichContactProfileFromAloware = async (
   }
 
   const lrnData =
-    lrnLookup && lrnLookup.data && typeof lrnLookup.data === 'object' ? (lrnLookup.data as Record<string, unknown>) : null;
+    lrnLookup?.data && typeof lrnLookup.data === 'object' ? (lrnLookup.data as Record<string, unknown>) : null;
   const lrnLineType = asString(lrnLookup?.line_type) || asString(lrnData?.line_type);
   const lrnCarrier = asString(lrnLookup?.carrier) || asString(lrnData?.spid_carrier_name) || asString(lrnData?.carrier);
   const lrnCity = asString(lrnLookup?.cnam_city) || asString(lrnData?.city);

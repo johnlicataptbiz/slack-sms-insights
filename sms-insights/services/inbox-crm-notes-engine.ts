@@ -111,7 +111,10 @@ const parseField = (content: string, labels: string[]): string | null => {
     const pattern = new RegExp(`\\*?${escaped}\\*?\\s*:\\s*([^\\n]+)`, 'i');
     const match = content.match(pattern);
     if (match?.[1]) {
-      const value = match[1].trim().replace(/<mailto:[^|>]+\|([^>]+)>/gi, '$1').replace(/<[^|>]+\|([^>]+)>/g, '$1');
+      const value = match[1]
+        .trim()
+        .replace(/<mailto:[^|>]+\|([^>]+)>/gi, '$1')
+        .replace(/<[^|>]+\|([^>]+)>/g, '$1');
       if (value.length > 0) return value;
     }
   }
@@ -220,7 +223,8 @@ const extractAdvisor = (context: CrmNotesContext, slackBookedCalls: SlackBookedC
   return 'Not specified';
 };
 
-const stripFences = (value: string): string => value.replace(/^```(?:markdown|md|txt)?\s*/i, '').replace(/\s*```$/i, '');
+const stripFences = (value: string): string =>
+  value.replace(/^```(?:markdown|md|txt)?\s*/i, '').replace(/\s*```$/i, '');
 
 const hasExpectedHeading = (value: string): boolean =>
   value.includes('📋 CRM Notes – Discovery Call (Setter → Advisor Handoff)');
@@ -242,13 +246,12 @@ const buildFallbackNotes = (context: CrmNotesContext, slackBookedCalls: SlackBoo
     })
     .slice(-6);
 
-  const bulletLines =
-    recentBullets.length > 0 ? recentBullets.map((row) => `- ${row}`).join('\n') : '- Not specified';
+  const bulletLines = recentBullets.length > 0 ? recentBullets.map((row) => `- ${row}`).join('\n') : '- Not specified';
 
   const leadName = (context.contactName || '').trim() || 'Not specified';
   const email = (context.contactEmail || '').trim() || 'Not specified';
   const source = resolveSource(context, slackBookedCalls);
-  const timezone = (context.timezone || '').trim() || 'Not specified';
+  const _timezone = (context.timezone || '').trim() || 'Not specified';
 
   return [
     '📋 CRM Notes – Discovery Call (Setter → Advisor Handoff)',

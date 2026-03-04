@@ -9,17 +9,23 @@ export const initDatabase = async (logger?: Pick<Logger, 'info' | 'error'>): Pro
     return;
   }
 
-  const databaseUrl = process.env.DATABASE_URL;
+  const databaseUrl = (process.env.DATABASE_URL || '').trim();
+  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || '').trim();
+  const resolvedUrl = databaseUrl || accelerateUrl;
+
   logger?.info(
     `Checking DATABASE_URL: ${databaseUrl ? `Present (starts with ${databaseUrl.substring(0, 10)}...)` : 'MISSING'}`,
   );
+  if (!databaseUrl && accelerateUrl) {
+    logger?.info('DATABASE_URL missing; falling back to PRISMA_ACCELERATE_URL');
+  }
 
-  if (!databaseUrl) {
-    logger?.error('DATABASE_URL not set; database logging disabled');
+  if (!resolvedUrl) {
+    logger?.error('DATABASE_URL or PRISMA_ACCELERATE_URL not set; database logging disabled');
     return;
   }
 
-  const connectionString = resolveNodePostgresConnectionString(databaseUrl, logger);
+  const connectionString = resolveNodePostgresConnectionString(resolvedUrl, logger);
 
   pool = new Pool({
     connectionString,

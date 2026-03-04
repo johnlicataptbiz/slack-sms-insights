@@ -1,6 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { getPool } from './db.js';
-import { resolveMondayLeadScope, type MondayLeadScope } from './monday-governed-analytics.js';
+import { type MondayLeadScope, resolveMondayLeadScope } from './monday-governed-analytics.js';
 
 type MondayLeadInsightsParams = {
   fromDay: string;
@@ -160,18 +160,19 @@ export const getMondayLeadInsights = async (
   const baseValues = [params.fromDay, params.toDay, ...boardFilter.values];
 
   try {
-    const [totalsResult, outcomesResult, sourcesResult, settersResult, activityResult, syncStateResult, qualityResult] = await Promise.all([
-      pool.query<{
-        leads: number;
-        booked: number;
-        closed_won: number;
-        closed_lost: number;
-        bad_timing: number;
-        bad_fit: number;
-        no_show: number;
-        cancelled: number;
-      }>(
-        `
+    const [totalsResult, outcomesResult, sourcesResult, settersResult, activityResult, syncStateResult, qualityResult] =
+      await Promise.all([
+        pool.query<{
+          leads: number;
+          booked: number;
+          closed_won: number;
+          closed_lost: number;
+          bad_timing: number;
+          bad_fit: number;
+          no_show: number;
+          cancelled: number;
+        }>(
+          `
         SELECT
           COUNT(*)::int AS leads,
           COUNT(*) FILTER (WHERE is_booked = TRUE)::int AS booked,
@@ -185,10 +186,10 @@ export const getMondayLeadInsights = async (
         WHERE COALESCE(call_date, item_updated_at::date) BETWEEN $1::date AND $2::date
         ${boardFilter.clause}
         `,
-        baseValues,
-      ),
-      pool.query<{ category: string; count: number }>(
-        `
+          baseValues,
+        ),
+        pool.query<{ category: string; count: number }>(
+          `
         SELECT outcome_category AS category, COUNT(*)::int AS count
         FROM lead_outcomes
         WHERE COALESCE(call_date, item_updated_at::date) BETWEEN $1::date AND $2::date
@@ -196,10 +197,10 @@ export const getMondayLeadInsights = async (
         GROUP BY outcome_category
         ORDER BY count DESC, outcome_category ASC
         `,
-        baseValues,
-      ),
-      pool.query<{ source: string; count: number }>(
-        `
+          baseValues,
+        ),
+        pool.query<{ source: string; count: number }>(
+          `
         SELECT
           COALESCE(NULLIF(BTRIM(source), ''), 'Unknown') AS source,
           COUNT(*)::int AS count
@@ -210,20 +211,20 @@ export const getMondayLeadInsights = async (
         ORDER BY count DESC, source ASC
         LIMIT $${baseValues.length + 1}
         `,
-        [...baseValues, sourceLimit],
-      ),
-      pool.query<{
-        setter: string;
-        leads: number;
-        booked: number;
-        closed_won: number;
-        closed_lost: number;
-        bad_timing: number;
-        bad_fit: number;
-        no_show: number;
-        cancelled: number;
-      }>(
-        `
+          [...baseValues, sourceLimit],
+        ),
+        pool.query<{
+          setter: string;
+          leads: number;
+          booked: number;
+          closed_won: number;
+          closed_lost: number;
+          bad_timing: number;
+          bad_fit: number;
+          no_show: number;
+          cancelled: number;
+        }>(
+          `
         SELECT
           COALESCE(NULLIF(BTRIM(setter), ''), 'Unassigned') AS setter,
           COUNT(*)::int AS leads,
@@ -241,20 +242,20 @@ export const getMondayLeadInsights = async (
         ORDER BY leads DESC, setter ASC
         LIMIT $${baseValues.length + 1}
         `,
-        [...baseValues, setterLimit],
-      ),
-      pool.query<{
-        day: string;
-        leads: number;
-        booked: number;
-        closed_won: number;
-        closed_lost: number;
-        bad_timing: number;
-        bad_fit: number;
-        no_show: number;
-        cancelled: number;
-      }>(
-        `
+          [...baseValues, setterLimit],
+        ),
+        pool.query<{
+          day: string;
+          leads: number;
+          booked: number;
+          closed_won: number;
+          closed_lost: number;
+          bad_timing: number;
+          bad_fit: number;
+          no_show: number;
+          cancelled: number;
+        }>(
+          `
         SELECT
           activity_date::text AS day,
           COUNT(*)::int AS leads,
@@ -271,16 +272,16 @@ export const getMondayLeadInsights = async (
         GROUP BY activity_date
         ORDER BY activity_date ASC
         `,
-        baseValues,
-      ),
-      pool.query<{
-        board_id: string;
-        status: string | null;
-        last_sync_at: string | null;
-        updated_at: string | null;
-        error: string | null;
-      }>(
-        `
+          baseValues,
+        ),
+        pool.query<{
+          board_id: string;
+          status: string | null;
+          last_sync_at: string | null;
+          updated_at: string | null;
+          error: string | null;
+        }>(
+          `
         SELECT
           board_id,
           status,
@@ -292,19 +293,19 @@ export const getMondayLeadInsights = async (
         ORDER BY updated_at DESC
         LIMIT 10
         `,
-        includedBoards.length ? [includedBoards] : [],
-      ),
-      pool.query<{
-        attribution_rows: number;
-        source_populated: number;
-        campaign_populated: number;
-        set_by_populated: number;
-        touchpoints_populated: number;
-        stale_boards: number;
-        errored_boards: number;
-        empty_boards: number;
-      }>(
-        `
+          includedBoards.length ? [includedBoards] : [],
+        ),
+        pool.query<{
+          attribution_rows: number;
+          source_populated: number;
+          campaign_populated: number;
+          set_by_populated: number;
+          touchpoints_populated: number;
+          stale_boards: number;
+          errored_boards: number;
+          empty_boards: number;
+        }>(
+          `
         WITH board_set AS (
           SELECT UNNEST($1::text[]) AS board_id
         ),
@@ -358,9 +359,9 @@ export const getMondayLeadInsights = async (
         CROSS JOIN touchpoints t
         CROSS JOIN sync_health s
         `,
-        [includedBoards, params.fromDay, params.toDay],
-      ),
-    ]);
+          [includedBoards, params.fromDay, params.toDay],
+        ),
+      ]);
 
     const totalsRow = totalsResult.rows[0];
     const qualityRow = qualityResult.rows[0];

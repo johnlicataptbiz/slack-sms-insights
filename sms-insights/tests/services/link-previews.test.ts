@@ -38,4 +38,3 @@ describe('link previews', () => {
     assert.deepEqual(previews.get('m2'), []);
   });
 });
-

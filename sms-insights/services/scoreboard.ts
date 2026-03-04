@@ -78,6 +78,21 @@ export type ScoreboardTimingRow = {
   replyRatePct: number;
 };
 
+export type ScoreboardLeadMagnetAttributionIssue = {
+  label: string;
+  parsedLeadMagnet: string;
+  parsedVersion: string;
+  reason: 'missing_lead_magnet' | 'no_pattern_match';
+};
+
+export type ScoreboardLeadMagnetAttributionDebug = {
+  missingCount: number;
+  missingLabels: string[];
+  parserNoMatchCount: number;
+  parserNoMatchLabels: string[];
+  issues: ScoreboardLeadMagnetAttributionIssue[];
+};
+
 export type ScoreboardV2 = {
   window: {
     weekStart: string;
@@ -108,6 +123,9 @@ export type ScoreboardV2 = {
     optOutRateWeeklyPct: number;
     optOutRateMonthlyPct: number;
     topOptOutSequences: Array<{ label: string; optOuts: number; optOutRatePct: number }>;
+  };
+  debug: {
+    leadMagnetAttribution: ScoreboardLeadMagnetAttributionDebug;
   };
   provenance: {
     attributionModel: 'sequence_initiated_conversation';
@@ -347,13 +365,41 @@ const buildSequenceRows = (
   }>,
   sequenceAttribution: ReturnType<typeof attributeSlackBookedCallsToSequences>,
   peopleContactedBySequence: Map<string, number>,
-): ScoreboardSequenceRow[] => {
-  return topSequences.map((row) => {
+): {
+  rows: ScoreboardSequenceRow[];
+  leadMagnetAttribution: ScoreboardLeadMagnetAttributionDebug;
+} => {
+  const rows: ScoreboardSequenceRow[] = [];
+  const missingLeadMagnetLabels = new Set<string>();
+  const parserNoMatchLabels = new Set<string>();
+  const issues: ScoreboardLeadMagnetAttributionIssue[] = [];
+
+  for (const row of topSequences) {
     const { leadMagnet, version } = parseLeadMagnetAndVersion(row.label);
     const booked = sequenceAttribution.byLabel.get(row.label)?.booked ?? 0;
     const uniqueContacted = peopleContactedBySequence.get(row.label) ?? row.messagesSent;
     const uniqueReplied = row.repliesReceived;
-    return {
+
+    const trimmedLeadMagnet = leadMagnet.trim();
+    if (!trimmedLeadMagnet) {
+      missingLeadMagnetLabels.add(row.label);
+      issues.push({
+        label: row.label,
+        parsedLeadMagnet: leadMagnet,
+        parsedVersion: version,
+        reason: 'missing_lead_magnet',
+      });
+    } else if (trimmedLeadMagnet === row.label.trim() && !version) {
+      parserNoMatchLabels.add(row.label);
+      issues.push({
+        label: row.label,
+        parsedLeadMagnet: leadMagnet,
+        parsedVersion: version,
+        reason: 'no_pattern_match',
+      });
+    }
+
+    rows.push({
       label: row.label,
       leadMagnet,
       version,
@@ -365,8 +411,19 @@ const buildSequenceRows = (
       bookingRatePct: uniqueContacted > 0 ? (booked / uniqueContacted) * 100 : 0,
       optOuts: row.optOuts,
       optOutRatePct: row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
-    };
-  });
+    });
+  }
+
+  return {
+    rows,
+    leadMagnetAttribution: {
+      missingCount: missingLeadMagnetLabels.size,
+      missingLabels: [...missingLeadMagnetLabels].sort((a, b) => a.localeCompare(b)),
+      parserNoMatchCount: parserNoMatchLabels.size,
+      parserNoMatchLabels: [...parserNoMatchLabels].sort((a, b) => a.localeCompare(b)),
+      issues,
+    },
+  };
 };
 
 const buildLeadMagnetComparison = (sequenceRows: ScoreboardSequenceRow[]): ScoreboardLeadMagnetRow[] => {
@@ -666,7 +723,11 @@ export const getScoreboardData = async (
   const monthlyBookings = buildBookingSplit(monthlyBooked, monthlySeqAttribution);
 
   // Sequence rows (weekly window, with lead-magnet + version parsing)
-  const sequenceRows = buildSequenceRows(weeklyCanonical.topSequences, weeklySeqAttribution, weeklyPeopleBySeq);
+  const { rows: sequenceRows, leadMagnetAttribution } = buildSequenceRows(
+    weeklyCanonical.topSequences,
+    weeklySeqAttribution,
+    weeklyPeopleBySeq,
+  );
   const leadMagnetComparison = buildLeadMagnetComparison(sequenceRows);
 
   // Compliance
@@ -705,6 +766,9 @@ export const getScoreboardData = async (
       optOutRateWeeklyPct: weeklyOptOutRate,
       optOutRateMonthlyPct: monthlyOptOutRate,
       topOptOutSequences,
+    },
+    debug: {
+      leadMagnetAttribution,
     },
     provenance: {
       attributionModel: 'sequence_initiated_conversation',

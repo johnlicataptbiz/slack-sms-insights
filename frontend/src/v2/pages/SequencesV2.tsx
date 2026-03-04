@@ -1,25 +1,17 @@
-import { Fragment, type ReactNode, useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import type { ColumnDef, ColumnPinningState, VisibilityState } from '@tanstack/react-table';
-import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
-import DiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
+import { type ReactNode, useMemo, useState } from 'react';
 
 import {
   useV2SalesMetrics,
   useV2Scoreboard,
   useV2SequenceQualification,
-  useV2SequenceVersionHistory,
-  useV2UpdateSequenceVersionDecision,
 } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
-import type { SalesMetricsV2, SequenceVersionHistoryRowV2 } from '../../api/v2-types';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
-import { useToast } from '../hooks/useToast';
+import type { SalesMetricsV2 } from '../../api/v2-types';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline } from '../components/V2Primitives';
 
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
 const NOT_CAPTURED_LABEL = 'Not Captured Yet';
-const WINNER_MIN_SENDS = 100;
 const executiveSectionsStorageKey = 'v2_sequences_executive_sections_v1';
 type ExecutiveSectionKey = 'leadMagnet' | 'attribution' | 'compliance' | 'timing';
 type ExecutiveSectionState = Record<ExecutiveSectionKey, boolean>;
@@ -31,38 +23,6 @@ const defaultExecutiveSectionState: ExecutiveSectionState = {
 };
 
 type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
-type Sort =
-  | 'version'
-  | 'messagesSent'
-  | 'replyRatePct'
-  | 'canonicalBookedCalls'
-  | 'optOutRatePct'
-  | 'uniqueContacted'
-  | 'bookingRatePct';
-
-type ColumnId =
-  | 'label'
-  | 'version'
-  | 'firstSeenAt'
-  | 'messagesSent'
-  | 'uniqueContacted'
-  | 'repliesReceived'
-  | 'replyRatePct'
-  | 'canonicalBookedCalls'
-  | 'bookingRatePct'
-  | 'optOutRatePct'
-  | 'optOuts'
-  | 'expand';
-
-// ─── SMS Reply Reason Labels ─────────────────────────────────────────────────
-
-const SMS_REPLY_REASON_LABELS: Record<string, string> = {
-  matched_reply_before_booking: 'SMS reply matched before booking',
-  no_contact_phone: 'No contact phone on file',
-  no_reply_before_booking: 'No SMS reply before booking',
-  invalid_booking_timestamp: 'Invalid booking timestamp',
-};
-
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -76,26 +36,6 @@ const fmtMins = (n: number | null): string => {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 };
 
-const shorten = (text: string, max: number): string => {
-  if (text.length <= max) return text;
-  const truncated = text.slice(0, max);
-  const lastSpace = truncated.lastIndexOf(' ');
-  return `${lastSpace > max * 0.7 ? truncated.slice(0, lastSpace) : truncated}…`;
-};
-
-const fmtSignedInt = (n: number): string => {
-  if (n === 0) return '0';
-  return `${n > 0 ? '+' : ''}${fmtInt(n)}`;
-};
-
-const fmtSignedPctPoints = (n: number): string => {
-  if (n === 0) return '0.0 pp';
-  return `${n > 0 ? '+' : ''}${n.toFixed(1)} pp`;
-};
-const fmtRatioHint = (numerator: number, denominator: number): string => {
-  if (denominator <= 0) return `${fmtInt(numerator)}/0`;
-  return `${fmtInt(numerator)}/${fmtInt(denominator)}`;
-};
 
 /**
  * Extract a display version string (e.g. "v1.2") from a sequence label.
@@ -107,46 +47,6 @@ const extractVersionDisplay = (label: string): string => {
   return match?.[1] ?? '';
 };
 
-const fmtDay = (iso: string | null) => {
-  if (!iso) return '—';
-  const value = iso.trim();
-  if (!value) return '—';
-  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (m) {
-    const utcDate = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
-    return utcDate.toLocaleDateString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
-  }
-  const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return value;
-  return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-};
-
-const fmtDateTime = (value: string | null): string => {
-  if (!value) return '—';
-  const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return value;
-  return dt.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-};
-
-const maskPhone = (value: string | null) => {
-  if (!value) return 'n/a';
-  const digits = value.replace(/\D/g, '');
-  if (digits.length < 4) return value;
-  return `***${digits.slice(-4)}`;
-};
-
-const BUCKET_LABELS: Record<'jack' | 'brandon' | 'selfBooked', string> = {
-  jack: 'Jack',
-  brandon: 'Brandon',
-  selfBooked: 'Self-booked',
-};
-const labelSorter = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
-
 const MODE_LABELS: Record<Mode, string> = {
   '7d': 'Last 7 days',
   '30d': 'Last 30 days',
@@ -156,16 +56,6 @@ const MODE_LABELS: Record<Mode, string> = {
 };
 
 // ─── JSX Helpers ─────────────────────────────────────────────────────────────
-
-const renderVersion = (label: string, version: string): React.ReactNode => {
-  const vDisplay = extractVersionDisplay(label);
-  if (vDisplay) return <span className="V2Badge V2Badge--version">{vDisplay}</span>;
-  if (version && version !== 'Legacy') return <span className="V2Badge V2Badge--version">{version}</span>;
-  return <span className="V2Table__dim">—</span>;
-};
-
-const toAuditId = (label: string) =>
-  `audit-${label.replace(/[^a-z0-9]/gi, '-').toLowerCase()}`;
 
 function ExecutiveSection({
   id,
@@ -234,55 +124,6 @@ type MergedSeqRow = {
   smsReplyPct: number | null;
 };
 
-type VersionDiffContext = {
-  previous: MergedSeqRow | null;
-  currentCanonicalBody: string | null;
-  previousCanonicalBody: string | null;
-  usingVariantPair: boolean;
-};
-
-type VersionTimelineItem = {
-  label: string;
-  versionLabel: string;
-  status: 'active' | 'testing' | 'rewrite' | 'archived';
-  firstSeenAt: string | null;
-  messagesSent: number;
-  replyRatePct: number;
-  bookedCalls: number;
-  bookingRatePct: number;
-  isCurrent: boolean;
-  isWinner: boolean;
-  winnerLowConfidence: boolean;
-};
-
-type SequenceConfidence = {
-  label: 'High' | 'Medium' | 'Low sample';
-  className: 'V2Badge--confidenceHigh' | 'V2Badge--confidenceMed' | 'V2Badge--confidenceLow';
-  hint: string;
-};
-
-const getSequenceConfidence = (row: Pick<MergedSeqRow, 'messagesSent' | 'uniqueContacted'>): SequenceConfidence => {
-  if (row.uniqueContacted >= 200 || row.messagesSent >= 400) {
-    return {
-      label: 'High',
-      className: 'V2Badge--confidenceHigh',
-      hint: 'High confidence: strong sample size for rate comparisons.',
-    };
-  }
-  if (row.uniqueContacted >= 75 || row.messagesSent >= 150) {
-    return {
-      label: 'Medium',
-      className: 'V2Badge--confidenceMed',
-      hint: 'Medium confidence: useful directional signal.',
-    };
-  }
-  return {
-    label: 'Low sample',
-    className: 'V2Badge--confidenceLow',
-    hint: 'Low sample: percentages can swing quickly with small volume.',
-  };
-};
-
 const parseVersionParts = (value: string): number[] | null => {
   const match = value.toLowerCase().match(/v(\d+(?:\.\d+)*)/);
   if (!match) return null;
@@ -308,105 +149,10 @@ const compareVersionParts = (a: number[] | null, b: number[] | null): number => 
   return 0;
 };
 
-const toVersionSortKey = (row: MergedSeqRow): number[] | null => {
-  return parseVersionParts(extractVersionDisplay(row.label) || row.version);
-};
-
-const toSequenceFamily = (row: Pick<MergedSeqRow, 'label' | 'leadMagnet' | 'isManual'>): string => {
-  if (row.isManual) return MANUAL_LABEL;
-  const cleaned = row.label
-    .replace(/\b20\d{2}\b/g, ' ')
-    .replace(/\bv\d+(?:\.\d+)+\b/gi, ' ')
-    .replace(/\s*-\s*/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (cleaned.length > 0) return cleaned;
-  return row.leadMagnet || NOT_CAPTURED_LABEL;
-};
-
-const getTopBodyVariants = (row: SequenceVersionHistoryRowV2 | null | undefined): string[] => {
-  if (!row) return [];
-  const candidates = [row.canonicalBody, ...(row.sampleBodies || [])]
-    .map((value) => (value || '').trim())
-    .filter((value) => value.length > 0);
-  const unique: string[] = [];
-  for (const value of candidates) {
-    if (!unique.includes(value)) unique.push(value);
-    if (unique.length >= 2) break;
-  }
-  return unique;
-};
-
-const pickDiffPair = (
-  previousVariants: string[],
-  currentVariants: string[],
-): { previous: string | null; current: string | null; usingVariantPair: boolean } => {
-  const prev0 = previousVariants[0] || null;
-  const curr0 = currentVariants[0] || null;
-  if (!prev0 || !curr0) {
-    return { previous: prev0, current: curr0, usingVariantPair: false };
-  }
-
-  if (prev0 !== curr0) {
-    return { previous: prev0, current: curr0, usingVariantPair: false };
-  }
-
-  const variantCandidates: Array<[string | null, string | null]> = [
-    [prev0, currentVariants[1] || null],
-    [previousVariants[1] || null, curr0],
-    [previousVariants[1] || null, currentVariants[1] || null],
-  ];
-
-  for (const [prev, curr] of variantCandidates) {
-    if (prev && curr && prev !== curr) {
-      return { previous: prev, current: curr, usingVariantPair: true };
-    }
-  }
-
-  return { previous: prev0, current: curr0, usingVariantPair: false };
-};
-
-export const computeSequenceHeaderMetrics = (
-  payload: SalesMetricsV2,
-  sequenceRows: SalesMetricsV2['sequences'],
-) => {
-  const totalBookedAllChannels = payload.totals.canonicalBookedCalls;
-  const totalBookedAttributedToRows = sequenceRows.reduce((sum, row) => sum + row.canonicalBookedCalls, 0);
-  const attribution = payload.provenance.sequenceBookedAttribution;
-  const unattributedCalls =
-    attribution?.unattributedCalls ?? Math.max(0, totalBookedAllChannels - totalBookedAttributedToRows);
-  const totalBookedAfterReply =
-    attribution?.strictSmsReplyLinkedCalls ??
-    sequenceRows.reduce((sum, row) => sum + row.canonicalBookedAfterSmsReply, 0);
-  const totalBookedNonSmsOrUnknown =
-    attribution?.nonSmsOrUnknownCalls ?? Math.max(0, totalBookedAllChannels - totalBookedAfterReply);
-
-  return {
-    totalBookedAllChannels,
-    totalBookedAttributedToRows,
-    unattributedCalls,
-    totalBookedAfterReply,
-    totalBookedNonSmsOrUnknown,
-  };
-};
-
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('7d');
-  const [sort, setSort] = useState<Sort>('version');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [query, setQuery] = useState('');
-  const [showManualRow, setShowManualRow] = useState(false);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
-    firstSeenAt: false,
-    uniqueContacted: false,
-    bookingRatePct: false,
-  });
-  const [columnPinning, setColumnPinning] = useState<ColumnPinningState>({
-    left: ['label'],
-    right: ['expand'],
-  });
   const [executiveSections, setExecutiveSections] = useState<ExecutiveSectionState>(() => {
     if (typeof window === 'undefined') return defaultExecutiveSectionState;
     try {
@@ -421,15 +167,10 @@ export default function SequencesV2() {
       return defaultExecutiveSectionState;
     }
   });
-  const [expandedLabels, setExpandedLabels] = useState<Set<string>>(new Set());
-  const [decisionPendingLabel, setDecisionPendingLabel] = useState<string | null>(null);
-  const toast = useToast();
 
   const salesMetricsQuery = useV2SalesMetrics({ range: mode, tz: BUSINESS_TZ });
   const scoreboardQuery = useV2Scoreboard({ tz: BUSINESS_TZ });
   const sequenceQualQuery = useV2SequenceQualification({ range: mode, tz: BUSINESS_TZ });
-  const sequenceVersionHistoryQuery = useV2SequenceVersionHistory({ lookbackDays: 365 });
-  const updateSequenceDecisionMutation = useV2UpdateSequenceVersionDecision();
 
   const updateExecutiveSections = (next: ExecutiveSectionState) => {
     setExecutiveSections(next);
@@ -464,35 +205,7 @@ export default function SequencesV2() {
 
   const salesMetrics = salesMetricsQuery.data?.data;
   const scoreboard = scoreboardQuery.data?.data;
-  const versionHistory = sequenceVersionHistoryQuery.data?.data?.items ?? [];
-
-  const versionHistoryByLabel = useMemo(() => {
-    const map = new Map<string, SequenceVersionHistoryRowV2>();
-    for (const row of versionHistory) {
-      map.set(row.label, row);
-    }
-    return map;
-  }, [versionHistory]);
-
-  const updateSequenceStatus = async (
-    label: string,
-    status: 'active' | 'testing' | 'rewrite' | 'archived',
-  ) => {
-    try {
-      setDecisionPendingLabel(label);
-      await updateSequenceDecisionMutation.mutateAsync({
-        label,
-        status,
-        updatedBy: 'dashboard',
-      });
-      toast.success(`Updated ${label} to ${status}.`, { duration: 2200 });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to update version status';
-      toast.error(message, { duration: 2800 });
-    } finally {
-      setDecisionPendingLabel(null);
-    }
-  };
+  const trendByDay = salesMetrics?.trendByDay ?? [];
 
   // Build scoreboard lookup by label for metadata fields (leadMagnet/version).
   const scoreboardByLabel = useMemo(() => {
@@ -538,146 +251,6 @@ export default function SequencesV2() {
     });
   }, [salesMetrics?.sequences, scoreboardByLabel]);
 
-  const versionDiffByLabel = useMemo(() => {
-    const grouped = new Map<string, MergedSeqRow[]>();
-    for (const row of mergedRows) {
-      const key = row.leadMagnet || NOT_CAPTURED_LABEL;
-      const bucket = grouped.get(key) ?? [];
-      bucket.push(row);
-      grouped.set(key, bucket);
-    }
-
-    const result = new Map<string, VersionDiffContext>();
-    for (const rows of grouped.values()) {
-      const ordered = [...rows].sort((a, b) => {
-        const v = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
-        if (v !== 0) return v;
-        const aTs = a.firstSeenAt ? new Date(a.firstSeenAt).getTime() : 0;
-        const bTs = b.firstSeenAt ? new Date(b.firstSeenAt).getTime() : 0;
-        return aTs - bTs;
-      });
-
-      ordered.forEach((current, idx) => {
-        const previous = idx > 0 ? (ordered[idx - 1] ?? null) : null;
-        const currentHistory = versionHistoryByLabel.get(current.label);
-        const previousHistory = previous ? versionHistoryByLabel.get(previous.label) : null;
-        const currentVariants = getTopBodyVariants(currentHistory);
-        const previousVariants = getTopBodyVariants(previousHistory);
-        const diffPair = pickDiffPair(previousVariants, currentVariants);
-        result.set(current.label, {
-          previous,
-          currentCanonicalBody: diffPair.current,
-          previousCanonicalBody: diffPair.previous,
-          usingVariantPair: diffPair.usingVariantPair,
-        });
-      });
-    }
-    return result;
-  }, [mergedRows, versionHistoryByLabel]);
-
-  const versionTimelineByLabel = useMemo(() => {
-    const grouped = new Map<string, MergedSeqRow[]>();
-    for (const row of mergedRows) {
-      const key = row.leadMagnet || NOT_CAPTURED_LABEL;
-      const bucket = grouped.get(key) ?? [];
-      bucket.push(row);
-      grouped.set(key, bucket);
-    }
-
-    const result = new Map<string, VersionTimelineItem[]>();
-    for (const rows of grouped.values()) {
-      const ordered = [...rows].sort((a, b) => {
-        const v = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
-        if (v !== 0) return v;
-        const aTs = a.firstSeenAt ? new Date(a.firstSeenAt).getTime() : 0;
-        const bTs = b.firstSeenAt ? new Date(b.firstSeenAt).getTime() : 0;
-        return aTs - bTs;
-      });
-
-      const winner = [...ordered].sort((a, b) => {
-        const aRate = a.messagesSent > 0 ? (a.canonicalBookedCalls / a.messagesSent) * 100 : 0;
-        const bRate = b.messagesSent > 0 ? (b.canonicalBookedCalls / b.messagesSent) * 100 : 0;
-        if (bRate !== aRate) return bRate - aRate;
-        if (b.canonicalBookedCalls !== a.canonicalBookedCalls) return b.canonicalBookedCalls - a.canonicalBookedCalls;
-        return b.messagesSent - a.messagesSent;
-      })[0] ?? null;
-
-      ordered.forEach((current) => {
-        const items: VersionTimelineItem[] = ordered.map((r) => ({
-          label: r.label,
-          versionLabel: extractVersionDisplay(r.label) || r.version || r.label,
-          status: versionHistoryByLabel.get(r.label)?.status ?? 'testing',
-          firstSeenAt: r.firstSeenAt,
-          messagesSent: r.messagesSent,
-          replyRatePct: r.replyRatePct,
-          bookedCalls: r.canonicalBookedCalls,
-          bookingRatePct: r.messagesSent > 0 ? (r.canonicalBookedCalls / r.messagesSent) * 100 : 0,
-          isCurrent: r.label === current.label,
-          isWinner: winner ? r.label === winner.label : false,
-          winnerLowConfidence: winner ? winner.messagesSent < WINNER_MIN_SENDS : false,
-        }));
-        result.set(current.label, items);
-      });
-    }
-    return result;
-  }, [mergedRows, versionHistoryByLabel]);
-
-  const filteredRows = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    return mergedRows.filter((row) => {
-      if (!showManualRow && row.isManual) return false;
-      if (!needle) return true;
-      return (
-        row.label.toLowerCase().includes(needle) ||
-        row.leadMagnet.toLowerCase().includes(needle) ||
-        row.version.toLowerCase().includes(needle)
-      );
-    });
-  }, [mergedRows, query, showManualRow]);
-
-  // Sort — manual/unattributed always last
-  const sortedRows = useMemo(() => {
-    const dir = sortDir === 'asc' ? 1 : -1;
-    return [...filteredRows].sort((a, b) => {
-      if (a.isManual && !b.isManual) return 1;
-      if (!a.isManual && b.isManual) return -1;
-      switch (sort) {
-        case 'version': {
-          const familyCmp = labelSorter.compare(toSequenceFamily(a), toSequenceFamily(b));
-          if (familyCmp !== 0) return familyCmp;
-          const versionCmp = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
-          if (versionCmp !== 0) return dir * versionCmp;
-          break;
-        }
-        case 'messagesSent':
-          if (a.messagesSent !== b.messagesSent) return dir * (a.messagesSent - b.messagesSent);
-          break;
-        case 'replyRatePct':
-          if (a.replyRatePct !== b.replyRatePct) return dir * (a.replyRatePct - b.replyRatePct);
-          break;
-        case 'canonicalBookedCalls':
-          if (a.canonicalBookedCalls !== b.canonicalBookedCalls) return dir * (a.canonicalBookedCalls - b.canonicalBookedCalls);
-          break;
-        case 'optOutRatePct':
-          if (a.optOutRatePct !== b.optOutRatePct) return dir * (a.optOutRatePct - b.optOutRatePct);
-          break;
-        case 'uniqueContacted':
-          if (a.uniqueContacted !== b.uniqueContacted) return dir * (a.uniqueContacted - b.uniqueContacted);
-          break;
-        case 'bookingRatePct':
-          if (a.bookingRatePct !== b.bookingRatePct) return dir * (a.bookingRatePct - b.bookingRatePct);
-          break;
-        default:
-          break;
-      }
-      const familyCmp = labelSorter.compare(toSequenceFamily(a), toSequenceFamily(b));
-      if (familyCmp !== 0) return familyCmp;
-      const versionCmp = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
-      if (versionCmp !== 0) return -versionCmp;
-      return labelSorter.compare(a.label, b.label);
-    });
-  }, [filteredRows, sort, sortDir]);
-
   // KPI totals
   const kpis = useMemo(() => {
     const activeRows = mergedRows.filter((r) => !r.isManual && r.messagesSent > 0);
@@ -695,337 +268,35 @@ export default function SequencesV2() {
       totalUniqueContacted,
       avgReplyRate,
       smsReplyBookingPct,
+      // Channel split KPIs - use totals from salesMetrics to avoid double-counting
+      sequenceMessagesSent: salesMetrics?.totals?.sequenceMessagesSent ?? 0,
+      manualMessagesSent: salesMetrics?.totals?.manualMessagesSent ?? 0,
+      sequenceReplyRatePct: salesMetrics?.totals?.sequenceReplyRatePct ?? 0,
+      manualReplyRatePct: salesMetrics?.totals?.manualReplyRatePct ?? 0,
     };
+  }, [mergedRows, salesMetrics]);
+
+  // Group sequences by lead magnet family
+  const sequencesByFamily = useMemo(() => {
+    return mergedRows
+      .filter(r => !r.isManual)
+      .reduce((acc, row) => {
+        const family = row.leadMagnet || NOT_CAPTURED_LABEL;
+        if (!acc[family]) {
+          acc[family] = [];
+        }
+        acc[family].push(row);
+        return acc;
+      }, {} as Record<string, MergedSeqRow[]>);
   }, [mergedRows]);
 
-  const toggleExpanded = (label: string) => {
-    setExpandedLabels((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) {
-        next.delete(label);
-      } else {
-        next.add(label);
-        // Fire a subtle toast when expanding to show the notification system works
-        toast.info(`Viewing audit log for ${label}`, { duration: 2000 });
-      }
-      return next;
-    });
-  };
-
-  const handleSortClick = (col: Sort) => {
-    if (sort === col) {
-      setSortDir((d) => (d === 'desc' ? 'asc' : 'desc'));
-    } else {
-      setSort(col);
-      setSortDir('desc');
-    }
-  };
-
-  const sortArrow = (col: Sort) =>
-    sort === col ? <span className="V2Table__sortArrow">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span> : null;
-  const columnSortMap: Record<Sort, ColumnId> = {
-    version: 'version',
-    messagesSent: 'messagesSent',
-    replyRatePct: 'replyRatePct',
-    canonicalBookedCalls: 'canonicalBookedCalls',
-    optOutRatePct: 'optOutRatePct',
-    uniqueContacted: 'uniqueContacted',
-    bookingRatePct: 'bookingRatePct',
-  };
-  const sortColumnId = columnSortMap[sort];
-  const columnLabels: Array<{ id: ColumnId; label: string }> = [
-    { id: 'label', label: 'Sequence Name' },
-    { id: 'version', label: 'Script Version' },
-    { id: 'firstSeenAt', label: 'Live Since' },
-    { id: 'messagesSent', label: 'Texts Sent' },
-    { id: 'uniqueContacted', label: 'Contacts' },
-    { id: 'repliesReceived', label: 'Leads Replied' },
-    { id: 'replyRatePct', label: 'Reply %' },
-    { id: 'canonicalBookedCalls', label: 'Calls Booked' },
-    { id: 'bookingRatePct', label: 'Booking %' },
-    { id: 'optOutRatePct', label: 'Stop %' },
-    { id: 'optOuts', label: 'Stops' },
-  ];
+  const familyEntries = Object.entries(sequencesByFamily);
+  const activeSequenceCount = mergedRows.filter(r => !r.isManual).length;
+  const uniqueFamilyCount = new Set(mergedRows.map(r => r.leadMagnet || NOT_CAPTURED_LABEL)).size;
 
   const monthlyBookings = scoreboard?.monthly.bookings;
   const compliance = scoreboard?.compliance;
   const timing = scoreboard?.timing;
-  const columns = useMemo<ColumnDef<MergedSeqRow, unknown>[]>(
-    () => [
-      {
-        id: 'label',
-        accessorKey: 'label',
-        header: 'Sequence Name',
-        cell: ({ row }) => {
-          const confidence = getSequenceConfidence(row.original);
-          return (
-            <div className="V2SequenceCell">
-              <span className="V2Table__seqName" title={row.original.label}>
-                {row.original.label}
-              </span>
-              <span className={`V2Badge ${confidence.className}`} title={confidence.hint}>
-                {confidence.label}
-              </span>
-            </div>
-          );
-        },
-        enableHiding: false,
-      },
-      {
-        id: 'version',
-        accessorKey: 'version',
-        header: () => (
-          <button
-            type="button"
-            className="V2Table__sortBtn"
-            onClick={() => handleSortClick('version')}
-            title="Group sequence families and sort by script version"
-          >
-            Script Version{sortArrow('version')}
-          </button>
-        ),
-        cell: ({ row }) => renderVersion(row.original.label, row.original.version),
-      },
-      {
-        id: 'firstSeenAt',
-        accessorKey: 'firstSeenAt',
-        header: 'Live Since',
-        cell: ({ row }) => <span className="V2Table__dim">{fmtDay(row.original.firstSeenAt)}</span>,
-      },
-      {
-        id: 'messagesSent',
-        accessorKey: 'messagesSent',
-        header: () => (
-          <button
-            type="button"
-            className="V2Table__sortBtn"
-            onClick={() => handleSortClick('messagesSent')}
-            title="Selected window"
-          >
-            Texts Sent (Window){sortArrow('messagesSent')}
-          </button>
-        ),
-        cell: ({ row }) => fmtInt(row.original.messagesSent),
-      },
-      {
-        id: 'uniqueContacted',
-        accessorKey: 'uniqueContacted',
-        header: () => (
-          <button
-            type="button"
-            className="V2Table__sortBtn"
-            title="Unique people reached by this sequence in the selected window"
-            onClick={() => handleSortClick('uniqueContacted')}
-          >
-            Contacts{sortArrow('uniqueContacted')}
-          </button>
-        ),
-        cell: ({ row }) =>
-          row.original.uniqueContacted > 0 ? fmtInt(row.original.uniqueContacted) : <span className="V2Table__dim">—</span>,
-      },
-      {
-        id: 'repliesReceived',
-        accessorKey: 'repliesReceived',
-        header: 'Leads Replied',
-        cell: ({ row }) => fmtInt(row.original.repliesReceived),
-      },
-      {
-        id: 'replyRatePct',
-        accessorKey: 'replyRatePct',
-        header: () => (
-          <button
-            type="button"
-            className="V2Table__sortBtn"
-            onClick={() => handleSortClick('replyRatePct')}
-            title="Replies ÷ texts sent in selected window"
-          >
-            Reply %{sortArrow('replyRatePct')}
-          </button>
-        ),
-        cell: ({ row }) => (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-            <span>{fmtPct(row.original.replyRatePct)}</span>
-            <span className="V2Table__dim" title={`Replies / Texts sent (${fmtRatioHint(row.original.repliesReceived, row.original.messagesSent)})`}>
-              {fmtRatioHint(row.original.repliesReceived, row.original.messagesSent)}
-            </span>
-            <div style={{ width: '40px' }}>
-              <V2ProgressBar
-                value={row.original.replyRatePct}
-                max={25}
-                height={4}
-                color={
-                  row.original.replyRatePct >= 10
-                    ? 'var(--v2-positive)'
-                    : row.original.replyRatePct < 5
-                      ? 'var(--v2-warning)'
-                      : 'var(--v2-accent)'
-                }
-              />
-            </div>
-          </div>
-        ),
-      },
-      {
-        id: 'canonicalBookedCalls',
-        accessorKey: 'canonicalBookedCalls',
-        header: () => (
-          <button
-            type="button"
-            className="V2Table__sortBtn"
-            onClick={() => handleSortClick('canonicalBookedCalls')}
-          >
-            Calls Booked (Slack){sortArrow('canonicalBookedCalls')}
-          </button>
-        ),
-        cell: ({ row }) => (
-          <div className="V2SeqRepSplit">
-            <strong>{fmtInt(row.original.canonicalBookedCalls)}</strong>
-            {row.original.canonicalBookedCalls > 0 && (
-              <div className="V2SeqRepSplit__badges">
-                {row.original.canonicalBookedJack > 0 && (
-                  <span
-                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--jack"
-                    title={`Jack: ${row.original.canonicalBookedJack}`}
-                  >
-                    J·{row.original.canonicalBookedJack}
-                  </span>
-                )}
-                {row.original.canonicalBookedBrandon > 0 && (
-                  <span
-                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--brandon"
-                    title={`Brandon: ${row.original.canonicalBookedBrandon}`}
-                  >
-                    B·{row.original.canonicalBookedBrandon}
-                  </span>
-                )}
-                {row.original.canonicalBookedSelf > 0 && (
-                  <span
-                    className="V2SeqRepSplit__badge V2SeqRepSplit__badge--self"
-                    title={`Self-booked: ${row.original.canonicalBookedSelf}`}
-                  >
-                    S·{row.original.canonicalBookedSelf}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: 'bookingRatePct',
-        accessorKey: 'bookingRatePct',
-        header: () => (
-          <button
-            type="button"
-            className="V2Table__sortBtn"
-            title="Booked calls ÷ unique contacts in selected window"
-            onClick={() => handleSortClick('bookingRatePct')}
-          >
-            Booking %{sortArrow('bookingRatePct')}
-          </button>
-        ),
-        cell: ({ row }) =>
-          row.original.bookingRatePct > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-              <span>{fmtPct(row.original.bookingRatePct)}</span>
-              <span
-                className="V2Table__dim"
-                title={`Booked calls / Unique contacts (${fmtRatioHint(row.original.canonicalBookedCalls, row.original.uniqueContacted)})`}
-              >
-                {fmtRatioHint(row.original.canonicalBookedCalls, row.original.uniqueContacted)}
-              </span>
-            </div>
-          ) : (
-            <span className="V2Table__dim">—</span>
-          ),
-      },
-      {
-        id: 'optOutRatePct',
-        accessorKey: 'optOutRatePct',
-        header: () => (
-          <button
-            type="button"
-            className="V2Table__sortBtn"
-            onClick={() => handleSortClick('optOutRatePct')}
-            title="Opt-outs ÷ texts sent in selected window"
-          >
-            Opt-out %{sortArrow('optOutRatePct')}
-          </button>
-        ),
-        cell: ({ row }) => {
-          const isHighOptOut = row.original.optOutRatePct >= 5 && row.original.messagesSent >= 10;
-          return (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-              <span className={isHighOptOut ? 'V2Table__cell--warn' : ''}>{fmtPct(row.original.optOutRatePct)}</span>
-              <span className="V2Table__dim" title={`Opt-outs / Texts sent (${fmtRatioHint(row.original.optOuts, row.original.messagesSent)})`}>
-                {fmtRatioHint(row.original.optOuts, row.original.messagesSent)}
-              </span>
-              <div style={{ width: '40px' }}>
-                <V2ProgressBar
-                  value={row.original.optOutRatePct}
-                  max={10}
-                  height={4}
-                  color={isHighOptOut ? 'var(--v2-critical)' : 'var(--v2-muted)'}
-                />
-              </div>
-            </div>
-          );
-        },
-      },
-      {
-        id: 'optOuts',
-        accessorKey: 'optOuts',
-        header: 'Stops',
-        cell: ({ row }) => fmtInt(row.original.optOuts),
-      },
-      {
-        id: 'expand',
-        header: '',
-        enableHiding: false,
-        cell: ({ row }) => {
-          const expanded = expandedLabels.has(row.original.label);
-          return (
-            <button
-              type="button"
-              className="V2Table__expandBtn"
-              onClick={() => toggleExpanded(row.original.label)}
-              aria-expanded={expanded}
-              aria-controls={toAuditId(row.original.label)}
-              title={expanded ? 'Collapse audit' : 'Expand audit'}
-            >
-              {expanded ? '▲' : '▼'}
-            </button>
-          );
-        },
-      },
-    ],
-    [expandedLabels, sort, sortDir],
-  );
-  const table = useReactTable({
-    data: sortedRows,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    state: {
-      columnVisibility,
-      columnPinning,
-    },
-    onColumnVisibilityChange: setColumnVisibility,
-    onColumnPinningChange: setColumnPinning,
-  });
-  const getPinnedStyles = (column: any): React.CSSProperties => {
-    const isPinned = column.getIsPinned();
-    if (!isPinned) return {};
-    return {
-      position: 'sticky',
-      [isPinned]: `${isPinned === 'left' ? column.getStart('left') : column.getAfter('right')}px`,
-      zIndex: 2,
-      background: 'var(--v2-surface-1)',
-      boxShadow:
-        isPinned === 'left'
-          ? '1px 0 0 rgba(7, 19, 36, 0.08)'
-          : '-1px 0 0 rgba(7, 19, 36, 0.08)',
-    };
-  };
 
   if (isLoading) {
     return (
@@ -1145,6 +416,78 @@ export default function SequencesV2() {
         />
       </V2AnimatedList>
 
+      {/* ── Channel Split KPIs ── */}
+      {(kpis.sequenceMessagesSent > 0 || kpis.manualMessagesSent > 0) && (
+        <V2AnimatedList className="V2MetricsGrid">
+          <V2MetricCard
+            label="Sequence Messages"
+            value={fmtInt(kpis.sequenceMessagesSent)}
+            meta={`${mode} window`}
+          />
+          <V2MetricCard
+            label="Sequence Reply Rate"
+            value={fmtPct(kpis.sequenceReplyRatePct)}
+            tone={kpis.sequenceReplyRatePct >= 10 ? 'positive' : 'default'}
+            meta="replies ÷ messages"
+          />
+          <V2MetricCard
+            label="Manual Messages"
+            value={fmtInt(kpis.manualMessagesSent)}
+            meta={`${mode} window`}
+          />
+          <V2MetricCard
+            label="Manual Reply Rate"
+            value={fmtPct(kpis.manualReplyRatePct)}
+            tone={kpis.manualReplyRatePct >= 10 ? 'positive' : 'default'}
+            meta="replies ÷ messages"
+          />
+        </V2AnimatedList>
+      )}
+
+      {/* ── Trend Sparklines ── */}
+      {trendByDay.length > 0 && (
+        <V2Panel
+          title="Trend Overview"
+          caption={`Day-by-day performance · ${MODE_LABELS[mode]}`}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Messages</span>
+              <V2Sparkline
+                data={trendByDay.map((d) => d.messagesSent)}
+                stroke="var(--v2-accent)"
+                height={28}
+              />
+              <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
+                {fmtInt(trendByDay.reduce((s, d) => s + d.messagesSent, 0))}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Replies</span>
+              <V2Sparkline
+                data={trendByDay.map((d) => d.repliesReceived)}
+                stroke="var(--v2-positive)"
+                height={28}
+              />
+              <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
+                {fmtInt(trendByDay.reduce((s, d) => s + d.repliesReceived, 0))}
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Bookings</span>
+              <V2Sparkline
+                data={trendByDay.map((d) => d.canonicalBookedCalls)}
+                stroke="var(--v2-success)"
+                height={28}
+              />
+              <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
+                {fmtInt(trendByDay.reduce((s, d) => s + d.canonicalBookedCalls, 0))}
+              </span>
+            </div>
+          </div>
+        </V2Panel>
+      )}
+
       {/* ── Sequence Qualification Breakdown ── */}
       <V2Panel
         title="Lead Qualification by Sequence"
@@ -1156,554 +499,265 @@ export default function SequencesV2() {
         />
       </V2Panel>
 
-      {/* ── Sequence Performance Table ── */}
-      <V2Panel
-        title="Core Metric Rules"
-        caption="Keep these definitions in mind when comparing sequences"
-      >
-        <div className="V2SeqRules">
-          <div className="V2SeqRules__item"><strong>Window metrics:</strong> Texts Sent, Replies, Reply %, Calls Booked, and Opt-out % use the selected rolling window.</div>
-          <div className="V2SeqRules__item"><strong>Window-unified core:</strong> Contacts and Booking % are also computed in the selected window.</div>
-          <div className="V2SeqRules__item"><strong>Denominators shown:</strong> Rate cells include numerator/denominator to avoid ambiguity.</div>
-          <div className="V2SeqRules__item"><strong>Confidence badge:</strong> High/Medium/Low sample indicates how stable each row’s rates are.</div>
-        </div>
-      </V2Panel>
-      <V2Panel
-        title="Sequence Performance"
-        caption={`${sortedRows.length} sequences · window: ${MODE_LABELS[mode]} · Booked = Slack-verified · click headers to sort`}
-      >
-        {sortedRows.length === 0 ? (
+      {/* ── Sequence Performance: Redesigned ── */}
+      {activeSequenceCount === 0 ? (
+        <V2Panel
+          title="Sequence Performance"
+          caption={`${MODE_LABELS[mode]} · Booked = Slack-verified`}
+        >
           <V2State kind="empty">No sequence data for this window.</V2State>
-        ) : (
-          <>
-            <div className="V2TableActions">
-              <div className="V2TableActions__header">
-                <label>
-                  Sequence Controls
-                  <span className="V2TableActions__hint">Use search + columns to reduce noise and horizontal scrolling.</span>
-                </label>
-                <div className="V2TableActions__summary">
-                  Showing <strong>{fmtInt(sortedRows.length)}</strong> of <strong>{fmtInt(mergedRows.length)}</strong>
-                </div>
-              </div>
-              <div className="V2TableActions__inputs">
-                <input
-                  type="text"
-                  className="V2TableActions__search"
-                  placeholder="Search sequence, version, or lead magnet…"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  aria-label="Search sequences"
-                />
-                <label className="V2TableActions__toggle">
-                  <input
-                    type="checkbox"
-                    checked={showManualRow}
-                    onChange={(event) => setShowManualRow(event.target.checked)}
-                  />
-                  Include manual/direct row
-                </label>
-              </div>
-              <div className="V2TableActions__chips">
-                {columnLabels.map((columnLabel) => {
-                  const column = table.getColumn(columnLabel.id);
-                  if (!column || !column.getCanHide()) return null;
-                  return (
-                    <button
-                      key={columnLabel.id}
-                      type="button"
-                      className={`V2TableActions__chip${column.getIsVisible() ? ' is-active' : ''}`}
-                      onClick={() => column.toggleVisibility(!column.getIsVisible())}
-                    >
-                      {columnLabel.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="V2TableWrap V2TableWrap--sequences">
-            <table className="V2Table V2Table--sequences">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id}>
-                    {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        className={`
-                          ${header.column.id === 'label' ? 'V2Table__col--label' : ''}
-                          ${header.column.id === 'version' ? 'V2Table__col--version' : ''}
-                          ${header.column.id === 'firstSeenAt' ? 'V2Table__col--date' : ''}
-                          ${header.column.id === 'expand' ? 'is-center V2Table__col--expand' : ''}
-                          ${['messagesSent','uniqueContacted','repliesReceived','replyRatePct','canonicalBookedCalls','bookingRatePct','optOutRatePct','optOuts'].includes(header.column.id) ? 'is-right' : ''}
-                          ${header.column.id === sortColumnId ? 'is-sortable' : ''}
-                        `}
-                        style={getPinnedStyles(header.column)}
-                        aria-sort={
-                          header.column.id === sortColumnId
-                            ? sortDir === 'asc'
-                              ? 'ascending'
-                              : 'descending'
-                            : 'none'
-                        }
-                      >
-                        {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <motion.tbody
-                initial="hidden"
-                animate="show"
-                variants={{
-                  hidden: { opacity: 0 },
-                  show: { opacity: 1, transition: { staggerChildren: 0.03 } }
-                }}
-              >
-                {table.getRowModel().rows.map((tableRow) => {
-                  const row = tableRow.original;
-                  const expanded = expandedLabels.has(row.label);
-                  const versionDiff = versionDiffByLabel.get(row.label);
-                  const versionTimeline = versionTimelineByLabel.get(row.label) ?? [];
-                  const previousVersionRow = versionDiff?.previous ?? null;
-                  const previousDiffText = versionDiff?.previousCanonicalBody ?? '';
-                  const currentDiffText = versionDiff?.currentCanonicalBody ?? '';
-                  const hasDiffInputs =
-                    previousDiffText.trim().length > 0 && currentDiffText.trim().length > 0;
-                  const canRenderTextDiff =
-                    hasDiffInputs && previousDiffText.trim() !== currentDiffText.trim();
-                  const isHighOptOut = row.optOutRatePct >= 5 && row.messagesSent >= 10;
-                  const isHighBooking = row.canonicalBookedCalls >= 2 && !row.isManual;
-                  const rowClass = [
-                    'V2Table__row',
-                    row.isManual ? 'V2Table__row--manual' : '',
-                    isHighOptOut ? 'V2Table__row--warn' : '',
-                    isHighBooking && !isHighOptOut ? 'V2Table__row--positive' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
+        </V2Panel>
+      ) : (
+        <V2Panel
+          title="Sequence Performance"
+          caption={`${activeSequenceCount} sequences across ${uniqueFamilyCount} lead magnets · ${MODE_LABELS[mode]} · Booked = Slack-verified`}
+        >
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+            {familyEntries.map(([family, familyRows]) => {
+              const sortedVersions = [...familyRows].sort((a, b) => {
+                const aVer = parseVersionParts(extractVersionDisplay(a.label) || a.version);
+                const bVer = parseVersionParts(extractVersionDisplay(b.label) || b.version);
+                return compareVersionParts(bVer, aVer);
+              });
+              
+              const totalContacts = familyRows.reduce((s, r) => s + r.uniqueContacted, 0);
+              const totalReplied = familyRows.reduce((s, r) => s + r.repliesReceived, 0);
+              const totalBooked = familyRows.reduce((s, r) => s + r.canonicalBookedCalls, 0);
+              const totalSent = familyRows.reduce((s, r) => s + r.messagesSent, 0);
+              const avgReplyRate = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0;
+              const avgBookingRate = totalContacts > 0 ? (totalBooked / totalContacts) * 100 : 0;
+              const hasMultipleVersions = familyRows.length > 1;
+              const isHighConfidence = totalContacts >= 200 || totalSent >= 400;
+              const confidenceLevel = isHighConfidence ? 'high' : totalContacts >= 75 || totalSent >= 150 ? 'medium' : 'low';
 
-                  return (
-                    <Fragment key={row.label}>
-                      <motion.tr 
-                        className={rowClass}
-                        variants={{
-                          hidden: { opacity: 0, y: 10 },
-                          show: { opacity: 1, y: 0 }
-                        }}
-                      >
-                        {tableRow.getVisibleCells().map((cell) => (
-                          <td
-                            key={cell.id}
-                            className={`
-                              ${cell.column.id === 'label' ? 'V2Table__col--label' : ''}
-                              ${cell.column.id === 'version' ? 'V2Table__col--version' : ''}
-                              ${cell.column.id === 'firstSeenAt' ? 'V2Table__col--date V2Table__dim' : ''}
-                              ${cell.column.id === 'expand' ? 'is-center' : ''}
-                              ${['messagesSent','uniqueContacted','repliesReceived','replyRatePct','canonicalBookedCalls','bookingRatePct','optOutRatePct','optOuts'].includes(cell.column.id) ? 'is-right' : ''}
-                            `}
-                            style={getPinnedStyles(cell.column)}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
-                        ))}
-                      </motion.tr>
+              return (
+                <div key={family} style={{ 
+                  border: '1px solid var(--v2-border)', 
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  background: 'var(--v2-bg)'
+                }}>
+                  {/* Family Header - Aggregate Stats */}
+                  <div style={{ 
+                    background: 'var(--v2-bg-subtle)', 
+                    padding: '1rem 1.25rem',
+                    borderBottom: '1px solid var(--v2-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    flexWrap: 'wrap',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
+                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--v2-text)' }}>{family}</h3>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
+                        {familyRows.length} version{familyRows.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+                      {/* Reply Rate */}
+                      <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                        <div style={{ 
+                          fontSize: '1.35rem', 
+                          fontWeight: 700, 
+                          color: avgReplyRate >= 10 ? 'var(--v2-positive)' : avgReplyRate < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)' 
+                        }}>
+                          {fmtPct(avgReplyRate)}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Reply Rate
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
+                          {fmtInt(totalReplied)}/{fmtInt(totalSent)} sent
+                        </div>
+                      </div>
 
-                      <AnimatePresence>
-                        {expanded && (
-                          <motion.tr 
-                            id={toAuditId(row.label)} 
-                            className="V2Table__auditRow"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                          >
-                            <td colSpan={table.getVisibleLeafColumns().length} style={{ padding: 0 }}>
-                              <motion.div 
-                                className="V2SeqAudit"
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                style={{ overflow: 'hidden' }}
-                              >
-                              {/* Booking breakdown summary */}
-                              <div className="V2SeqAudit__summary">
-                                <div className="V2SeqAudit__summaryItem">
-                                  <span className="V2SeqAudit__summaryLabel">Booked (Slack-verified)</span>
-                                  <span className="V2SeqAudit__summaryValue">
-                                    {fmtInt(row.canonicalBookedCalls)}
-                                    {row.canonicalBookedCalls > 0 && (
-                                      <span className="V2SeqAudit__breakdown">
-                                        {' '}— Jack {fmtInt(row.canonicalBookedJack)} / Brandon{' '}
-                                        {fmtInt(row.canonicalBookedBrandon)} / Self{' '}
-                                        {fmtInt(row.canonicalBookedSelf)}
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                                <div className="V2SeqAudit__summaryItem">
-                                  <span className="V2SeqAudit__summaryLabel">SMS-Linked</span>
-                                  <span className="V2SeqAudit__summaryValue">
-                                    {fmtInt(row.canonicalBookedAfterSmsReply)}
-                                    {row.canonicalBookedCalls > 0 && row.smsReplyPct !== null && (
-                                      <span className="V2SeqAudit__breakdown">
-                                        {' '}({fmtPct(row.smsReplyPct)} of bookings)
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                                <div className="V2SeqAudit__summaryItem V2SeqAudit__summaryItem--diagnostic">
-                                  <span className="V2SeqAudit__summaryLabel">
-                                    Booking Signals
-                                    <span className="V2SeqAudit__hint"> (for reference only)</span>
-                                  </span>
-                                  <span className="V2SeqAudit__summaryValue V2SeqAudit__summaryValue--muted">
-                                    {fmtInt(row.diagnosticSmsBookingSignals)}
-                                  </span>
-                                </div>
+                      {/* Booking Rate */}
+                      <div style={{ textAlign: 'center', minWidth: '70px' }}>
+                        <div style={{ 
+                          fontSize: '1.35rem', 
+                          fontWeight: 700, 
+                          color: avgBookingRate >= 2 ? 'var(--v2-positive)' : 'var(--v2-text)' 
+                        }}>
+                          {fmtPct(avgBookingRate)}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          Booking Rate
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
+                          {fmtInt(totalBooked)}/{fmtInt(totalContacts)} contacts
+                        </div>
+                      </div>
+
+                      {/* Confidence Badge */}
+                      <div style={{ textAlign: 'center' }}>
+                        <span className={`V2Badge ${confidenceLevel === 'high' ? 'V2Badge--confidenceHigh' : confidenceLevel === 'medium' ? 'V2Badge--confidenceMed' : 'V2Badge--confidenceLow'}`}>
+                          {confidenceLevel === 'high' ? 'High confidence' : confidenceLevel === 'medium' ? 'Medium' : 'Low sample'}
+                        </span>
+                        <div style={{ fontSize: '0.6rem', color: 'var(--v2-text-dim)', marginTop: '2px' }}>
+                          {confidenceLevel === 'high' ? '200+ contacts' : confidenceLevel === 'medium' ? '75+ contacts' : 'small dataset'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Version Rows */}
+                  <div>
+                    {sortedVersions.map((row, idx) => {
+                      const replyRate = row.messagesSent > 0 ? (row.repliesReceived / row.messagesSent) * 100 : 0;
+                      const bookingRate = row.uniqueContacted > 0 ? (row.canonicalBookedCalls / row.uniqueContacted) * 100 : 0;
+                      const versionLabel = extractVersionDisplay(row.label) || row.version || 'Legacy';
+                      const isWinning = hasMultipleVersions && idx === 0;
+                      return (
+                        <div
+                          key={row.label}
+                          style={{
+                            padding: '0.75rem 1.25rem',
+                            borderBottom: idx < sortedVersions.length - 1 ? '1px solid var(--v2-border)' : 'none',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            flexWrap: 'wrap',
+                            gap: '0.75rem',
+                            background: isWinning ? 'rgba(34, 197, 94, 0.04)' : undefined,
+                          }}
+                        >
+                          {/* Version & Volume Info */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '180px' }}>
+                            <span className="V2Badge V2Badge--version" style={{ fontSize: '0.8rem' }}>
+                              {versionLabel}
+                            </span>
+                            {isWinning && (
+                              <span className="V2Badge" style={{ background: 'var(--v2-positive)', color: 'white', fontSize: '0.7rem' }}>
+                                TOP
+                              </span>
+                            )}
+                            <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
+                              {fmtInt(row.messagesSent)} sent
+                            </span>
+                          </div>
+
+                          {/* Metrics */}
+                          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+                            {/* Reply */}
+                            <div style={{ minWidth: '70px' }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: replyRate >= 10 ? 'var(--v2-positive)' : replyRate < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)' }}>
+                                {fmtPct(replyRate)}
                               </div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
+                                {fmtInt(row.repliesReceived)} replies
+                              </div>
+                            </div>
 
-                              <section className="V2SeqVersionDiff">
-                                <header className="V2SeqVersionDiff__header">
-                                  <h4 className="V2SeqVersionDiff__title">Sequence Script Changes</h4>
-                                  <p className="V2SeqVersionDiff__caption">
-                                    {previousVersionRow
-                                      ? `Comparing against previous ${previousVersionRow.version || 'version'} in ${row.leadMagnet}`
-                                      : 'No earlier version found for this lead magnet yet.'}
-                                  </p>
-                                  {versionDiff?.usingVariantPair ? (
-                                    <p className="V2SeqVersionDiff__caption">
-                                      Diff uses top message variants because primary canonical texts matched.
-                                    </p>
-                                  ) : null}
-                                </header>
-                                {versionTimeline.length > 1 && (
-                                  <div className="V2SeqVersionDiff__timeline">
-                                    <p className="V2SeqVersionDiff__copyLabel">Version Timeline</p>
-                                    <div className="V2SeqVersionDiff__timelineList">
-                                      {versionTimeline.map((item) => (
-                                        <article
-                                          key={item.label}
-                                          className={`V2SeqVersionDiff__timelineItem${item.isCurrent ? ' is-current' : ''}${item.isWinner && item.winnerLowConfidence ? ' is-low-confidence' : ''}`}
-                                        >
-                                          <p className="V2SeqVersionDiff__timelineVersion">
-                                            {item.versionLabel}
-                                            <span className={`V2SeqVersionDiff__timelineBadge is-status is-${item.status}`}>
-                                              {item.status}
-                                            </span>
-                                            {item.isWinner && !item.winnerLowConfidence && (
-                                              <span className="V2SeqVersionDiff__timelineBadge is-winner">Winner</span>
-                                            )}
-                                            {item.isWinner && item.winnerLowConfidence && (
-                                              <span className="V2SeqVersionDiff__timelineBadge is-low-confidence">Leading (low confidence)</span>
-                                            )}
-                                          </p>
-                                          <p className="V2SeqVersionDiff__timelineMeta">
-                                            {fmtDay(item.firstSeenAt)} · {fmtInt(item.messagesSent)} sent · {fmtPct(item.replyRatePct)} reply ·{' '}
-                                            {fmtInt(item.bookedCalls)} booked · {fmtPct(item.bookingRatePct)} booked rate
-                                          </p>
-                                          <div className="V2SeqVersionDiff__timelineActions">
-                                            <button
-                                              type="button"
-                                              className="V2SeqVersionDiff__timelineAction"
-                                              onClick={() => void updateSequenceStatus(item.label, 'active')}
-                                              disabled={decisionPendingLabel === item.label || item.status === 'active'}
-                                            >
-                                              Promote
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="V2SeqVersionDiff__timelineAction"
-                                              onClick={() => void updateSequenceStatus(item.label, 'rewrite')}
-                                              disabled={decisionPendingLabel === item.label || item.status === 'rewrite'}
-                                            >
-                                              Rewrite
-                                            </button>
-                                            <button
-                                              type="button"
-                                              className="V2SeqVersionDiff__timelineAction"
-                                              onClick={() => void updateSequenceStatus(item.label, 'archived')}
-                                              disabled={decisionPendingLabel === item.label || item.status === 'archived'}
-                                            >
-                                              Archive
-                                            </button>
-                                          </div>
-                                        </article>
-                                      ))}
-                                    </div>
-                                    <p className="V2SeqVersionDiff__note">
-                                      Winner uses highest booked rate. Confidence requires at least {fmtInt(WINNER_MIN_SENDS)} sent.
-                                    </p>
-                                  </div>
-                                )}
-                                {previousVersionRow ? (
-                                  <>
-                                    <div className="V2SeqVersionDiff__metrics">
-                                      <div className="V2SeqVersionDiff__metric">
-                                        <span className="V2SeqVersionDiff__metricLabel">Texts Sent</span>
-                                        <strong className="V2SeqVersionDiff__metricValue">
-                                          {fmtSignedInt(row.messagesSent - previousVersionRow.messagesSent)}
-                                        </strong>
-                                      </div>
-                                      <div className="V2SeqVersionDiff__metric">
-                                        <span className="V2SeqVersionDiff__metricLabel">Reply %</span>
-                                        <strong className="V2SeqVersionDiff__metricValue">
-                                          {fmtSignedPctPoints(row.replyRatePct - previousVersionRow.replyRatePct)}
-                                        </strong>
-                                      </div>
-                                      <div className="V2SeqVersionDiff__metric">
-                                        <span className="V2SeqVersionDiff__metricLabel">Calls Booked</span>
-                                        <strong className="V2SeqVersionDiff__metricValue">
-                                          {fmtSignedInt(row.canonicalBookedCalls - previousVersionRow.canonicalBookedCalls)}
-                                        </strong>
-                                      </div>
-                                      <div className="V2SeqVersionDiff__metric">
-                                        <span className="V2SeqVersionDiff__metricLabel">Stop %</span>
-                                        <strong
-                                          className={`V2SeqVersionDiff__metricValue ${
-                                            row.optOutRatePct - previousVersionRow.optOutRatePct <= 0
-                                              ? 'is-positive'
-                                              : 'is-negative'
-                                          }`}
-                                        >
-                                          {fmtSignedPctPoints(row.optOutRatePct - previousVersionRow.optOutRatePct)}
-                                        </strong>
-                                      </div>
-                                    </div>
-                                    <div className="V2SeqVersionDiff__copyGrid">
-                                      <article className="V2SeqVersionDiff__copyCard">
-                                        <p className="V2SeqVersionDiff__copyLabel">
-                                          Before ({previousVersionRow.version || previousVersionRow.label})
-                                        </p>
-                                        {versionDiff?.previousCanonicalBody ? (
-                                          <blockquote className="V2SeqVersionDiff__quote">
-                                            {shorten(versionDiff.previousCanonicalBody, 220)}
-                                          </blockquote>
-                                        ) : (
-                                          <p className="V2SeqVersionDiff__empty">Previous version text not found yet.</p>
-                                        )}
-                                      </article>
-                                      <article className="V2SeqVersionDiff__copyCard">
-                                        <p className="V2SeqVersionDiff__copyLabel">After ({row.version || row.label})</p>
-                                        {versionDiff?.currentCanonicalBody ? (
-                                          <blockquote className="V2SeqVersionDiff__quote">
-                                            {shorten(versionDiff.currentCanonicalBody, 220)}
-                                          </blockquote>
-                                        ) : (
-                                          <p className="V2SeqVersionDiff__empty">Current version text not found yet.</p>
-                                        )}
-                                      </article>
-                                    </div>
-                                    <div className="V2SeqVersionDiff__diff">
-                                      <p className="V2SeqVersionDiff__copyLabel">Copy Diff (Before vs After)</p>
-                                      {canRenderTextDiff ? (
-                                        <DiffViewer
-                                          oldValue={previousDiffText}
-                                          newValue={currentDiffText}
-                                          splitView
-                                          compareMethod={DiffMethod.WORDS}
-                                          disableWordDiff={false}
-                                          extraLinesSurroundingDiff={1}
-                                          hideLineNumbers={false}
-                                          showDiffOnly
-                                          hideSummary
-                                          leftTitle={`Before (${previousVersionRow.version || previousVersionRow.label})`}
-                                          rightTitle={`After (${row.version || row.label})`}
-                                          useDarkTheme={false}
-                                          styles={{
-                                            diffContainer: {
-                                              borderRadius: '10px',
-                                              border: '1px solid rgba(7, 19, 36, 0.1)',
-                                              overflow: 'hidden',
-                                            },
-                                            titleBlock: {
-                                              background: 'rgba(7, 19, 36, 0.03)',
-                                              borderBottom: '1px solid rgba(7, 19, 36, 0.08)',
-                                              color: 'var(--v2-text)',
-                                              fontWeight: 700,
-                                            },
-                                            marker: {
-                                              minWidth: '22px',
-                                              textAlign: 'center',
-                                            },
-                                            contentText: {
-                                              fontSize: '0.76rem',
-                                              lineHeight: '1.4',
-                                              fontFamily: 'var(--v2-font-sans)',
-                                            },
-                                            gutter: {
-                                              minWidth: '28px',
-                                            },
-                                            diffAdded: {
-                                              background: 'rgba(19, 185, 129, 0.16)',
-                                            },
-                                            diffRemoved: {
-                                              background: 'rgba(224, 62, 62, 0.16)',
-                                            },
-                                            wordAdded: {
-                                              background: 'rgba(19, 185, 129, 0.34)',
-                                            },
-                                            wordRemoved: {
-                                              background: 'rgba(224, 62, 62, 0.34)',
-                                            },
-                                            highlightedGutter: {
-                                              background: 'rgba(17, 184, 214, 0.10)',
-                                            },
-                                          }}
-                                        />
-                                      ) : hasDiffInputs ? (
-                                        <p className="V2SeqVersionDiff__empty">
-                                          No copy change between these two versions.
-                                        </p>
-                                      ) : (
-                                        <p className="V2SeqVersionDiff__empty">
-                                          We need both the previous and current sent sequence texts to show a diff.
-                                        </p>
-                                      )}
-                                    </div>
-                                    <p className="V2SeqVersionDiff__note">
-                                      Diff is based only on actual sequence texts that were sent to leads.
-                                    </p>
-                                  </>
-                                ) : null}
-                              </section>
+                            {/* Booking */}
+                            <div style={{ minWidth: '70px' }}>
+                              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: bookingRate >= 2 ? 'var(--v2-positive)' : 'var(--v2-text)' }}>
+                                {fmtPct(bookingRate)}
+                              </div>
+                              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
+                                {fmtInt(row.canonicalBookedCalls)} booked
+                              </div>
+                            </div>
 
-                              {/* Per-booking audit rows */}
-                              {row.bookedAuditRows.length === 0 ? (
-                                <V2State kind="empty">
-                                  No booking records found for this sequence in this window.
-                                </V2State>
-                              ) : (
-                                <div className="V2AuditList">
-                                  {row.bookedAuditRows
-                                    .slice()
-                                    .sort(
-                                      (a, b) =>
-                                        new Date(b.eventTs).getTime() - new Date(a.eventTs).getTime(),
-                                    )
-                                    .map((audit) => (
-                                      <article key={audit.bookedCallId} className="V2AuditItem">
-                                        <header className="V2AuditItem__header">
-                                          <strong>{fmtDateTime(audit.eventTs)}</strong>
-                                          <span
-                                            className={`V2Badge V2Badge--${
-                                              audit.bucket === 'jack'
-                                                ? 'jack'
-                                                : audit.bucket === 'brandon'
-                                                  ? 'brandon'
-                                                  : 'self'
-                                            }`}
-                                          >
-                                            {BUCKET_LABELS[audit.bucket]}
-                                          </span>
-                                          {audit.rep && (
-                                            <span className="V2Badge V2Badge--muted" title="Rep">
-                                              {audit.rep}
-                                            </span>
-                                          )}
-                                          {audit.line && (
-                                            <span className="V2Badge V2Badge--muted" title="Line">
-                                              {audit.line}
-                                            </span>
-                                          )}
-                                          <span
-                                            className={`V2Badge V2Badge--${audit.strictSmsReplyLinked ? 'positive' : 'muted'}`}
-                                          >
-                                            SMS reply: {audit.strictSmsReplyLinked ? 'yes' : 'no'}
-                                          </span>
-                                          {audit.convertedViaSequence && (
-                                            <span
-                                              className="V2Badge V2Badge--via"
-                                              title="Contact was actively enrolled in this sequence at booking time"
-                                            >
-                                              via {audit.convertedViaSequence}
-                                            </span>
-                                          )}
-                                        </header>
-                                        <p className="V2AuditItem__meta">
-                                          Lead source:{' '}
-                                          <em>{audit.firstConversion || 'n/a'}</em> · Contact:{' '}
-                                          {audit.contactName || 'n/a'} · Phone:{' '}
-                                          {maskPhone(audit.contactPhone)}
-                                        </p>
-                                        <p className="V2AuditItem__reason">
-                                          Reason:{' '}
-                                          {SMS_REPLY_REASON_LABELS[audit.strictSmsReplyReason] ?? audit.strictSmsReplyReason.replace(/_/g, ' ')}
-                                          {audit.latestReplyAt
-                                            ? ` · Latest SMS reply: ${fmtDateTime(audit.latestReplyAt)}`
-                                            : ''}
-                                        </p>
-                                        {audit.text && (
-                                          <p className="V2AuditItem__text">
-                                            <span className="V2AuditItem__textLabel">Message: </span>
-                                            {shorten(audit.text, 120)}
-                                          </p>
-                                        )}
-                                      </article>
-                                    ))}
-                                </div>
+                            {/* Rep Attribution */}
+                            <div style={{ minWidth: '80px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              {row.canonicalBookedJack > 0 && (
+                                <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
+                                  J:{row.canonicalBookedJack}
+                                </span>
                               )}
-                              </motion.div>
-                            </td>
-                          </motion.tr>
-                        )}
-                      </AnimatePresence>
-                    </Fragment>
-                  );
-                })}
-              </motion.tbody>
-            </table>
-            </div>
-          </>
-        )}
-      </V2Panel>
+                              {row.canonicalBookedBrandon > 0 && (
+                                <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
+                                  B:{row.canonicalBookedBrandon}
+                                </span>
+                              )}
+                              {row.canonicalBookedSelf > 0 && (
+                                <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
+                                  S:{row.canonicalBookedSelf}
+                                </span>
+                              )}
+                              {row.canonicalBookedCalls === 0 && (
+                                <span style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>—</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </V2Panel>
+      )}
 
-      {/* ── Booking Attribution (Monthly) ── */}
-      {monthlyBookings && (
+      {/* ── Booking Attribution ── */}
+      {(salesMetrics?.bookedCredit || monthlyBookings) && (
         <ExecutiveSection
           id="attribution"
-          title="Booking Attribution (Monthly)"
-          meta="Expanded analysis panel · monthly scoreboard window"
+          title="Booking Attribution"
+          meta={`Expanded analysis panel · rep split: ${MODE_LABELS[mode]} window`}
           isOpen={executiveSections.attribution}
           onToggle={setExecutiveSectionOpen}
         >
-          <V2Panel
-            title="Booking Attribution (Monthly)"
-            caption="How booked calls are attributed across setters and conversation types · monthly scoreboard window"
-          >
-            <div className="V2SeqAttribution">
-              <div className="V2SeqAttribution__grid">
-                <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
-                  <span className="V2SeqAttribution__label">Total Booked</span>
-                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.total)}</span>
+          {salesMetrics?.bookedCredit && (
+            <V2Panel
+              title={`Booking Attribution — ${MODE_LABELS[mode]}`}
+              caption={`Rep split for the selected ${mode} window · Booked = Slack-verified`}
+            >
+              <div className="V2SeqAttribution">
+                <div className="V2SeqAttribution__grid">
+                  <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
+                    <span className="V2SeqAttribution__label">Total Booked</span>
+                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.total)}</span>
+                  </div>
+                  <div className="V2SeqAttribution__item">
+                    <span className="V2SeqAttribution__label">Jack</span>
+                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.jack)}</span>
+                  </div>
+                  <div className="V2SeqAttribution__item">
+                    <span className="V2SeqAttribution__label">Brandon</span>
+                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.brandon)}</span>
+                  </div>
+                  <div className="V2SeqAttribution__item">
+                    <span className="V2SeqAttribution__label">Self-Booked</span>
+                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.selfBooked)}</span>
+                  </div>
                 </div>
-                <div className="V2SeqAttribution__item">
-                  <span className="V2SeqAttribution__label">Jack</span>
-                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.jack)}</span>
-                </div>
-                <div className="V2SeqAttribution__item">
-                  <span className="V2SeqAttribution__label">Brandon</span>
-                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.brandon)}</span>
-                </div>
-                <div className="V2SeqAttribution__item">
-                  <span className="V2SeqAttribution__label">Self-Booked</span>
-                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.selfBooked)}</span>
-                </div>
-                <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
-                  <span className="V2SeqAttribution__label">From Sequences</span>
-                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
-                </div>
-                <div className="V2SeqAttribution__item">
-                  <span className="V2SeqAttribution__label">From Direct Outreach</span>
-                  <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
-                </div>
+                <p className="V2SeqAttribution__note">
+                  Rep split reflects the selected {mode} rolling window. Booked = Slack-verified bookings channel.
+                </p>
               </div>
-              <p className="V2SeqAttribution__note">
-                A sequence gets credit when it started the first outbound contact with a lead, even if manual follow-ups came before the booking.
-              </p>
-            </div>
-          </V2Panel>
+            </V2Panel>
+          )}
+          {monthlyBookings && (
+            <V2Panel
+              title="Channel Attribution — Monthly"
+              caption="Sequence-initiated vs direct outreach · always monthly scoreboard window (channel split not available per rolling window)"
+            >
+              <div className="V2SeqAttribution">
+                <div className="V2SeqAttribution__grid">
+                  <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
+                    <span className="V2SeqAttribution__label">From Sequences</span>
+                    <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
+                  </div>
+                  <div className="V2SeqAttribution__item">
+                    <span className="V2SeqAttribution__label">From Direct Outreach</span>
+                    <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
+                  </div>
+                  <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
+                    <span className="V2SeqAttribution__label">Total (month)</span>
+                    <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.total)}</span>
+                  </div>
+                </div>
+                <p className="V2SeqAttribution__note">
+                  A sequence gets credit when it started the first outbound contact with a lead, even if manual follow-ups came before the booking.
+                </p>
+              </div>
+            </V2Panel>
+          )}
         </ExecutiveSection>
       )}
 

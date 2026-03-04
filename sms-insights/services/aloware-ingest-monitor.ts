@@ -73,9 +73,7 @@ export const recordAlowareIngestSkip = (params: {
   state.recentSamples = [sample, ...state.recentSamples].slice(0, MAX_SAMPLES);
 };
 
-export const maybeLogAlowareIngestWarnings = (
-  logger?: Pick<Logger, 'warn' | 'info'>,
-): void => {
+export const maybeLogAlowareIngestWarnings = (logger?: Pick<Logger, 'warn' | 'info'>): void => {
   if (!logger) return;
   if (state.totalSkipped === 0) return;
 

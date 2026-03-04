@@ -234,7 +234,10 @@ export const buildSequenceQualificationBreakdown = async (params: {
   const breakdowns: SequenceQualificationBreakdown[] = [];
 
   for (let i = 0; i < result.rows.length; i++) {
-    const row = result.rows[i]!;
+    const row = result.rows[i];
+    if (!row) {
+      continue;
+    }
     const [
       fullTimeQuote,
       partTimeQuote,
@@ -249,7 +252,7 @@ export const buildSequenceQualificationBreakdown = async (params: {
       mediumInterestQuote,
       lowInterestQuote,
       topNiches,
-    ] = enrichmentResults[i]!;
+    ] = enrichmentResults[i] ?? [];
     const total = Number(row.total_conversations);
     const mondayTotalOutcomes = Number(row.monday_total_outcomes);
     const mondayBooked = Number(row.monday_booked_count);

@@ -630,10 +630,17 @@ export default function InboxV2() {
     (c) => displaySetterName(c.ownerLabel) === "Brandon",
   ).length;
   const unassignedCount = conversations.filter((c) => !c.ownerLabel).length;
-  const inboxHealth = Math.max(
-    0,
-    Math.min(100, 100 - urgentCount * 10 - unassignedCount * 5),
-  );
+  
+  // More meaningful health metrics instead of opaque score
+  const criticalCount = conversations.filter(
+    (c) => c.escalation.level === 1 && c.openNeedsReplyCount > 0,
+  ).length;
+  const staleCount = conversations.filter((c) => {
+    const lastMsg = parseDateValue(c.lastMessage.createdAt || "");
+    if (!lastMsg) return false;
+    const hoursSince = (Date.now() - lastMsg.getTime()) / (1000 * 60 * 60);
+    return hoursSince > 48 && c.openNeedsReplyCount > 0;
+  }).length;
   const activeFiltersCount =
     Number(statusFilter !== "open") +
     Number(ownerFilter !== "all") +
@@ -1686,12 +1693,6 @@ export default function InboxV2() {
   const submitAddNote = noteForm.handleSubmit(onAddNote);
   const submitCreateTemplate = templateForm.handleSubmit(onCreateTemplate);
 
-  const getHealthColor = (score: number): string => {
-    if (score >= 80) return "#13b981";
-    if (score >= 60) return "#f59d0d";
-    return "#ef4c62";
-  };
-
   const GUARDRAIL_SIGNALS = [
     { id: "timeline", label: "Timeline — Has a clear start date in mind" },
     { id: "cash", label: "Cash Intent — Expressed desire to go cash-pay" },
@@ -2162,24 +2163,93 @@ export default function InboxV2() {
         {/* Right: Analytics Dashboard */}
         <div className="V2Inbox__analyticsColumn">
           <div className="V2Inbox__analyticsPanel">
-            <h3 className="V2Inbox__analyticsTitle">Inbox Health</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 className="V2Inbox__analyticsTitle">Inbox Overview</h3>
+              {listQuery.dataUpdatedAt ? (
+                <span style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>
+                  Updated {timeAgo(new Date(listQuery.dataUpdatedAt).toISOString())}
+                </span>
+              ) : null}
+            </div>
 
-            <div className="V2Inbox__healthScore">
-              <div
-                className="V2Inbox__healthRing"
-                style={{
-                  background: `conic-gradient(${getHealthColor(inboxHealth)} ${inboxHealth * 3.6}deg, rgba(7, 19, 36, 0.08) 0deg)`,
-                }}
-              >
-                <span>{Math.round(inboxHealth)}</span>
-              </div>
-              <p className="V2Inbox__healthLabel">
-                {inboxHealth >= 80
-                  ? "Healthy"
-                  : inboxHealth >= 60
-                    ? "Needs attention"
-                    : "Critical"}
-              </p>
+            {/* Clearer priority metrics instead of opaque score */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+              {criticalCount > 0 ? (
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: '0.625rem',
+                  background: 'rgba(239, 76, 98, 0.1)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(239, 76, 98, 0.2)'
+                }}>
+                  <span style={{ fontSize: '1rem' }}>🚨</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--v2-critical)', fontWeight: 600 }}>
+                    {criticalCount} critical
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>
+                    (L1 + needs reply)
+                  </span>
+                </div>
+              ) : null}
+              
+              {staleCount > 0 ? (
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: '0.625rem',
+                  background: 'rgba(245, 157, 13, 0.1)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(245, 157, 13, 0.2)'
+                }}>
+                  <span style={{ fontSize: '1rem' }}>⏰</span>
+                  <span style={{ fontSize: '0.85rem', color: '#f59d0d', fontWeight: 600 }}>
+                    {staleCount} stale
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>
+                    (48h+ no reply)
+                  </span>
+                </div>
+              ) : null}
+              
+              {unassignedCount > 0 ? (
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: '0.625rem',
+                  background: 'rgba(17, 184, 214, 0.1)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(17, 184, 214, 0.2)'
+                }}>
+                  <span style={{ fontSize: '1rem' }}>👤</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--v2-accent)', fontWeight: 600 }}>
+                    {unassignedCount} unassigned
+                  </span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>
+                    (need owner)
+                  </span>
+                </div>
+              ) : null}
+              
+              {criticalCount === 0 && staleCount === 0 && unassignedCount === 0 && totalConversations > 0 && (
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.5rem',
+                  padding: '0.625rem',
+                  background: 'rgba(19, 185, 129, 0.1)',
+                  borderRadius: '6px',
+                  border: '1px solid rgba(19, 185, 129, 0.2)'
+                }}>
+                  <span style={{ fontSize: '1rem' }}>✅</span>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--v2-positive)', fontWeight: 600 }}>
+                    All caught up
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="V2Inbox__statGrid">
@@ -2199,7 +2269,9 @@ export default function InboxV2() {
                 >
                   {urgentCount}
                 </span>
-                <span className="V2Inbox__statLabel">Urgent</span>
+                <span className="V2Inbox__statLabel" title="L1-L2 escalation + needs reply">
+                  Urgent
+                </span>
               </div>
               <div className="V2Inbox__statCard">
                 <span className="V2Inbox__statValue">{jackCount}</span>
@@ -2210,13 +2282,6 @@ export default function InboxV2() {
                 <span className="V2Inbox__statLabel">Brandon</span>
               </div>
             </div>
-
-            {unassignedCount > 0 && (
-              <div className="V2Inbox__alertBanner">
-                <span className="V2Inbox__alertIcon">⚠️</span>
-                <span>{unassignedCount} unassigned</span>
-              </div>
-            )}
 
           </div>
         </div>

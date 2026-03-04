@@ -92,6 +92,10 @@ const fmtSignedPctPoints = (n: number): string => {
   if (n === 0) return '0.0 pp';
   return `${n > 0 ? '+' : ''}${n.toFixed(1)} pp`;
 };
+const fmtRatioHint = (numerator: number, denominator: number): string => {
+  if (denominator <= 0) return `${fmtInt(numerator)}/0`;
+  return `${fmtInt(numerator)}/${fmtInt(denominator)}`;
+};
 
 /**
  * Extract a display version string (e.g. "v1.2") from a sequence label.
@@ -249,6 +253,34 @@ type VersionTimelineItem = {
   isCurrent: boolean;
   isWinner: boolean;
   winnerLowConfidence: boolean;
+};
+
+type SequenceConfidence = {
+  label: 'High' | 'Medium' | 'Low sample';
+  className: 'V2Badge--confidenceHigh' | 'V2Badge--confidenceMed' | 'V2Badge--confidenceLow';
+  hint: string;
+};
+
+const getSequenceConfidence = (row: Pick<MergedSeqRow, 'messagesSent' | 'uniqueContacted'>): SequenceConfidence => {
+  if (row.uniqueContacted >= 200 || row.messagesSent >= 400) {
+    return {
+      label: 'High',
+      className: 'V2Badge--confidenceHigh',
+      hint: 'High confidence: strong sample size for rate comparisons.',
+    };
+  }
+  if (row.uniqueContacted >= 75 || row.messagesSent >= 150) {
+    return {
+      label: 'Medium',
+      className: 'V2Badge--confidenceMed',
+      hint: 'Medium confidence: useful directional signal.',
+    };
+  }
+  return {
+    label: 'Low sample',
+    className: 'V2Badge--confidenceLow',
+    hint: 'Low sample: percentages can swing quickly with small volume.',
+  };
 };
 
 const parseVersionParts = (value: string): number[] | null => {
@@ -607,10 +639,10 @@ export default function SequencesV2() {
     return [...filteredRows].sort((a, b) => {
       if (a.isManual && !b.isManual) return 1;
       if (!a.isManual && b.isManual) return -1;
-      const familyCmp = labelSorter.compare(toSequenceFamily(a), toSequenceFamily(b));
-      if (familyCmp !== 0) return familyCmp;
       switch (sort) {
         case 'version': {
+          const familyCmp = labelSorter.compare(toSequenceFamily(a), toSequenceFamily(b));
+          if (familyCmp !== 0) return familyCmp;
           const versionCmp = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
           if (versionCmp !== 0) return dir * versionCmp;
           break;
@@ -636,6 +668,8 @@ export default function SequencesV2() {
         default:
           break;
       }
+      const familyCmp = labelSorter.compare(toSequenceFamily(a), toSequenceFamily(b));
+      if (familyCmp !== 0) return familyCmp;
       const versionCmp = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
       if (versionCmp !== 0) return -versionCmp;
       return labelSorter.compare(a.label, b.label);
@@ -720,11 +754,19 @@ export default function SequencesV2() {
         id: 'label',
         accessorKey: 'label',
         header: 'Sequence Name',
-        cell: ({ row }) => (
-          <span className="V2Table__seqName" title={row.original.label}>
-            {row.original.label}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const confidence = getSequenceConfidence(row.original);
+          return (
+            <div className="V2SequenceCell">
+              <span className="V2Table__seqName" title={row.original.label}>
+                {row.original.label}
+              </span>
+              <span className={`V2Badge ${confidence.className}`} title={confidence.hint}>
+                {confidence.label}
+              </span>
+            </div>
+          );
+        },
         enableHiding: false,
       },
       {
@@ -756,8 +798,9 @@ export default function SequencesV2() {
             type="button"
             className="V2Table__sortBtn"
             onClick={() => handleSortClick('messagesSent')}
+            title="Selected window"
           >
-            Texts Sent{sortArrow('messagesSent')}
+            Texts Sent (Window){sortArrow('messagesSent')}
           </button>
         ),
         cell: ({ row }) => fmtInt(row.original.messagesSent),
@@ -769,10 +812,10 @@ export default function SequencesV2() {
           <button
             type="button"
             className="V2Table__sortBtn"
-            title="Unique people reached by this sequence · weekly window"
+            title="Unique people reached by this sequence in the latest weekly scoreboard window"
             onClick={() => handleSortClick('uniqueContacted')}
           >
-            Contacts{sortArrow('uniqueContacted')}
+            Contacts (Weekly){sortArrow('uniqueContacted')}
           </button>
         ),
         cell: ({ row }) =>
@@ -792,6 +835,7 @@ export default function SequencesV2() {
             type="button"
             className="V2Table__sortBtn"
             onClick={() => handleSortClick('replyRatePct')}
+            title="Replies ÷ texts sent in selected window"
           >
             Reply %{sortArrow('replyRatePct')}
           </button>
@@ -799,6 +843,9 @@ export default function SequencesV2() {
         cell: ({ row }) => (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
             <span>{fmtPct(row.original.replyRatePct)}</span>
+            <span className="V2Table__dim" title={`Replies / Texts sent (${fmtRatioHint(row.original.repliesReceived, row.original.messagesSent)})`}>
+              {fmtRatioHint(row.original.repliesReceived, row.original.messagesSent)}
+            </span>
             <div style={{ width: '40px' }}>
               <V2ProgressBar
                 value={row.original.replyRatePct}
@@ -825,7 +872,7 @@ export default function SequencesV2() {
             className="V2Table__sortBtn"
             onClick={() => handleSortClick('canonicalBookedCalls')}
           >
-            Calls Booked{sortArrow('canonicalBookedCalls')}
+            Calls Booked (Slack){sortArrow('canonicalBookedCalls')}
           </button>
         ),
         cell: ({ row }) => (
@@ -869,14 +916,26 @@ export default function SequencesV2() {
           <button
             type="button"
             className="V2Table__sortBtn"
-            title="Booked calls ÷ unique contacts · weekly window"
+            title="Booked calls ÷ unique contacts in latest weekly scoreboard window"
             onClick={() => handleSortClick('bookingRatePct')}
           >
-            Booking %{sortArrow('bookingRatePct')}
+            Booking % (Weekly){sortArrow('bookingRatePct')}
           </button>
         ),
         cell: ({ row }) =>
-          row.original.bookingRatePct > 0 ? fmtPct(row.original.bookingRatePct) : <span className="V2Table__dim">—</span>,
+          row.original.bookingRatePct > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+              <span>{fmtPct(row.original.bookingRatePct)}</span>
+              <span
+                className="V2Table__dim"
+                title={`Booked calls / Unique contacts (${fmtRatioHint(row.original.canonicalBookedCalls, row.original.uniqueContacted)})`}
+              >
+                {fmtRatioHint(row.original.canonicalBookedCalls, row.original.uniqueContacted)}
+              </span>
+            </div>
+          ) : (
+            <span className="V2Table__dim">—</span>
+          ),
       },
       {
         id: 'optOutRatePct',
@@ -886,8 +945,9 @@ export default function SequencesV2() {
             type="button"
             className="V2Table__sortBtn"
             onClick={() => handleSortClick('optOutRatePct')}
+            title="Opt-outs ÷ texts sent in selected window"
           >
-            Stop %{sortArrow('optOutRatePct')}
+            Opt-out %{sortArrow('optOutRatePct')}
           </button>
         ),
         cell: ({ row }) => {
@@ -895,6 +955,9 @@ export default function SequencesV2() {
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
               <span className={isHighOptOut ? 'V2Table__cell--warn' : ''}>{fmtPct(row.original.optOutRatePct)}</span>
+              <span className="V2Table__dim" title={`Opt-outs / Texts sent (${fmtRatioHint(row.original.optOuts, row.original.messagesSent)})`}>
+                {fmtRatioHint(row.original.optOuts, row.original.messagesSent)}
+              </span>
               <div style={{ width: '40px' }}>
                 <V2ProgressBar
                   value={row.original.optOutRatePct}
@@ -1093,8 +1156,19 @@ export default function SequencesV2() {
 
       {/* ── Sequence Performance Table ── */}
       <V2Panel
+        title="Core Metric Rules"
+        caption="Keep these definitions in mind when comparing sequences"
+      >
+        <div className="V2SeqRules">
+          <div className="V2SeqRules__item"><strong>Window metrics:</strong> Texts Sent, Replies, Reply %, Calls Booked, and Opt-out % use the selected rolling window.</div>
+          <div className="V2SeqRules__item"><strong>Weekly metrics:</strong> Contacts and Booking % come from the latest weekly scoreboard snapshot.</div>
+          <div className="V2SeqRules__item"><strong>Denominators shown:</strong> Rate cells include numerator/denominator to avoid ambiguity.</div>
+          <div className="V2SeqRules__item"><strong>Confidence badge:</strong> High/Medium/Low sample indicates how stable each row’s rates are.</div>
+        </div>
+      </V2Panel>
+      <V2Panel
         title="Sequence Performance"
-        caption={`${sortedRows.length} sequences · all numbers from ${mode} rolling window · Booked = Slack-verified · Unique/Booking Rate from weekly window · click headers to sort`}
+        caption={`${sortedRows.length} sequences · window: ${MODE_LABELS[mode]} · Booked = Slack-verified · Contacts/Booking% = weekly snapshot · click headers to sort`}
       >
         {sortedRows.length === 0 ? (
           <V2State kind="empty">No sequence data for this window.</V2State>

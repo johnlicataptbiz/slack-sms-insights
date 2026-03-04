@@ -5953,6 +5953,35 @@ display: inline-block;
   color: color-mix(in srgb, #f59d0d 80%, var(--v2-base-800) 20%);
 }
 
+.V2Badge--confidenceHigh {
+  background: rgba(19, 185, 129, 0.12);
+  border-color: rgba(19, 185, 129, 0.34);
+  color: var(--v2-positive);
+}
+
+.V2Badge--confidenceMed {
+  background: rgba(17, 184, 214, 0.12);
+  border-color: rgba(17, 184, 214, 0.32);
+  color: var(--v2-accent-strong);
+}
+
+.V2Badge--confidenceLow {
+  background: rgba(245, 157, 13, 0.12);
+  border-color: rgba(245, 157, 13, 0.3);
+  color: color-mix(in srgb, #f59d0d 80%, var(--v2-base-800) 20%);
+}
+
+.V2SeqRules {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.V2SeqRules__item {
+  font-size: 0.83rem;
+  color: var(--v2-text);
+  line-height: 1.4;
+}
+
 /* ============================================================
    SEQUENCES V2 — AUDIT PANEL
    ============================================================ */

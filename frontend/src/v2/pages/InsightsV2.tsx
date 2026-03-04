@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 
 import type { SalesMetricsV2 } from '../../api/v2-types';
 import {
@@ -9,7 +8,7 @@ import {
   useV2SalesMetrics,
   useV2WeeklySummary,
 } from '../../api/v2Queries';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2RiskAlert, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
 
 type InsightsRange = 'today' | '7d' | '30d';
 type VolumeMode = 'all' | 'sequence' | 'manual';
@@ -124,10 +123,6 @@ export function InsightsV2() {
       }))
       .slice(0, 6);
   }, [payload]);
-
-  const criticalRiskCount = useMemo(() => {
-    return highRisk.filter((s) => s.optOutRatePct >= 6).length;
-  }, [highRisk]);
 
   // Extract sparkline data from trendByDay based on volume mode
   const sparklines = useMemo(() => {
@@ -295,27 +290,6 @@ export function InsightsV2() {
 
       {section === 'executive' && (
         <>
-
-      {/* Risk Alert Banner */}
-      <AnimatePresence>
-        {criticalRiskCount > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: -20, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: -20, height: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <V2RiskAlert
-              title="High Opt-Out Risk Detected"
-              count={criticalRiskCount}
-              onAction={() => {
-                const element = document.querySelector('.V2Panel:has(.V2Table)');
-                element?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Primary Metrics with Sparklines */}
       <V2AnimatedList className="V2MetricsGrid">

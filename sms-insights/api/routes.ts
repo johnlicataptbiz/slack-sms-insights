@@ -2803,37 +2803,73 @@ const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origi
   const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
   const ownerLabel = toInboxConversationV2(conversation).ownerLabel || null;
 
-  let messages = await listMessagesForConversation(conversationId, 250, logger);
-  if (messages.length === 0) {
-    const legacy = await listSmsEventsForConversation(
-      {
-        id: conversationId,
-        contact_id: conversation.contact_id,
-        contact_phone: conversation.contact_phone,
-      },
-      250,
-      logger,
-    );
-    messages = legacy.map((event) => ({
-      id: event.id,
-      conversation_id: conversationId,
-      event_ts: event.event_ts,
-      direction: event.direction,
-      body: event.body,
-      sequence: null,
-      line: null,
-      aloware_user: null,
-      slack_channel_id: event.slack_channel_id,
-      slack_message_ts: event.slack_message_ts,
-    }));
-    messages.sort((a, b) => {
-      const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
-      if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
-      return a.id.localeCompare(b.id);
+  let messages = [] as Array<{
+    id: string;
+    conversation_id: string | null;
+    event_ts: string;
+    direction: 'inbound' | 'outbound' | 'unknown';
+    body: string | null;
+    sequence: string | null;
+    line: string | null;
+    aloware_user: string | null;
+    slack_channel_id: string;
+    slack_message_ts: string;
+  }>;
+  try {
+    messages = await listMessagesForConversation(conversationId, 250, logger);
+  } catch (error) {
+    logger?.warn?.('CRM notes: failed to load v2 message rows; falling back to legacy events', {
+      conversationId,
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 
-  const mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
+  if (messages.length === 0) {
+    try {
+      const legacy = await listSmsEventsForConversation(
+        {
+          id: conversationId,
+          contact_id: conversation.contact_id,
+          contact_phone: conversation.contact_phone,
+        },
+        250,
+        logger,
+      );
+      messages = legacy.map((event) => ({
+        id: event.id,
+        conversation_id: conversationId,
+        event_ts: event.event_ts,
+        direction: event.direction,
+        body: event.body,
+        sequence: null,
+        line: null,
+        aloware_user: null,
+        slack_channel_id: event.slack_channel_id,
+        slack_message_ts: event.slack_message_ts,
+      }));
+      messages.sort((a, b) => {
+        const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
+        if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
+        return a.id.localeCompare(b.id);
+      });
+    } catch (error) {
+      logger?.warn?.('CRM notes: failed to load legacy sms_events; proceeding with empty transcript', {
+        conversationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  let mondayTrail = [] as Awaited<ReturnType<typeof listMondayTrailForContactKey>>;
+  try {
+    mondayTrail = await listMondayTrailForContactKey(conversation.contact_key, 10, logger);
+  } catch (error) {
+    logger?.warn?.('CRM notes: failed to load monday trail; continuing without monday context', {
+      conversationId,
+      contactKey: conversation.contact_key,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   const result = await generateCrmNotesSuggestion(
     {

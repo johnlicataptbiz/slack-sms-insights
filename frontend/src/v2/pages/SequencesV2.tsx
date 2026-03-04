@@ -12,12 +12,13 @@ import {
   useV2UpdateSequenceVersionDecision,
 } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
-import type { SalesMetricsV2, ScoreboardLeadMagnetRow, SequenceVersionHistoryRowV2 } from '../../api/v2-types';
+import type { SalesMetricsV2, SequenceVersionHistoryRowV2 } from '../../api/v2-types';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
 import { useToast } from '../hooks/useToast';
 
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
+const NOT_CAPTURED_LABEL = 'Not Captured Yet';
 const WINNER_MIN_SENDS = 100;
 const executiveSectionsStorageKey = 'v2_sequences_executive_sections_v1';
 type ExecutiveSectionKey = 'leadMagnet' | 'attribution' | 'compliance' | 'timing';
@@ -31,6 +32,7 @@ const defaultExecutiveSectionState: ExecutiveSectionState = {
 
 type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
 type Sort =
+  | 'version'
   | 'messagesSent'
   | 'replyRatePct'
   | 'canonicalBookedCalls'
@@ -139,6 +141,7 @@ const BUCKET_LABELS: Record<'jack' | 'brandon' | 'selfBooked', string> = {
   brandon: 'Brandon',
   selfBooked: 'Self-booked',
 };
+const labelSorter = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 const MODE_LABELS: Record<Mode, string> = {
   '7d': 'Last 7 days',
@@ -277,6 +280,18 @@ const toVersionSortKey = (row: MergedSeqRow): number[] | null => {
   return parseVersionParts(extractVersionDisplay(row.label) || row.version);
 };
 
+const toSequenceFamily = (row: Pick<MergedSeqRow, 'label' | 'leadMagnet' | 'isManual'>): string => {
+  if (row.isManual) return MANUAL_LABEL;
+  const cleaned = row.label
+    .replace(/\b20\d{2}\b/g, ' ')
+    .replace(/\bv\d+(?:\.\d+)+\b/gi, ' ')
+    .replace(/\s*-\s*/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (cleaned.length > 0) return cleaned;
+  return row.leadMagnet || NOT_CAPTURED_LABEL;
+};
+
 const getTopBodyVariants = (row: SequenceVersionHistoryRowV2 | null | undefined): string[] => {
   if (!row) return [];
   const candidates = [row.canonicalBody, ...(row.sampleBodies || [])]
@@ -347,7 +362,7 @@ export const computeSequenceHeaderMetrics = (
 
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('7d');
-  const [sort, setSort] = useState<Sort>('messagesSent');
+  const [sort, setSort] = useState<Sort>('version');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [query, setQuery] = useState('');
   const [showManualRow, setShowManualRow] = useState(false);
@@ -462,7 +477,7 @@ export default function SequencesV2() {
       const sb = scoreboardByLabel.get(seq.label);
       return {
         label: seq.label,
-        leadMagnet: sb?.leadMagnet ?? 'Unknown',
+        leadMagnet: sb?.leadMagnet ?? NOT_CAPTURED_LABEL,
         version: sb?.version ?? '',
         firstSeenAt: seq.firstSeenAt,
         messagesSent: seq.messagesSent,
@@ -492,7 +507,7 @@ export default function SequencesV2() {
   const versionDiffByLabel = useMemo(() => {
     const grouped = new Map<string, MergedSeqRow[]>();
     for (const row of mergedRows) {
-      const key = row.leadMagnet || 'Unknown';
+      const key = row.leadMagnet || NOT_CAPTURED_LABEL;
       const bucket = grouped.get(key) ?? [];
       bucket.push(row);
       grouped.set(key, bucket);
@@ -529,7 +544,7 @@ export default function SequencesV2() {
   const versionTimelineByLabel = useMemo(() => {
     const grouped = new Map<string, MergedSeqRow[]>();
     for (const row of mergedRows) {
-      const key = row.leadMagnet || 'Unknown';
+      const key = row.leadMagnet || NOT_CAPTURED_LABEL;
       const bucket = grouped.get(key) ?? [];
       bucket.push(row);
       grouped.set(key, bucket);
@@ -592,22 +607,38 @@ export default function SequencesV2() {
     return [...filteredRows].sort((a, b) => {
       if (a.isManual && !b.isManual) return 1;
       if (!a.isManual && b.isManual) return -1;
+      const familyCmp = labelSorter.compare(toSequenceFamily(a), toSequenceFamily(b));
+      if (familyCmp !== 0) return familyCmp;
       switch (sort) {
+        case 'version': {
+          const versionCmp = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
+          if (versionCmp !== 0) return dir * versionCmp;
+          break;
+        }
         case 'messagesSent':
-          return dir * (a.messagesSent - b.messagesSent);
+          if (a.messagesSent !== b.messagesSent) return dir * (a.messagesSent - b.messagesSent);
+          break;
         case 'replyRatePct':
-          return dir * (a.replyRatePct - b.replyRatePct);
+          if (a.replyRatePct !== b.replyRatePct) return dir * (a.replyRatePct - b.replyRatePct);
+          break;
         case 'canonicalBookedCalls':
-          return dir * (a.canonicalBookedCalls - b.canonicalBookedCalls);
+          if (a.canonicalBookedCalls !== b.canonicalBookedCalls) return dir * (a.canonicalBookedCalls - b.canonicalBookedCalls);
+          break;
         case 'optOutRatePct':
-          return dir * (a.optOutRatePct - b.optOutRatePct);
+          if (a.optOutRatePct !== b.optOutRatePct) return dir * (a.optOutRatePct - b.optOutRatePct);
+          break;
         case 'uniqueContacted':
-          return dir * (a.uniqueContacted - b.uniqueContacted);
+          if (a.uniqueContacted !== b.uniqueContacted) return dir * (a.uniqueContacted - b.uniqueContacted);
+          break;
         case 'bookingRatePct':
-          return dir * (a.bookingRatePct - b.bookingRatePct);
+          if (a.bookingRatePct !== b.bookingRatePct) return dir * (a.bookingRatePct - b.bookingRatePct);
+          break;
         default:
-          return 0;
+          break;
       }
+      const versionCmp = compareVersionParts(toVersionSortKey(a), toVersionSortKey(b));
+      if (versionCmp !== 0) return -versionCmp;
+      return labelSorter.compare(a.label, b.label);
     });
   }, [filteredRows, sort, sortDir]);
 
@@ -657,6 +688,7 @@ export default function SequencesV2() {
   const sortArrow = (col: Sort) =>
     sort === col ? <span className="V2Table__sortArrow">{sortDir === 'desc' ? ' ↓' : ' ↑'}</span> : null;
   const columnSortMap: Record<Sort, ColumnId> = {
+    version: 'version',
     messagesSent: 'messagesSent',
     replyRatePct: 'replyRatePct',
     canonicalBookedCalls: 'canonicalBookedCalls',
@@ -679,7 +711,6 @@ export default function SequencesV2() {
     { id: 'optOuts', label: 'Stops' },
   ];
 
-  const leadMagnetRows: ScoreboardLeadMagnetRow[] = scoreboard?.leadMagnetComparison ?? [];
   const monthlyBookings = scoreboard?.monthly.bookings;
   const compliance = scoreboard?.compliance;
   const timing = scoreboard?.timing;
@@ -699,7 +730,16 @@ export default function SequencesV2() {
       {
         id: 'version',
         accessorKey: 'version',
-        header: 'Script Version',
+        header: () => (
+          <button
+            type="button"
+            className="V2Table__sortBtn"
+            onClick={() => handleSortClick('version')}
+            title="Group sequence families and sort by script version"
+          >
+            Script Version{sortArrow('version')}
+          </button>
+        ),
         cell: ({ row }) => renderVersion(row.original.label, row.original.version),
       },
       {
@@ -1542,79 +1582,6 @@ export default function SequencesV2() {
           </>
         )}
       </V2Panel>
-
-      {/* ── Lead Magnet Comparison ── */}
-      {leadMagnetRows.length > 0 && (
-        <ExecutiveSection
-          id="leadMagnet"
-          title="Lead Magnet Comparison"
-          meta="Expanded analysis panel · weekly window"
-          isOpen={executiveSections.leadMagnet}
-          onToggle={setExecutiveSectionOpen}
-        >
-          <V2Panel
-            title="Lead Magnet Comparison"
-            caption="Legacy vs v2 sequences by lead magnet · weekly window"
-          >
-            <div className="V2TableWrap">
-              <table className="V2Table">
-                <thead>
-                  <tr>
-                    <th>Lead Magnet</th>
-                    <th className="is-right">Legacy Sent</th>
-                    <th className="is-right">Legacy Contacts</th>
-                    <th className="is-right">Legacy Reply Rate</th>
-                    <th className="is-right">Legacy Booked</th>
-                    <th className="is-right">Legacy Booking Rate</th>
-                    <th className="is-right">v2 Sent</th>
-                    <th className="is-right">v2 Contacts</th>
-                    <th className="is-right">v2 Reply Rate</th>
-                    <th className="is-right">v2 Booked</th>
-                    <th className="is-right">v2 Booking Rate</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leadMagnetRows.map((row) => (
-                    <tr key={row.leadMagnet}>
-                      <td>{row.leadMagnet}</td>
-                      <td className="is-right">
-                        {row.legacy ? fmtInt(row.legacy.messagesSent) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right V2Table__dim">
-                        {row.legacy ? fmtInt(row.legacy.uniqueContacted) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right">
-                        {row.legacy ? fmtPct(row.legacy.replyRatePct) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right">
-                        {row.legacy ? fmtInt(row.legacy.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right V2Table__dim">
-                        {row.legacy ? fmtPct(row.legacy.bookingRatePct) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right">
-                        {row.v2 ? fmtInt(row.v2.messagesSent) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right V2Table__dim">
-                        {row.v2 ? fmtInt(row.v2.uniqueContacted) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right">
-                        {row.v2 ? fmtPct(row.v2.replyRatePct) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right">
-                        {row.v2 ? fmtInt(row.v2.canonicalBookedCalls) : <span className="V2Table__dim">—</span>}
-                      </td>
-                      <td className="is-right V2Table__dim">
-                        {row.v2 ? fmtPct(row.v2.bookingRatePct) : <span className="V2Table__dim">—</span>}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </V2Panel>
-        </ExecutiveSection>
-      )}
 
       {/* ── Booking Attribution (Monthly) ── */}
       {monthlyBookings && (

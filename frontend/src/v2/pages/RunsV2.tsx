@@ -202,6 +202,12 @@ const runDateLabel = (run: RunV2): string => {
   return formatDateTime(run.timestamp);
 };
 
+const runGeneratedLabel = (run: RunV2): string => {
+  const parsed = parseDateValue(run.timestamp);
+  if (!parsed) return run.timestamp;
+  return formatDateFns(parsed, 'MMM d, h:mm a');
+};
+
 const toIsoDay = (value: string | null): string | null => {
   if (!value) return null;
   const trimmed = value.trim();
@@ -771,7 +777,10 @@ export default function RunsV2() {
                           <span className="V2Tag V2Tag--accent">{run.reportType}</span>
                         </div>
                       </div>
-                      <p className="V2RunList__meta">{channelLabel(run)} | {runDateLabel(run)}</p>
+                      <p className="V2RunList__meta">{channelLabel(run)}</p>
+                      <p className="V2RunList__meta">
+                        Generated {runGeneratedLabel(run)} · Covers {runDateLabel(run)}
+                      </p>
                       <div className="V2RunList__kpis">
                         <span>Sent {formatCount(runView.messagesSent)}</span>
                         <span>Replies {formatCount(runView.repliesReceived)}</span>

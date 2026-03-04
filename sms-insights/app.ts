@@ -23,9 +23,6 @@ const assertStartupSecurityConfig = (): void => {
   if (allowDummyAuthToken && isProduction()) {
     throw new Error('ALLOW_DUMMY_AUTH_TOKEN cannot be enabled in production.');
   }
-  if (isProduction() && !(process.env.DASHBOARD_PASSWORD || '').trim()) {
-    throw new Error('DASHBOARD_PASSWORD is required in production.');
-  }
   assertStreamTokenSecretConfigured();
 };
 

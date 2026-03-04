@@ -211,12 +211,14 @@ type MergedSeqRow = {
   leadMagnet: string;
   // metadata from scoreboard (window-independent)
   version: string;
-  // all numeric fields exclusively from sales-metrics (respects mode toggle)
+  // all numeric fields from sales-metrics (respects mode toggle)
   firstSeenAt: string | null;
   messagesSent: number;
+  uniqueContacted: number;
   repliesReceived: number;
   replyRatePct: number;
   canonicalBookedCalls: number;
+  bookingRatePct: number;
   canonicalBookedAfterSmsReply: number;
   canonicalBookedJack: number;
   canonicalBookedBrandon: number;
@@ -226,10 +228,8 @@ type MergedSeqRow = {
   bookedAuditRows: AuditRow[];
   diagnosticSmsBookingSignals: number;
   isManual: boolean;
-  // from scoreboard (weekly window — metadata only, noted in UI)
-  uniqueContacted: number;
+  // from scoreboard metadata
   uniqueReplied: number;
-  bookingRatePct: number;
   // pre-computed derived fields
   smsReplyPct: number | null;
 };
@@ -492,7 +492,7 @@ export default function SequencesV2() {
     }
   };
 
-  // Build scoreboard lookup by label for leadMagnet / version / uniqueContacted / bookingRatePct
+  // Build scoreboard lookup by label for metadata fields (leadMagnet/version).
   const scoreboardByLabel = useMemo(() => {
     const map = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
     for (const seq of scoreboard?.sequences ?? []) {
@@ -501,8 +501,8 @@ export default function SequencesV2() {
     return map;
   }, [scoreboard?.sequences]);
 
-  // Merge: numeric fields exclusively from sales-metrics (time-range consistent).
-  // Scoreboard used only for window-independent metadata: version, uniqueContacted, uniqueReplied, bookingRatePct.
+  // Merge: numeric fields from sales-metrics (time-range consistent).
+  // Scoreboard is used only for window-independent metadata (lead magnet/version labels).
   const mergedRows = useMemo((): MergedSeqRow[] => {
     const smSeqs = salesMetrics?.sequences ?? [];
     return smSeqs.map((seq) => {
@@ -513,9 +513,11 @@ export default function SequencesV2() {
         version: sb?.version ?? '',
         firstSeenAt: seq.firstSeenAt,
         messagesSent: seq.messagesSent,
+        uniqueContacted: seq.uniqueContacted,
         repliesReceived: seq.repliesReceived,
         replyRatePct: seq.replyRatePct,
         canonicalBookedCalls: seq.canonicalBookedCalls,
+        bookingRatePct: seq.bookingRatePct,
         canonicalBookedAfterSmsReply: seq.canonicalBookedAfterSmsReply,
         canonicalBookedJack: seq.canonicalBookedJack,
         canonicalBookedBrandon: seq.canonicalBookedBrandon,
@@ -525,9 +527,7 @@ export default function SequencesV2() {
         bookedAuditRows: seq.bookedAuditRows,
         diagnosticSmsBookingSignals: seq.diagnosticSmsBookingSignals,
         isManual: seq.label === MANUAL_LABEL,
-        uniqueContacted: sb?.uniqueContacted ?? 0,
         uniqueReplied: sb?.uniqueReplied ?? 0,
-        bookingRatePct: sb?.bookingRatePct ?? 0,
         smsReplyPct:
           seq.canonicalBookedCalls > 0
             ? (seq.canonicalBookedAfterSmsReply / seq.canonicalBookedCalls) * 100
@@ -812,10 +812,10 @@ export default function SequencesV2() {
           <button
             type="button"
             className="V2Table__sortBtn"
-            title="Unique people reached by this sequence in the latest weekly scoreboard window"
+            title="Unique people reached by this sequence in the selected window"
             onClick={() => handleSortClick('uniqueContacted')}
           >
-            Contacts (Weekly){sortArrow('uniqueContacted')}
+            Contacts{sortArrow('uniqueContacted')}
           </button>
         ),
         cell: ({ row }) =>
@@ -916,10 +916,10 @@ export default function SequencesV2() {
           <button
             type="button"
             className="V2Table__sortBtn"
-            title="Booked calls ÷ unique contacts in latest weekly scoreboard window"
+            title="Booked calls ÷ unique contacts in selected window"
             onClick={() => handleSortClick('bookingRatePct')}
           >
-            Booking % (Weekly){sortArrow('bookingRatePct')}
+            Booking %{sortArrow('bookingRatePct')}
           </button>
         ),
         cell: ({ row }) =>
@@ -1121,7 +1121,7 @@ export default function SequencesV2() {
         <V2MetricCard
           label="Unique Contacts"
           value={fmtInt(kpis.totalUniqueContacted)}
-          meta="weekly window"
+          meta={`${mode} window`}
         />
         <V2MetricCard
           label="Booked Calls"
@@ -1161,14 +1161,14 @@ export default function SequencesV2() {
       >
         <div className="V2SeqRules">
           <div className="V2SeqRules__item"><strong>Window metrics:</strong> Texts Sent, Replies, Reply %, Calls Booked, and Opt-out % use the selected rolling window.</div>
-          <div className="V2SeqRules__item"><strong>Weekly metrics:</strong> Contacts and Booking % come from the latest weekly scoreboard snapshot.</div>
+          <div className="V2SeqRules__item"><strong>Window-unified core:</strong> Contacts and Booking % are also computed in the selected window.</div>
           <div className="V2SeqRules__item"><strong>Denominators shown:</strong> Rate cells include numerator/denominator to avoid ambiguity.</div>
           <div className="V2SeqRules__item"><strong>Confidence badge:</strong> High/Medium/Low sample indicates how stable each row’s rates are.</div>
         </div>
       </V2Panel>
       <V2Panel
         title="Sequence Performance"
-        caption={`${sortedRows.length} sequences · window: ${MODE_LABELS[mode]} · Booked = Slack-verified · Contacts/Booking% = weekly snapshot · click headers to sort`}
+        caption={`${sortedRows.length} sequences · window: ${MODE_LABELS[mode]} · Booked = Slack-verified · click headers to sort`}
       >
         {sortedRows.length === 0 ? (
           <V2State kind="empty">No sequence data for this window.</V2State>

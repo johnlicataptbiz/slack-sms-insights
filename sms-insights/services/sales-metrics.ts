@@ -27,8 +27,10 @@ export type SalesTrendPoint = {
 export type TopSequenceRow = {
   label: string;
   messagesSent: number;
+  uniqueContacted?: number;
   repliesReceived: number;
   replyRatePct: number;
+  bookingRatePct?: number;
   bookingSignalsSms: number;
   booked: number; // deprecated alias, kept for one compatibility release
   optOuts: number;
@@ -622,6 +624,7 @@ export const getSalesMetricsSummary = async (
   // Fill sequence messagesSent from outbound events.
   // NOTE: manual outbound exclusion does NOT apply here because this table is "by sequence";
   // excluded manual outbounds are not part of any sequence label anyway.
+  const contactedBySequence = new Map<string, Set<string>>();
   for (const e of events) {
     if (e.direction !== 'outbound') continue;
     const label = (e.sequence || '').trim() || MANUAL_SEQUENCE_LABEL;
@@ -640,6 +643,16 @@ export const getSalesMetricsSummary = async (
     if (eventDay && (!row.firstSeenAt || eventDay < row.firstSeenAt)) {
       row.firstSeenAt = eventDay;
     }
+    seqMap.set(label, row);
+
+    const set = contactedBySequence.get(label) || new Set<string>();
+    set.add(e._contactKey);
+    contactedBySequence.set(label, set);
+  }
+  for (const [label, contacts] of contactedBySequence.entries()) {
+    const row = seqMap.get(label);
+    if (!row) continue;
+    row.uniqueContacted = contacts.size;
     seqMap.set(label, row);
   }
 
@@ -748,6 +761,12 @@ export const getSalesMetricsSummary = async (
     };
     row.optOuts = contacts.size;
     seqMap.set(label, row);
+  }
+
+  // booking rate per sequence uses the same selected-range unique contacted denominator.
+  for (const row of seqMap.values()) {
+    const uniqueContacted = row.uniqueContacted ?? 0;
+    row.bookingRatePct = uniqueContacted > 0 ? (row.bookingSignalsSms / uniqueContacted) * 100 : 0;
   }
 
   // Best-effort sequence provenance: first outbound timestamp observed in PTBizSMS history for each label.

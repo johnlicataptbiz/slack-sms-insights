@@ -57,9 +57,11 @@ export type SalesMetricsV2 = {
     label: string;
     firstSeenAt: string | null;
     messagesSent: number;
+    uniqueContacted: number;
     repliesReceived: number;
     replyRatePct: number;
     canonicalBookedCalls: number;
+    bookingRatePct: number;
     canonicalBookedAfterSmsReply: number;
     canonicalBookedJack: number;
     canonicalBookedBrandon: number;

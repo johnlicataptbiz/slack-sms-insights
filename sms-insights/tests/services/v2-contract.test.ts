@@ -45,8 +45,10 @@ describe('v2 contract mappers', () => {
         {
           label: 'A',
           messagesSent: 50,
+          uniqueContacted: 25,
           repliesReceived: 10,
           replyRatePct: 20,
+          bookingRatePct: 20,
           bookingSignalsSms: 5,
           optOuts: 2,
           slackBookedCalls: 3,
@@ -88,6 +90,8 @@ describe('v2 contract mappers', () => {
     assert.equal(v2.bookedCredit.jack, 5);
     assert.equal(v2.sequences[0]?.diagnosticSmsBookingSignals, 5);
     assert.equal(v2.sequences[0]?.canonicalBookedCalls, 3);
+    assert.equal(v2.sequences[0]?.uniqueContacted, 25);
+    assert.equal(v2.sequences[0]?.bookingRatePct, 12);
   });
 
   it('builds envelope metadata and run list pagination', () => {

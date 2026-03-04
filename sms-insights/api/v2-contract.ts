@@ -60,9 +60,11 @@ export type SalesMetricsV2 = {
     label: string;
     firstSeenAt: string | null;
     messagesSent: number;
+    uniqueContacted: number;
     repliesReceived: number;
     replyRatePct: number;
     canonicalBookedCalls: number;
+    bookingRatePct: number;
     canonicalBookedAfterSmsReply: number;
     canonicalBookedJack: number;
     canonicalBookedBrandon: number;
@@ -621,8 +623,10 @@ type SalesMetricsV1Compatible = {
     label: string;
     firstSeenAt?: string | null;
     messagesSent: number;
+    uniqueContacted?: number;
     repliesReceived: number;
     replyRatePct: number;
+    bookingRatePct?: number;
     bookingSignalsSms: number;
     optOuts: number;
     slackBookedCalls?: number;
@@ -738,12 +742,14 @@ export const toSalesMetricsV2 = (source: SalesMetricsV1Compatible): SalesMetrics
     label: row.label,
     firstSeenAt: row.firstSeenAt ?? null,
     messagesSent: row.messagesSent,
+    uniqueContacted: row.uniqueContacted ?? 0,
     repliesReceived: row.repliesReceived,
     replyRatePct: row.replyRatePct,
     // Attribution priority:
     // 1. slackBookedCalls — real Slack booked-calls channel data, attributed to sequences via
     //    fuzzy match on firstConversion. This is the ground truth for actual bookings.
     canonicalBookedCalls: row.slackBookedCalls ?? 0,
+    bookingRatePct: (row.uniqueContacted ?? 0) > 0 ? ((row.slackBookedCalls ?? 0) / (row.uniqueContacted ?? 0)) * 100 : 0,
     canonicalBookedAfterSmsReply: row.slackBookedAfterSmsReply ?? 0,
     canonicalBookedJack: row.slackBookedJack ?? 0,
     canonicalBookedBrandon: row.slackBookedBrandon ?? 0,

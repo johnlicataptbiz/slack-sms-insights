@@ -457,8 +457,10 @@ export default function SequencesV2() {
     });
   };
 
-  const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading || sequenceQualQuery.isLoading;
-  const isError = salesMetricsQuery.isError || scoreboardQuery.isError || sequenceQualQuery.isError;
+  // sequenceQualQuery is intentionally excluded from the main loading gate — it is a secondary
+  // enrichment query that can be slow. The page renders with core data while qual loads separately.
+  const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading;
+  const isError = salesMetricsQuery.isError || scoreboardQuery.isError;
 
   const salesMetrics = salesMetricsQuery.data?.data;
   const scoreboard = scoreboardQuery.data?.data;

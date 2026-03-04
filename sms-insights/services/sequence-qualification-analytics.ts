@@ -210,19 +210,31 @@ export const buildSequenceQualificationBreakdown = async (params: {
     [from, to, minConversations, timezone],
   );
 
-  // Fetch sample quotes for each category
+  // Fetch all sample quotes and top niches for all rows in parallel (one Promise.all across all rows).
+  const enrichmentResults = await Promise.all(
+    result.rows.map((row) =>
+      Promise.all([
+        fetchSampleQuote(pool, row.sequence_label, 'full_time', 'qualification_full_or_part_time', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'part_time', 'qualification_full_or_part_time', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'mostly_cash', 'qualification_revenue_mix', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'mostly_insurance', 'qualification_revenue_mix', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'balanced', 'qualification_revenue_mix', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'brick_and_mortar', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'mobile', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'online', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'hybrid', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'high', 'qualification_coaching_interest', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'medium', 'qualification_coaching_interest', from, to),
+        fetchSampleQuote(pool, row.sequence_label, 'low', 'qualification_coaching_interest', from, to),
+        fetchTopNiches(pool, row.sequence_label, from, to),
+      ]),
+    ),
+  );
+
   const breakdowns: SequenceQualificationBreakdown[] = [];
 
-  for (const row of result.rows) {
-    const total = Number(row.total_conversations);
-    const mondayTotalOutcomes = Number(row.monday_total_outcomes);
-    const mondayBooked = Number(row.monday_booked_count);
-    const mondayClosedWon = Number(row.monday_closed_won_count);
-    const mondayNoShow = Number(row.monday_no_show_count);
-    const mondayCancelled = Number(row.monday_cancelled_count);
-    const mondayPct = (count: number): number => (mondayTotalOutcomes > 0 ? (count / mondayTotalOutcomes) * 100 : 0);
-
-    // Get sample quotes for each qualification category
+  for (let i = 0; i < result.rows.length; i++) {
+    const row = result.rows[i]!;
     const [
       fullTimeQuote,
       partTimeQuote,
@@ -237,21 +249,14 @@ export const buildSequenceQualificationBreakdown = async (params: {
       mediumInterestQuote,
       lowInterestQuote,
       topNiches,
-    ] = await Promise.all([
-      fetchSampleQuote(pool, row.sequence_label, 'full_time', 'qualification_full_or_part_time', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'part_time', 'qualification_full_or_part_time', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'mostly_cash', 'qualification_revenue_mix', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'mostly_insurance', 'qualification_revenue_mix', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'balanced', 'qualification_revenue_mix', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'brick_and_mortar', 'qualification_delivery_model', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'mobile', 'qualification_delivery_model', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'online', 'qualification_delivery_model', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'hybrid', 'qualification_delivery_model', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'high', 'qualification_coaching_interest', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'medium', 'qualification_coaching_interest', from, to),
-      fetchSampleQuote(pool, row.sequence_label, 'low', 'qualification_coaching_interest', from, to),
-      fetchTopNiches(pool, row.sequence_label, from, to),
-    ]);
+    ] = enrichmentResults[i]!;
+    const total = Number(row.total_conversations);
+    const mondayTotalOutcomes = Number(row.monday_total_outcomes);
+    const mondayBooked = Number(row.monday_booked_count);
+    const mondayClosedWon = Number(row.monday_closed_won_count);
+    const mondayNoShow = Number(row.monday_no_show_count);
+    const mondayCancelled = Number(row.monday_cancelled_count);
+    const mondayPct = (count: number): number => (mondayTotalOutcomes > 0 ? (count / mondayTotalOutcomes) * 100 : 0);
 
     breakdowns.push({
       sequenceLabel: row.sequence_label,

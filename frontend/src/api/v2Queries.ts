@@ -1078,6 +1078,8 @@ export const useV2LinePerformance = (params: { range: 'today' | '7d' | '30d'; tz
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
+    retry: 2,
+    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 15000),
     refetchOnWindowFocus: false,
   });
 };

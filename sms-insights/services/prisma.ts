@@ -149,6 +149,7 @@ export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
     return {
       status: 'error',
       configured: true,
+      configured: true,
       detail: `Prisma query failed: ${error instanceof Error ? error.message : String(error)}`,
     };
   }

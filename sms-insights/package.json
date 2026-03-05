@@ -1,6 +1,6 @@
 {
   "name": "ptbizsms-api",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A scaffold template for Slack apps",
   "main": "dist/app.js",
   "type": "module",

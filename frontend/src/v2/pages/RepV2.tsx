@@ -22,7 +22,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
   const day = useMemo(() => (currentBusinessDay ? shiftIsoDay(currentBusinessDay.day, -1) : null), [currentBusinessDay]);
   const prevDay = useMemo(() => (day ? shiftIsoDay(day, -1) : null), [day]);
 
-  const { data, isLoading, isError, error, refetch } = useV2SalesMetrics(
+  const { data, isLoading, isError, refetch } = useV2SalesMetrics(
     day ? { day, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ },
   );
   const { data: prevData } = useV2SalesMetrics(prevDay ? { day: prevDay, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ });

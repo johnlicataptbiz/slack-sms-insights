@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { describe, it, expect } from 'vitest';
 import { SequencePerformanceTable, type MergedSeqRow } from '../SequencePerformanceTable';
 
@@ -69,14 +70,18 @@ describe('SequencePerformanceTable', () => {
     expect(screen.getByText('v1.0')).toBeInTheDocument();
     
     // Should show metrics
-    expect(screen.getByText('100 sent')).toBeInTheDocument();
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.getByText('leads')).toBeInTheDocument();
+    expect(screen.getByText('100 msgs')).toBeInTheDocument();
     expect(screen.getAllByText('20.0%')[0]).toBeInTheDocument(); // Reply rate
-    expect(screen.getAllByText('5.0%')[0]).toBeInTheDocument(); // Booking rate
+    expect(screen.getAllByText('5.0%')[1]).toBeInTheDocument(); // Booking rate
+    
+    // Should show interaction count
+    expect(screen.getByText('20 interactions')).toBeInTheDocument();
     
     // Should show rep attribution
-    expect(screen.getByText('J:2')).toBeInTheDocument();
-    expect(screen.getByText('B:2')).toBeInTheDocument();
-    expect(screen.getByText('S:1')).toBeInTheDocument();
+    expect(screen.getByText('5 calls')).toBeInTheDocument();
+    expect(screen.getByText('(J:2 B:2 S:1)')).toBeInTheDocument();
   });
 
   it('filters out manual sequences', () => {

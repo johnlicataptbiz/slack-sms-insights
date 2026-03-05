@@ -7,7 +7,6 @@ import {
 } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import { SkeletonDashboard } from '../components/Skeleton';
-import type { SalesMetricsV2 } from '../../api/v2-types';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline } from '../components/V2Primitives';
 import { SequencePerformanceTable, type MergedSeqRow } from '../components/SequencePerformanceTable';
 import { CompliancePanel } from '../components/CompliancePanel';
@@ -33,13 +32,6 @@ type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtInt = (n: number) => n.toLocaleString();
 
-const fmtMins = (n: number | null): string => {
-  if (n === null) return '—';
-  if (n < 60) return `${Math.round(n)}m`;
-  const h = Math.floor(n / 60);
-  const m = Math.round(n % 60);
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
-};
 
 
 const normalizeSequenceLabel = (label: string): string => label.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -145,7 +137,6 @@ function ExecutiveSection({
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type AuditRow = SalesMetricsV2['sequences'][0]['bookedAuditRows'][0];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 

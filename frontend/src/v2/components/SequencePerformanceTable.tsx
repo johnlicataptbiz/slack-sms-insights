@@ -82,7 +82,7 @@ function StatDelta({ current, previous, isPct = true }: StatDeltaProps) {
 
 interface SequencePerformanceTableProps {
   mergedRows: MergedSeqRow[];
-  unattributedAuditRows?: UnattributedAuditRow[];
+  unattributedAuditRows?: UnattributedAuditRow[] | undefined;
   modeLabel: string;
 }
 
@@ -255,7 +255,7 @@ export function SequencePerformanceTable({
   mergedRows, 
   modeLabel, 
   unattributedAuditRows = [] 
-}: SequencePerformanceTableProps & { unattributedAuditRows?: UnattributedAuditRow[] }) {
+}: SequencePerformanceTableProps) {
   const { familyEntries, activeSequenceCount, uniqueFamilyCount } = useMemo(() => {
     const filteredRows = mergedRows.filter((r) => !r.isManual);
 

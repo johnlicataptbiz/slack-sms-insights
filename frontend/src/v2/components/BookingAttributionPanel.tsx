@@ -3,13 +3,13 @@ import type { BookedCredit, SalesMetricsV2 } from '../../api/v2-types';
 import { V2Panel } from './V2Primitives';
 
 interface BookingAttributionPanelProps {
-  bookedCredit?: BookedCredit;
-  attribution?: SalesMetricsV2['provenance']['sequenceBookedAttribution'];
+  bookedCredit?: BookedCredit | undefined;
+  attribution?: SalesMetricsV2['provenance']['sequenceBookedAttribution'] | undefined;
   modeLabel: string;
   mode: string;
 }
 
-export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel, mode }: BookingAttributionPanelProps) {
+export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel }: BookingAttributionPanelProps) {
   const navigate = useNavigate();
 
   if (!bookedCredit) return null;

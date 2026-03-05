@@ -436,7 +436,7 @@ export default function RunsV2() {
   const selectedId = searchParams.get('run');
   const [isRunDetailFocused, setIsRunDetailFocused] = useState(() => Boolean(selectedId));
 
-  const { data: runsData, isLoading, isError, error, refetch } = useV2Runs({
+  const { data: runsData, isLoading, isError, refetch } = useV2Runs({
     daysBack,
     channelId,
     limit: 100,
@@ -633,7 +633,7 @@ export default function RunsV2() {
   };
 
   const deleteSavedView = (viewId: string) => {
-    setSavedViews((prev) => prev.filter((view) => view.id !== viewId));
+    setSavedViews((prev) => prev.filter((view: SavedRunsView) => view.id !== viewId));
   };
 
   const buildSavedViewUrl = (view: SavedRunsView) => {
@@ -696,7 +696,7 @@ export default function RunsV2() {
               className="V2Shell__defsButton"
               ref={savedViewsRefs.setReference}
               {...getSavedViewsReferenceProps({
-                onClick: () => setShowSavedViews((v) => !v),
+                onClick: () => setShowSavedViews((v: boolean) => !v),
                 'aria-expanded': showSavedViews,
                 'aria-haspopup': 'dialog',
               })}
@@ -1044,7 +1044,7 @@ export default function RunsV2() {
                     </div>
                     {savedViews.length ? (
                       <div className="V2SavedViews__list">
-                        {savedViews.map((view) => (
+                        {savedViews.map((view: SavedRunsView) => (
                           <article className="V2SavedViews__item" key={view.id}>
                             <div>
                               <h3>{view.name}</h3>

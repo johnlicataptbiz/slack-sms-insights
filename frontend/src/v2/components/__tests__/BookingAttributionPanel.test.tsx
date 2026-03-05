@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect } from 'vitest';
 import { BookingAttributionPanel } from '../BookingAttributionPanel';
+import type { SalesMetricsV2 } from '../../../api/v2-types';
 
 describe('BookingAttributionPanel', () => {
   const mockBookedCredit = {
@@ -10,65 +13,58 @@ describe('BookingAttributionPanel', () => {
     selfBooked: 15,
   };
 
-  const mockMonthlyBookings = {
-    sequenceInitiated: 30,
-    manualInitiated: 20,
-    total: 50,
+  const mockAttribution: SalesMetricsV2['provenance']['sequenceBookedAttribution'] = {
+    source: 'slack_booked_calls',
+    model: 'strict_sms_first_conversion',
+    totalCalls: 50,
+    matchedCalls: 30,
+    unattributedCalls: 10,
+    manualCalls: 10,
+    strictSmsReplyLinkedCalls: 25,
+    nonSmsOrUnknownCalls: 5,
+    unattributedAuditRows: []
   };
 
   it('renders booked credit correctly', () => {
     render(
-      <BookingAttributionPanel 
-        bookedCredit={mockBookedCredit} 
-        modeLabel="Last 7 days" 
-        mode="7d" 
-      />
+      <MemoryRouter>
+        <BookingAttributionPanel 
+          bookedCredit={mockBookedCredit} 
+          modeLabel="Last 7 days" 
+          mode="7d"
+        />
+      </MemoryRouter>
     );
     
-    expect(screen.getByText('Booking Attribution — Last 7 days')).toBeInTheDocument();
-    expect(screen.getByText('Total Booked')).toBeInTheDocument();
+    expect(screen.getByText('Booking Attribution')).toBeInTheDocument();
+    expect(screen.getByText('Total Slack Bookings')).toBeInTheDocument();
     expect(screen.getByText('50')).toBeInTheDocument();
     
-    expect(screen.getByText('Jack')).toBeInTheDocument();
+    expect(screen.getByText('jack')).toBeInTheDocument();
     expect(screen.getByText('20')).toBeInTheDocument();
     
-    expect(screen.getByText('Brandon')).toBeInTheDocument();
+    expect(screen.getByText('brandon')).toBeInTheDocument();
     expect(screen.getAllByText('15')[0]).toBeInTheDocument();
     
-    expect(screen.getByText('Self-Booked')).toBeInTheDocument();
+    expect(screen.getByText('selfBooked')).toBeInTheDocument();
   });
 
-  it('renders monthly bookings correctly', () => {
+  it('renders attribution correctly', () => {
     render(
-      <BookingAttributionPanel 
-        monthlyBookings={mockMonthlyBookings} 
-        modeLabel="Last 7 days" 
-        mode="7d" 
-      />
+      <MemoryRouter>
+        <BookingAttributionPanel 
+          bookedCredit={mockBookedCredit}
+          attribution={mockAttribution} 
+          modeLabel="Last 7 days" 
+          mode="7d"
+        />
+      </MemoryRouter>
     );
     
-    expect(screen.getByText('Channel Attribution — Monthly')).toBeInTheDocument();
-    
-    expect(screen.getByText('From Sequences')).toBeInTheDocument();
+    expect(screen.getByText('Matched to Sequence')).toBeInTheDocument();
     expect(screen.getByText('30')).toBeInTheDocument();
-    
-    expect(screen.getByText('From Direct Outreach')).toBeInTheDocument();
-    expect(screen.getByText('20')).toBeInTheDocument();
-    
-    expect(screen.getByText('Total (month)')).toBeInTheDocument();
-  });
-
-  it('renders both panels when both data objects are provided', () => {
-    render(
-      <BookingAttributionPanel 
-        bookedCredit={mockBookedCredit}
-        monthlyBookings={mockMonthlyBookings} 
-        modeLabel="Last 7 days" 
-        mode="7d" 
-      />
-    );
-    
-    expect(screen.getByText('Booking Attribution — Last 7 days')).toBeInTheDocument();
-    expect(screen.getByText('Channel Attribution — Monthly')).toBeInTheDocument();
+    expect(screen.getByText('Manual / Direct')).toBeInTheDocument();
+    expect(screen.getAllByText('10')[0]).toBeInTheDocument();
+    expect(screen.getByText('Unattributed Gaps')).toBeInTheDocument();
   });
 });

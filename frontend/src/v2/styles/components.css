@@ -99,6 +99,52 @@
   background: rgba(0, 0, 0, 0.04);
 }
 
+/* ─── V2State Error Actions (Try Again / Reload Page) ───────────────────────── */
+.V2State__actions {
+  display: flex;
+  gap: 0.625rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.V2State__btn {
+  font-family: var(--v2-font-ui, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.5rem 1.125rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth, ease);
+  line-height: 1;
+}
+
+.V2State__btn--primary {
+  background: var(--gradient-primary, linear-gradient(135deg, #11b8d6, #13b981));
+  color: #fff;
+}
+
+.V2State__btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(17, 184, 214, 0.35);
+}
+
+.V2State__btn--primary:active {
+  transform: translateY(0);
+}
+
+.V2State__btn--secondary {
+  background: transparent;
+  color: var(--v2-muted, #888);
+  border: 1px solid var(--v2-divider, rgba(0,0,0,0.1));
+}
+
+.V2State__btn--secondary:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--v2-text, #111);
+}
+
 /* ─── Issue #11: Skeleton Loaders ───────────────────────────────────────────── */
 .V2Skeleton {
   background: linear-gradient(

@@ -64,6 +64,7 @@ import type {
 } from "../../api/v2-types";
 import { V2Select, type V2SelectOption } from "../components/V2Select";
 import { V2State } from "../components/V2Primitives";
+import { SkeletonText } from "../components/Skeleton";
 import { useToast } from "../hooks/useToast";
 
 const parseDateValue = (value: string): Date | null => {
@@ -2005,9 +2006,8 @@ export default function InboxV2() {
               ))}
             </div>
           ) : listQuery.isError ? (
-            <V2State kind="error">
-              Failed to load conversations:{" "}
-              {String((listQuery.error as Error)?.message || listQuery.error)}
+            <V2State kind="error" onRetry={() => void listQuery.refetch()}>
+              Failed to load conversations. Check your connection and try again.
             </V2State>
           ) : sortedConversations.length === 0 ? (
             <div className="V2Inbox__emptyState">
@@ -2619,13 +2619,12 @@ export default function InboxV2() {
                   Select a conversation to open it.
                 </V2State>
               ) : detailQuery.isLoading ? (
-                <V2State kind="loading">Loading messages…</V2State>
+                <div style={{ padding: '1.5rem' }}>
+                  <SkeletonText lines={6} />
+                </div>
               ) : detailQuery.isError || !detail ? (
-                <V2State kind="error">
-                  Failed to load messages:{" "}
-                  {String(
-                    (detailQuery.error as Error)?.message || detailQuery.error,
-                  )}
+                <V2State kind="error" onRetry={() => void detailQuery.refetch()}>
+                  Failed to load messages. Check your connection and try again.
                 </V2State>
               ) : (
                 <Group

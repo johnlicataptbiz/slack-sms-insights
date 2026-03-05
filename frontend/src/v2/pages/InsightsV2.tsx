@@ -9,6 +9,7 @@ import {
   useV2WeeklySummary,
 } from '../../api/v2Queries';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2StatBar, V2PipelineVisual, V2ActionList, V2MiniTrend, V2AnimatedList, V2ProgressBar } from '../components/V2Primitives';
+import { SkeletonDashboard } from '../components/Skeleton';
 
 type InsightsRange = 'today' | '7d' | '30d';
 type VolumeMode = 'all' | 'sequence' | 'manual';
@@ -80,7 +81,7 @@ export function InsightsV2() {
   const [range, setRange] = useState<InsightsRange>('7d');
   const [volumeMode, setVolumeMode] = useState<VolumeMode>('all');
   const [section, setSection] = useState<InsightsSection>('executive');
-  const { data: payloadEnvelope, isLoading, error } = useV2SalesMetrics({ range });
+  const { data: payloadEnvelope, isLoading, error, refetch } = useV2SalesMetrics({ range });
   const { data: weeklyEnvelope } = useV2WeeklySummary({});
   const mondayLeadInsightsQuery = useV2MondayLeadInsights({
     range,
@@ -226,7 +227,7 @@ export function InsightsV2() {
     return (
       <div className="V2Page">
         <V2PageHeader title="Performance" subtitle="Track your team's messaging performance and outcomes." />
-        <V2State kind="loading">Loading performance metrics…</V2State>
+        <SkeletonDashboard />
       </div>
     );
   }
@@ -235,7 +236,9 @@ export function InsightsV2() {
     return (
       <div className="V2Page">
         <V2PageHeader title="Performance" subtitle="Track your team's messaging performance and outcomes." />
-        <V2State kind="error">Unable to load metrics. Please try again later.</V2State>
+        <V2State kind="error" onRetry={() => void refetch()}>
+          Unable to load metrics. Check your connection and try again.
+        </V2State>
       </div>
     );
   }

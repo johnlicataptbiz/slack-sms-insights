@@ -1,12 +1,73 @@
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import type { Logger } from '@slack/bolt';
 import { generateAiResponse } from './ai-response.js';
 import { getPool } from './db.js';
 import type { InboxMessageRow } from './inbox-store.js';
 
-const CRM_NOTES_PROMPT_DOC_PATH = '/Users/jl/Downloads/CRM NOTES PROMPT.docx';
 const OPENAI_MISSING_KEY_MESSAGE = 'Set OPENAI_API_KEY in your environment to enable AI replies.';
+
+// ─── Embedded CRM Notes Prompt ────────────────────────────────────────────────
+// This prompt is embedded directly so it works in all environments (local + production).
+// It instructs the AI to produce the exact PT Biz setter → advisor handoff format.
+const EMBEDDED_CRM_NOTES_PROMPT = `You are a CRM notes writer for PT Biz, a physical therapy business coaching company. Your job is to write structured setter → advisor handoff notes based on an SMS conversation transcript and any available lead context.
+
+REQUIRED OUTPUT FORMAT (copy this structure exactly, including the emoji headers):
+
+📋 CRM Notes – Discovery Call (Setter → Advisor Handoff)
+
+Lead Name: [Full name or "Not specified"]
+
+Phone: [Digits only, e.g. 15162421520, or "Not specified"]
+
+Email: [Email address or "Not specified"]
+
+Source: [Lead magnet / opt-in source or "Not specified"]
+
+Appt Time: [Appointment date and time or "Not specified"]
+
+Assigned Advisor: [Advisor name or "Not specified"]
+
+👤 Stage & Profile
+
+Stage: [e.g. "Pre-launch", "Early stage", "Established", "Hybrid – full time + side practice", etc.]
+
+Commitment: [Describe their current work situation, hours, and how serious they are about building a cash practice]
+
+🎯 Motivation & Goals
+
+Motivation (Why now?): [What triggered them to reach out or book? What is their immediate pain point or catalyst?]
+
+Primary Goal: [What do they ultimately want to achieve with their practice?]
+
+📉 Revenue & Bottlenecks
+
+Current Revenue: [Current monthly or annual revenue from their practice, or "Not specified"]
+
+Target Revenue: [Their revenue goal, or "Not specified"]
+
+Main Bottleneck #1: [The single biggest obstacle they face right now]
+
+Main Bottleneck #2: [The second biggest obstacle, or "Not specified"]
+
+Pricing: [How they currently price their services, or "Not specified"]
+
+🔍 Additional Notes from Conversation
+
+• [Key detail or observation from the SMS thread]
+• [Another key detail]
+• [Continue with as many bullet points as needed — include positioning used, objections raised, scheduling preferences, geographic info, niche details, lead's response to the setter, etc.]
+
+Setter Handoff Summary
+
+[2–4 sentence paragraph summarizing who this lead is, where they are in their journey, what their biggest challenge is, why they are a good fit (or not), any objections or concerns raised, and what the advisor should focus on in the strategy call. Write this as if briefing the advisor verbally before the call.]
+
+RULES:
+- Use "Not specified" when information is genuinely missing — do not guess or fabricate.
+- Extract as much detail as possible from the SMS transcript. Read between the lines.
+- The Setter Handoff Summary must be a flowing paragraph, not bullet points.
+- Do NOT include any preamble, explanation, or code fences — output ONLY the formatted notes.
+- The first line of your response MUST be exactly: 📋 CRM Notes – Discovery Call (Setter → Advisor Handoff)
+- Keep the section headers exactly as shown (with emoji).`;
 
 export type CrmNotesContext = {
   conversationId: string;
@@ -43,18 +104,6 @@ export type CrmNotesGenerationResult = {
   generationWarnings: string[];
   promptSnapshotHash: string;
   createdAt: string;
-};
-
-const readDocx = (path: string): string => {
-  try {
-    return execFileSync('textutil', ['-convert', 'txt', '-stdout', path], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-      maxBuffer: 4 * 1024 * 1024,
-    }).trim();
-  } catch {
-    return '';
-  }
 };
 
 const toEpochMs = (value: string): number => {
@@ -303,7 +352,7 @@ const buildFallbackNotes = (context: CrmNotesContext, slackBookedCalls: SlackBoo
 };
 
 const buildPrompt = (context: CrmNotesContext, slackBookedCallsSection: SlackBookedCallHint[]): string => {
-  const templatePrompt = readDocx(CRM_NOTES_PROMPT_DOC_PATH);
+  const templatePrompt = EMBEDDED_CRM_NOTES_PROMPT;
   const threadTranscript = formatThreadTranscript(context.messages);
   const mondayTrail = (context.mondayTrail || [])
     .map((row) => {
@@ -393,9 +442,10 @@ export const generateCrmNotesSuggestion = async (
   } else {
     output = stripFences(output).trim();
     if (!hasExpectedHeading(output)) {
-      generationMode = 'contextual_fallback';
-      generationWarnings.push('AI response did not match required CRM format.');
-      output = buildFallbackNotes(context, slackBookedCalls);
+      // AI produced content but without the exact heading — prepend it rather than
+      // discarding the AI's work and falling back to "Not specified" for everything.
+      generationWarnings.push('AI response was missing the expected heading; heading prepended.');
+      output = `📋 CRM Notes – Discovery Call (Setter → Advisor Handoff)\n\n${output}`;
     }
   }
 

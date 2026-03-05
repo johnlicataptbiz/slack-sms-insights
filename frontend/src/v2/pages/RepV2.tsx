@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 
 import { useV2SalesMetrics } from '../../api/v2Queries';
+import { SkeletonDashboard } from '../components/Skeleton';
 import { resolveCurrentBusinessDay, shiftIsoDay } from '../../utils/runDay';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
 
@@ -21,7 +22,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
   const day = useMemo(() => (currentBusinessDay ? shiftIsoDay(currentBusinessDay.day, -1) : null), [currentBusinessDay]);
   const prevDay = useMemo(() => (day ? shiftIsoDay(day, -1) : null), [day]);
 
-  const { data, isLoading, isError, error } = useV2SalesMetrics(
+  const { data, isLoading, isError, error, refetch } = useV2SalesMetrics(
     day ? { day, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ },
   );
   const { data: prevData } = useV2SalesMetrics(prevDay ? { day: prevDay, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ });
@@ -128,8 +129,12 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     return flags;
   }, [deltas, metrics.booked, metrics.optOutRate, metrics.outbound, metrics.replyRate, prevDay]);
 
-  if (isLoading) return <V2State kind="loading">Loading scorecard…</V2State>;
-  if (isError || !payload) return <V2State kind="error">Failed to load scorecard: {String((error as Error)?.message || error)}</V2State>;
+  if (isLoading) return <SkeletonDashboard />;
+  if (isError || !payload) return (
+    <V2State kind="error" onRetry={() => void refetch()}>
+      Failed to load scorecard. Check your connection and try again.
+    </V2State>
+  );
 
   return (
     <div className="V2Page">

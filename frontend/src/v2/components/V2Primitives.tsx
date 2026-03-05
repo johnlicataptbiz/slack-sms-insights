@@ -367,7 +367,15 @@ export function V2ProgressBar({
 }
 
 // ─── State Display ───────────────────────────────────────────────────────────
-export function V2State({ kind, children }: { kind: 'loading' | 'error' | 'empty'; children: ReactNode }) {
+export function V2State({
+  kind,
+  children,
+  onRetry,
+}: {
+  kind: 'loading' | 'error' | 'empty';
+  children: ReactNode;
+  onRetry?: () => void;
+}) {
   const iconVariants: Variants = {
     loading: {
       rotate: 360,
@@ -398,6 +406,26 @@ export function V2State({ kind, children }: { kind: 'loading' | 'error' | 'empty
         {kind === 'loading' ? '◌' : kind === 'error' ? '⚠' : '○'}
       </motion.span>
       <span className="V2State__text">{children}</span>
+      {kind === 'error' && (
+        <div className="V2State__actions">
+          {onRetry && (
+            <button
+              type="button"
+              className="V2State__btn V2State__btn--primary"
+              onClick={onRetry}
+            >
+              Try again
+            </button>
+          )}
+          <button
+            type="button"
+            className="V2State__btn V2State__btn--secondary"
+            onClick={() => window.location.reload()}
+          >
+            Reload page
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

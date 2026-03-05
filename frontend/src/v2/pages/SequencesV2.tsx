@@ -6,6 +6,7 @@ import {
   useV2SequenceQualification,
 } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
+import { SkeletonDashboard } from '../components/Skeleton';
 import type { SalesMetricsV2 } from '../../api/v2-types';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline } from '../components/V2Primitives';
 import { SequencePerformanceTable, type MergedSeqRow } from '../components/SequencePerformanceTable';
@@ -292,7 +293,7 @@ export default function SequencesV2() {
   if (isLoading) {
     return (
       <div className="V2Page">
-        <V2State kind="loading">Loading sequences…</V2State>
+        <SkeletonDashboard />
       </div>
     );
   }
@@ -300,7 +301,9 @@ export default function SequencesV2() {
   if (isError) {
     return (
       <div className="V2Page">
-        <V2State kind="error">Failed to load sequence data. Check your connection and try again.</V2State>
+        <V2State kind="error" onRetry={() => void salesMetricsQuery.refetch()}>
+          Failed to load sequence data. Check your connection and try again.
+        </V2State>
       </div>
     );
   }

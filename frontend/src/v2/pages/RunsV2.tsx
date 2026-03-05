@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useV2Channels, useV2Run, useV2Runs, useV2SalesMetrics } from '../../api/v2Queries';
+import { SkeletonTable } from '../components/Skeleton';
 import type { RunV2 } from '../../api/v2-types';
 import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser';
 import { v2Copy } from '../copy';
@@ -435,7 +436,7 @@ export default function RunsV2() {
   const selectedId = searchParams.get('run');
   const [isRunDetailFocused, setIsRunDetailFocused] = useState(() => Boolean(selectedId));
 
-  const { data: runsData, isLoading, isError, error } = useV2Runs({
+  const { data: runsData, isLoading, isError, error, refetch } = useV2Runs({
     daysBack,
     channelId,
     limit: 100,
@@ -645,8 +646,12 @@ export default function RunsV2() {
     return url.toString();
   };
 
-  if (isLoading) return <V2State kind="loading">Loading reports…</V2State>;
-  if (isError || !runsData) return <V2State kind="error">Failed to load reports: {String((error as Error)?.message || error)}</V2State>;
+  if (isLoading) return <SkeletonTable rows={6} columns={4} />;
+  if (isError || !runsData) return (
+    <V2State kind="error" onRetry={() => void refetch()}>
+      Failed to load reports. Check your connection and try again.
+    </V2State>
+  );
 
   return (
     <div className="V2Page">

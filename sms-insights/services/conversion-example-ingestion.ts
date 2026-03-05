@@ -106,9 +106,11 @@ export const maybeRecordConversionExample = async (
       id: string;
       body: string | null;
       sequence: string | null;
+      event_ts: string;
     }>(
       `
-      SELECT id, body, sequence
+      SELECT id, body, sequence,
+          event_ts
       FROM sms_events
       WHERE conversation_id = $1
         AND direction = 'outbound'

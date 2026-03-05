@@ -33,6 +33,7 @@ import {
 } from '../services/comprehensive-fixes.js';
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getCronStatusSnapshot } from '../services/cron-scheduler.js';
+import { detectRunOutliers, parseRunMetrics } from '../services/daily-report-summary.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
 import { getPool } from '../services/db.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
@@ -1003,6 +1004,9 @@ const handleGetRunById: RequestHandler = async (req, res, logger, origin) => {
 
 const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
   const botToken = req.headers['x-bot-token'];
+  if (!process.env.SLACK_BOT_TOKEN) {
+    return sendJson(res, 503, { error: 'Bot token not configured' }, origin);
+  }
   if (botToken !== process.env.SLACK_BOT_TOKEN) {
     return sendJson(res, 401, { error: 'Invalid bot token' }, origin);
   }
@@ -1078,11 +1082,16 @@ const handleGetRunsV2: RequestHandler = async (req, res, logger, origin) => {
     logger,
   );
 
+  const parsedMetrics = rows.map((row) =>
+    parseRunMetrics(row.id, row.report_date, row.summary_text, row.duration_ms),
+  );
+  const outliers = detectRunOutliers(parsedMetrics);
+
   sendJson(
     res,
     200,
     toEnvelope({
-      data: toRunsListV2({ rows, limit, offset, daysBack, channelId, legacyMode, includeFullReport }),
+      data: toRunsListV2({ rows, limit, offset, daysBack, channelId, legacyMode, includeFullReport, outliers }),
       timeZone: DEFAULT_BUSINESS_TIMEZONE,
     }),
     origin,
@@ -4191,7 +4200,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/runtime-status', public: true, handler: handleGetRuntimeStatus },
   { method: 'GET', path: '/api/oauth/start', public: true, handler: handleOauthStart },
   { method: 'GET', path: '/api/oauth/callback', public: true, handler: handleOauthCallback },
-  { method: 'POST', path: '/api/runs', public: true, csrf: false, rateLimitBucket: 'none', handler: handlePostRun },
+  { method: 'POST', path: '/api/runs', public: true, csrf: false, rateLimitBucket: 'mutation', handler: handlePostRun },
 
   { method: 'POST', path: '/api/auth/password', public: true, csrf: false, handler: handleAuthPassword },
   { method: 'GET', path: '/api/auth/verify', handler: handleAuthVerify },

@@ -1,4 +1,5 @@
 import type { ChannelWithRunsRow, DailyRunRow } from '../services/daily-run-logger.js';
+import type { RunOutlierAnnotation } from '../services/daily-report-summary.js';
 import type { WeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 
 export type RequestedMode = 'day' | 'range' | 'from-to';
@@ -131,6 +132,8 @@ export type RunsListV2 = {
     channelId: string | null;
     legacyMode: 'exclude' | 'only' | 'include';
   };
+  /** IQR-based outlier annotations for runs in this page. Only runs with ≥1 outlier field are included. */
+  outliers: RunOutlierAnnotation[];
 };
 
 export type RunV2 = {
@@ -814,6 +817,7 @@ export const toRunsListV2 = (params: {
   channelId?: string;
   legacyMode: 'exclude' | 'only' | 'include';
   includeFullReport?: boolean;
+  outliers?: RunOutlierAnnotation[];
 }): RunsListV2 => ({
   items: params.rows.map((row) => toRunV2(row, { includeFullReport: params.includeFullReport === true })),
   pagination: {
@@ -826,6 +830,7 @@ export const toRunsListV2 = (params: {
     channelId: params.channelId || null,
     legacyMode: params.legacyMode,
   },
+  outliers: params.outliers ?? [],
 });
 
 export const toChannelsV2 = (rows: ChannelWithRunsRow[]): ChannelsV2 => ({

@@ -2042,6 +2042,7 @@ export default function InboxV2() {
                     return (
                       <div
                         key={virtualItem.key}
+                        data-index={virtualItem.index}
                         ref={rowVirtualizer.measureElement}
                         style={{
                           position: "absolute",

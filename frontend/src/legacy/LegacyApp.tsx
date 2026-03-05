@@ -30,7 +30,7 @@ export default function LegacyApp() {
     <div className="AppShell">
       <nav className="AppShell__nav">
         <div className="AppShell__logo">
-          <img className="AppShell__logoMark" src="/sidebar-logo.png" alt="PT Biz SMS" />
+          <img className="AppShell__logoMark" src="https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/smslogofinal.png" alt="PT Biz SMS" />
         </div>
 
         <div className="AppShell__links">

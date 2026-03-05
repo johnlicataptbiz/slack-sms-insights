@@ -24,7 +24,7 @@ const navItems: NavItem[] = [
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: '⟐' },
 ];
 
-const brandLogoUrl = '/bizsmslogo.png';
+const brandLogoUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/smslogofinal.png';
 const mobileMediaQuery = '(max-width: 1080px)';
 const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
 

@@ -6,7 +6,7 @@ import { ApiError, client } from '../api/client';
 import './PasswordGate.css';
 
 const brandLogoUrl =
-  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/Untitled.png';
+  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/smslogofinal.png';
 
 // Floating orb component for background ambiance
 function FloatingOrb({ delay, x, y, size, color }: { delay: number; x: string; y: string; size: number; color: string }) {

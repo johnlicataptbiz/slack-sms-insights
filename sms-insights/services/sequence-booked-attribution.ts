@@ -180,10 +180,6 @@ const resolveSequenceLabel = (
   const raw = (firstConversion || '').trim();
   if (!raw) return { label: null, manual: false };
 
-  if (MEETING_LINK_PATTERN.test(raw)) {
-    return { label: MANUAL_SEQUENCE_LABEL, manual: true };
-  }
-
   let bestLabel: string | null = null;
   let bestScore = 0;
   let bestMessagesSent = -1;
@@ -210,6 +206,13 @@ const resolveSequenceLabel = (
 
   if (bestLabel && bestScore >= 0.34) {
     return { label: bestLabel, manual: bestLabel === MANUAL_SEQUENCE_LABEL };
+  }
+
+  // Only classify as manual/direct if no sequence matched AND the text looks like a meeting link.
+  // Checked AFTER fuzzy matching so that a firstConversion like "Hiring Guide - discovery call"
+  // is attributed to the Hiring Guide sequence rather than being discarded as manual.
+  if (MEETING_LINK_PATTERN.test(raw)) {
+    return { label: MANUAL_SEQUENCE_LABEL, manual: true };
   }
 
   return { label: null, manual: false };

@@ -262,3 +262,106 @@ export const buildDailyReportBlocks = (report: string): SlackBlock[] => {
 
   return blocks;
 };
+
+// ─── Outlier Detection ────────────────────────────────────────────────────────
+
+export type ParsedRunMetrics = {
+  runId: string;
+  reportDate: string | null;
+  messagesSent: number;
+  booked: number;
+  optOuts: number;
+  replyRatePct: number;
+  durationMs: number | null;
+};
+
+export type RunOutlierAnnotation = {
+  runId: string;
+  outlierFields: Array<{
+    field: keyof Omit<ParsedRunMetrics, 'runId' | 'reportDate'>;
+    value: number;
+    direction: 'high' | 'low';
+    q1: number;
+    q3: number;
+    iqr: number;
+    fence: number;
+  }>;
+};
+
+/** Linear interpolation percentile on a pre-sorted array. */
+const iqrPercentile = (sorted: number[], p: number): number => {
+  if (sorted.length === 0) return 0;
+  const idx = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+};
+
+/**
+ * Parse key numeric metrics out of a run's summaryText + durationMs.
+ * Used as input to detectRunOutliers.
+ */
+export const parseRunMetrics = (
+  runId: string,
+  reportDate: string | null,
+  summaryText: string | null,
+  durationMs: number | null,
+): ParsedRunMetrics => {
+  const text = summaryText || '';
+  const sequences = aggregateSequenceRows(text);
+  const messagesSent =
+    sequences.reduce((s, r) => s + r.messagesSent, 0) ||
+    sumFromPatterns(text, OUTBOUND_CONVERSATIONS_PATTERNS);
+  const repliesReceived = sequences.reduce((s, r) => s + r.repliesReceived, 0);
+  const replyRatePct = messagesSent > 0 ? (repliesReceived / messagesSent) * 100 : 0;
+  const booked = sumFromPatterns(text, BOOKINGS_PATTERNS);
+  const optOuts = sumFromPatterns(text, OPTOUTS_PATTERNS);
+  return { runId, reportDate, messagesSent, booked, optOuts, replyRatePct, durationMs };
+};
+
+/**
+ * IQR-based outlier detection across a set of parsed run metrics.
+ * Returns only runs that have at least one outlier field.
+ * Requires at least 4 data points; returns [] for smaller sets.
+ */
+export const detectRunOutliers = (runs: ParsedRunMetrics[]): RunOutlierAnnotation[] => {
+  if (runs.length < 4) return [];
+
+  type NumericField = keyof Omit<ParsedRunMetrics, 'runId' | 'reportDate'>;
+  const numericFields: NumericField[] = ['messagesSent', 'booked', 'optOuts', 'replyRatePct', 'durationMs'];
+
+  const fences = new Map<NumericField, { q1: number; q3: number; iqr: number; lo: number; hi: number }>();
+  for (const field of numericFields) {
+    const values = runs
+      .map((r) => r[field])
+      .filter((v): v is number => v !== null && Number.isFinite(v as number));
+    if (values.length < 4) continue;
+    const sorted = [...values].sort((a, b) => a - b);
+    const q1 = iqrPercentile(sorted, 25);
+    const q3 = iqrPercentile(sorted, 75);
+    const iqr = q3 - q1;
+    if (iqr === 0) continue; // All values identical — no outliers possible
+    fences.set(field, { q1, q3, iqr, lo: q1 - 1.5 * iqr, hi: q3 + 1.5 * iqr });
+  }
+
+  const annotations: RunOutlierAnnotation[] = [];
+  for (const run of runs) {
+    const outlierFields: RunOutlierAnnotation['outlierFields'] = [];
+    for (const field of numericFields) {
+      const fence = fences.get(field);
+      if (!fence) continue;
+      const raw = run[field];
+      if (raw === null || !Number.isFinite(raw as number)) continue;
+      const v = raw as number;
+      if (v < fence.lo) {
+        outlierFields.push({ field, value: v, direction: 'low', q1: fence.q1, q3: fence.q3, iqr: fence.iqr, fence: fence.lo });
+      } else if (v > fence.hi) {
+        outlierFields.push({ field, value: v, direction: 'high', q1: fence.q1, q3: fence.q3, iqr: fence.iqr, fence: fence.hi });
+      }
+    }
+    if (outlierFields.length > 0) {
+      annotations.push({ runId: run.runId, outlierFields });
+    }
+  }
+  return annotations;
+};

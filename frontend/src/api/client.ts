@@ -51,6 +51,13 @@ const getCsrfToken = (): string | null => {
   }
 };
 
+type UnauthorizedHandler = () => void;
+let _unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export const setUnauthorizedHandler = (handler: UnauthorizedHandler): void => {
+  _unauthorizedHandler = handler;
+};
+
 export const apiFetch = async <T>(
   path: string,
   init: RequestInit & { token?: string } = {},
@@ -123,6 +130,9 @@ export const apiFetch = async <T>(
       typeof body === 'object' && body && 'error' in (body as Record<string, unknown>)
         ? String((body as Record<string, unknown>).error)
         : `Request failed (${res.status})`;
+    if (res.status === 401 && _unauthorizedHandler) {
+      _unauthorizedHandler();
+    }
     throw new ApiError(message, res.status, body);
   }
 

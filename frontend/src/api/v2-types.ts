@@ -12,6 +12,26 @@ export type ApiEnvelope<T> = {
   meta: ApiEnvelopeMeta;
 };
 
+export type UnattributedAuditRow = {
+  bookedCallId: string;
+  eventTs: string;
+  bucket: 'booked' | 'jack' | 'brandon' | 'selfBooked';
+  firstConversion: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  text: string | null;
+  bestFuzzyScore: number;
+  bestFuzzyCandidate: string | null;
+};
+
+export type BookedCredit = {
+  total: number;
+  /** Bookings by rep names or categories */
+  jack: number;
+  brandon: number;
+  selfBooked: number;
+};
+
 export type SalesMetricsV2 = {
   processing: {
     model: 'live_rolling_metrics';
@@ -34,12 +54,7 @@ export type SalesMetricsV2 = {
     canonicalBookedCalls: number;
     optOuts: number;
   };
-  bookedCredit: {
-    total: number;
-    jack: number;
-    brandon: number;
-    selfBooked: number;
-  };
+  bookedCredit: BookedCredit;
   trendByDay: Array<{
     day: string;
     messagesSent: number;
@@ -108,6 +123,7 @@ export type SalesMetricsV2 = {
       manualCalls: number;
       strictSmsReplyLinkedCalls?: number;
       nonSmsOrUnknownCalls?: number;
+      unattributedAuditRows?: UnattributedAuditRow[];
     };
   };
 };

@@ -1552,6 +1552,7 @@ const buildSalesMetricsPayload = async (params: {
           0,
           sequenceBookedAttribution.totals.totalCalls - sequenceBookedAttribution.totals.bookedAfterSmsReply,
         ),
+        unattributedAuditRows: sequenceBookedAttribution.unattributedAuditRows,
       },
       deprecations: {
         topSequencesBookedAlias: true,

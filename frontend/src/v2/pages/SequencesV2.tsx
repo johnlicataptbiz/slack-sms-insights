@@ -494,7 +494,11 @@ export default function SequencesV2() {
       </V2Panel>
 
       {/* ── Sequence Performance: Redesigned ── */}
-      <SequencePerformanceTable mergedRows={mergedRows} modeLabel={MODE_LABELS[mode]} />
+      <SequencePerformanceTable 
+        mergedRows={mergedRows} 
+        modeLabel={MODE_LABELS[mode]} 
+        unattributedAuditRows={salesMetrics?.provenance.sequenceBookedAttribution?.unattributedAuditRows}
+      />
 
       {/* ── Booking Attribution ── */}
       {(salesMetrics?.bookedCredit || monthlyBookings) && (
@@ -507,7 +511,7 @@ export default function SequencesV2() {
         >
           <BookingAttributionPanel
             bookedCredit={salesMetrics?.bookedCredit}
-            monthlyBookings={monthlyBookings}
+            attribution={salesMetrics?.provenance.sequenceBookedAttribution}
             modeLabel={MODE_LABELS[mode]}
             mode={mode}
           />

@@ -1,6 +1,7 @@
 import type { ChannelWithRunsRow, DailyRunRow } from '../services/daily-run-logger.js';
 import type { RunOutlierAnnotation } from '../services/daily-report-summary.js';
 import type { WeeklyManagerSummary } from '../services/weekly-manager-summary.js';
+import type { UnattributedAuditRow } from '../services/sequence-booked-attribution.js';
 
 export type RequestedMode = 'day' | 'range' | 'from-to';
 
@@ -116,6 +117,7 @@ export type SalesMetricsV2 = {
       manualCalls: number;
       strictSmsReplyLinkedCalls?: number;
       nonSmsOrUnknownCalls?: number;
+      unattributedAuditRows?: UnattributedAuditRow[];
     };
   };
 };
@@ -682,6 +684,7 @@ type SalesMetricsV1Compatible = {
       manualCalls: number;
       strictSmsReplyLinkedCalls?: number;
       nonSmsOrUnknownCalls?: number;
+      unattributedAuditRows?: UnattributedAuditRow[];
     };
   };
 };

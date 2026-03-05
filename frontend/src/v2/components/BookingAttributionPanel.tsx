@@ -1,91 +1,67 @@
+import { useNavigate } from 'react-router-dom';
+import type { BookedCredit, SalesMetricsV2 } from '../../api/v2-types';
 import { V2Panel } from './V2Primitives';
-
-const fmtInt = (n: number) => n.toLocaleString();
-
-interface BookedCredit {
-  total: number;
-  jack: number;
-  brandon: number;
-  selfBooked: number;
-}
-
-interface MonthlyBookings {
-  sequenceInitiated: number;
-  manualInitiated: number;
-  total: number;
-}
 
 interface BookingAttributionPanelProps {
   bookedCredit?: BookedCredit;
-  monthlyBookings?: MonthlyBookings;
+  attribution?: SalesMetricsV2['provenance']['sequenceBookedAttribution'];
   modeLabel: string;
   mode: string;
 }
 
-export function BookingAttributionPanel({
-  bookedCredit,
-  monthlyBookings,
-  modeLabel,
-  mode,
-}: BookingAttributionPanelProps) {
+export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel, mode }: BookingAttributionPanelProps) {
+  const navigate = useNavigate();
+
+  if (!bookedCredit) return null;
+
   return (
-    <>
-      {bookedCredit && (
-        <V2Panel
-          title={`Booking Attribution — ${modeLabel}`}
-          caption={`Rep split for the selected ${mode} window · Booked = Slack-verified`}
+    <V2Panel title="Booking Attribution" caption={`How ${modeLabel} bookings are being credited and sourced.`}>
+      <div className="V2SplitStat" style={{ marginBottom: '1.5rem' }}>
+        <div>
+          <span>Total Slack Bookings</span>
+          <strong>{attribution?.totalCalls ?? bookedCredit.total}</strong>
+        </div>
+        <div>
+          <span>Matched to Sequence</span>
+          <strong>{attribution?.matchedCalls ?? '—'}</strong>
+        </div>
+        <div>
+          <span>Manual / Direct</span>
+          <strong>{attribution?.manualCalls ?? '—'}</strong>
+        </div>
+        <div style={{ color: (attribution?.unattributedCalls ?? 0) > 0 ? 'var(--v2-warning)' : 'inherit' }}>
+          <span>Unattributed Gaps</span>
+          <strong>{attribution?.unattributedCalls ?? 0}</strong>
+        </div>
+      </div>
+
+      <div className="V2ActionRow">
+        <button 
+          type="button"
+          className="V2Btn" 
+          onClick={() => navigate('/v2/attribution')}
+          title="See detailed audit of every booked call and its attribution path."
         >
-          <div className="V2SeqAttribution">
-            <div className="V2SeqAttribution__grid">
-              <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
-                <span className="V2SeqAttribution__label">Total Booked</span>
-                <span className="V2SeqAttribution__value">{fmtInt(bookedCredit.total)}</span>
-              </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">Jack</span>
-                <span className="V2SeqAttribution__value">{fmtInt(bookedCredit.jack)}</span>
-              </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">Brandon</span>
-                <span className="V2SeqAttribution__value">{fmtInt(bookedCredit.brandon)}</span>
-              </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">Self-Booked</span>
-                <span className="V2SeqAttribution__value">{fmtInt(bookedCredit.selfBooked)}</span>
-              </div>
+          View Attribution Deep Dive
+        </button>
+      </div>
+
+      <div className="V2Divider" style={{ margin: '1.5rem 0', height: '1px', background: 'var(--v2-border)' }} />
+
+      <h4 style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--v2-text-dim)', marginBottom: '0.75rem' }}>
+        Rep Credits ({modeLabel})
+      </h4>
+      <div className="V2RepSplits">
+        {Object.entries(bookedCredit).map(([rep, count]) => {
+          if (rep === 'total') return null;
+          return (
+            <div key={rep} className="V2RepStat">
+              <span className="V2RepStat__name" style={{ textTransform: 'capitalize' }}>{rep}</span>
+              <span className="V2RepStat__count">{count}</span>
             </div>
-            <p className="V2SeqAttribution__note">
-              Rep split reflects the selected {mode} rolling window. Booked = Slack-verified bookings channel.
-            </p>
-          </div>
-        </V2Panel>
-      )}
-      {monthlyBookings && (
-        <V2Panel
-          title="Channel Attribution — Monthly"
-          caption="Sequence-initiated vs direct outreach · always monthly scoreboard window (channel split not available per rolling window)"
-        >
-          <div className="V2SeqAttribution">
-            <div className="V2SeqAttribution__grid">
-              <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
-                <span className="V2SeqAttribution__label">From Sequences</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
-              </div>
-              <div className="V2SeqAttribution__item">
-                <span className="V2SeqAttribution__label">From Direct Outreach</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
-              </div>
-              <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
-                <span className="V2SeqAttribution__label">Total (month)</span>
-                <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.total)}</span>
-              </div>
-            </div>
-            <p className="V2SeqAttribution__note">
-              A sequence gets credit when it started the first outbound contact with a lead, even if manual follow-ups came before the booking.
-            </p>
-          </div>
-        </V2Panel>
-      )}
-    </>
+          );
+        })}
+      </div>
+    </V2Panel>
   );
 }

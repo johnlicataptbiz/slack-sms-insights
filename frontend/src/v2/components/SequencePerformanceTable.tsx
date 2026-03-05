@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { UnattributedAuditRow } from '../../api/v2-types';
 import { V2Panel, V2State } from './V2Primitives';
 
 // Formatting utilities
@@ -31,7 +32,7 @@ export interface MergedSeqRow {
 }
 
 const parseVersionParts = (value: string): number[] | null => {
-  const match = value.toLowerCase().match(/v(\d+(?:\.\d+)*)/);
+  const match = value.toLowerCase().match(/v?(\d+(?:\.\d+)*)/);
   if (!match) return null;
   const raw = match[1] ?? '';
   if (!raw) return null;
@@ -56,26 +57,49 @@ const compareVersionParts = (a: number[] | null, b: number[] | null): number => 
 };
 
 const extractVersionDisplay = (label: string): string => {
-  const match = label.match(/\b(v\d+(?:\.\d+)+)\b/i);
-  return match?.[1] ?? '';
+  const match = label.match(/(?:v)?(\d+(?:\.\d+)+)/i);
+  return match?.[0] ?? '';
 };
+
+interface StatDeltaProps {
+  current: number;
+  previous: number;
+  isPct?: boolean;
+}
+
+function StatDelta({ current, previous, isPct = true }: StatDeltaProps) {
+  if (!previous || previous === 0) return null;
+  const diff = current - previous;
+  const isPositive = diff > 0;
+  const symbol = isPositive ? '+' : '';
+  
+  return (
+    <span className={`V2Delta ${isPositive ? 'V2Delta--positive' : 'V2Delta--negative'}`}>
+      {symbol}{isPct ? diff.toFixed(1) : diff.toLocaleString()}{isPct ? '%' : ''}
+    </span>
+  );
+}
 
 interface SequencePerformanceTableProps {
   mergedRows: MergedSeqRow[];
+  unattributedAuditRows?: UnattributedAuditRow[];
   modeLabel: string;
 }
 
-function SequenceFamilyGroup({ family, familyRows }: { family: string; familyRows: MergedSeqRow[] }) {
+function SequenceFamilyGroup({ 
+  family, 
+  familyRows, 
+  unattributedAuditRows = [] 
+}: { 
+  family: string; 
+  familyRows: MergedSeqRow[];
+  unattributedAuditRows?: UnattributedAuditRow[];
+}) {
   const {
     sortedVersions,
-    totalContacts,
-    totalReplied,
-    totalBooked,
-    totalSent,
     avgReplyRate,
     avgBookingRate,
     hasMultipleVersions,
-    confidenceLevel,
   } = useMemo(() => {
     const sorted = [...familyRows].sort((a, b) => {
       const aVer = parseVersionParts(extractVersionDisplay(a.label) || a.version);
@@ -90,161 +114,148 @@ function SequenceFamilyGroup({ family, familyRows }: { family: string; familyRow
     const replyRate = sent > 0 ? (replied / sent) * 100 : 0;
     const bookingRate = contacts > 0 ? (booked / contacts) * 100 : 0;
     const multipleVersions = familyRows.length > 1;
-    const isHighConfidence = contacts >= 200 || sent >= 400;
-    const confLevel = isHighConfidence ? 'high' : contacts >= 75 || sent >= 150 ? 'medium' : 'low';
 
     return {
       sortedVersions: sorted,
-      totalContacts: contacts,
-      totalReplied: replied,
-      totalBooked: booked,
-      totalSent: sent,
       avgReplyRate: replyRate,
       avgBookingRate: bookingRate,
       hasMultipleVersions: multipleVersions,
-      confidenceLevel: confLevel,
     };
   }, [familyRows]);
 
+  // Find the "Champion" (best booking rate with enough volume)
+  const championLabel = useMemo(() => {
+    let best = -1;
+    let winner = '';
+    familyRows.forEach(r => {
+      if (r.uniqueContacted >= 50 && r.bookingRatePct > best) {
+        best = r.bookingRatePct;
+        winner = r.label;
+      }
+    });
+    return winner;
+  }, [familyRows]);
+
   return (
-    <div style={{ border: '1px solid var(--v2-border)', borderRadius: '10px', overflow: 'hidden', background: 'var(--v2-bg)' }}>
-      {/* Family Header */}
-      <div style={{ background: 'var(--v2-bg-subtle)', padding: '1rem 1.25rem', borderBottom: '1px solid var(--v2-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--v2-text)' }}>{family}</h3>
-          <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
-            {familyRows.length} version{familyRows.length > 1 ? 's' : ''}
-          </span>
-        </div>
-
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-          {/* Reply Rate */}
-          <div style={{ textAlign: 'center', minWidth: '70px' }}>
-            <div style={{ fontSize: '1.35rem', fontWeight: 700, color: avgReplyRate >= 10 ? 'var(--v2-positive)' : avgReplyRate < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)' }}>
-              {fmtPct(avgReplyRate)}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Reply Rate
-            </div>
-            <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-              {fmtInt(totalReplied)}/{fmtInt(totalSent)} sent
-            </div>
-          </div>
-
-          {/* Booking Rate */}
-          <div style={{ textAlign: 'center', minWidth: '70px' }}>
-            <div style={{ fontSize: '1.35rem', fontWeight: 700, color: avgBookingRate >= 2 ? 'var(--v2-positive)' : 'var(--v2-text)' }}>
-              {fmtPct(avgBookingRate)}
-            </div>
-            <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Booking Rate
-            </div>
-            <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-              {fmtInt(totalBooked)}/{fmtInt(totalContacts)} contacts
-            </div>
-          </div>
-
-          {/* Confidence Badge */}
-          <div style={{ textAlign: 'center' }}>
-            <span className={`V2Badge ${confidenceLevel === 'high' ? 'V2Badge--confidenceHigh' : confidenceLevel === 'medium' ? 'V2Badge--confidenceMed' : 'V2Badge--confidenceLow'}`}>
-              {confidenceLevel === 'high' ? 'High confidence' : confidenceLevel === 'medium' ? 'Medium' : 'Low sample'}
+    <div className="V2Panel V2Panel--nested" style={{ border: '1px solid var(--v2-border)', borderRadius: '12px', background: 'rgba(255,255,255,0.01)', overflow: 'hidden' }}>
+      {/* Group Header */}
+      <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--v2-border)', background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{family}</h3>
+            <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
+              {familyRows.length} Iterations in Family
             </span>
-            <div style={{ fontSize: '0.6rem', color: 'var(--v2-text-dim)', marginTop: '2px' }}>
-              {confidenceLevel === 'high' ? '200+ contacts' : confidenceLevel === 'medium' ? '75+ contacts' : 'small dataset'}
+          </div>
+          <div style={{ display: 'flex', gap: '2rem' }}>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--v2-accent)' }}>{fmtPct(avgReplyRate)}</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase' }}>Avg Reply</div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: avgBookingRate > 0 ? 'var(--v2-positive)' : 'var(--v2-text-dim)' }}>{fmtPct(avgBookingRate)}</div>
+              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase' }}>Avg Booked</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Version Rows */}
-      <div>
-        {sortedVersions.map((row, idx) => {
-          const replyRate = row.messagesSent > 0 ? (row.repliesReceived / row.messagesSent) * 100 : 0;
-          const bookingRate = row.uniqueContacted > 0 ? (row.canonicalBookedCalls / row.uniqueContacted) * 100 : 0;
-          const versionLabel = extractVersionDisplay(row.label) || row.version || 'Legacy';
-          const isWinning = hasMultipleVersions && idx === 0;
-          return (
-            <div
-              key={row.label}
-              style={{
-                padding: '0.75rem 1.25rem',
-                borderBottom: idx < sortedVersions.length - 1 ? '1px solid var(--v2-border)' : 'none',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: '0.75rem',
-                background: isWinning ? 'rgba(34, 197, 94, 0.04)' : undefined,
-              }}
-            >
-              {/* Version & Volume Info */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '180px' }}>
-                <span className="V2Badge V2Badge--version" style={{ fontSize: '0.8rem' }}>
-                  {versionLabel}
-                </span>
-                {isWinning && (
-                  <span className="V2Badge" style={{ background: 'var(--v2-positive)', color: 'white', fontSize: '0.7rem' }}>
-                    TOP
-                  </span>
-                )}
-                <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
-                  {fmtInt(row.messagesSent)} sent
-                </span>
-              </div>
+      {/* Rows */}
+      <table className="V2Table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--v2-text-dim)', textAlign: 'left', borderBottom: '1px solid var(--v2-border)' }}>
+            <th style={{ padding: '0.75rem 1.25rem' }}>Version / Status</th>
+            <th>Volume</th>
+            <th>Reply Rate</th>
+            <th>Booking Rate</th>
+            <th>Opt-Outs</th>
+            <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>Gaps</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedVersions.map((row, idx) => {
+            const prevVersion = sortedVersions[idx + 1];
+            const versionLabel = extractVersionDisplay(row.label) || row.version || 'v?';
+            const isExperimental = idx === 0 && hasMultipleVersions;
+            const isChampion = row.label === championLabel;
+            
+            // Link Gaps
+            const gaps = unattributedAuditRows.filter(g => g.bestFuzzyCandidate === row.label);
 
-              {/* Metrics */}
-              <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                {/* Reply */}
-                <div style={{ minWidth: '70px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: replyRate >= 10 ? 'var(--v2-positive)' : replyRate < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)' }}>
-                    {fmtPct(replyRate)}
+            return (
+              <tr key={row.label} style={{ borderBottom: idx < sortedVersions.length -1 ? '1px solid var(--v2-border)' : 'none' }}>
+                <td style={{ padding: '1rem 1.25rem' }}>
+                  <div className="V2ExperimentMeta">
+                    <span className="V2ExperimentMeta__version">{versionLabel}</span>
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {isChampion && <span className="V2Badge V2Badge--champion">Champion</span>}
+                      {isExperimental && <span className="V2Badge V2Badge--experimental">Latest</span>}
+                      {row.uniqueContacted > 0 && row.uniqueContacted < 50 && <span className="V2Badge V2Badge--confidenceLow">Low Sample</span>}
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-                    {fmtInt(row.repliesReceived)} replies
-                  </div>
-                </div>
-
-                {/* Booking */}
-                <div style={{ minWidth: '70px' }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: bookingRate >= 2 ? 'var(--v2-positive)' : 'var(--v2-text)' }}>
-                    {fmtPct(bookingRate)}
-                  </div>
-                  <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-                    {fmtInt(row.canonicalBookedCalls)} booked
-                  </div>
-                </div>
-
-                {/* Rep Attribution */}
-                <div style={{ minWidth: '80px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  {row.canonicalBookedJack > 0 && (
-                    <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
-                      J:{row.canonicalBookedJack}
+                </td>
+                <td>
+                  <div style={{ fontWeight: 500 }}>{fmtInt(row.uniqueContacted)} <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.75rem' }}>leads</span></div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{fmtInt(row.messagesSent)} msgs</div>
+                </td>
+                <td>
+                  <div className="V2StatComparison">
+                    <span className="V2Table__cell--main-metric" style={{ color: row.replyRatePct >= 10 ? 'var(--v2-positive)' : 'inherit' }}>
+                      {fmtPct(row.replyRatePct)}
                     </span>
-                  )}
-                  {row.canonicalBookedBrandon > 0 && (
-                    <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
-                      B:{row.canonicalBookedBrandon}
+                    <StatDelta current={row.replyRatePct} previous={prevVersion?.replyRatePct ?? 0} />
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{fmtInt(row.repliesReceived)} interactions</div>
+                </td>
+                <td>
+                  <div className="V2StatComparison">
+                    <span className="V2Table__cell--main-metric" style={{ color: row.bookingRatePct >= 2 ? 'var(--v2-positive)' : 'inherit' }}>
+                      {fmtPct(row.bookingRatePct)}
                     </span>
+                    <StatDelta current={row.bookingRatePct} previous={prevVersion?.bookingRatePct ?? 0} />
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', display: 'flex', gap: '8px' }}>
+                    <span>{fmtInt(row.canonicalBookedCalls)} calls</span>
+                    {(row.canonicalBookedJack > 0 || row.canonicalBookedBrandon > 0 || row.canonicalBookedSelf > 0) && (
+                      <span style={{ color: 'var(--v2-text-dim)', opacity: 0.8 }}>
+                        ({[
+                          row.canonicalBookedJack > 0 && `J:${row.canonicalBookedJack}`,
+                          row.canonicalBookedBrandon > 0 && `B:${row.canonicalBookedBrandon}`,
+                          row.canonicalBookedSelf > 0 && `S:${row.canonicalBookedSelf}`
+                        ].filter(Boolean).join(' ')})
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <div style={{ color: row.optOutRatePct >= 6 ? 'var(--v2-warning)' : 'inherit' }}>
+                    {fmtPct(row.optOutRatePct)}
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{row.optOuts} total</div>
+                </td>
+                <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                  {gaps.length > 0 ? (
+                    <div className="V2Table__cell--gap-warning" title={`${gaps.length} booked calls almost matched this version but were below the fuzzy threshold.`}>
+                      ⚠️ {gaps.length} Gaps
+                    </div>
+                  ) : (
+                    <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.8rem' }}>—</span>
                   )}
-                  {row.canonicalBookedSelf > 0 && (
-                    <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
-                      S:{row.canonicalBookedSelf}
-                    </span>
-                  )}
-                  {row.canonicalBookedCalls === 0 && (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>—</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
 
-export function SequencePerformanceTable({ mergedRows, modeLabel }: SequencePerformanceTableProps) {
+export function SequencePerformanceTable({ 
+  mergedRows, 
+  modeLabel, 
+  unattributedAuditRows = [] 
+}: SequencePerformanceTableProps & { unattributedAuditRows?: UnattributedAuditRow[] }) {
   const { familyEntries, activeSequenceCount, uniqueFamilyCount } = useMemo(() => {
     const filteredRows = mergedRows.filter((r) => !r.isManual);
 
@@ -258,7 +269,7 @@ export function SequencePerformanceTable({ mergedRows, modeLabel }: SequencePerf
     return {
       familyEntries: Object.entries(grouped),
       activeSequenceCount: filteredRows.length,
-      uniqueFamilyCount: new Set(mergedRows.map((r) => r.leadMagnet || 'Not Captured Yet')).size,
+      uniqueFamilyCount: Object.keys(grouped).length,
     };
   }, [mergedRows]);
 
@@ -272,12 +283,17 @@ export function SequencePerformanceTable({ mergedRows, modeLabel }: SequencePerf
 
   return (
     <V2Panel
-      title="Sequence Performance"
-      caption={`${activeSequenceCount} sequences across ${uniqueFamilyCount} lead magnets · ${modeLabel} · Booked = Slack-verified`}
+      title="Sequence Performance Dashboard"
+      caption={`Iterative tracking across ${uniqueFamilyCount} sequence families · ${modeLabel} · Booked = Slack-verified`}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         {familyEntries.map(([family, familyRows]) => (
-          <SequenceFamilyGroup key={family} family={family} familyRows={familyRows} />
+          <SequenceFamilyGroup 
+            key={family} 
+            family={family} 
+            familyRows={familyRows} 
+            unattributedAuditRows={unattributedAuditRows}
+          />
         ))}
       </div>
     </V2Panel>

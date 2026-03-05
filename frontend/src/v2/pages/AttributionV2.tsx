@@ -4,6 +4,7 @@ import { useV2SalesMetrics } from '../../api/v2Queries';
 import { resolveCurrentBusinessDay, shiftIsoDay } from '../../utils/runDay';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
 import { v2Copy } from '../copy';
+import { UnattributedAuditTable } from '../components/UnattributedAuditTable';
 
 const BUSINESS_TZ = 'America/Chicago';
 
@@ -74,6 +75,10 @@ export default function AttributionV2() {
           </div>
         </div>
       </V2Panel>
+
+      {payload.provenance.sequenceBookedAttribution?.unattributedAuditRows && (
+        <UnattributedAuditTable rows={payload.provenance.sequenceBookedAttribution.unattributedAuditRows} />
+      )}
     </div>
   );
 }

@@ -51,8 +51,24 @@ export type SequenceBookedBreakdown = {
   auditRows: SequenceBookedAuditRow[];
 };
 
+export type UnattributedAuditRow = {
+  bookedCallId: string;
+  eventTs: string;
+  bucket: BookedCallAttributionBucket;
+  firstConversion: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  text: string | null;
+  /** Best fuzzy score achieved — tells you how close it came to matching. */
+  bestFuzzyScore: number;
+  /** Label that got the best fuzzy score (even if below threshold). */
+  bestFuzzyCandidate: string | null;
+};
+
 export type SequenceBookedAttributionResult = {
   byLabel: Map<string, SequenceBookedBreakdown>;
+  /** Calls that failed both fuzzy and SMS phone match — useful for debugging attribution gaps. */
+  unattributedAuditRows: UnattributedAuditRow[];
   totals: {
     totalCalls: number;
     matchedCalls: number;
@@ -176,9 +192,9 @@ const emptyBreakdown = (): SequenceBookedBreakdown => ({
 const resolveSequenceLabel = (
   firstConversion: string | null,
   candidates: CandidateSequence[],
-): { label: string | null; manual: boolean } => {
+): { label: string | null; manual: boolean; bestScore: number; bestCandidate: string | null } => {
   const raw = (firstConversion || '').trim();
-  if (!raw) return { label: null, manual: false };
+  if (!raw) return { label: null, manual: false, bestScore: 0, bestCandidate: null };
 
   let bestLabel: string | null = null;
   let bestScore = 0;
@@ -205,17 +221,17 @@ const resolveSequenceLabel = (
   }
 
   if (bestLabel && bestScore >= 0.34) {
-    return { label: bestLabel, manual: bestLabel === MANUAL_SEQUENCE_LABEL };
+    return { label: bestLabel, manual: bestLabel === MANUAL_SEQUENCE_LABEL, bestScore, bestCandidate: bestLabel };
   }
 
   // Only classify as manual/direct if no sequence matched AND the text looks like a meeting link.
   // Checked AFTER fuzzy matching so that a firstConversion like "Hiring Guide - discovery call"
   // is attributed to the Hiring Guide sequence rather than being discarded as manual.
   if (MEETING_LINK_PATTERN.test(raw)) {
-    return { label: MANUAL_SEQUENCE_LABEL, manual: true };
+    return { label: MANUAL_SEQUENCE_LABEL, manual: true, bestScore, bestCandidate: bestLabel };
   }
 
-  return { label: null, manual: false };
+  return { label: null, manual: false, bestScore, bestCandidate: bestLabel };
 };
 
 export const attributeSlackBookedCallsToSequences = (
@@ -241,6 +257,7 @@ export const attributeSlackBookedCallsToSequences = (
   }
 
   const byLabel = new Map<string, SequenceBookedBreakdown>();
+  const unattributedAuditRows: UnattributedAuditRow[] = [];
   const totals = {
     totalCalls: 0,
     matchedCalls: 0,
@@ -286,6 +303,17 @@ export const attributeSlackBookedCallsToSequences = (
 
     if (!resolvedLabel) {
       totals.unattributedCalls += 1;
+      unattributedAuditRows.push({
+        bookedCallId: call.bookedCallId,
+        eventTs: call.eventTs,
+        bucket: call.bucket,
+        firstConversion: call.firstConversion,
+        contactName: call.contactName,
+        contactPhone: call.contactPhone,
+        text: call.text,
+        bestFuzzyScore: fuzzyResolved.bestScore,
+        bestFuzzyCandidate: fuzzyResolved.bestCandidate,
+      });
       continue;
     }
 
@@ -325,5 +353,5 @@ export const attributeSlackBookedCallsToSequences = (
     else totals.fuzzyTextMatchedCalls += 1;
   }
 
-  return { byLabel, totals };
+  return { byLabel, unattributedAuditRows, totals };
 };

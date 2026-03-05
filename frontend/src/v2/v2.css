@@ -502,6 +502,7 @@
   line-height: 1.2;
   color: var(--v2-text);
   cursor: pointer;
+  -webkit-user-select: none;
   user-select: none;
 }
 
@@ -6795,3 +6796,413 @@ display: inline-block;
   background: rgba(17, 184, 214, 0.16);
   color: var(--v2-accent);
 }
+
+/* ─── Unattributed Audit Table ────────────────────────────────────────────── */
+
+.V2Table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.V2Table th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid var(--v2-border);
+  color: var(--v2-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+}
+
+.V2Table td {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--v2-border);
+  vertical-align: top;
+}
+
+.V2Table tr:hover td {
+  background: rgba(17, 184, 214, 0.03);
+}
+
+.V2Badge--booked {
+  background: rgba(19, 185, 129, 0.12);
+  color: var(--v2-positive);
+}
+
+.V2Badge--jack {
+  background: rgba(17, 184, 214, 0.12);
+  color: var(--v2-accent);
+}
+
+.V2Badge--brandon {
+  background: rgba(245, 157, 13, 0.12);
+  color: var(--v2-warning);
+}
+
+.V2Badge--selfBooked {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+}
+
+.V2TableWrapper {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.V2DateWrap, .V2ContactWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.V2DateWrap__date {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.V2DateWrap__time, .V2ContactWrap__phone {
+  font-size: 0.7rem;
+  color: var(--v2-text-dim);
+}
+
+.V2ContactWrap__name {
+  font-weight: 600;
+}
+
+.V2AuditText {
+  font-size: 0.75rem;
+  color: var(--v2-text-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.25;
+  max-width: 320px;
+}
+
+.V2FuzzyCandidate {
+  font-size: 0.75rem;
+  color: var(--v2-accent);
+  font-weight: 500;
+}
+
+.V2Score {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--v2-text-dim);
+}
+
+.V2Score--high {
+  color: var(--v2-warning);
+}
+
+.V2ActionRow {
+  margin-bottom: 1rem;/* Experiment Dashboard Styles */
+.V2Delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.V2Delta--positive {
+  color: #4cb782;
+}
+
+.V2Delta--negative {
+  color: #e66666;
+}
+
+.V2Badge--champion {
+  background: var(--v2-accent-200);
+  color: var(--v2-accent-800);
+  border: 1px solid var(--v2-accent-400);
+}
+
+.V2Badge--experimental {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffe0b2;
+}
+
+.V2Badge--low-sample {
+  background: #f5f5f5;
+  color: #757575;
+  border: 1px solid #e0e0e0;
+}
+
+.V2Table__cell--gap-warning {
+  color: #e65100;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.V2Table__row--highlight {
+  background-color: rgba(60, 131, 246, 0.05) !important;
+}
+
+.V2Table__row--version {
+  border-left: 3px solid transparent;
+}
+
+.V2Table__row--version.V2Table__row--active {
+  border-left-color: var(--v2-accent);
+}
+
+.V2RepSplits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.V2RepStat {
+  display: flex;
+  flex-direction: column;
+  background: var(--v2-base-200);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--v2-radius-md);
+  border: 1px solid var(--v2-border);
+  min-width: 80px;
+}
+
+.V2RepStat__name {
+  font-size: 0.7rem;
+  color: var(--v2-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.V2RepStat__count {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--v2-text);
+}
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* Experiment Dashboard Styles */
+.V2Delta {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.V2Delta--positive {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.V2Delta--negative {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.V2Badge--champion {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.V2Badge--experimental {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.V2Badge--active-run {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.V2Table__cell--gap-warning {
+  color: #f59e0b;
+  cursor: help;
+}
+
+.V2Table__cell--main-metric {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.V2Table__row--family-header {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.V2Table__row--family-header td {
+  border-bottom: 2px solid var(--v2-border);
+  padding: 1rem 0.8rem !important;
+}
+
+.V2StatComparison {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.V2ExperimentMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.V2ExperimentMeta__version {
+  font-family: var(--v2-font-mono);
+  font-weight: 700;
+  color: var(--v2-text-bright);
+}
+
+.V2TableWrapper {
+  overflow-x: auto;
+  margin-top: 1rem;
+}
+
+.V2DateWrap, .V2ContactWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.V2DateWrap__date {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.V2DateWrap__time, .V2ContactWrap__phone {
+  font-size: 0.7rem;
+  color: var(--v2-text-dim);
+}
+
+.V2ContactWrap__name {
+  font-weight: 600;
+}
+
+.V2AuditText {
+  font-size: 0.75rem;
+  color: var(--v2-text-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.25;
+  max-width: 320px;
+}
+
+.V2FuzzyCandidate {
+  font-size: 0.75rem;
+  color: var(--v2-accent);
+  font-weight: 500;
+}
+
+.V2Score {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--v2-text-dim);
+}
+
+.V2Score--high {
+  color: var(--v2-warning);
+}
+
+.V2ActionRow {
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 1rem;
+}
+
+/* Experiment Dashboard Styles */
+.V2Delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.V2Delta--positive {
+  color: #4cb782;
+}
+
+.V2Delta--negative {
+  color: #e66666;
+}
+
+.V2Badge--champion {
+  background: var(--v2-accent-200);
+  color: var(--v2-accent-800);
+  border: 1px solid var(--v2-accent-400);
+}
+
+.V2Badge--experimental {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffe0b2;
+}
+
+.V2Badge--low-sample {
+  background: #f5f5f5;
+  color: #757575;
+  border: 1px solid #e0e0e0;
+}
+
+.V2Table__cell--gap-warning {
+  color: #e65100;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.V2Table__row--highlight {
+  background-color: rgba(60, 131, 246, 0.05) !important;
+}
+
+.V2Table__row--version {
+  border-left: 3px solid transparent;
+}
+
+.V2Table__row--version.V2Table__row--active {
+  border-left-color: var(--v2-accent);
+}
+
+.V2RepSplits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.V2RepStat {
+  display: flex;
+  flex-direction: column;
+  background: var(--v2-base-200);
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--v2-radius-md);
+  border: 1px solid var(--v2-border);
+  min-width: 80px;
+}
+
+.V2RepStat__name {
+  font-size: 0.7rem;
+  color: var(--v2-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.V2RepStat__count {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--v2-text);
+}
+

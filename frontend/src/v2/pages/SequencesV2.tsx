@@ -8,6 +8,10 @@ import {
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import type { SalesMetricsV2 } from '../../api/v2-types';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline } from '../components/V2Primitives';
+import { SequencePerformanceTable, type MergedSeqRow } from '../components/SequencePerformanceTable';
+import { CompliancePanel } from '../components/CompliancePanel';
+import { TimingPanel } from '../components/TimingPanel';
+import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
 
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
@@ -36,16 +40,6 @@ const fmtMins = (n: number | null): string => {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 };
 
-
-/**
- * Extract a display version string (e.g. "v1.2") from a sequence label.
- * Used in the Version column so we show the actual version number instead of
- * the internal "Legacy" classification tag.
- */
-const extractVersionDisplay = (label: string): string => {
-  const match = label.match(/\b(v\d+(?:\.\d+)+)\b/i);
-  return match?.[1] ?? '';
-};
 
 const normalizeSequenceLabel = (label: string): string => label.trim().replace(/\s+/g, ' ').toLowerCase();
 
@@ -151,59 +145,6 @@ function ExecutiveSection({
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 type AuditRow = SalesMetricsV2['sequences'][0]['bookedAuditRows'][0];
-
-type MergedSeqRow = {
-  label: string;
-  leadMagnet: string;
-  // metadata from scoreboard (window-independent)
-  version: string;
-  // all numeric fields from sales-metrics (respects mode toggle)
-  firstSeenAt: string | null;
-  messagesSent: number;
-  uniqueContacted: number;
-  repliesReceived: number;
-  replyRatePct: number;
-  canonicalBookedCalls: number;
-  bookingRatePct: number;
-  canonicalBookedAfterSmsReply: number;
-  canonicalBookedJack: number;
-  canonicalBookedBrandon: number;
-  canonicalBookedSelf: number;
-  optOuts: number;
-  optOutRatePct: number;
-  bookedAuditRows: AuditRow[];
-  diagnosticSmsBookingSignals: number;
-  isManual: boolean;
-  // from scoreboard metadata
-  uniqueReplied: number;
-  // pre-computed derived fields
-  smsReplyPct: number | null;
-};
-
-const parseVersionParts = (value: string): number[] | null => {
-  const match = value.toLowerCase().match(/v(\d+(?:\.\d+)*)/);
-  if (!match) return null;
-  const raw = match[1] ?? '';
-  if (!raw) return null;
-  const parts = raw
-    .split('.')
-    .map((part) => Number(part))
-    .filter((part) => Number.isFinite(part));
-  return parts.length > 0 ? parts : null;
-};
-
-const compareVersionParts = (a: number[] | null, b: number[] | null): number => {
-  if (!a && !b) return 0;
-  if (!a) return -1;
-  if (!b) return 1;
-  const maxLen = Math.max(a.length, b.length);
-  for (let i = 0; i < maxLen; i += 1) {
-    const av = a[i] ?? 0;
-    const bv = b[i] ?? 0;
-    if (av !== bv) return av - bv;
-  }
-  return 0;
-};
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -343,24 +284,6 @@ export default function SequencesV2() {
       manualReplyRatePct: salesMetrics?.totals?.manualReplyRatePct ?? 0,
     };
   }, [mergedRows, salesMetrics]);
-
-  // Group sequences by lead magnet family
-  const sequencesByFamily = useMemo(() => {
-    return mergedRows
-      .filter(r => !r.isManual)
-      .reduce((acc, row) => {
-        const family = row.leadMagnet || NOT_CAPTURED_LABEL;
-        if (!acc[family]) {
-          acc[family] = [];
-        }
-        acc[family].push(row);
-        return acc;
-      }, {} as Record<string, MergedSeqRow[]>);
-  }, [mergedRows]);
-
-  const familyEntries = Object.entries(sequencesByFamily);
-  const activeSequenceCount = mergedRows.filter(r => !r.isManual).length;
-  const uniqueFamilyCount = new Set(mergedRows.map(r => r.leadMagnet || NOT_CAPTURED_LABEL)).size;
 
   const monthlyBookings = scoreboard?.monthly.bookings;
   const compliance = scoreboard?.compliance;
@@ -568,198 +491,7 @@ export default function SequencesV2() {
       </V2Panel>
 
       {/* ── Sequence Performance: Redesigned ── */}
-      {activeSequenceCount === 0 ? (
-        <V2Panel
-          title="Sequence Performance"
-          caption={`${MODE_LABELS[mode]} · Booked = Slack-verified`}
-        >
-          <V2State kind="empty">No sequence data for this window.</V2State>
-        </V2Panel>
-      ) : (
-        <V2Panel
-          title="Sequence Performance"
-          caption={`${activeSequenceCount} sequences across ${uniqueFamilyCount} lead magnets · ${MODE_LABELS[mode]} · Booked = Slack-verified`}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {familyEntries.map(([family, familyRows]) => {
-              const sortedVersions = [...familyRows].sort((a, b) => {
-                const aVer = parseVersionParts(extractVersionDisplay(a.label) || a.version);
-                const bVer = parseVersionParts(extractVersionDisplay(b.label) || b.version);
-                return compareVersionParts(bVer, aVer);
-              });
-              
-              const totalContacts = familyRows.reduce((s, r) => s + r.uniqueContacted, 0);
-              const totalReplied = familyRows.reduce((s, r) => s + r.repliesReceived, 0);
-              const totalBooked = familyRows.reduce((s, r) => s + r.canonicalBookedCalls, 0);
-              const totalSent = familyRows.reduce((s, r) => s + r.messagesSent, 0);
-              const avgReplyRate = totalSent > 0 ? (totalReplied / totalSent) * 100 : 0;
-              const avgBookingRate = totalContacts > 0 ? (totalBooked / totalContacts) * 100 : 0;
-              const hasMultipleVersions = familyRows.length > 1;
-              const isHighConfidence = totalContacts >= 200 || totalSent >= 400;
-              const confidenceLevel = isHighConfidence ? 'high' : totalContacts >= 75 || totalSent >= 150 ? 'medium' : 'low';
-
-              return (
-                <div key={family} style={{ 
-                  border: '1px solid var(--v2-border)', 
-                  borderRadius: '10px',
-                  overflow: 'hidden',
-                  background: 'var(--v2-bg)'
-                }}>
-                  {/* Family Header - Aggregate Stats */}
-                  <div style={{ 
-                    background: 'var(--v2-bg-subtle)', 
-                    padding: '1rem 1.25rem',
-                    borderBottom: '1px solid var(--v2-border)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '0.75rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: 'var(--v2-text)' }}>{family}</h3>
-                      <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
-                        {familyRows.length} version{familyRows.length > 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    
-                    <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-                      {/* Reply Rate */}
-                      <div style={{ textAlign: 'center', minWidth: '70px' }}>
-                        <div style={{ 
-                          fontSize: '1.35rem', 
-                          fontWeight: 700, 
-                          color: avgReplyRate >= 10 ? 'var(--v2-positive)' : avgReplyRate < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)' 
-                        }}>
-                          {fmtPct(avgReplyRate)}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Reply Rate
-                        </div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-                          {fmtInt(totalReplied)}/{fmtInt(totalSent)} sent
-                        </div>
-                      </div>
-
-                      {/* Booking Rate */}
-                      <div style={{ textAlign: 'center', minWidth: '70px' }}>
-                        <div style={{ 
-                          fontSize: '1.35rem', 
-                          fontWeight: 700, 
-                          color: avgBookingRate >= 2 ? 'var(--v2-positive)' : 'var(--v2-text)' 
-                        }}>
-                          {fmtPct(avgBookingRate)}
-                        </div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                          Booking Rate
-                        </div>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-                          {fmtInt(totalBooked)}/{fmtInt(totalContacts)} contacts
-                        </div>
-                      </div>
-
-                      {/* Confidence Badge */}
-                      <div style={{ textAlign: 'center' }}>
-                        <span className={`V2Badge ${confidenceLevel === 'high' ? 'V2Badge--confidenceHigh' : confidenceLevel === 'medium' ? 'V2Badge--confidenceMed' : 'V2Badge--confidenceLow'}`}>
-                          {confidenceLevel === 'high' ? 'High confidence' : confidenceLevel === 'medium' ? 'Medium' : 'Low sample'}
-                        </span>
-                        <div style={{ fontSize: '0.6rem', color: 'var(--v2-text-dim)', marginTop: '2px' }}>
-                          {confidenceLevel === 'high' ? '200+ contacts' : confidenceLevel === 'medium' ? '75+ contacts' : 'small dataset'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Version Rows */}
-                  <div>
-                    {sortedVersions.map((row, idx) => {
-                      const replyRate = row.messagesSent > 0 ? (row.repliesReceived / row.messagesSent) * 100 : 0;
-                      const bookingRate = row.uniqueContacted > 0 ? (row.canonicalBookedCalls / row.uniqueContacted) * 100 : 0;
-                      const versionLabel = extractVersionDisplay(row.label) || row.version || 'Legacy';
-                      const isWinning = hasMultipleVersions && idx === 0;
-                      return (
-                        <div
-                          key={row.label}
-                          style={{
-                            padding: '0.75rem 1.25rem',
-                            borderBottom: idx < sortedVersions.length - 1 ? '1px solid var(--v2-border)' : 'none',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            flexWrap: 'wrap',
-                            gap: '0.75rem',
-                            background: isWinning ? 'rgba(34, 197, 94, 0.04)' : undefined,
-                          }}
-                        >
-                          {/* Version & Volume Info */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: '180px' }}>
-                            <span className="V2Badge V2Badge--version" style={{ fontSize: '0.8rem' }}>
-                              {versionLabel}
-                            </span>
-                            {isWinning && (
-                              <span className="V2Badge" style={{ background: 'var(--v2-positive)', color: 'white', fontSize: '0.7rem' }}>
-                                TOP
-                              </span>
-                            )}
-                            <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
-                              {fmtInt(row.messagesSent)} sent
-                            </span>
-                          </div>
-
-                          {/* Metrics */}
-                          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
-                            {/* Reply */}
-                            <div style={{ minWidth: '70px' }}>
-                              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: replyRate >= 10 ? 'var(--v2-positive)' : replyRate < 5 ? 'var(--v2-warning)' : 'var(--v2-accent)' }}>
-                                {fmtPct(replyRate)}
-                              </div>
-                              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-                                {fmtInt(row.repliesReceived)} replies
-                              </div>
-                            </div>
-
-                            {/* Booking */}
-                            <div style={{ minWidth: '70px' }}>
-                              <div style={{ fontWeight: 600, fontSize: '0.9rem', color: bookingRate >= 2 ? 'var(--v2-positive)' : 'var(--v2-text)' }}>
-                                {fmtPct(bookingRate)}
-                              </div>
-                              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)' }}>
-                                {fmtInt(row.canonicalBookedCalls)} booked
-                              </div>
-                            </div>
-
-                            {/* Rep Attribution */}
-                            <div style={{ minWidth: '80px', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                              {row.canonicalBookedJack > 0 && (
-                                <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
-                                  J:{row.canonicalBookedJack}
-                                </span>
-                              )}
-                              {row.canonicalBookedBrandon > 0 && (
-                                <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
-                                  B:{row.canonicalBookedBrandon}
-                                </span>
-                              )}
-                              {row.canonicalBookedSelf > 0 && (
-                                <span style={{ fontSize: '0.7rem', background: 'var(--v2-bg)', padding: '2px 5px', borderRadius: '3px', color: 'var(--v2-text-dim)' }}>
-                                  S:{row.canonicalBookedSelf}
-                                </span>
-                              )}
-                              {row.canonicalBookedCalls === 0 && (
-                                <span style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>—</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </V2Panel>
-      )}
+      <SequencePerformanceTable mergedRows={mergedRows} modeLabel={MODE_LABELS[mode]} />
 
       {/* ── Booking Attribution ── */}
       {(salesMetrics?.bookedCredit || monthlyBookings) && (
@@ -770,62 +502,12 @@ export default function SequencesV2() {
           isOpen={executiveSections.attribution}
           onToggle={setExecutiveSectionOpen}
         >
-          {salesMetrics?.bookedCredit && (
-            <V2Panel
-              title={`Booking Attribution — ${MODE_LABELS[mode]}`}
-              caption={`Rep split for the selected ${mode} window · Booked = Slack-verified`}
-            >
-              <div className="V2SeqAttribution">
-                <div className="V2SeqAttribution__grid">
-                  <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
-                    <span className="V2SeqAttribution__label">Total Booked</span>
-                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.total)}</span>
-                  </div>
-                  <div className="V2SeqAttribution__item">
-                    <span className="V2SeqAttribution__label">Jack</span>
-                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.jack)}</span>
-                  </div>
-                  <div className="V2SeqAttribution__item">
-                    <span className="V2SeqAttribution__label">Brandon</span>
-                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.brandon)}</span>
-                  </div>
-                  <div className="V2SeqAttribution__item">
-                    <span className="V2SeqAttribution__label">Self-Booked</span>
-                    <span className="V2SeqAttribution__value">{fmtInt(salesMetrics.bookedCredit.selfBooked)}</span>
-                  </div>
-                </div>
-                <p className="V2SeqAttribution__note">
-                  Rep split reflects the selected {mode} rolling window. Booked = Slack-verified bookings channel.
-                </p>
-              </div>
-            </V2Panel>
-          )}
-          {monthlyBookings && (
-            <V2Panel
-              title="Channel Attribution — Monthly"
-              caption="Sequence-initiated vs direct outreach · always monthly scoreboard window (channel split not available per rolling window)"
-            >
-              <div className="V2SeqAttribution">
-                <div className="V2SeqAttribution__grid">
-                  <div className="V2SeqAttribution__item V2SeqAttribution__item--highlight">
-                    <span className="V2SeqAttribution__label">From Sequences</span>
-                    <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.sequenceInitiated)}</span>
-                  </div>
-                  <div className="V2SeqAttribution__item">
-                    <span className="V2SeqAttribution__label">From Direct Outreach</span>
-                    <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.manualInitiated)}</span>
-                  </div>
-                  <div className="V2SeqAttribution__item V2SeqAttribution__item--total">
-                    <span className="V2SeqAttribution__label">Total (month)</span>
-                    <span className="V2SeqAttribution__value">{fmtInt(monthlyBookings.total)}</span>
-                  </div>
-                </div>
-                <p className="V2SeqAttribution__note">
-                  A sequence gets credit when it started the first outbound contact with a lead, even if manual follow-ups came before the booking.
-                </p>
-              </div>
-            </V2Panel>
-          )}
+          <BookingAttributionPanel
+            bookedCredit={salesMetrics?.bookedCredit}
+            monthlyBookings={monthlyBookings}
+            modeLabel={MODE_LABELS[mode]}
+            mode={mode}
+          />
         </ExecutiveSection>
       )}
 
@@ -838,58 +520,7 @@ export default function SequencesV2() {
           isOpen={executiveSections.compliance}
           onToggle={setExecutiveSectionOpen}
         >
-          <V2Panel
-            title="Opt-Out Health"
-            caption="Opt-out rates and top opt-out sequences · weekly window"
-          >
-            <div className="V2SeqCompliance">
-              <div className="V2SeqCompliance__rates">
-                <div className="V2SeqCompliance__rate">
-                  <span className="V2SeqCompliance__rateLabel">Weekly Opt-Out Rate</span>
-                  <span
-                    className={`V2SeqCompliance__rateValue${compliance.optOutRateWeeklyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
-                  >
-                    {fmtPct(compliance.optOutRateWeeklyPct)}
-                  </span>
-                </div>
-                <div className="V2SeqCompliance__rate">
-                  <span className="V2SeqCompliance__rateLabel">Monthly Opt-Out Rate</span>
-                  <span
-                    className={`V2SeqCompliance__rateValue${compliance.optOutRateMonthlyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
-                  >
-                    {fmtPct(compliance.optOutRateMonthlyPct)}
-                  </span>
-                </div>
-              </div>
-              {compliance.topOptOutSequences.length > 0 && (
-                <div className="V2SeqCompliance__topList">
-                  <p className="V2SeqCompliance__topTitle">Highest Opt-Out Sequences</p>
-                  <div className="V2TableWrap">
-                    <table className="V2Table">
-                      <thead>
-                        <tr>
-                          <th>Sequence</th>
-                          <th className="is-right">Opt-Outs</th>
-                          <th className="is-right">Opt-Out Rate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {compliance.topOptOutSequences.map((seq) => (
-                          <tr key={seq.label}>
-                            <td>{seq.label}</td>
-                            <td className="is-right">{fmtInt(seq.optOuts)}</td>
-                            <td className={`is-right${seq.optOutRatePct >= 5 ? ' V2Table__cell--warn' : ''}`}>
-                              {fmtPct(seq.optOutRatePct)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          </V2Panel>
+          <CompliancePanel compliance={compliance} />
         </ExecutiveSection>
       )}
 
@@ -902,43 +533,7 @@ export default function SequencesV2() {
           isOpen={executiveSections.timing}
           onToggle={setExecutiveSectionOpen}
         >
-          <V2Panel
-            title="Reply Timing"
-            caption="Median time to first reply and reply rate by day of week · weekly window"
-          >
-            <div className="V2SeqTiming">
-              {timing.medianTimeToFirstReplyMinutes !== null && (
-                <div className="V2SeqTiming__median">
-                  <span className="V2SeqTiming__medianLabel">Median Time to First Reply</span>
-                  <span className="V2SeqTiming__medianValue">
-                    {fmtMins(timing.medianTimeToFirstReplyMinutes)}
-                  </span>
-                </div>
-              )}
-              {timing.replyRateByDayOfWeek.length > 0 && (
-                <div className="V2SeqTiming__chart">
-                  <p className="V2SeqTiming__chartTitle">Reply Rate by Day of Week</p>
-                  {timing.replyRateByDayOfWeek.map((day) => {
-                    const barPct = Math.min(day.replyRatePct, 100);
-                    return (
-                      <div key={day.dayOfWeek} className="V2SeqTiming__row">
-                        <span className="V2SeqTiming__day">{day.dayOfWeek}</span>
-                        <div className="V2SeqTiming__barWrap">
-                          <div
-                            className="V2SeqTiming__bar"
-                            style={{ width: `${barPct}%` }}
-                            title={`${fmtPct(day.replyRatePct)} reply rate · ${fmtInt(day.outboundCount)} sent · ${fmtInt(day.replyCount)} replied`}
-                          />
-                        </div>
-                        <span className="V2SeqTiming__pct">{fmtPct(day.replyRatePct)}</span>
-                        <span className="V2SeqTiming__vol">{fmtInt(day.outboundCount)} sent</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </V2Panel>
+          <TimingPanel timing={timing} />
         </ExecutiveSection>
       )}
     </div>

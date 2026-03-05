@@ -85,8 +85,13 @@ const MetricCard: React.FC<{
   color: string;
   sampleQuote?: string | null;
 }> = ({ label, count, pct, icon, color, sampleQuote }) => (
-  <div className="metric-card" title={sampleQuote ?? undefined}>
-    <div className="metric-icon" style={{ backgroundColor: `${color}20`, color }}>
+  <div 
+    className="metric-card" 
+    title={sampleQuote ?? undefined}
+    aria-label={sampleQuote ? `${label}: ${count} (${Math.round(pct)}%). Sample quote: ${sampleQuote}` : `${label}: ${count} (${Math.round(pct)}%)`}
+    role={sampleQuote ? "tooltip" : undefined}
+  >
+    <div className="metric-icon" style={{ backgroundColor: `${color}20`, color }} aria-hidden="true">
       {icon}
     </div>
     <div className="metric-content">
@@ -112,6 +117,7 @@ const SequenceCard: React.FC<{
     ? Math.round((withQualData / item.totalConversations) * 100)
     : 0;
   const sampleQuotes = collectSampleQuotes(item);
+  const detailsId = `sequence-details-${item.sequenceLabel.replace(/\s+/g, '-')}`;
 
   return (
     <motion.div
@@ -120,7 +126,14 @@ const SequenceCard: React.FC<{
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="sequence-header" onClick={onToggle}>
+      <button 
+        id={`header-${detailsId}`}
+        className="sequence-header" 
+        onClick={onToggle}
+        aria-expanded={isExpanded}
+        aria-controls={detailsId}
+        style={{ width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+      >
         <div className="sequence-title">
           <h3>{item.sequenceLabel}</h3>
           <div className="sequence-meta">
@@ -130,19 +143,22 @@ const SequenceCard: React.FC<{
             </span>
           </div>
         </div>
-        <button className="expand-btn" type="button">
+        <div className="expand-btn" aria-hidden="true">
           {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </button>
-      </div>
+        </div>
+      </button>
 
       <AnimatePresence>
         {isExpanded && (
           <motion.div
+            id={detailsId}
             className="sequence-details"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
+            role="region"
+            aria-labelledby={`header-${detailsId}`}
           >
             <div className="metrics-grid">
               {/* Employment */}

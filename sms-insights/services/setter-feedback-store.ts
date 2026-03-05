@@ -1,4 +1,6 @@
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
+
+const getPrisma = () => getPrismaClient();
 
 export const hasRecentPersistentFeedback = async ({
   channelId,
@@ -9,21 +11,25 @@ export const hasRecentPersistentFeedback = async ({
   threadTs: string;
   dedupeMinutes: number;
 }): Promise<boolean> => {
-  const pool = getPool();
-  if (!pool) return false;
+  const prisma = getPrisma();
 
-  const client = await pool.connect();
   try {
-    const res = await client.query(
-      'SELECT created_at FROM setter_feedback_dedupe WHERE channel_id = $1 AND thread_ts = $2 LIMIT 1',
-      [channelId, threadTs],
-    );
-    if (!res.rows || res.rows.length === 0) return false;
-    const createdAt = new Date(res.rows[0].created_at).getTime();
+    const feedback = await prisma.setter_feedback_dedupe.findUnique({
+      where: {
+        channel_id_thread_ts: {
+          channel_id: channelId,
+          thread_ts: threadTs,
+        },
+      },
+      select: { created_at: true },
+    });
+
+    if (!feedback) return false;
+    const createdAt = feedback.created_at.getTime();
     const ageMs = Date.now() - createdAt;
     return ageMs < dedupeMinutes * 60_000;
-  } finally {
-    client.release();
+  } catch (err) {
+    return false;
   }
 };
 
@@ -36,17 +42,27 @@ export const insertPersistentFeedback = async ({
   threadTs: string;
   messageTs?: string;
 }): Promise<void> => {
-  const pool = getPool();
-  if (!pool) return;
+  const prisma = getPrisma();
 
-  const client = await pool.connect();
   try {
-    await client.query(
-      `INSERT INTO setter_feedback_dedupe (channel_id, thread_ts, message_ts) VALUES ($1, $2, $3)
-       ON CONFLICT (channel_id, thread_ts) DO UPDATE SET message_ts = EXCLUDED.message_ts, created_at = CURRENT_TIMESTAMP`,
-      [channelId, threadTs, messageTs || null],
-    );
-  } finally {
-    client.release();
+    await prisma.setter_feedback_dedupe.upsert({
+      where: {
+        channel_id_thread_ts: {
+          channel_id: channelId,
+          thread_ts: threadTs,
+        },
+      },
+      create: {
+        channel_id: channelId,
+        thread_ts: threadTs,
+        message_ts: messageTs || null,
+      },
+      update: {
+        message_ts: messageTs || null,
+        created_at: new Date(),
+      },
+    });
+  } catch (err) {
+    // Ignore errors for dedupe tracking
   }
 };

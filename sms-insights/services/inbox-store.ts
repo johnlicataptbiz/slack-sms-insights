@@ -1,6 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import type {
   CoachingInterest,
   DeliveryModel,
@@ -22,15 +21,15 @@ export type ConversationStateRow = {
   escalation_level: 1 | 2 | 3 | 4;
   escalation_reason: string | null;
   escalation_overridden: boolean;
-  last_podcast_sent_at: string | null;
-  next_followup_due_at: string | null;
+  last_podcast_sent_at: Date | null;
+  next_followup_due_at: Date | null;
   cadence_status: CadenceStatus;
   // Phase 3 columns
   objection_tags: string[];
   guardrail_override_count: number;
   call_outcome: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 };
 
 export type SendAttemptStatus = 'blocked' | 'queued' | 'sent' | 'failed';
@@ -50,7 +49,7 @@ export type SendAttemptRow = {
   request_payload: unknown | null;
   response_payload: unknown | null;
   error_message: string | null;
-  created_at: string;
+  created_at: Date;
 };
 
 export type DraftSuggestionRow = {
@@ -66,8 +65,8 @@ export type DraftSuggestionRow = {
   edited: boolean;
   send_linked_event_id: string | null;
   raw: unknown | null;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 };
 
 export type ConversionExampleRow = {
@@ -79,13 +78,23 @@ export type ConversionExampleRow = {
   structure_signature: string | null;
   qualifier_snapshot: unknown | null;
   channel_marker: string;
-  created_at: string;
+  created_at: Date;
+};
+
+export type UpsertConversionExampleInput = {
+  sourceOutboundEventId: string;
+  bookedCallLabel?: string | null;
+  closedWonLabel?: string | null;
+  escalationLevel: 1 | 2 | 3 | 4;
+  structureSignature?: string | null;
+  qualifierSnapshot?: unknown | null;
+  channelMarker?: string | null;
 };
 
 export type SetterVoiceExampleRow = {
   id: string;
   conversation_id: string | null;
-  event_ts: string;
+  event_ts: Date;
   body: string | null;
   line: string | null;
   aloware_user: string | null;
@@ -100,13 +109,13 @@ export type InboxConversationListRow = {
   contact_phone: string | null;
   current_rep_id: string | null;
   status: 'open' | 'closed' | 'dnc';
-  last_inbound_at: string | null;
-  last_outbound_at: string | null;
-  last_touch_at: string | null;
+  last_inbound_at: Date | null;
+  last_outbound_at: Date | null;
+  last_touch_at: Date | null;
   unreplied_inbound_count: number;
-  next_followup_due_at: string | null;
-  created_at: string;
-  updated_at: string;
+  next_followup_due_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
   profile_name: string | null;
   profile_phone: string | null;
   profile_email: string | null;
@@ -125,17 +134,17 @@ export type InboxConversationListRow = {
   state_escalation_level: number | null;
   state_escalation_reason: string | null;
   state_escalation_overridden: boolean | null;
-  state_last_podcast_sent_at: string | null;
+  state_last_podcast_sent_at: Date | null;
   state_cadence_status: CadenceStatus | null;
-  state_next_followup_due_at: string | null;
+  state_next_followup_due_at: Date | null;
   state_objection_tags: string[] | null;
   state_call_outcome: string | null;
   state_guardrail_override_count: number | null;
   open_needs_reply_count: number;
-  needs_reply_due_at: string | null;
+  needs_reply_due_at: Date | null;
   last_message_body: string | null;
   last_message_direction: 'inbound' | 'outbound' | 'unknown' | null;
-  last_message_at: string | null;
+  last_message_at: Date | null;
   latest_outbound_user: string | null;
   latest_outbound_line: string | null;
   monday_booked: boolean;
@@ -144,7 +153,7 @@ export type InboxConversationListRow = {
 export type InboxMessageRow = {
   id: string;
   conversation_id: string | null;
-  event_ts: string;
+  event_ts: Date;
   direction: 'inbound' | 'outbound' | 'unknown';
   body: string | null;
   sequence: string | null;
@@ -172,13 +181,7 @@ export type InboxConversationDetail = {
   }>;
 };
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+const getPrisma = () => getPrismaClient();
 
 const BOOKED_CALLS_CHANNEL_ID = (process.env.BOOKED_CALLS_CHANNEL_ID || '').trim() || null;
 
@@ -255,25 +258,15 @@ export const getConversationState = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationStateRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<ConversationStateRow>(
-      `
-      SELECT *
-      FROM conversation_state
-      WHERE conversation_id = $1
-      LIMIT 1;
-      `,
-      [conversationId],
-    );
-
-    return result.rows[0] ?? null;
+    const result = await prisma.conversation_state.findUnique({
+      where: { conversation_id: conversationId },
+    });
+    return result as unknown as ConversationStateRow | null;
   } catch (err) {
     logger?.error('getConversationState failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -281,30 +274,17 @@ export const ensureConversationState = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationStateRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<ConversationStateRow>(
-      `
-      INSERT INTO conversation_state (conversation_id)
-      VALUES ($1)
-      ON CONFLICT (conversation_id)
-      DO UPDATE SET updated_at = NOW()
-      RETURNING *;
-      `,
-      [conversationId],
-    );
-
-    const row = result.rows[0];
-    if (!row) {
-      throw new Error('Failed to ensure conversation state');
-    }
-    return row;
+    const result = await prisma.conversation_state.upsert({
+      where: { conversation_id: conversationId },
+      update: { updated_at: new Date() },
+      create: { conversation_id: conversationId },
+    });
+    return result as unknown as ConversationStateRow;
   } catch (err) {
     logger?.error('ensureConversationState failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -328,79 +308,38 @@ export const updateConversationState = async (
   input: UpdateConversationStateInput,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationStateRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
 
   try {
-    await client.query(
-      `
-      INSERT INTO conversation_state (conversation_id)
-      VALUES ($1)
-      ON CONFLICT (conversation_id) DO NOTHING;
-      `,
-      [conversationId],
-    );
+    const updateData: any = {
+      updated_at: new Date(),
+    };
+    if (input.fullOrPartTime !== undefined) updateData.qualification_full_or_part_time = input.fullOrPartTime;
+    if (input.niche !== undefined) updateData.qualification_niche = input.niche;
+    if (input.revenueMix !== undefined) updateData.qualification_revenue_mix = input.revenueMix;
+    if (input.deliveryModel !== undefined) updateData.qualification_delivery_model = input.deliveryModel;
+    if (input.coachingInterest !== undefined) updateData.qualification_coaching_interest = input.coachingInterest;
+    if (input.progressStep !== undefined) updateData.qualification_progress_step = input.progressStep;
+    if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
+    if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
+    if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;
+    if (input.lastPodcastSentAt !== undefined) updateData.last_podcast_sent_at = input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null;
+    if (input.nextFollowupDueAt !== undefined) updateData.next_followup_due_at = input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null;
+    if (input.cadenceStatus !== undefined) updateData.cadence_status = input.cadenceStatus;
 
-    const result = await client.query<ConversationStateRow>(
-      `
-      UPDATE conversation_state
-      SET
-        qualification_full_or_part_time = COALESCE($2::text, qualification_full_or_part_time),
-        qualification_niche = CASE
-          WHEN $3::text IS NULL THEN qualification_niche
-          ELSE $3::text
-        END,
-        qualification_revenue_mix = COALESCE($4::text, qualification_revenue_mix),
-        qualification_delivery_model = COALESCE($5::text, qualification_delivery_model),
-        qualification_coaching_interest = COALESCE($6::text, qualification_coaching_interest),
-        qualification_progress_step = COALESCE($7::integer, qualification_progress_step),
-        escalation_level = COALESCE($8::integer, escalation_level),
-        escalation_reason = CASE
-          WHEN $9::text IS NULL THEN escalation_reason
-          ELSE $9::text
-        END,
-        escalation_overridden = COALESCE($10::boolean, escalation_overridden),
-        last_podcast_sent_at = CASE
-          WHEN $11::timestamptz IS NULL THEN last_podcast_sent_at
-          ELSE $11::timestamptz
-        END,
-        next_followup_due_at = CASE
-          WHEN $12::timestamptz IS NULL THEN next_followup_due_at
-          ELSE $12::timestamptz
-        END,
-        cadence_status = COALESCE($13::text, cadence_status),
-        updated_at = NOW()
-      WHERE conversation_id = $1
-      RETURNING *;
-      `,
-      [
-        conversationId,
-        input.fullOrPartTime ?? null,
-        input.niche ?? null,
-        input.revenueMix ?? null,
-        input.deliveryModel ?? null,
-        input.coachingInterest ?? null,
-        Number.isFinite(input.progressStep as number) ? input.progressStep : null,
-        input.escalationLevel ?? null,
-        input.escalationReason ?? null,
-        typeof input.escalationOverridden === 'boolean' ? input.escalationOverridden : null,
-        input.lastPodcastSentAt ?? null,
-        input.nextFollowupDueAt ?? null,
-        input.cadenceStatus ?? null,
-      ],
-    );
+    const result = await prisma.conversation_state.upsert({
+      where: { conversation_id: conversationId },
+      update: updateData,
+      create: {
+        conversation_id: conversationId,
+        ...updateData,
+      },
+    });
 
-    const row = result.rows[0];
-    if (!row) {
-      throw new Error('Failed to update conversation state');
-    }
-
-    return row;
+    return result as unknown as ConversationStateRow;
   } catch (err) {
     logger?.error('updateConversationState failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -417,11 +356,10 @@ export const listInboxConversations = async (
   params: ListInboxConversationsParams,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxConversationListRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
     const where: string[] = [];
-    const values: Array<string | number | boolean | null> = [];
+    const values: Array<any> = [];
     let index = 1;
 
     if (params.status) {
@@ -553,13 +491,11 @@ export const listInboxConversations = async (
       OFFSET ${offsetPlaceholder};
     `;
 
-    const result = await client.query<InboxConversationListRow>(sql, values);
-    return result.rows;
+    const result = await prisma.$queryRawUnsafe<InboxConversationListRow[]>(sql, ...values);
+    return result;
   } catch (err) {
     logger?.error('listInboxConversations failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -567,11 +503,9 @@ export const getInboxConversationById = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxConversationListRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<InboxConversationListRow>(
-      `
+    const sql = `
       WITH open_items AS (
         SELECT
           conversation_id,
@@ -660,16 +594,13 @@ export const getInboxConversationById = async (
         ON latest_outbound.conversation_id = c.id
       WHERE c.id = $1
       LIMIT 1;
-      `,
-      [conversationId, BOOKED_CALLS_CHANNEL_ID ?? null],
-    );
+      `;
 
-    return result.rows[0] ?? null;
+    const result = await prisma.$queryRawUnsafe<InboxConversationListRow[]>(sql, conversationId, BOOKED_CALLS_CHANNEL_ID ?? null);
+    return result[0] ?? null;
   } catch (err) {
     logger?.error('getInboxConversationById failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -678,10 +609,9 @@ export const listMessagesForConversation = async (
   limit: number,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxMessageRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<InboxMessageRow>(
+    const result = await prisma.$queryRawUnsafe<InboxMessageRow[]>(
       `
       SELECT
         recent.id,
@@ -707,21 +637,20 @@ export const listMessagesForConversation = async (
           slack_channel_id,
           slack_message_ts
         FROM sms_events
-        WHERE conversation_id = $1
+        WHERE conversation_id = $1::uuid
         ORDER BY event_ts DESC, id DESC
         LIMIT $2
       ) AS recent
       ORDER BY recent.event_ts ASC, recent.id ASC;
       `,
-      [conversationId, Math.max(1, Math.min(limit, 500))],
+      conversationId,
+      Math.max(1, Math.min(limit, 500)),
     );
 
-    return result.rows;
+    return result;
   } catch (err) {
     logger?.error('listMessagesForConversation failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -730,27 +659,11 @@ export const listMondayTrailForContactKey = async (
   limit: number,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxConversationDetail['mondayTrail']> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
     const normalizedLimit = Math.max(1, Math.min(limit, 50));
 
-    // Monday snapshots are keyed by:
-    // - contact:<id> or phone:<digits> (direct match)
-    // - name:<lead name> (our workflow: Monday item name = Aloware/Slack lead name)
-    //
-    // We resolve the profile name via inbox_contact_profiles so that
-    // contact:12345 → profile.name = "John Smith" → matches name:John Smith in Monday.
-    const result = await client.query<{
-      board_id: string;
-      item_id: string;
-      item_name: string | null;
-      stage: string | null;
-      call_date: string | null;
-      disposition: string | null;
-      is_booked: boolean;
-      updated_at: string;
-    }>(
+    const result = await prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
         m.board_id,
@@ -776,10 +689,11 @@ export const listMondayTrailForContactKey = async (
       ORDER BY m.updated_at DESC
       LIMIT $2;
       `,
-      [contactKey, normalizedLimit],
+      contactKey,
+      normalizedLimit,
     );
 
-    return result.rows.map((row) => ({
+    return result.map((row) => ({
       boardId: row.board_id,
       itemId: row.item_id,
       itemName: row.item_name,
@@ -792,8 +706,6 @@ export const listMondayTrailForContactKey = async (
   } catch (err) {
     logger?.error('listMondayTrailForContactKey failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -817,63 +729,80 @@ export const insertSendAttempt = async (
   input: InsertSendAttemptInput,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SendAttemptRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<SendAttemptRow>(
-      `
-      INSERT INTO send_attempts (
-        conversation_id,
-        message_body,
-        sender_identity,
-        line_id,
-        from_number,
-        allowlist_decision,
-        dnc_decision,
-        idempotency_key,
-        status,
-        retry_count,
-        request_payload,
-        response_payload,
-        error_message
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-      ON CONFLICT (conversation_id, idempotency_key)
-      WHERE idempotency_key IS NOT NULL
-      DO UPDATE SET
-        response_payload = COALESCE(EXCLUDED.response_payload, send_attempts.response_payload),
-        status = EXCLUDED.status,
-        retry_count = GREATEST(send_attempts.retry_count, EXCLUDED.retry_count),
-        error_message = COALESCE(EXCLUDED.error_message, send_attempts.error_message)
-      RETURNING *;
-      `,
-      [
-        input.conversationId,
-        input.messageBody,
-        input.senderIdentity ?? null,
-        input.lineId ?? null,
-        input.fromNumber ?? null,
-        input.allowlistDecision,
-        input.dncDecision,
-        input.idempotencyKey ?? null,
-        input.status,
-        input.retryCount ?? 0,
-        input.requestPayload ?? null,
-        input.responsePayload ?? null,
-        input.errorMessage ?? null,
-      ],
-    );
+    const data = {
+      conversation_id: input.conversationId,
+      message_body: input.messageBody,
+      sender_identity: input.senderIdentity ?? null,
+      line_id: input.lineId ?? null,
+      from_number: input.fromNumber ?? null,
+      allowlist_decision: input.allowlistDecision,
+      dnc_decision: input.dncDecision,
+      idempotency_key: input.idempotencyKey ?? null,
+      status: input.status,
+      retry_count: input.retryCount ?? 0,
+      request_payload: input.requestPayload as any ?? null,
+      response_payload: input.responsePayload as any ?? null,
+      error_message: input.errorMessage ?? null,
+    };
 
-    const row = result.rows[0];
-    if (!row) {
-      throw new Error('Failed to insert send attempt');
+    if (input.idempotencyKey) {
+      const result = await prisma.send_attempts.upsert({
+        where: {
+          conversation_id_idempotency_key: {
+            conversation_id: input.conversationId,
+            idempotency_key: input.idempotencyKey,
+          },
+        },
+        update: {
+          response_payload: input.responsePayload as any ?? undefined,
+          status: input.status,
+          retry_count: {
+            increment: 0, // We need to replicate GREATEST. Prisma doesn't have GREATEST in fluent API easily.
+          },
+          error_message: input.errorMessage ?? undefined,
+        },
+        create: data,
+      });
+
+      // Special handling for retry_count GREATEST via $executeRaw if needed, 
+      // but usually retry_count is managed by the caller.
+      // The original SQL: retry_count = GREATEST(send_attempts.retry_count, EXCLUDED.retry_count)
+      // Let's use $queryRawUnsafe to perfectly match the original behavior for upsert.
+      const upsertSql = `
+        INSERT INTO send_attempts (
+          conversation_id, message_body, sender_identity, line_id, from_number,
+          allowlist_decision, dnc_decision, idempotency_key, status, retry_count,
+          request_payload, response_payload, error_message
+        )
+        VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+        ON CONFLICT (conversation_id, idempotency_key)
+        WHERE idempotency_key IS NOT NULL
+        DO UPDATE SET
+          response_payload = COALESCE(EXCLUDED.response_payload, send_attempts.response_payload),
+          status = EXCLUDED.status,
+          retry_count = GREATEST(send_attempts.retry_count, EXCLUDED.retry_count),
+          error_message = COALESCE(EXCLUDED.error_message, send_attempts.error_message)
+        RETURNING *;
+      `;
+      const rows = await prisma.$queryRawUnsafe<SendAttemptRow[]>(
+        upsertSql,
+        input.conversationId, input.messageBody, input.senderIdentity ?? null,
+        input.lineId ?? null, input.fromNumber ?? null, input.allowlistDecision,
+        input.dncDecision, input.idempotencyKey, input.status, input.retryCount ?? 0,
+        input.requestPayload ?? null, input.responsePayload ?? null, input.errorMessage ?? null
+      );
+      return rows[0];
+    } else {
+      const result = await prisma.send_attempts.create({
+        data,
+      });
+      return result as unknown as SendAttemptRow;
     }
-    return row;
   } catch (err) {
     logger?.error('insertSendAttempt failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -883,50 +812,30 @@ export const reserveSendAttemptIdempotency = async (
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SendAttemptRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<SendAttemptRow>(
-      `
+    const sql = `
       INSERT INTO send_attempts (
-        conversation_id,
-        message_body,
-        sender_identity,
-        line_id,
-        from_number,
-        allowlist_decision,
-        dnc_decision,
-        idempotency_key,
-        status,
-        retry_count,
-        request_payload,
-        response_payload,
-        error_message
+        conversation_id, message_body, sender_identity, line_id, from_number,
+        allowlist_decision, dnc_decision, idempotency_key, status, retry_count,
+        request_payload, response_payload, error_message
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'queued',0,$9,NULL,NULL)
+      VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,'queued',0,$9,NULL,NULL)
       ON CONFLICT (conversation_id, idempotency_key)
       WHERE idempotency_key IS NOT NULL
       DO NOTHING
       RETURNING *;
-      `,
-      [
-        input.conversationId,
-        input.messageBody,
-        input.senderIdentity ?? null,
-        input.lineId ?? null,
-        input.fromNumber ?? null,
-        input.allowlistDecision,
-        input.dncDecision,
-        input.idempotencyKey,
-        input.requestPayload ?? null,
-      ],
+    `;
+    const rows = await prisma.$queryRawUnsafe<SendAttemptRow[]>(
+      sql,
+      input.conversationId, input.messageBody, input.senderIdentity ?? null,
+      input.lineId ?? null, input.fromNumber ?? null, input.allowlistDecision,
+      input.dncDecision, input.idempotencyKey, input.requestPayload ?? null
     );
-    return result.rows[0] ?? null;
+    return rows[0] ?? null;
   } catch (err) {
     logger?.error('reserveSendAttemptIdempotency failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -935,25 +844,20 @@ export const getSendAttemptByIdempotency = async (
   idempotencyKey: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SendAttemptRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<SendAttemptRow>(
-      `
-      SELECT *
-      FROM send_attempts
-      WHERE conversation_id = $1
-        AND idempotency_key = $2
-      LIMIT 1;
-      `,
-      [conversationId, idempotencyKey],
-    );
-    return result.rows[0] ?? null;
+    const result = await prisma.send_attempts.findUnique({
+      where: {
+        conversation_id_idempotency_key: {
+          conversation_id: conversationId,
+          idempotency_key: idempotencyKey,
+        },
+      },
+    });
+    return result as unknown as SendAttemptRow | null;
   } catch (err) {
     logger?.error('getSendAttemptByIdempotency failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -967,14 +871,9 @@ export const getSendAttemptVolumeCounts = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SendAttemptVolumeCounts> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<{
-      sent_last_hour: string;
-      sent_last_day: string;
-      conversation_sent_last_hour: string;
-    }>(
+    const result = await prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
         COUNT(*) FILTER (
@@ -992,10 +891,10 @@ export const getSendAttemptVolumeCounts = async (
         )::text AS conversation_sent_last_hour
       FROM send_attempts;
       `,
-      [conversationId],
+      conversationId,
     );
 
-    const row = result.rows[0];
+    const row = result[0];
     return {
       sentLastHour: Number.parseInt(row?.sent_last_hour || '0', 10) || 0,
       sentLastDay: Number.parseInt(row?.sent_last_day || '0', 10) || 0,
@@ -1004,8 +903,6 @@ export const getSendAttemptVolumeCounts = async (
   } catch (err) {
     logger?.error('getSendAttemptVolumeCounts failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1024,46 +921,25 @@ export const insertDraftSuggestion = async (
   input: InsertDraftSuggestionInput,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<DraftSuggestionRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<DraftSuggestionRow>(
-      `
-      INSERT INTO draft_suggestions (
-        conversation_id,
-        prompt_snapshot_hash,
-        retrieved_exemplar_ids,
-        generated_text,
-        lint_score,
-        structural_score,
-        lint_issues,
-        raw
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-      RETURNING *;
-      `,
-      [
-        input.conversationId,
-        input.promptSnapshotHash,
-        input.retrievedExemplarIds ? JSON.stringify(input.retrievedExemplarIds) : null,
-        input.generatedText,
-        input.lintScore,
-        input.structuralScore,
-        input.lintIssues ? JSON.stringify(input.lintIssues) : null,
-        input.raw ?? null,
-      ],
-    );
+    const result = await prisma.draft_suggestions.create({
+      data: {
+        conversation_id: input.conversationId,
+        prompt_snapshot_hash: input.promptSnapshotHash,
+        retrieved_exemplar_ids: input.retrievedExemplarIds as any ?? null,
+        generated_text: input.generatedText,
+        lint_score: input.lintScore,
+        structural_score: input.structuralScore,
+        lint_issues: input.lintIssues as any ?? null,
+        raw: input.raw as any ?? null,
+      },
+    });
 
-    const row = result.rows[0];
-    if (!row) {
-      throw new Error('Failed to insert draft suggestion');
-    }
-    return row;
+    return result as unknown as DraftSuggestionRow;
   } catch (err) {
     logger?.error('insertDraftSuggestion failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1072,50 +948,34 @@ export const listDraftSuggestionsForConversation = async (
   limit: number,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<DraftSuggestionRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<DraftSuggestionRow>(
-      `
-      SELECT *
-      FROM draft_suggestions
-      WHERE conversation_id = $1
-      ORDER BY created_at DESC
-      LIMIT $2;
-      `,
-      [conversationId, Math.max(1, Math.min(limit, 50))],
-    );
-    return result.rows;
+    const result = await prisma.draft_suggestions.findMany({
+      where: { conversation_id: conversationId },
+      orderBy: { created_at: 'desc' },
+      take: Math.max(1, Math.min(limit, 50)),
+    });
+    return result as unknown as DraftSuggestionRow[];
   } catch (err) {
     logger?.error('listDraftSuggestionsForConversation failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
+
 
 export const getDraftSuggestionById = async (
   draftId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<DraftSuggestionRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<DraftSuggestionRow>(
-      `
-      SELECT *
-      FROM draft_suggestions
-      WHERE id = $1
-      LIMIT 1;
-      `,
-      [draftId],
-    );
-    return result.rows[0] ?? null;
+    const result = await prisma.draft_suggestions.findUnique({
+      where: { id: draftId },
+    });
+    return result as unknown as DraftSuggestionRow | null;
   } catch (err) {
     logger?.error('getDraftSuggestionById failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1128,97 +988,58 @@ export const updateDraftSuggestionFeedback = async (
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<DraftSuggestionRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<DraftSuggestionRow>(
-      `
-      UPDATE draft_suggestions
-      SET
-        accepted = COALESCE($2::boolean, accepted),
-        edited = COALESCE($3::boolean, edited),
-        send_linked_event_id = COALESCE($4::uuid, send_linked_event_id),
-        updated_at = NOW()
-      WHERE id = $1
-      RETURNING *;
-      `,
-      [
-        draftId,
-        typeof params.accepted === 'boolean' ? params.accepted : null,
-        typeof params.edited === 'boolean' ? params.edited : null,
-        params.sendLinkedEventId ?? null,
-      ],
-    );
+    const updateData: any = {
+      updated_at: new Date(),
+    };
+    if (typeof params.accepted === 'boolean') updateData.accepted = params.accepted;
+    if (typeof params.edited === 'boolean') updateData.edited = params.edited;
+    if (params.sendLinkedEventId !== undefined) updateData.send_linked_event_id = params.sendLinkedEventId;
 
-    return result.rows[0] ?? null;
+    const result = await prisma.draft_suggestions.update({
+      where: { id: draftId },
+      data: updateData,
+    });
+
+    return result as unknown as DraftSuggestionRow | null;
   } catch (err) {
     logger?.error('updateDraftSuggestionFeedback failed', err);
     throw err;
-  } finally {
-    client.release();
   }
-};
-
-export type UpsertConversionExampleInput = {
-  sourceOutboundEventId: string;
-  bookedCallLabel?: string | null;
-  closedWonLabel?: string | null;
-  escalationLevel: 1 | 2 | 3 | 4;
-  structureSignature?: string | null;
-  qualifierSnapshot?: unknown;
-  channelMarker?: string;
 };
 
 export const upsertConversionExample = async (
   input: UpsertConversionExampleInput,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversionExampleRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<ConversionExampleRow>(
-      `
-      INSERT INTO conversion_examples (
-        source_outbound_event_id,
-        booked_call_label,
-        closed_won_label,
-        escalation_level,
-        structure_signature,
-        qualifier_snapshot,
-        channel_marker
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7)
-      ON CONFLICT (source_outbound_event_id)
-      DO UPDATE SET
-        booked_call_label = COALESCE(EXCLUDED.booked_call_label, conversion_examples.booked_call_label),
-        closed_won_label = COALESCE(EXCLUDED.closed_won_label, conversion_examples.closed_won_label),
-        escalation_level = EXCLUDED.escalation_level,
-        structure_signature = COALESCE(EXCLUDED.structure_signature, conversion_examples.structure_signature),
-        qualifier_snapshot = COALESCE(EXCLUDED.qualifier_snapshot, conversion_examples.qualifier_snapshot),
-        channel_marker = COALESCE(EXCLUDED.channel_marker, conversion_examples.channel_marker)
-      RETURNING *;
-      `,
-      [
-        input.sourceOutboundEventId,
-        input.bookedCallLabel ?? null,
-        input.closedWonLabel ?? null,
-        input.escalationLevel,
-        input.structureSignature ?? null,
-        input.qualifierSnapshot ?? null,
-        input.channelMarker || 'sms',
-      ],
-    );
+    const result = await prisma.conversion_examples.upsert({
+      where: { source_outbound_event_id: input.sourceOutboundEventId },
+      update: {
+        booked_call_label: input.bookedCallLabel ?? undefined,
+        closed_won_label: input.closedWonLabel ?? undefined,
+        escalation_level: input.escalationLevel,
+        structure_signature: input.structureSignature ?? undefined,
+        qualifier_snapshot: input.qualifierSnapshot as any ?? undefined,
+        channel_marker: input.channelMarker ?? undefined,
+      },
+      create: {
+        source_outbound_event_id: input.sourceOutboundEventId,
+        booked_call_label: input.bookedCallLabel ?? null,
+        closed_won_label: input.closedWonLabel ?? null,
+        escalation_level: input.escalationLevel,
+        structure_signature: input.structureSignature ?? null,
+        qualifier_snapshot: input.qualifierSnapshot as any ?? null,
+        channel_marker: input.channelMarker || 'sms',
+      },
+    });
 
-    const row = result.rows[0];
-    if (!row) {
-      throw new Error('Failed to upsert conversion example');
-    }
-    return row;
+    return result as unknown as ConversionExampleRow;
   } catch (err) {
     logger?.error('upsertConversionExample failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1227,24 +1048,23 @@ export const updateConversationStatus = async (
   status: 'open' | 'closed' | 'dnc',
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<{ id: string; status: 'open' | 'closed' | 'dnc' } | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<{ id: string; status: 'open' | 'closed' | 'dnc' }>(
-      `
-      UPDATE conversations
-      SET status = $2, updated_at = NOW()
-      WHERE id = $1
-      RETURNING id, status;
-      `,
-      [conversationId, status],
-    );
-    return result.rows[0] ?? null;
+    const result = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        status,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        status: true,
+      },
+    });
+    return result as { id: string; status: 'open' | 'closed' | 'dnc' };
   } catch (err) {
     logger?.error('updateConversationStatus failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1255,7 +1075,7 @@ export type ConversationNoteRow = {
   conversation_id: string;
   author: string;
   text: string;
-  created_at: string;
+  created_at: Date;
 };
 
 export const insertConversationNote = async (
@@ -1264,25 +1084,19 @@ export const insertConversationNote = async (
   text: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationNoteRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<ConversationNoteRow>(
-      `
-      INSERT INTO conversation_notes (conversation_id, author, text)
-      VALUES ($1, $2, $3)
-      RETURNING *;
-      `,
-      [conversationId, author, text],
-    );
-    const row = result.rows[0];
-    if (!row) throw new Error('Failed to insert conversation note');
-    return row;
+    const result = await prisma.conversation_notes.create({
+      data: {
+        conversation_id: conversationId,
+        author,
+        text,
+      },
+    });
+    return result as unknown as ConversationNoteRow;
   } catch (err) {
     logger?.error('insertConversationNote failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1290,23 +1104,16 @@ export const listConversationNotes = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationNoteRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<ConversationNoteRow>(
-      `
-      SELECT * FROM conversation_notes
-      WHERE conversation_id = $1
-      ORDER BY created_at ASC;
-      `,
-      [conversationId],
-    );
-    return result.rows;
+    const result = await prisma.conversation_notes.findMany({
+      where: { conversation_id: conversationId },
+      orderBy: { created_at: 'asc' },
+    });
+    return result as unknown as ConversationNoteRow[];
   } catch (err) {
     logger?.error('listConversationNotes failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1316,27 +1123,27 @@ export const snoozeConversation = async (
   conversationId: string,
   snoozedUntil: string | null,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<{ id: string; next_followup_due_at: string | null }> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+): Promise<{ id: string; next_followup_due_at: Date | null }> => {
+  const prisma = getPrisma();
   try {
-    const result = await client.query<{ id: string; next_followup_due_at: string | null }>(
-      `
-      UPDATE conversations
-      SET next_followup_due_at = $2, updated_at = NOW()
-      WHERE id = $1
-      RETURNING id, next_followup_due_at;
-      `,
-      [conversationId, snoozedUntil],
-    );
-    const row = result.rows[0];
-    if (!row) throw new Error('Conversation not found');
-    return row;
+    const result = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        nextFollowupAt: snoozedUntil ? new Date(snoozedUntil) : null,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        nextFollowupAt: true,
+      },
+    });
+    return {
+      id: result.id,
+      next_followup_due_at: result.nextFollowupAt,
+    };
   } catch (err) {
     logger?.error('snoozeConversation failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1347,38 +1154,23 @@ export const assignConversation = async (
   ownerLabel: string | null,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<{ id: string; owner_label: string | null }> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    // Store owner label in conversation_state (escalation_reason repurposed as owner_label
-    // would be wrong — use a dedicated column or the profile). We store it in
-    // conversation_state as a new column. For now we write to the conversations
-    // table's current_rep_id as a text label (cast to uuid if valid, else store
-    // in a separate owner_label column via conversation_state).
-    // Simplest safe approach: store as text in conversation_state.escalation_reason
-    // is wrong. Instead we add owner_label to conversation_state.
-    // Since we can't run migrations here, we'll store it in the conversations
-    // table's contact_key-adjacent field. Actually the cleanest is to just
-    // update a text column. Let's use conversation_state with a new approach:
-    // store in the existing `latest_outbound_user` equivalent — but that's read-only.
-    // Best: update conversations.current_rep_id as a text label (it's varchar).
-    const result = await client.query<{ id: string; current_rep_id: string | null }>(
-      `
-      UPDATE conversations
-      SET current_rep_id = $2, updated_at = NOW()
-      WHERE id = $1
-      RETURNING id, current_rep_id;
-      `,
-      [conversationId, ownerLabel],
-    );
-    const row = result.rows[0];
-    if (!row) throw new Error('Conversation not found');
-    return { id: row.id, owner_label: row.current_rep_id };
+    const result = await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        current_rep_id: ownerLabel,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        current_rep_id: true,
+      },
+    });
+    return { id: result.id, owner_label: result.current_rep_id ?? null };
   } catch (err) {
     logger?.error('assignConversation failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1389,28 +1181,22 @@ export type MessageTemplateRow = {
   name: string;
   body: string;
   created_by: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 };
 
 export const listMessageTemplates = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<MessageTemplateRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<MessageTemplateRow>(
-      `
-      SELECT * FROM message_templates
-      ORDER BY name ASC;
-      `,
-    );
-    return result.rows;
+    const result = await prisma.message_templates.findMany({
+      orderBy: { name: 'asc' },
+    });
+    return result as unknown as MessageTemplateRow[];
   } catch (err) {
     logger?.error('listMessageTemplates failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1420,25 +1206,19 @@ export const insertMessageTemplate = async (
   createdBy: string | null,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<MessageTemplateRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<MessageTemplateRow>(
-      `
-      INSERT INTO message_templates (name, body, created_by)
-      VALUES ($1, $2, $3)
-      RETURNING *;
-      `,
-      [name, body, createdBy],
-    );
-    const row = result.rows[0];
-    if (!row) throw new Error('Failed to insert template');
-    return row;
+    const result = await prisma.message_templates.create({
+      data: {
+        name,
+        body,
+        created_by: createdBy ?? undefined,
+      },
+    });
+    return result as unknown as MessageTemplateRow;
   } catch (err) {
     logger?.error('insertMessageTemplate failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1446,16 +1226,15 @@ export const deleteMessageTemplate = async (
   id: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<boolean> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query('DELETE FROM message_templates WHERE id = $1;', [id]);
-    return (result.rowCount ?? 0) > 0;
+    const result = await prisma.message_templates.delete({
+      where: { id },
+    });
+    return !!result;
   } catch (err) {
     logger?.error('deleteMessageTemplate failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1466,28 +1245,27 @@ export const updateObjectionTags = async (
   tags: string[],
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<{ conversation_id: string; objection_tags: string[] }> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    await client.query(
-      'INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING',
-      [conversationId],
-    );
-    const result = await client.query<{ conversation_id: string; objection_tags: string[] }>(
-      `UPDATE conversation_state
-       SET objection_tags = $2::text[], updated_at = NOW()
-       WHERE conversation_id = $1
-       RETURNING conversation_id, objection_tags`,
-      [conversationId, tags],
-    );
-    const row = result.rows[0];
-    if (!row) throw new Error('Conversation state not found');
-    return row;
+    const result = await prisma.conversation_state.upsert({
+      where: { conversation_id: conversationId },
+      update: {
+        objection_tags: tags,
+        updated_at: new Date(),
+      },
+      create: {
+        conversation_id: conversationId,
+        objection_tags: tags,
+      },
+      select: {
+        conversation_id: true,
+        objection_tags: true,
+      },
+    });
+    return result;
   } catch (err) {
     logger?.error('updateObjectionTags failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1501,28 +1279,27 @@ export const updateCallOutcome = async (
   outcome: string | null,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<{ conversation_id: string; call_outcome: string | null }> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    await client.query(
-      'INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING',
-      [conversationId],
-    );
-    const result = await client.query<{ conversation_id: string; call_outcome: string | null }>(
-      `UPDATE conversation_state
-       SET call_outcome = $2, updated_at = NOW()
-       WHERE conversation_id = $1
-       RETURNING conversation_id, call_outcome`,
-      [conversationId, outcome],
-    );
-    const row = result.rows[0];
-    if (!row) throw new Error('Conversation state not found');
-    return row;
+    const result = await prisma.conversation_state.upsert({
+      where: { conversation_id: conversationId },
+      update: {
+        call_outcome: outcome,
+        updated_at: new Date(),
+      },
+      create: {
+        conversation_id: conversationId,
+        call_outcome: outcome,
+      },
+      select: {
+        conversation_id: true,
+        call_outcome: true,
+      },
+    });
+    return result;
   } catch (err) {
     logger?.error('updateCallOutcome failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1532,28 +1309,28 @@ export const incrementGuardrailOverride = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<{ conversation_id: string; guardrail_override_count: number }> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    await client.query(
-      'INSERT INTO conversation_state (conversation_id) VALUES ($1) ON CONFLICT (conversation_id) DO NOTHING',
-      [conversationId],
+    // Replicating the increment behavior via upsert.
+    // However, Prisma doesn't support relative increments in create.
+    // So we first find or create, then update, or just use raw if it's cleaner.
+    // Let's use raw to be safe and efficient for increments.
+    const result = await prisma.$queryRawUnsafe<any[]>(
+      `
+      INSERT INTO conversation_state (conversation_id, guardrail_override_count)
+      VALUES ($1::uuid, 1)
+      ON CONFLICT (conversation_id)
+      DO UPDATE SET
+        guardrail_override_count = conversation_state.guardrail_override_count + 1,
+        updated_at = NOW()
+      RETURNING conversation_id, guardrail_override_count;
+      `,
+      conversationId,
     );
-    const result = await client.query<{ conversation_id: string; guardrail_override_count: number }>(
-      `UPDATE conversation_state
-       SET guardrail_override_count = guardrail_override_count + 1, updated_at = NOW()
-       WHERE conversation_id = $1
-       RETURNING conversation_id, guardrail_override_count`,
-      [conversationId],
-    );
-    const row = result.rows[0];
-    if (!row) throw new Error('Conversation state not found');
-    return row;
+    return result[0];
   } catch (err) {
     logger?.error('incrementGuardrailOverride failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1570,10 +1347,9 @@ export type StageConversionRow = {
 export const getStageConversionAnalytics = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<StageConversionRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<StageConversionRow>(`
+    const result = await prisma.$queryRawUnsafe<StageConversionRow[]>(`
       SELECT
         COALESCE(s.escalation_level, 1) AS escalation_level,
         COUNT(DISTINCT c.id)::int AS total_conversations,
@@ -1590,12 +1366,10 @@ export const getStageConversionAnalytics = async (
       GROUP BY COALESCE(s.escalation_level, 1)
       ORDER BY escalation_level ASC
     `);
-    return result.rows;
+    return result;
   } catch (err) {
     logger?.error('getStageConversionAnalytics failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1615,10 +1389,9 @@ export type SetterAssistPerformanceRow = {
 export const getObjectionFrequencyAnalytics = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ObjectionFrequencyRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<ObjectionFrequencyRow>(`
+    const result = await prisma.$queryRawUnsafe<ObjectionFrequencyRow[]>(`
       SELECT
         unnested.tag,
         COUNT(*)::int AS count
@@ -1628,22 +1401,19 @@ export const getObjectionFrequencyAnalytics = async (
       GROUP BY unnested.tag
       ORDER BY count DESC
     `);
-    return result.rows;
+    return result;
   } catch (err) {
     logger?.error('getObjectionFrequencyAnalytics failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
 export const getSetterAssistPerformanceAnalytics = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SetterAssistPerformanceRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<SetterAssistPerformanceRow>(`
+    const result = await prisma.$queryRawUnsafe<SetterAssistPerformanceRow[]>(`
       WITH attempts AS (
         SELECT
           sa.id,
@@ -1688,12 +1458,10 @@ export const getSetterAssistPerformanceAnalytics = async (
       ORDER BY sent_count DESC, replied_count DESC, e.chip_label ASC
       LIMIT 12
     `);
-    return result.rows;
+    return result;
   } catch (err) {
     logger?.error('getSetterAssistPerformanceAnalytics failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1716,8 +1484,7 @@ export const listConversionExamples = async (
     }
   >
 > => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
     const where: string[] = [];
     const values: Array<string | number> = [];
@@ -1736,18 +1503,11 @@ export const listConversionExamples = async (
       values.push(`%${params.preferredOwnerLabel.trim().toLowerCase()}%`);
     }
 
-    values.push(Math.max(1, Math.min(params.limit, 50)));
+    const limit = Math.max(1, Math.min(params.limit, 50));
     const limitPlaceholder = `$${i++}`;
+    values.push(limit);
 
-    const result = await client.query<
-      ConversionExampleRow & {
-        outbound_body: string | null;
-        outbound_user: string | null;
-        source_inbound_body: string | null;
-        source_conversation_id: string | null;
-        source_outbound_ts: string | null;
-      }
-    >(
+    const result = await prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
         ce.*,
@@ -1773,15 +1533,13 @@ export const listConversionExamples = async (
       ORDER BY ce.created_at DESC
       LIMIT ${limitPlaceholder};
       `,
-      values,
+      ...values,
     );
 
-    return result.rows;
+    return result;
   } catch (err) {
     logger?.error('listConversionExamples failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -1793,8 +1551,7 @@ export const listSetterVoiceExamples = async (
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SetterVoiceExampleRow[]> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
     const owner = params.ownerLabel.trim().toLowerCase();
     if (!owner) return [];
@@ -1812,10 +1569,11 @@ export const listSetterVoiceExamples = async (
       values.push(params.escalationLevel);
     }
 
-    values.push(Math.max(1, Math.min(params.limit, 30)));
+    const limit = Math.max(1, Math.min(params.limit, 30));
     const limitPlaceholder = `$${i++}`;
+    values.push(limit);
 
-    const result = await client.query<SetterVoiceExampleRow>(
+    const result = await prisma.$queryRawUnsafe<SetterVoiceExampleRow[]>(
       `
       SELECT
         e.id,
@@ -1835,14 +1593,12 @@ export const listSetterVoiceExamples = async (
         e.event_ts DESC
       LIMIT ${limitPlaceholder};
       `,
-      values,
+      ...values,
     );
 
-    return result.rows;
+    return result;
   } catch (err) {
     logger?.error('listSetterVoiceExamples failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };

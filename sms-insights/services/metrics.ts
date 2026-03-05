@@ -1,14 +1,7 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+const getPrisma = () => getPrismaClient();
 
 export type MetricsOverview = {
   windowDays: number;
@@ -65,15 +58,14 @@ export const getMetricsOverview = async (
   params: { windowDays: number; repId?: string },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<MetricsOverview> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<{
-      open_work_items: string;
-      overdue_work_items: string;
-      open_needs_reply: string;
-      overdue_needs_reply: string;
-    }>(
+    const result = await prisma.$queryRawUnsafe<{
+      open_work_items: string | number | bigint;
+      overdue_work_items: string | number | bigint;
+      open_needs_reply: string | number | bigint;
+      overdue_needs_reply: string | number | bigint;
+    }[]>(
       `
       WITH open_items AS (
         SELECT wi.*
@@ -88,22 +80,20 @@ export const getMetricsOverview = async (
         (SELECT COUNT(*) FROM open_items WHERE type = 'needs_reply' AND due_at IS NOT NULL AND due_at < NOW()) AS overdue_needs_reply
       ;
       `,
-      [params.repId ?? null],
+      params.repId ?? null,
     );
 
-    const row = result.rows[0];
+    const row = result[0];
     return {
       windowDays: params.windowDays,
-      openWorkItems: Number.parseInt(row?.open_work_items ?? '0', 10),
-      overdueWorkItems: Number.parseInt(row?.overdue_work_items ?? '0', 10),
-      openNeedsReply: Number.parseInt(row?.open_needs_reply ?? '0', 10),
-      overdueNeedsReply: Number.parseInt(row?.overdue_needs_reply ?? '0', 10),
+      openWorkItems: Number(row?.open_work_items ?? 0),
+      overdueWorkItems: Number(row?.overdue_work_items ?? 0),
+      openNeedsReply: Number(row?.open_needs_reply ?? 0),
+      overdueNeedsReply: Number(row?.overdue_needs_reply ?? 0),
     };
   } catch (err) {
     logger?.error('getMetricsOverview failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -111,24 +101,18 @@ export const getSlaMetrics = async (
   params: { windowDays: number; repId?: string },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SlaMetrics> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    // Approximate response time:
-    // For each inbound event in window, find the first outbound event after it for the same contact_id/phone.
-    // This is a v1 approximation until sms_events has conversation_id and we can do exact pairing.
-    // IMPORTANT: when repId is not provided, pass NULL (not undefined) so Postgres can infer $1::text.
-    // Some pg query plans can still error with 42P18 if the driver sends an "unknown" typed param.
     const repIdParam: string | null = params.repId ? String(params.repId) : null;
 
-    const result = await client.query<{
-      open_needs_reply: string;
-      overdue_needs_reply: string;
+    const result = await prisma.$queryRawUnsafe<{
+      open_needs_reply: string | number | bigint;
+      overdue_needs_reply: string | number | bigint;
       p50_minutes: number | null;
       p75_minutes: number | null;
       p90_minutes: number | null;
       p95_minutes: number | null;
-    }>(
+    }[]>(
       `
       WITH _params AS (
         SELECT $1::text AS rep_id, $2::int AS window_days
@@ -162,7 +146,7 @@ export const getSlaMetrics = async (
           LIMIT 1
         ) o ON TRUE
       ),
-      open_needs_reply AS (
+      open_needs_reply_items AS (
         SELECT wi.*
         FROM work_items wi
         CROSS JOIN _params p
@@ -171,24 +155,24 @@ export const getSlaMetrics = async (
           AND (p.rep_id IS NULL OR wi.rep_id = p.rep_id)
       )
       SELECT
-        (SELECT COUNT(*) FROM open_needs_reply) AS open_needs_reply,
-        (SELECT COUNT(*) FROM open_needs_reply WHERE due_at IS NOT NULL AND due_at < NOW()) AS overdue_needs_reply,
+        (SELECT COUNT(*) FROM open_needs_reply_items) AS open_needs_reply,
+        (SELECT COUNT(*) FROM open_needs_reply_items WHERE due_at IS NOT NULL AND due_at < NOW()) AS overdue_needs_reply,
         (SELECT percentile_cont(0.50) WITHIN GROUP (ORDER BY minutes) FROM response_times) AS p50_minutes,
         (SELECT percentile_cont(0.75) WITHIN GROUP (ORDER BY minutes) FROM response_times) AS p75_minutes,
         (SELECT percentile_cont(0.90) WITHIN GROUP (ORDER BY minutes) FROM response_times) AS p90_minutes,
         (SELECT percentile_cont(0.95) WITHIN GROUP (ORDER BY minutes) FROM response_times) AS p95_minutes
       ;
       `,
-      [repIdParam, params.windowDays],
+      repIdParam,
+      params.windowDays,
     );
 
-    const row = result.rows[0];
-    const openNeedsReply = Number.parseInt(row?.open_needs_reply ?? '0', 10);
-    const overdueNeedsReply = Number.parseInt(row?.overdue_needs_reply ?? '0', 10);
+    const row = result[0];
+    const openNeedsReply = Number(row?.open_needs_reply ?? 0);
+    const overdueNeedsReply = Number(row?.overdue_needs_reply ?? 0);
     const breachRate = openNeedsReply > 0 ? overdueNeedsReply / openNeedsReply : 0;
 
-    // Calculate buckets from response_times
-    const bucketResult = await client.query<{ bucket: string; count: string }>(
+    const bucketResult = await prisma.$queryRawUnsafe<{ bucket: string; count: string | number | bigint }[]>(
       `
       WITH _params AS (
         SELECT $1::text AS rep_id, $2::int AS window_days
@@ -234,7 +218,8 @@ export const getSlaMetrics = async (
       FROM response_times
       GROUP BY 1;
       `,
-      [repIdParam, params.windowDays],
+      repIdParam,
+      params.windowDays,
     );
 
     const buckets: ResponseTimeBucket[] = [
@@ -245,9 +230,9 @@ export const getSlaMetrics = async (
       { bucket: '180+', count: 0 },
     ];
 
-    for (const r of bucketResult.rows) {
+    for (const r of bucketResult) {
       const b = buckets.find((b) => b.bucket === r.bucket);
-      if (b) b.count = Number.parseInt(r.count, 10);
+      if (b) b.count = Number(r.count);
     }
 
     return {
@@ -255,17 +240,15 @@ export const getSlaMetrics = async (
       openNeedsReply,
       overdueNeedsReply,
       breachRate,
-      p50Minutes: typeof row?.p50_minutes === 'number' ? row.p50_minutes : null,
-      p75Minutes: typeof row?.p75_minutes === 'number' ? row.p75_minutes : null,
-      p90Minutes: typeof row?.p90_minutes === 'number' ? row.p90_minutes : null,
-      p95Minutes: typeof row?.p95_minutes === 'number' ? row.p95_minutes : null,
+      p50Minutes: row?.p50_minutes ?? null,
+      p75Minutes: row?.p75_minutes ?? null,
+      p90Minutes: row?.p90_minutes ?? null,
+      p95Minutes: row?.p95_minutes ?? null,
       buckets,
     };
   } catch (err) {
     logger?.error('getSlaMetrics failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -273,18 +256,17 @@ export const getWorkloadByRepMetrics = async (
   params: { windowDays: number },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<WorkloadByRepMetrics> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<{
+    const result = await prisma.$queryRawUnsafe<{
       rep_id: string | null;
-      conversations_with_open_items: string;
-      open_work_items: string;
-      overdue_work_items: string;
-      open_needs_reply: string;
-      overdue_needs_reply: string;
-      high_severity_open: string;
-    }>(
+      conversations_with_open_items: string | number | bigint;
+      open_work_items: string | number | bigint;
+      overdue_work_items: string | number | bigint;
+      open_needs_reply: string | number | bigint;
+      overdue_needs_reply: string | number | bigint;
+      high_severity_open: string | number | bigint;
+    }[]>(
       `
       WITH open_items AS (
         SELECT wi.*
@@ -311,21 +293,19 @@ export const getWorkloadByRepMetrics = async (
 
     return {
       windowDays: params.windowDays,
-      rows: result.rows.map((r) => ({
+      rows: result.map((r) => ({
         repId: r.rep_id,
-        conversationsWithOpenItems: Number.parseInt(r.conversations_with_open_items ?? '0', 10),
-        openWorkItems: Number.parseInt(r.open_work_items ?? '0', 10),
-        overdueWorkItems: Number.parseInt(r.overdue_work_items ?? '0', 10),
-        openNeedsReply: Number.parseInt(r.open_needs_reply ?? '0', 10),
-        overdueNeedsReply: Number.parseInt(r.overdue_needs_reply ?? '0', 10),
-        highSeverityOpen: Number.parseInt(r.high_severity_open ?? '0', 10),
+        conversationsWithOpenItems: Number(r.conversations_with_open_items),
+        openWorkItems: Number(r.open_work_items),
+        overdueWorkItems: Number(r.overdue_work_items),
+        openNeedsReply: Number(r.open_needs_reply),
+        overdueNeedsReply: Number(r.overdue_needs_reply),
+        highSeverityOpen: Number(r.high_severity_open),
       })),
     };
   } catch (err) {
     logger?.error('getWorkloadByRepMetrics failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -333,14 +313,13 @@ export const getVolumeByDayMetrics = async (
   params: { windowDays: number },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<VolumeByDayMetrics> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<{
+    const result = await prisma.$queryRawUnsafe<{
       day: string;
-      inbound: string;
-      outbound: string;
-    }>(
+      inbound: string | number | bigint;
+      outbound: string | number | bigint;
+    }[]>(
       `
       WITH days AS (
         SELECT generate_series(
@@ -360,28 +339,26 @@ export const getVolumeByDayMetrics = async (
       )
       SELECT
         d.day::text AS day,
-        COALESCE(c.inbound, 0)::text AS inbound,
-        COALESCE(c.outbound, 0)::text AS outbound
+        COALESCE(c.inbound, 0) AS inbound,
+        COALESCE(c.outbound, 0) AS outbound
       FROM days d
       LEFT JOIN counts c ON c.day = d.day
       ORDER BY d.day ASC
       ;
       `,
-      [params.windowDays],
+      params.windowDays,
     );
 
     return {
       windowDays: params.windowDays,
-      rows: result.rows.map((r) => ({
+      rows: result.map((r) => ({
         day: r.day,
-        inbound: Number.parseInt(r.inbound ?? '0', 10),
-        outbound: Number.parseInt(r.outbound ?? '0', 10),
+        inbound: Number(r.inbound),
+        outbound: Number(r.outbound),
       })),
     };
   } catch (err) {
     logger?.error('getVolumeByDayMetrics failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };

@@ -1,6 +1,7 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
+
+const getPrisma = () => getPrismaClient();
 
 export type SmsEventDirection = 'inbound' | 'outbound' | 'unknown';
 
@@ -26,7 +27,7 @@ export type SmsEventRow = {
   slack_team_id: string;
   slack_channel_id: string;
   slack_message_ts: string;
-  event_ts: string;
+  event_ts: Date;
   direction: SmsEventDirection;
   contact_id: string | null;
   contact_phone: string | null;
@@ -37,82 +38,60 @@ export type SmsEventRow = {
   sequence: string | null;
   conversation_id: string | null;
   raw: unknown | null;
-  created_at: string;
+  created_at: Date;
 };
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+// No longer need getDbOrThrow as getPrisma handles error states or lazy initialization.
 
 export const insertSmsEvent = async (
   event: NewSmsEvent,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SmsEventRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
-  try {
-    // Idempotent insert: unique (slack_channel_id, slack_message_ts)
-    const result = await client.query<SmsEventRow>(
-      `
-      INSERT INTO sms_events (
-        slack_team_id,
-        slack_channel_id,
-        slack_message_ts,
-        event_ts,
-        direction,
-        contact_id,
-        contact_phone,
-        contact_name,
-        aloware_user,
-        body,
-        line,
-        sequence,
-        conversation_id,
-        raw
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-      ON CONFLICT (slack_channel_id, slack_message_ts)
-      DO UPDATE SET
-        -- keep the first write as source of truth, but allow filling missing fields
-        contact_id = COALESCE(sms_events.contact_id, EXCLUDED.contact_id),
-        contact_phone = COALESCE(sms_events.contact_phone, EXCLUDED.contact_phone),
-        contact_name = COALESCE(sms_events.contact_name, EXCLUDED.contact_name),
-        aloware_user = COALESCE(sms_events.aloware_user, EXCLUDED.aloware_user),
-        body = COALESCE(sms_events.body, EXCLUDED.body),
-        line = COALESCE(sms_events.line, EXCLUDED.line),
-        sequence = COALESCE(sms_events.sequence, EXCLUDED.sequence),
-        conversation_id = COALESCE(sms_events.conversation_id, EXCLUDED.conversation_id),
-        raw = COALESCE(sms_events.raw, EXCLUDED.raw)
-      RETURNING *;
-    `,
-      [
-        event.slackTeamId,
-        event.slackChannelId,
-        event.slackMessageTs,
-        event.eventTs,
-        event.direction,
-        event.contactId ?? null,
-        event.contactPhone ?? null,
-        event.contactName ?? null,
-        event.alowareUser ?? null,
-        event.body ?? null,
-        event.line ?? null,
-        event.sequence ?? null,
-        event.conversationId ?? null,
-        event.raw ?? null,
-      ],
-    );
+  const prisma = getPrisma();
 
-    return result.rows[0] ?? null;
+  try {
+    const data = {
+      slack_team_id: event.slackTeamId,
+      slack_channel_id: event.slackChannelId,
+      slack_message_ts: event.slackMessageTs,
+      event_ts: event.eventTs,
+      direction: event.direction,
+      contact_id: event.contactId ?? null,
+      contact_phone: event.contactPhone ?? null,
+      contact_name: event.contactName ?? null,
+      aloware_user: event.alowareUser ?? null,
+      body: event.body ?? null,
+      line: event.line ?? null,
+      sequence: event.sequence ?? null,
+      conversation_id: event.conversationId ?? null,
+      raw: (event.raw as any) ?? null,
+    };
+
+    const result = await prisma.sms_events.upsert({
+      where: {
+        slack_channel_id_slack_message_ts: {
+          slack_channel_id: event.slackChannelId,
+          slack_message_ts: event.slackMessageTs,
+        },
+      },
+      create: data,
+      update: {
+        contact_id: data.contact_id,
+        contact_phone: data.contact_phone,
+        contact_name: data.contact_name,
+        aloware_user: data.aloware_user,
+        body: data.body,
+        line: data.line,
+        sequence: data.sequence,
+        conversation_id: data.conversation_id,
+        raw: data.raw,
+      },
+    });
+
+    return result as unknown as SmsEventRow;
   } catch (err) {
     logger?.error('insertSmsEvent failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -121,23 +100,24 @@ export const linkSmsEventToConversation = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<void> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
+
   try {
-    await client.query(
-      `
-      UPDATE sms_events
-      SET conversation_id = $2
-      WHERE id = $1
-        AND (conversation_id IS NULL OR conversation_id = $2);
-      `,
-      [eventId, conversationId],
-    );
+    await prisma.sms_events.updateMany({
+      where: {
+        id: eventId,
+        OR: [
+          { conversation_id: null },
+          { conversation_id: conversationId },
+        ],
+      },
+      data: {
+        conversation_id: conversationId,
+      },
+    });
   } catch (err) {
     logger?.error('linkSmsEventToConversation failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -146,14 +126,22 @@ export const listWorkItemPreviewEventsByConversation = async (
   limit: number,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<Array<Pick<SmsEventRow, 'direction' | 'body' | 'event_ts'>>> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
+
   try {
-    // We don't have conversation_id on sms_events yet; this is a placeholder for later.
-    // For now, callers should use conversation.contact_id/contact_phone to query events.
-    logger?.debug?.('listWorkItemPreviewEventsByConversation called but not implemented', { conversationId, limit });
+    const results = await prisma.sms_events.findMany({
+      where: { conversation_id: conversationId },
+      orderBy: { event_ts: 'desc' },
+      take: limit,
+      select: {
+        direction: true,
+        body: true,
+        event_ts: true,
+      },
+    });
+    return results as unknown as Array<Pick<SmsEventRow, 'direction' | 'body' | 'event_ts'>>;
+  } catch (err) {
+    logger?.error('listWorkItemPreviewEventsByConversation failed', err);
     return [];
-  } finally {
-    client.release();
   }
 };

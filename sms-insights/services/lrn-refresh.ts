@@ -1,9 +1,12 @@
 import type { Logger } from '@slack/bolt';
 import { lookupAlowareNumberLrn } from './aloware-client.js';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { upsertInboxContactProfile } from './inbox-contact-profiles.js';
 
+const getPrisma = () => getPrismaClient();
+
 export type LrnBackfillOptions = {
+// ... (rest of the types same as before)
   dryRun: boolean;
   limit: number;
   offset: number;
@@ -65,10 +68,9 @@ const sleep = async (ms: number): Promise<void> => {
 };
 
 const fetchCandidates = async (options: LrnBackfillOptions): Promise<CandidateRow[]> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
-  const result = await pool.query<CandidateRow>(
+  const rows = await prisma.$queryRawUnsafe<any[]>(
     `
     SELECT
       contact_key,
@@ -86,9 +88,12 @@ const fetchCandidates = async (options: LrnBackfillOptions): Promise<CandidateRo
     LIMIT $1
     OFFSET $2
     `,
-    [options.limit, options.offset, options.forceAll, options.staleDays],
+    options.limit,
+    options.offset,
+    options.forceAll,
+    options.staleDays,
   );
-  return result.rows;
+  return rows;
 };
 
 export const getDefaultLrnBackfillOptions = (): LrnBackfillOptions => ({

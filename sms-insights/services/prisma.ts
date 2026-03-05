@@ -46,7 +46,7 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
     process.env.PRISMA_ACCELERATE_URL = config.url;
   }
 
-  const prismaClientOptions = {
+  const prismaClientOptions: any = {
     datasources: {
       db: {
         url: config.url,
@@ -55,7 +55,7 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   };
 
   if (config.mode === 'accelerate') {
-    return new PrismaClient(prismaClientOptions).$extends(withAccelerate()) as unknown as PrismaClient;
+    return (new PrismaClient(prismaClientOptions) as any).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
   return new PrismaClient(prismaClientOptions);
@@ -80,6 +80,7 @@ export const getPrismaClient = (): PrismaRuntimeClient => {
   prismaDirect = client as PrismaRuntimeClient;
   return prismaDirect;
 };
+export const getPrisma = getPrismaClient;
 
 export type PrismaStatus = {
   status: 'ok' | 'warn' | 'error';
@@ -148,7 +149,6 @@ export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
     }
     return {
       status: 'error',
-      configured: true,
       configured: true,
       detail: `Prisma query failed: ${error instanceof Error ? error.message : String(error)}`,
     };

@@ -10,9 +10,12 @@
  */
 
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { upsertConversionExample } from './inbox-store.js';
 import type { SmsEventRow } from './sms-event-store.js';
+
+const getPrisma = () => getPrismaClient();
+// ... (rest of classification patterns same as before)
 
 // ─── Structure Signature Classification ──────────────────────────────────────
 // Mirrors the patterns used in the backfill script so new examples are
@@ -96,43 +99,38 @@ export const maybeRecordConversionExample = async (
   if (inboundEvent.direction !== 'inbound') return;
   if (!inboundEvent.body || inboundEvent.body.trim().length < 5) return;
 
-  const pool = getPool();
-  if (!pool) return;
+  const prisma = getPrisma();
 
-  const client = await pool.connect();
   try {
     // ── Find the most recent qualifying outbound message ──────────────────
-    const { rows } = await client.query<{
-      id: string;
-      body: string | null;
-      sequence: string | null;
-      event_ts: string;
-    }>(
-      `
-      SELECT id, body, sequence,
-          event_ts
-      FROM sms_events
-      WHERE conversation_id = $1
-        AND direction = 'outbound'
-        AND body IS NOT NULL
-        AND LENGTH(body) >= 30
-        AND event_ts < $2::timestamptz
-        AND event_ts > $2::timestamptz - INTERVAL '48 hours'
-      ORDER BY event_ts DESC
-      LIMIT 1
-      `,
-      [conversationId, inboundEvent.event_ts],
-    );
+    const fortyEightHoursAgo = new Date(inboundEvent.event_ts.getTime() - 48 * 60 * 60 * 1000);
 
-    const outbound = rows[0];
-    if (!outbound) return; // No qualifying outbound found — skip
+    const outbound = await prisma.sms_events.findFirst({
+      where: {
+        conversation_id: conversationId,
+        direction: 'outbound',
+        body: {
+          not: null,
+          // Prisma doesn't have a direct LENGTH filter in where, so we might need a raw query or just fetch and filter.
+          // But actually, we can use a raw query if we really want the length check in DB.
+          // Given it's a small check, let's use a raw query or just accept we fetch it.
+        },
+        event_ts: {
+          lt: inboundEvent.event_ts,
+          gt: fortyEightHoursAgo,
+        },
+      },
+      orderBy: { event_ts: 'desc' },
+    });
+
+    if (!outbound || !outbound.body || outbound.body.length < 30) return;
 
     // ── Get escalation level from conversation state (default 1) ─────────
-    const { rows: stateRows } = await client.query<{ escalation_level: number }>(
-      'SELECT escalation_level FROM conversation_state WHERE conversation_id = $1 LIMIT 1',
-      [conversationId],
-    );
-    const escalationLevel = Math.max(1, Math.min(4, stateRows[0]?.escalation_level ?? 1)) as 1 | 2 | 3 | 4;
+    const state = await prisma.conversation_state.findUnique({
+      where: { conversation_id: conversationId },
+      select: { escalation_level: true },
+    });
+    const escalationLevel = Math.max(1, Math.min(4, state?.escalation_level ?? 1)) as 1 | 2 | 3 | 4;
 
     // ── Classify message structure ────────────────────────────────────────
     const structureSignature = classifyStructure(outbound.body ?? '');
@@ -159,7 +157,5 @@ export const maybeRecordConversionExample = async (
   } catch (err) {
     // Non-fatal — never let this break the main ingestion pipeline
     logger?.warn?.('[conversion-ingestion] Failed to record conversion example (non-fatal):', err);
-  } finally {
-    client.release();
   }
 };

@@ -1,5 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrisma } from './prisma.js';
 
 export type MondayLeadScope = 'curated' | 'all' | 'board_ids';
 
@@ -39,28 +39,22 @@ export const resolveMondayLeadScope = async (
   },
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondayScopeResolution> => {
-  const pool = getPool();
-  if (!pool) {
-    return {
-      scope: params.scope,
-      requestedBoardIds: normalizeBoardIds(params.boardIds),
-      includedBoardIds: [],
-      excludedBoardIds: [],
-    };
-  }
+  const prisma = getPrisma();
 
   try {
-    const boardsResult = await pool.query<{
-      board_id: string;
-      active: boolean;
-      metric_grain: 'lead_item' | 'aggregate_metric';
-      include_in_funnel: boolean;
-    }>(`
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{
+        board_id: string;
+        active: boolean;
+        metric_grain: 'lead_item' | 'aggregate_metric';
+        include_in_funnel: boolean;
+      }>
+    >(`
       SELECT board_id, active, metric_grain, include_in_funnel
       FROM monday_board_registry
       ORDER BY board_id ASC
     `);
-    const rows = boardsResult.rows;
+
     const activeRows = rows.filter((row) => row.active);
     const requestedBoardIds = normalizeBoardIds(params.boardIds);
     const requestedSet = new Set(requestedBoardIds);
@@ -146,40 +140,35 @@ export const listMondayBoardCatalog = async (
   }>;
 }> => {
   const staleThresholdHours = Math.max(1, params?.staleThresholdHours || 24);
-  const pool = getPool();
-  if (!pool) {
-    return {
-      generatedAt: new Date().toISOString(),
-      staleThresholdHours,
-      totals: { boards: 0, active: 0, funnelBoards: 0, synced: 0, stale: 0, errored: 0, empty: 0 },
-      boards: [],
-    };
-  }
+  const prisma = getPrisma();
+
   try {
-    const result = await pool.query<{
-      board_id: string;
-      board_label: string;
-      board_class: string;
-      metric_grain: string;
-      include_in_funnel: boolean;
-      include_in_exec: boolean;
-      active: boolean;
-      owner_team: string | null;
-      notes: string | null;
-      sync_status: string | null;
-      last_sync_at: string | null;
-      sync_updated_at: string | null;
-      sync_error: string | null;
-      snapshot_count: number;
-      lead_outcome_count: number;
-      lead_attribution_count: number;
-      setter_activity_count: number;
-      metric_fact_count: number;
-      source_populated: number;
-      campaign_populated: number;
-      set_by_populated: number;
-      touchpoints_populated: number;
-    }>(`
+    const rows = await prisma.$queryRawUnsafe<
+      Array<{
+        board_id: string;
+        board_label: string;
+        board_class: string;
+        metric_grain: string;
+        include_in_funnel: boolean;
+        include_in_exec: boolean;
+        active: boolean;
+        owner_team: string | null;
+        notes: string | null;
+        sync_status: string | null;
+        last_sync_at: string | Date | null;
+        sync_updated_at: string | Date | null;
+        sync_error: string | null;
+        snapshot_count: number | bigint;
+        lead_outcome_count: number | bigint;
+        lead_attribution_count: number | bigint;
+        setter_activity_count: number | bigint;
+        metric_fact_count: number | bigint;
+        source_populated: number | bigint;
+        campaign_populated: number | bigint;
+        set_by_populated: number | bigint;
+        touchpoints_populated: number | bigint;
+      }>
+    >(`
       SELECT *
       FROM analytics_board_registry_v
       ORDER BY board_class ASC, board_label ASC, board_id ASC
@@ -187,7 +176,7 @@ export const listMondayBoardCatalog = async (
 
     const staleMs = staleThresholdHours * 60 * 60 * 1000;
     const now = Date.now();
-    const boards = result.rows.map((row) => {
+    const boards = rows.map((row) => {
       const lastSyncMs = row.last_sync_at ? new Date(row.last_sync_at).getTime() : Number.NaN;
       const isStale = !Number.isFinite(lastSyncMs) || now - lastSyncMs > staleMs;
       return {
@@ -201,20 +190,20 @@ export const listMondayBoardCatalog = async (
         ownerTeam: row.owner_team,
         notes: row.notes,
         syncStatus: row.sync_status,
-        lastSyncAt: row.last_sync_at,
-        syncUpdatedAt: row.sync_updated_at,
+        lastSyncAt: row.last_sync_at ? new Date(row.last_sync_at).toISOString() : null,
+        syncUpdatedAt: row.sync_updated_at ? new Date(row.sync_updated_at).toISOString() : null,
         syncError: row.sync_error,
         isStale,
-        snapshotCount: row.snapshot_count,
-        leadOutcomeCount: row.lead_outcome_count,
-        leadAttributionCount: row.lead_attribution_count,
-        setterActivityCount: row.setter_activity_count,
-        metricFactCount: row.metric_fact_count,
+        snapshotCount: Number(row.snapshot_count || 0),
+        leadOutcomeCount: Number(row.lead_outcome_count || 0),
+        leadAttributionCount: Number(row.lead_attribution_count || 0),
+        setterActivityCount: Number(row.setter_activity_count || 0),
+        metricFactCount: Number(row.metric_fact_count || 0),
         coverage: {
-          sourcePopulated: row.source_populated,
-          campaignPopulated: row.campaign_populated,
-          setByPopulated: row.set_by_populated,
-          touchpointsPopulated: row.touchpoints_populated,
+          sourcePopulated: Number(row.source_populated || 0),
+          campaignPopulated: Number(row.campaign_populated || 0),
+          setByPopulated: Number(row.set_by_populated || 0),
+          touchpointsPopulated: Number(row.touchpoints_populated || 0),
         },
       };
     });
@@ -274,23 +263,9 @@ export const getMondayScorecards = async (
     totalValue: number | null;
   }>;
 }> => {
-  const pool = getPool();
-  if (!pool) {
-    return {
-      window: { fromDay: params.fromDay, toDay: params.toDay, timeZone: params.timeZone },
-      filters: {
-        boardClass: params.boardClass || null,
-        metricOwner: params.metricOwner || null,
-        metricName: params.metricName || null,
-      },
-      totals: { rows: 0, boards: 0, metrics: 0 },
-      metrics: [],
-      trendByDay: [],
-      byOwner: [],
-    };
-  }
+  const prisma = getPrisma();
 
-  const values: string[] = [params.fromDay, params.toDay];
+  const values: any[] = [params.fromDay, params.toDay];
   const where: string[] = ['metric_date BETWEEN $1::date AND $2::date'];
   if ((params.boardClass || '').trim()) {
     values.push((params.boardClass || '').trim());
@@ -307,8 +282,8 @@ export const getMondayScorecards = async (
   const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   try {
-    const [totals, metrics, trend, owners] = await Promise.all([
-      pool.query<{ rows: number; boards: number; metrics: number }>(
+    const [totalsResult, metricsResult, trendResult, ownersResult] = await Promise.all([
+      prisma.$queryRawUnsafe<Array<{ rows: number | bigint; boards: number | bigint; metrics: number | bigint }>>(
         `
         SELECT
           COUNT(*)::int AS rows,
@@ -317,15 +292,17 @@ export const getMondayScorecards = async (
         FROM analytics_monday_scorecard_fact_v
         ${whereSql}
       `,
-        values,
+        ...values,
       ),
-      pool.query<{
-        metric_name: string;
-        row_count: number;
-        boards: number;
-        total_value: number | null;
-        avg_value: number | null;
-      }>(
+      prisma.$queryRawUnsafe<
+        Array<{
+          metric_name: string;
+          row_count: number | bigint;
+          boards: number | bigint;
+          total_value: number | bigint | null;
+          avg_value: number | bigint | null;
+        }>
+      >(
         `
         SELECT
           metric_name,
@@ -339,9 +316,11 @@ export const getMondayScorecards = async (
         ORDER BY row_count DESC, metric_name ASC
         LIMIT 50
       `,
-        values,
+        ...values,
       ),
-      pool.query<{ day: string; metric_name: string; value: number | null; row_count: number }>(
+      prisma.$queryRawUnsafe<
+        Array<{ day: string | Date; metric_name: string; value: number | bigint | null; row_count: number | bigint }>
+      >(
         `
         SELECT
           metric_date::text AS day,
@@ -354,14 +333,16 @@ export const getMondayScorecards = async (
         ORDER BY metric_date ASC, metric_name ASC
         LIMIT 1000
       `,
-        values,
+        ...values,
       ),
-      pool.query<{
-        metric_owner: string;
-        role: 'setter' | 'closer' | 'other';
-        row_count: number;
-        total_value: number | null;
-      }>(
+      prisma.$queryRawUnsafe<
+        Array<{
+          metric_owner: string;
+          role: 'setter' | 'closer' | 'other';
+          row_count: number | bigint;
+          total_value: number | bigint | null;
+        }>
+      >(
         `
         WITH actor_match AS (
           SELECT
@@ -394,9 +375,11 @@ export const getMondayScorecards = async (
         ORDER BY row_count DESC, metric_owner ASC
         LIMIT 50
       `,
-        values,
+        ...values,
       ),
     ]);
+
+    const totalsRow = totalsResult[0];
 
     return {
       window: { fromDay: params.fromDay, toDay: params.toDay, timeZone: params.timeZone },
@@ -405,25 +388,29 @@ export const getMondayScorecards = async (
         metricOwner: params.metricOwner || null,
         metricName: params.metricName || null,
       },
-      totals: totals.rows[0] || { rows: 0, boards: 0, metrics: 0 },
-      metrics: metrics.rows.map((row) => ({
+      totals: {
+        rows: Number(totalsRow?.rows || 0),
+        boards: Number(totalsRow?.boards || 0),
+        metrics: Number(totalsRow?.metrics || 0),
+      },
+      metrics: metricsResult.map((row) => ({
         metricName: row.metric_name,
-        rowCount: row.row_count,
-        boards: row.boards,
-        totalValue: row.total_value,
-        avgValue: row.avg_value,
+        rowCount: Number(row.row_count),
+        boards: Number(row.boards),
+        totalValue: row.total_value !== null ? Number(row.total_value) : null,
+        avgValue: row.avg_value !== null ? Number(row.avg_value) : null,
       })),
-      trendByDay: trend.rows.map((row) => ({
-        day: row.day,
+      trendByDay: trendResult.map((row) => ({
+        day: row.day instanceof Date ? row.day.toISOString().split('T')[0] : String(row.day),
         metricName: row.metric_name,
-        value: row.value,
-        rowCount: row.row_count,
+        value: row.value !== null ? Number(row.value) : null,
+        rowCount: Number(row.row_count),
       })),
-      byOwner: owners.rows.map((row) => ({
+      byOwner: ownersResult.map((row) => ({
         metricOwner: row.metric_owner,
         role: row.role,
-        rowCount: row.row_count,
-        totalValue: row.total_value,
+        rowCount: Number(row.row_count),
+        totalValue: row.total_value !== null ? Number(row.total_value) : null,
       })),
     };
   } catch (error) {

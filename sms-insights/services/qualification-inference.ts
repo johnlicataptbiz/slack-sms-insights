@@ -36,7 +36,8 @@ type InferenceOptions = {
   allowOverwriteKnown?: boolean;
 };
 
-const toEpochMs = (value: string): number => {
+const toEpochMs = (value: string | Date): number => {
+  if (value instanceof Date) return value.getTime();
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
 };

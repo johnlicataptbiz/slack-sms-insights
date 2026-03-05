@@ -1,4 +1,6 @@
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
+
+const getPrisma = () => getPrismaClient();
 
 // ─── Line Performance Analytics ────────────────────────────────────────────────
 
@@ -30,20 +32,19 @@ export const getLinePerformanceAnalytics = async (params: {
   to: Date;
   timeZone?: string;
 }): Promise<LinePerformanceAnalytics> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   const fromIso = params.from.toISOString();
   const toIso = params.to.toISOString();
 
-  const { rows } = await pool.query<{
+  const rows = await prisma.$queryRawUnsafe<{
     line: string;
-    messages_sent: string;
-    replies_received: string;
-    opt_outs: string;
-    booking_signals: string;
-    unique_contacts: string;
-  }>(
+    messages_sent: number | bigint;
+    replies_received: number | bigint;
+    opt_outs: number | bigint;
+    booking_signals: number | bigint;
+    unique_contacts: number | bigint;
+  }[]>(
     `
     WITH outbound_stats AS (
       SELECT
@@ -80,22 +81,23 @@ export const getLinePerformanceAnalytics = async (params: {
     )
     SELECT
       o.line,
-      o.messages_sent::text,
-      COALESCE(i.replies_received, 0)::text AS replies_received,
-      COALESCE(i.opt_outs, 0)::text AS opt_outs,
-      COALESCE(i.booking_signals, 0)::text AS booking_signals,
-      o.unique_contacts::text
+      o.messages_sent,
+      COALESCE(i.replies_received, 0) AS replies_received,
+      COALESCE(i.opt_outs, 0) AS opt_outs,
+      COALESCE(i.booking_signals, 0) AS booking_signals,
+      o.unique_contacts
     FROM outbound_stats o
     LEFT JOIN inbound_stats i ON o.line = i.line
     ORDER BY o.messages_sent DESC
     `,
-    [fromIso, toIso],
+    fromIso,
+    toIso,
   );
 
   const lines: LinePerformanceRow[] = rows.map((row) => {
-    const messagesSent = Number.parseInt(row.messages_sent, 10);
-    const repliesReceived = Number.parseInt(row.replies_received, 10);
-    const optOuts = Number.parseInt(row.opt_outs, 10);
+    const messagesSent = Number(row.messages_sent);
+    const repliesReceived = Number(row.replies_received);
+    const optOuts = Number(row.opt_outs);
 
     return {
       line: row.line,
@@ -104,8 +106,8 @@ export const getLinePerformanceAnalytics = async (params: {
       replyRatePct: messagesSent > 0 ? (repliesReceived / messagesSent) * 100 : 0,
       optOuts,
       optOutRatePct: messagesSent > 0 ? (optOuts / messagesSent) * 100 : 0,
-      bookingSignals: Number.parseInt(row.booking_signals, 10),
-      uniqueContacts: Number.parseInt(row.unique_contacts, 10),
+      bookingSignals: Number(row.booking_signals),
+      uniqueContacts: Number(row.unique_contacts),
     };
   });
 
@@ -152,72 +154,71 @@ export type QualificationFunnelAnalytics = {
 };
 
 export const getQualificationFunnelAnalytics = async (): Promise<QualificationFunnelAnalytics> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
-  const { rows: funnelRows } = await pool.query<{
-    total_conversations: string;
-    qualified_conversations: string;
-    full_time: string;
-    part_time: string;
-    employment_unknown: string;
-    mostly_cash: string;
-    mostly_insurance: string;
-    balanced: string;
-    revenue_unknown: string;
-    high_interest: string;
-    medium_interest: string;
-    low_interest: string;
-    interest_unknown: string;
-    level_1: string;
-    level_2: string;
-    level_3: string;
-    level_4: string;
-    cadence_idle: string;
-    cadence_podcast_sent: string;
-    cadence_call_offered: string;
-    cadence_nurture_pool: string;
-  }>(`
+  const funnelRows = await prisma.$queryRawUnsafe<{
+    total_conversations: number | bigint;
+    qualified_conversations: number | bigint;
+    full_time: number | bigint;
+    part_time: number | bigint;
+    employment_unknown: number | bigint;
+    mostly_cash: number | bigint;
+    mostly_insurance: number | bigint;
+    balanced: number | bigint;
+    revenue_unknown: number | bigint;
+    high_interest: number | bigint;
+    medium_interest: number | bigint;
+    low_interest: number | bigint;
+    interest_unknown: number | bigint;
+    level_1: number | bigint;
+    level_2: number | bigint;
+    level_3: number | bigint;
+    level_4: number | bigint;
+    cadence_idle: number | bigint;
+    cadence_podcast_sent: number | bigint;
+    cadence_call_offered: number | bigint;
+    cadence_nurture_pool: number | bigint;
+  }[]>(`
     SELECT
-      COUNT(DISTINCT c.id)::text AS total_conversations,
-      COUNT(DISTINCT cs.conversation_id)::text AS qualified_conversations,
-      COUNT(DISTINCT CASE WHEN cs.qualification_full_or_part_time = 'full_time' THEN cs.conversation_id END)::text AS full_time,
-      COUNT(DISTINCT CASE WHEN cs.qualification_full_or_part_time = 'part_time' THEN cs.conversation_id END)::text AS part_time,
-      COUNT(DISTINCT CASE WHEN cs.qualification_full_or_part_time = 'unknown' OR cs.qualification_full_or_part_time IS NULL THEN cs.conversation_id END)::text AS employment_unknown,
-      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'mostly_cash' THEN cs.conversation_id END)::text AS mostly_cash,
-      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'mostly_insurance' THEN cs.conversation_id END)::text AS mostly_insurance,
-      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'balanced' THEN cs.conversation_id END)::text AS balanced,
-      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'unknown' OR cs.qualification_revenue_mix IS NULL THEN cs.conversation_id END)::text AS revenue_unknown,
-      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'high' THEN cs.conversation_id END)::text AS high_interest,
-      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'medium' THEN cs.conversation_id END)::text AS medium_interest,
-      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'low' THEN cs.conversation_id END)::text AS low_interest,
-      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'unknown' OR cs.qualification_coaching_interest IS NULL THEN cs.conversation_id END)::text AS interest_unknown,
-      COUNT(DISTINCT CASE WHEN cs.escalation_level = 1 THEN cs.conversation_id END)::text AS level_1,
-      COUNT(DISTINCT CASE WHEN cs.escalation_level = 2 THEN cs.conversation_id END)::text AS level_2,
-      COUNT(DISTINCT CASE WHEN cs.escalation_level = 3 THEN cs.conversation_id END)::text AS level_3,
-      COUNT(DISTINCT CASE WHEN cs.escalation_level = 4 THEN cs.conversation_id END)::text AS level_4,
-      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'idle' THEN cs.conversation_id END)::text AS cadence_idle,
-      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'podcast_sent' THEN cs.conversation_id END)::text AS cadence_podcast_sent,
-      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'call_offered' THEN cs.conversation_id END)::text AS cadence_call_offered,
-      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'nurture_pool' THEN cs.conversation_id END)::text AS cadence_nurture_pool
+      COUNT(DISTINCT c.id) AS total_conversations,
+      COUNT(DISTINCT cs.conversation_id) AS qualified_conversations,
+      COUNT(DISTINCT CASE WHEN cs.qualification_full_or_part_time = 'full_time' THEN cs.conversation_id END) AS full_time,
+      COUNT(DISTINCT CASE WHEN cs.qualification_full_or_part_time = 'part_time' THEN cs.conversation_id END) AS part_time,
+      COUNT(DISTINCT CASE WHEN cs.qualification_full_or_part_time = 'unknown' OR cs.qualification_full_or_part_time IS NULL THEN cs.conversation_id END) AS employment_unknown,
+      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'mostly_cash' THEN cs.conversation_id END) AS mostly_cash,
+      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'mostly_insurance' THEN cs.conversation_id END) AS mostly_insurance,
+      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'balanced' THEN cs.conversation_id END) AS balanced,
+      COUNT(DISTINCT CASE WHEN cs.qualification_revenue_mix = 'unknown' OR cs.qualification_revenue_mix IS NULL THEN cs.conversation_id END) AS revenue_unknown,
+      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'high' THEN cs.conversation_id END) AS high_interest,
+      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'medium' THEN cs.conversation_id END) AS medium_interest,
+      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'low' THEN cs.conversation_id END) AS low_interest,
+      COUNT(DISTINCT CASE WHEN cs.qualification_coaching_interest = 'unknown' OR cs.qualification_coaching_interest IS NULL THEN cs.conversation_id END) AS interest_unknown,
+      COUNT(DISTINCT CASE WHEN cs.escalation_level = 1 THEN cs.conversation_id END) AS level_1,
+      COUNT(DISTINCT CASE WHEN cs.escalation_level = 2 THEN cs.conversation_id END) AS level_2,
+      COUNT(DISTINCT CASE WHEN cs.escalation_level = 3 THEN cs.conversation_id END) AS level_3,
+      COUNT(DISTINCT CASE WHEN cs.escalation_level = 4 THEN cs.conversation_id END) AS level_4,
+      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'idle' THEN cs.conversation_id END) AS cadence_idle,
+      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'podcast_sent' THEN cs.conversation_id END) AS cadence_podcast_sent,
+      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'call_offered' THEN cs.conversation_id END) AS cadence_call_offered,
+      COUNT(DISTINCT CASE WHEN cs.cadence_status = 'nurture_pool' THEN cs.conversation_id END) AS cadence_nurture_pool
     FROM conversations c
     LEFT JOIN conversation_state cs ON c.id = cs.conversation_id
   `);
 
   const row = funnelRows[0];
-  const totalConversations = Number.parseInt(row.total_conversations, 10);
-  const qualifiedConversations = Number.parseInt(row.qualified_conversations, 10);
+  const totalConversations = Number(row.total_conversations);
+  const qualifiedConversations = Number(row.qualified_conversations);
 
   // Calculate conversion rates by interest level
-  const { rows: conversionRows } = await pool.query<{
+  const conversionRows = await prisma.$queryRawUnsafe<{
     coaching_interest: string;
-    total: string;
-    booked: string;
-  }>(`
+    total: number | bigint;
+    booked: number | bigint;
+  }[]>(`
     SELECT
       cs.qualification_coaching_interest AS coaching_interest,
-      COUNT(*)::text AS total,
-      COUNT(CASE WHEN cs.escalation_level >= 3 THEN 1 END)::text AS booked
+      COUNT(*) AS total,
+      COUNT(CASE WHEN cs.escalation_level >= 3 THEN 1 END) AS booked
     FROM conversation_state cs
     WHERE cs.qualification_coaching_interest IN ('high', 'medium', 'low')
     GROUP BY cs.qualification_coaching_interest
@@ -226,8 +227,8 @@ export const getQualificationFunnelAnalytics = async (): Promise<QualificationFu
   const conversionByInterest: Record<string, { total: number; booked: number }> = {};
   for (const cr of conversionRows) {
     conversionByInterest[cr.coaching_interest] = {
-      total: Number.parseInt(cr.total, 10),
-      booked: Number.parseInt(cr.booked, 10),
+      total: Number(cr.total),
+      booked: Number(cr.booked),
     };
   }
 
@@ -242,34 +243,34 @@ export const getQualificationFunnelAnalytics = async (): Promise<QualificationFu
     qualifiedConversations,
     funnel: {
       employmentStatus: {
-        fullTime: Number.parseInt(row.full_time, 10),
-        partTime: Number.parseInt(row.part_time, 10),
-        unknown: Number.parseInt(row.employment_unknown, 10),
+        fullTime: Number(row.full_time),
+        partTime: Number(row.part_time),
+        unknown: Number(row.employment_unknown),
       },
       revenueMix: {
-        mostlyCash: Number.parseInt(row.mostly_cash, 10),
-        mostlyInsurance: Number.parseInt(row.mostly_insurance, 10),
-        balanced: Number.parseInt(row.balanced, 10),
-        unknown: Number.parseInt(row.revenue_unknown, 10),
+        mostlyCash: Number(row.mostly_cash),
+        mostlyInsurance: Number(row.mostly_insurance),
+        balanced: Number(row.balanced),
+        unknown: Number(row.revenue_unknown),
       },
       coachingInterest: {
-        high: Number.parseInt(row.high_interest, 10),
-        medium: Number.parseInt(row.medium_interest, 10),
-        low: Number.parseInt(row.low_interest, 10),
-        unknown: Number.parseInt(row.interest_unknown, 10),
+        high: Number(row.high_interest),
+        medium: Number(row.medium_interest),
+        low: Number(row.low_interest),
+        unknown: Number(row.interest_unknown),
       },
     },
     escalationDistribution: {
-      level1: Number.parseInt(row.level_1, 10),
-      level2: Number.parseInt(row.level_2, 10),
-      level3: Number.parseInt(row.level_3, 10),
-      level4: Number.parseInt(row.level_4, 10),
+      level1: Number(row.level_1),
+      level2: Number(row.level_2),
+      level3: Number(row.level_3),
+      level4: Number(row.level_4),
     },
     cadenceDistribution: {
-      idle: Number.parseInt(row.cadence_idle, 10),
-      podcastSent: Number.parseInt(row.cadence_podcast_sent, 10),
-      callOffered: Number.parseInt(row.cadence_call_offered, 10),
-      nurturePool: Number.parseInt(row.cadence_nurture_pool, 10),
+      idle: Number(row.cadence_idle),
+      podcastSent: Number(row.cadence_podcast_sent),
+      callOffered: Number(row.cadence_call_offered),
+      nurturePool: Number(row.cadence_nurture_pool),
     },
     conversionByQualification: {
       highInterestConversionRate: calcConversionRate('high'),
@@ -313,62 +314,62 @@ export const getDraftAIPerformanceAnalytics = async (params: {
   from: Date;
   to: Date;
 }): Promise<DraftAIPerformanceAnalytics> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   const fromIso = params.from.toISOString();
   const toIso = params.to.toISOString();
 
   // Overall stats
-  const { rows: overallRows } = await pool.query<{
-    total_drafts: string;
-    accepted_drafts: string;
-    edited_drafts: string;
-    generic_tone_drafts: string;
-    setter_anchored_drafts: string;
-    avg_lint_score: string;
-    avg_structural_score: string;
-  }>(
+  const overallRows = await prisma.$queryRawUnsafe<{
+    total_drafts: number | bigint;
+    accepted_drafts: number | bigint;
+    edited_drafts: number | bigint;
+    generic_tone_drafts: number | bigint;
+    setter_anchored_drafts: number | bigint;
+    avg_lint_score: number | string;
+    avg_structural_score: number | string;
+  }[]>(
     `
     SELECT
-      COUNT(*)::text AS total_drafts,
-      COUNT(CASE WHEN accepted = true THEN 1 END)::text AS accepted_drafts,
-      COUNT(CASE WHEN edited = true THEN 1 END)::text AS edited_drafts,
+      COUNT(*) AS total_drafts,
+      COUNT(CASE WHEN accepted = true THEN 1 END) AS accepted_drafts,
+      COUNT(CASE WHEN edited = true THEN 1 END) AS edited_drafts,
       COUNT(
         CASE
           WHEN COALESCE((raw->>'genericToneDetected')::boolean, false) = true
           THEN 1
         END
-      )::text AS generic_tone_drafts,
+      ) AS generic_tone_drafts,
       COUNT(
         CASE
           WHEN COALESCE((raw->>'styleAnchorCount')::int, 0) > 0
           THEN 1
         END
-      )::text AS setter_anchored_drafts,
-      COALESCE(AVG(lint_score), 0)::text AS avg_lint_score,
-      COALESCE(AVG(structural_score), 0)::text AS avg_structural_score
+      ) AS setter_anchored_drafts,
+      COALESCE(AVG(lint_score), 0) AS avg_lint_score,
+      COALESCE(AVG(structural_score), 0) AS avg_structural_score
     FROM draft_suggestions
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
   `,
-    [fromIso, toIso],
+    fromIso,
+    toIso,
   );
 
   const overall = overallRows[0];
-  const totalDrafts = Number.parseInt(overall.total_drafts, 10);
-  const acceptedDrafts = Number.parseInt(overall.accepted_drafts, 10);
-  const editedDrafts = Number.parseInt(overall.edited_drafts, 10);
-  const genericToneDrafts = Number.parseInt(overall.generic_tone_drafts, 10);
-  const setterAnchoredDrafts = Number.parseInt(overall.setter_anchored_drafts, 10);
+  const totalDrafts = Number(overall.total_drafts);
+  const acceptedDrafts = Number(overall.accepted_drafts);
+  const editedDrafts = Number(overall.edited_drafts);
+  const genericToneDrafts = Number(overall.generic_tone_drafts);
+  const setterAnchoredDrafts = Number(overall.setter_anchored_drafts);
   const rejectedDrafts = Math.max(0, totalDrafts - acceptedDrafts);
   const setterLikeDrafts = Math.max(0, setterAnchoredDrafts - genericToneDrafts);
 
   // Score by outcome
-  const { rows: outcomeRows } = await pool.query<{
+  const outcomeRows = await prisma.$queryRawUnsafe<{
     outcome: string;
-    avg_lint: string;
-    avg_structural: string;
-  }>(
+    avg_lint: number | string;
+    avg_structural: number | string;
+  }[]>(
     `
     SELECT
       CASE
@@ -376,13 +377,14 @@ export const getDraftAIPerformanceAnalytics = async (params: {
         WHEN edited = true THEN 'edited'
         ELSE 'rejected'
       END AS outcome,
-      COALESCE(AVG(lint_score), 0)::text AS avg_lint,
-      COALESCE(AVG(structural_score), 0)::text AS avg_structural
+      COALESCE(AVG(lint_score), 0) AS avg_lint,
+      COALESCE(AVG(structural_score), 0) AS avg_structural
     FROM draft_suggestions
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
   `,
-    [fromIso, toIso],
+    fromIso,
+    toIso,
   );
 
   const scoreByOutcome = {
@@ -394,41 +396,42 @@ export const getDraftAIPerformanceAnalytics = async (params: {
   for (const row of outcomeRows) {
     if (row.outcome in scoreByOutcome) {
       scoreByOutcome[row.outcome as keyof typeof scoreByOutcome] = {
-        avgLint: Number.parseFloat(row.avg_lint),
-        avgStructural: Number.parseFloat(row.avg_structural),
+        avgLint: Number(row.avg_lint),
+        avgStructural: Number(row.avg_structural),
       };
     }
   }
 
   // Trend by day
-  const { rows: trendRows } = await pool.query<{
+  const trendRows = await prisma.$queryRawUnsafe<{
     day: string;
-    total: string;
-    accepted: string;
-    edited: string;
-    avg_lint_score: string;
-  }>(
+    total: number | bigint;
+    accepted: number | bigint;
+    edited: number | bigint;
+    avg_lint_score: number | string;
+  }[]>(
     `
     SELECT
       TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') AS day,
-      COUNT(*)::text AS total,
-      COUNT(CASE WHEN accepted = true THEN 1 END)::text AS accepted,
-      COUNT(CASE WHEN edited = true THEN 1 END)::text AS edited,
-      COALESCE(AVG(lint_score), 0)::text AS avg_lint_score
+      COUNT(*) AS total,
+      COUNT(CASE WHEN accepted = true THEN 1 END) AS accepted,
+      COUNT(CASE WHEN edited = true THEN 1 END) AS edited,
+      COALESCE(AVG(lint_score), 0) AS avg_lint_score
     FROM draft_suggestions
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
     ORDER BY 1
   `,
-    [fromIso, toIso],
+    fromIso,
+    toIso,
   );
 
   const trendByDay = trendRows.map((row) => ({
     day: row.day,
-    total: Number.parseInt(row.total, 10),
-    accepted: Number.parseInt(row.accepted, 10),
-    edited: Number.parseInt(row.edited, 10),
-    avgLintScore: Number.parseFloat(row.avg_lint_score),
+    total: Number(row.total),
+    accepted: Number(row.accepted),
+    edited: Number(row.edited),
+    avgLintScore: Number(row.avg_lint_score),
   }));
 
   return {
@@ -443,8 +446,8 @@ export const getDraftAIPerformanceAnalytics = async (params: {
     setterLikeRate: totalDrafts > 0 ? (setterLikeDrafts / totalDrafts) * 100 : 0,
     acceptanceRate: totalDrafts > 0 ? (acceptedDrafts / totalDrafts) * 100 : 0,
     editRate: totalDrafts > 0 ? (editedDrafts / totalDrafts) * 100 : 0,
-    avgLintScore: Number.parseFloat(overall.avg_lint_score),
-    avgStructuralScore: Number.parseFloat(overall.avg_structural_score),
+    avgLintScore: Number(overall.avg_lint_score),
+    avgStructuralScore: Number(overall.avg_structural_score),
     scoreByOutcome,
     trendByDay,
   };
@@ -477,107 +480,109 @@ export type FollowUpSLAAnalytics = {
 };
 
 export const getFollowUpSLAAnalytics = async (params: { from: Date; to: Date }): Promise<FollowUpSLAAnalytics> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   const fromIso = params.from.toISOString();
   const toIso = params.to.toISOString();
 
   // Overall SLA stats
-  const { rows: overallRows } = await pool.query<{
-    total_work_items: string;
-    resolved_on_time: string;
-    resolved_late: string;
-    pending: string;
-    avg_resolution_minutes: string;
-  }>(
+  const overallRows = await prisma.$queryRawUnsafe<{
+    total_work_items: number | bigint;
+    resolved_on_time: number | bigint;
+    resolved_late: number | bigint;
+    pending: number | bigint;
+    avg_resolution_minutes: number | string;
+  }[]>(
     `
     SELECT
-      COUNT(*)::text AS total_work_items,
-      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at <= due_at THEN 1 END)::text AS resolved_on_time,
-      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at > due_at THEN 1 END)::text AS resolved_late,
-      COUNT(CASE WHEN resolved_at IS NULL THEN 1 END)::text AS pending,
-      COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60), 0)::text AS avg_resolution_minutes
+      COUNT(*) AS total_work_items,
+      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at <= due_at THEN 1 END) AS resolved_on_time,
+      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at > due_at THEN 1 END) AS resolved_late,
+      COUNT(CASE WHEN resolved_at IS NULL THEN 1 END) AS pending,
+      COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60), 0) AS avg_resolution_minutes
     FROM work_items
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
   `,
-    [fromIso, toIso],
+    fromIso,
+    toIso,
   );
 
   const overall = overallRows[0];
-  const totalWorkItems = Number.parseInt(overall.total_work_items, 10);
-  const resolvedOnTime = Number.parseInt(overall.resolved_on_time, 10);
-  const resolvedLate = Number.parseInt(overall.resolved_late, 10);
-  const pending = Number.parseInt(overall.pending, 10);
+  const totalWorkItems = Number(overall.total_work_items);
+  const resolvedOnTime = Number(overall.resolved_on_time);
+  const resolvedLate = Number(overall.resolved_late);
+  const pending = Number(overall.pending);
   const resolved = resolvedOnTime + resolvedLate;
 
   // By rep
-  const { rows: repRows } = await pool.query<{
+  const repRows = await prisma.$queryRawUnsafe<{
     rep_id: string;
-    total: string;
-    on_time: string;
-    late: string;
-    pending: string;
-  }>(
+    total: number | bigint;
+    on_time: number | bigint;
+    late: number | bigint;
+    pending: number | bigint;
+  }[]>(
     `
     SELECT
       COALESCE(rep_id, 'Unassigned') AS rep_id,
-      COUNT(*)::text AS total,
-      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at <= due_at THEN 1 END)::text AS on_time,
-      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at > due_at THEN 1 END)::text AS late,
-      COUNT(CASE WHEN resolved_at IS NULL THEN 1 END)::text AS pending
+      COUNT(*) AS total,
+      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at <= due_at THEN 1 END) AS on_time,
+      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at > due_at THEN 1 END) AS late,
+      COUNT(CASE WHEN resolved_at IS NULL THEN 1 END) AS pending
     FROM work_items
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
     ORDER BY COUNT(*) DESC
   `,
-    [fromIso, toIso],
+    fromIso,
+    toIso,
   );
 
   const byRep = repRows.map((row) => {
-    const total = Number.parseInt(row.total, 10);
-    const onTime = Number.parseInt(row.on_time, 10);
-    const late = Number.parseInt(row.late, 10);
+    const total = Number(row.total);
+    const onTime = Number(row.on_time);
+    const late = Number(row.late);
     const repResolved = onTime + late;
     return {
       repId: row.rep_id,
       total,
       onTime,
       late,
-      pending: Number.parseInt(row.pending, 10),
+      pending: Number(row.pending),
       complianceRate: repResolved > 0 ? (onTime / repResolved) * 100 : 0,
     };
   });
 
   // By type
-  const { rows: typeRows } = await pool.query<{
+  const typeRows = await prisma.$queryRawUnsafe<{
     type: string;
-    total: string;
-    on_time: string;
-    late: string;
-    avg_resolution_minutes: string;
-  }>(
+    total: number | bigint;
+    on_time: number | bigint;
+    late: number | bigint;
+    avg_resolution_minutes: number | string;
+  }[]>(
     `
     SELECT
       type,
-      COUNT(*)::text AS total,
-      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at <= due_at THEN 1 END)::text AS on_time,
-      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at > due_at THEN 1 END)::text AS late,
-      COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60), 0)::text AS avg_resolution_minutes
+      COUNT(*) AS total,
+      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at <= due_at THEN 1 END) AS on_time,
+      COUNT(CASE WHEN resolved_at IS NOT NULL AND resolved_at > due_at THEN 1 END) AS late,
+      COALESCE(AVG(EXTRACT(EPOCH FROM (resolved_at - created_at)) / 60), 0) AS avg_resolution_minutes
     FROM work_items
     WHERE created_at >= $1::timestamptz AND created_at <= $2::timestamptz
     GROUP BY 1
     ORDER BY COUNT(*) DESC
   `,
-    [fromIso, toIso],
+    fromIso,
+    toIso,
   );
 
   const byType = typeRows.map((row) => ({
     type: row.type,
-    total: Number.parseInt(row.total, 10),
-    onTime: Number.parseInt(row.on_time, 10),
-    late: Number.parseInt(row.late, 10),
-    avgResolutionMinutes: Number.parseFloat(row.avg_resolution_minutes),
+    total: Number(row.total),
+    onTime: Number(row.on_time),
+    late: Number(row.late),
+    avgResolutionMinutes: Number(row.avg_resolution_minutes),
   }));
 
   return {
@@ -586,7 +591,7 @@ export const getFollowUpSLAAnalytics = async (params: { from: Date; to: Date }):
     resolvedLate,
     pending,
     slaComplianceRate: resolved > 0 ? (resolvedOnTime / resolved) * 100 : 0,
-    avgResolutionTimeMinutes: Number.parseFloat(overall.avg_resolution_minutes),
+    avgResolutionTimeMinutes: Number(overall.avg_resolution_minutes),
     byRep,
     byType,
   };

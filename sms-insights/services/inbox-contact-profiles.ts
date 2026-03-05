@@ -1,6 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 
 export type RevenueMixCategory = 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
 export type EmploymentStatus = 'full_time' | 'part_time' | 'unknown';
@@ -26,7 +25,7 @@ export type InboxContactProfileRow = {
   cnam_city: string | null;
   cnam_state: string | null;
   cnam_country: string | null;
-  last_engagement_at: string | null;
+  last_engagement_at: Date | null;
   inbound_sms_count: number | null;
   outbound_sms_count: number | null;
   inbound_call_count: number | null;
@@ -37,14 +36,14 @@ export type InboxContactProfileRow = {
   lrn_city: string | null;
   lrn_state: string | null;
   lrn_country: string | null;
-  lrn_last_checked_at: string | null;
+  lrn_last_checked_at: Date | null;
   revenue_mix_category: RevenueMixCategory;
   employment_status: EmploymentStatus;
   coaching_interest: CoachingInterest;
   dnc: boolean;
   raw: unknown | null;
-  created_at: string;
-  updated_at: string;
+  created_at: Date;
+  updated_at: Date;
 };
 
 export type UpsertInboxContactProfileInput = {
@@ -85,27 +84,20 @@ export type UpsertInboxContactProfileInput = {
   raw?: unknown | null;
 };
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+const getPrisma = () => getPrismaClient();
 
 export const upsertInboxContactProfile = async (
   input: UpsertInboxContactProfileInput,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxContactProfileRow> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
 
   const revenueMix = input.revenueMixCategory || 'unknown';
   const employmentStatus = input.employmentStatus || 'unknown';
   const coachingInterest = input.coachingInterest || 'unknown';
 
   try {
-    const result = await client.query<InboxContactProfileRow>(
+    const results = await prisma.$queryRawUnsafe<InboxContactProfileRow[]>(
       `
       INSERT INTO inbox_contact_profiles (
         contact_key,
@@ -193,46 +185,44 @@ export const upsertInboxContactProfile = async (
         updated_at = NOW()
       RETURNING *;
       `,
-      [
-        input.contactKey,
-        input.conversationId ?? null,
-        input.contactId ?? null,
-        input.alowareContactId ?? null,
-        input.name ?? null,
-        input.phone ?? null,
-        input.email ?? null,
-        input.timezone ?? null,
-        input.niche ?? null,
-        input.leadSource ?? null,
-        input.sequenceId ?? null,
-        input.dispositionStatusId ?? null,
-        input.tags ?? null,
-        input.textAuthorized ?? null,
-        input.isBlocked ?? null,
-        input.cnamCity ?? null,
-        input.cnamState ?? null,
-        input.cnamCountry ?? null,
-        input.lastEngagementAt ?? null,
-        input.inboundSmsCount ?? null,
-        input.outboundSmsCount ?? null,
-        input.inboundCallCount ?? null,
-        input.outboundCallCount ?? null,
-        input.unreadCount ?? null,
-        input.lrnLineType ?? null,
-        input.lrnCarrier ?? null,
-        input.lrnCity ?? null,
-        input.lrnState ?? null,
-        input.lrnCountry ?? null,
-        input.lrnLastCheckedAt ?? null,
-        revenueMix,
-        employmentStatus,
-        coachingInterest,
-        input.dnc === true,
-        input.raw ?? null,
-      ],
+      input.contactKey,
+      input.conversationId ?? null,
+      input.contactId ?? null,
+      input.alowareContactId ?? null,
+      input.name ?? null,
+      input.phone ?? null,
+      input.email ?? null,
+      input.timezone ?? null,
+      input.niche ?? null,
+      input.leadSource ?? null,
+      input.sequenceId ?? null,
+      input.dispositionStatusId ?? null,
+      input.tags ?? null,
+      input.textAuthorized ?? null,
+      input.isBlocked ?? null,
+      input.cnamCity ?? null,
+      input.cnamState ?? null,
+      input.cnamCountry ?? null,
+      input.lastEngagementAt ? new Date(input.lastEngagementAt) : null,
+      input.inboundSmsCount ?? null,
+      input.outboundSmsCount ?? null,
+      input.inboundCallCount ?? null,
+      input.outboundCallCount ?? null,
+      input.unreadCount ?? null,
+      input.lrnLineType ?? null,
+      input.lrnCarrier ?? null,
+      input.lrnCity ?? null,
+      input.lrnState ?? null,
+      input.lrnCountry ?? null,
+      input.lrnLastCheckedAt ? new Date(input.lrnLastCheckedAt) : null,
+      revenueMix,
+      employmentStatus,
+      coachingInterest,
+      input.dnc === true,
+      input.raw ?? null,
     );
 
-    const row = result.rows[0];
+    const row = results[0];
     if (!row) {
       throw new Error('Failed to upsert inbox contact profile');
     }
@@ -240,8 +230,6 @@ export const upsertInboxContactProfile = async (
   } catch (err) {
     logger?.error('upsertInboxContactProfile failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -249,24 +237,15 @@ export const getInboxContactProfileByKey = async (
   contactKey: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxContactProfileRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<InboxContactProfileRow>(
-      `
-      SELECT *
-      FROM inbox_contact_profiles
-      WHERE contact_key = $1
-      LIMIT 1;
-      `,
-      [contactKey],
-    );
-    return result.rows[0] ?? null;
+    const result = await prisma.inbox_contact_profiles.findUnique({
+      where: { contact_key: contactKey },
+    });
+    return result as unknown as InboxContactProfileRow | null;
   } catch (err) {
     logger?.error('getInboxContactProfileByKey failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -276,22 +255,16 @@ export const listInboxContactProfilesByKeys = async (
 ): Promise<InboxContactProfileRow[]> => {
   if (contactKeys.length === 0) return [];
 
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<InboxContactProfileRow>(
-      `
-      SELECT *
-      FROM inbox_contact_profiles
-      WHERE contact_key = ANY($1::text[]);
-      `,
-      [contactKeys],
-    );
-    return result.rows;
+    const results = await prisma.inbox_contact_profiles.findMany({
+      where: {
+        contact_key: { in: contactKeys },
+      },
+    });
+    return results as unknown as InboxContactProfileRow[];
   } catch (err) {
     logger?.error('listInboxContactProfilesByKeys failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };

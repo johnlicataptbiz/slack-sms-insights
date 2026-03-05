@@ -1,6 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { listBookedCallsInRange } from './booked-calls-store.js';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
 
 export type BookedCallsTrendPoint = {
@@ -314,7 +314,7 @@ export const getBookedCallAttributionSources = async (params: {
 
     normalized.push({
       bookedCallId: c.id,
-      eventTs: c.event_ts,
+      eventTs: c.event_ts.toISOString(),
       bucket,
       firstConversion,
       rep,
@@ -353,8 +353,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
   const results = new Map<string, BookedCallSmsSequenceLookup>();
   if (calls.length === 0) return results;
 
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrismaClient();
 
   type CallEntry = { bookedCallId: string; bookingTs: number };
 
@@ -437,7 +436,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
     if (emailKeyToEntries.size > 0) {
       const emailKeys = [...emailKeyToEntries.keys()];
       // Step 1: resolve email → phone via inbox_contact_profiles
-      const { rows: profileRows } = await pool.query<{ email_key: string; phone_key: string }>(
+      const profileRows = await prisma.$queryRawUnsafe<{ email_key: string; phone_key: string }[]>(
         `
         SELECT
           LOWER(TRIM(email)) AS email_key,
@@ -447,8 +446,9 @@ export const getBookedCallSequenceFromSmsEvents = async (
           AND phone IS NOT NULL AND TRIM(phone) != ''
           AND LOWER(TRIM(email)) = ANY($1::text[])
         `,
-        [emailKeys],
+        emailKeys,
       );
+
       const emailToPhoneKey = new Map<string, string>();
       for (const row of profileRows) {
         if (row.email_key && row.phone_key && row.phone_key.length === 10) {
@@ -459,7 +459,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
       const emailDerivedPhoneKeys = [...new Set([...emailToPhoneKey.values()])];
       if (emailDerivedPhoneKeys.length > 0) {
         // Step 2: phone → sms_events outbound sequence
-        const { rows } = await pool.query<{ phone_key: string; sequence: string; event_ts: string }>(
+        const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date }[]>(
           `
           SELECT
             RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
@@ -474,7 +474,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
             AND event_ts <= $3::timestamptz
           ORDER BY event_ts ASC
           `,
-          [emailDerivedPhoneKeys, fromIso, toIso],
+          emailDerivedPhoneKeys, fromIso, toIso,
         );
         const outboundByEmailPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
         for (const row of rows) {
@@ -507,7 +507,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
     const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
     if (phoneKeyToEntries.size > 0) {
       const phoneKeys = [...phoneKeyToEntries.keys()];
-      const { rows } = await pool.query<{ phone_key: string; sequence: string; event_ts: string }>(
+      const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date }[]>(
         `
         SELECT
           RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
@@ -522,7 +522,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        [phoneKeys, fromIso, toIso],
+        phoneKeys, fromIso, toIso,
       );
       for (const row of rows) {
         const ts = new Date(row.event_ts).getTime();
@@ -551,7 +551,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
     const outboundByName = new Map<string, Array<{ sequence: string; ts: number }>>();
     if (nameKeyToEntries.size > 0) {
       const nameKeys = [...nameKeyToEntries.keys()];
-      const { rows } = await pool.query<{ contact_name_key: string; sequence: string; event_ts: string }>(
+      const rows = await prisma.$queryRawUnsafe<{ contact_name_key: string; sequence: string; event_ts: Date }[]>(
         `
         SELECT
           LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) AS contact_name_key,
@@ -566,7 +566,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        [nameKeys, fromIso, toIso],
+        nameKeys, fromIso, toIso,
       );
       for (const row of rows) {
         const ts = new Date(row.event_ts).getTime();
@@ -605,8 +605,7 @@ export const getBookedCallSmsReplyLinks = async (
   const results = new Map<string, BookedCallSmsReplyLink>();
   if (calls.length === 0) return results;
 
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrismaClient();
 
   const normalizedCalls = calls.map((call) => {
     const key = bookedCallSourceKey(call);
@@ -649,7 +648,7 @@ export const getBookedCallSmsReplyLinks = async (
 
   try {
     if (phoneKeys.length > 0) {
-      const { rows } = await pool.query<{ phone_key: string; event_ts: string }>(
+      const rows = await prisma.$queryRawUnsafe<{ phone_key: string; event_ts: Date }[]>(
         `
         SELECT
           RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
@@ -662,7 +661,7 @@ export const getBookedCallSmsReplyLinks = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        [phoneKeys, fromIso, toIso],
+        phoneKeys, fromIso, toIso,
       );
 
       for (const row of rows) {
@@ -676,7 +675,7 @@ export const getBookedCallSmsReplyLinks = async (
     }
 
     if (contactNameKeys.length > 0) {
-      const { rows } = await pool.query<{ contact_name_key: string; event_ts: string }>(
+      const rows = await prisma.$queryRawUnsafe<{ contact_name_key: string; event_ts: Date }[]>(
         `
         SELECT
           LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) AS contact_name_key,
@@ -689,7 +688,7 @@ export const getBookedCallSmsReplyLinks = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        [contactNameKeys, fromIso, toIso],
+        contactNameKeys, fromIso, toIso,
       );
 
       for (const row of rows) {

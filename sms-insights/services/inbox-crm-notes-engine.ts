@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import type { Logger } from '@slack/bolt';
 import { generateAiResponse } from './ai-response.js';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import type { InboxMessageRow } from './inbox-store.js';
 
+const getPrisma = () => getPrismaClient();
+
 const OPENAI_MISSING_KEY_MESSAGE = 'Set OPENAI_API_KEY in your environment to enable AI replies.';
+// ... (rest of the prompt and types same as before)
 
 // ─── Embedded CRM Notes Prompt ────────────────────────────────────────────────
 // This prompt is embedded directly so it works in all environments (local + production).
@@ -106,7 +109,8 @@ export type CrmNotesGenerationResult = {
   createdAt: string;
 };
 
-const toEpochMs = (value: string): number => {
+const toEpochMs = (value: string | Date): number => {
+  if (value instanceof Date) return value.getTime();
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
 };
@@ -131,7 +135,8 @@ const formatThreadTranscript = (messages: InboxMessageRow[]): string => {
             ? message.aloware_user.trim()
             : 'Setter';
       const text = (message.body || '').trim() || '(empty)';
-      return `[${message.event_ts}] ${speaker}: ${text}`;
+      const ts = message.event_ts instanceof Date ? message.event_ts.toISOString() : message.event_ts;
+      return `[${ts}] ${speaker}: ${text}`;
     })
     .join('\n');
 };
@@ -181,21 +186,14 @@ const listSlackBookedCallHints = async (
   context: CrmNotesContext,
   logger?: Pick<Logger, 'warn' | 'error'>,
 ): Promise<SlackBookedCallHint[]> => {
-  const pool = getPool();
-  if (!pool) return [];
+  const prisma = getPrisma();
 
   const phoneKey = normalizePhoneKey(context.contactPhone);
   const nameKey = normalizeNameKey(context.contactName);
   if (!phoneKey && !nameKey) return [];
 
   try {
-    const { rows } = await pool.query<{
-      event_ts: string;
-      text: string | null;
-      raw: unknown;
-      slack_channel_id: string;
-      slack_message_ts: string;
-    }>(
+    const rows = await prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
         bc.event_ts::text,
@@ -226,7 +224,8 @@ const listSlackBookedCallHints = async (
       ORDER BY bc.event_ts DESC
       LIMIT 5
       `,
-      [phoneKey, nameKey],
+      phoneKey,
+      nameKey,
     );
 
     return rows.map((row) => {

@@ -1,11 +1,10 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
 import { maybeRecordConversionExample } from './conversion-example-ingestion.js';
-import { getPool } from './db.js';
 import { syncQualificationFromConversationText } from './qualification-sync.js';
 import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventDirection, SmsEventRow } from './sms-event-store.js';
 import { linkSmsEventToConversation } from './sms-event-store.js';
+import { getPrismaClient } from './prisma.js';
 
 export type ConversationRow = {
   id: string;
@@ -14,22 +13,16 @@ export type ConversationRow = {
   contact_phone: string | null;
   current_rep_id: string | null;
   status: 'open' | 'closed' | 'dnc';
-  last_inbound_at: string | null;
-  last_outbound_at: string | null;
-  last_touch_at: string | null;
+  last_inbound_at: Date | null;
+  last_outbound_at: Date | null;
+  last_touch_at: Date | null;
   unreplied_inbound_count: number;
-  next_followup_due_at: string | null;
-  created_at: string;
-  updated_at: string;
+  next_followup_due_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
 };
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+const getPrisma = () => getPrismaClient();
 
 const normalizeDigits = (value: string): string => value.replace(/\D/g, '');
 
@@ -55,8 +48,7 @@ export const upsertConversationFromEvent = async (
     return null;
   }
 
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
     const eventTs = new Date(event.event_ts);
 
@@ -70,7 +62,7 @@ export const upsertConversationFromEvent = async (
     const unrepliedDelta = isInbound(event.direction) ? 1 : 0;
     const shouldResetUnreplied = isOutbound(event.direction);
 
-    const result = await client.query<ConversationRow>(
+    const results = await prisma.$queryRawUnsafe<ConversationRow[]>(
       `
       INSERT INTO conversations (
         contact_key,
@@ -97,20 +89,18 @@ export const upsertConversationFromEvent = async (
         updated_at = now()
       RETURNING *;
     `,
-      [
-        contactKey,
-        event.contact_id,
-        event.contact_phone ? normalizeDigits(event.contact_phone) : null,
-        lastInboundAt,
-        lastOutboundAt,
-        lastTouchAt,
-        isInbound(event.direction) ? 1 : 0,
-        shouldResetUnreplied,
-        unrepliedDelta,
-      ],
+      contactKey,
+      event.contact_id,
+      event.contact_phone ? normalizeDigits(event.contact_phone) : null,
+      lastInboundAt,
+      lastOutboundAt,
+      lastTouchAt,
+      isInbound(event.direction) ? 1 : 0,
+      shouldResetUnreplied,
+      unrepliedDelta,
     );
 
-    const row = result.rows[0] ?? null;
+    const row = results[0] ?? null;
     if (row) {
       await linkSmsEventToConversation(event.id, row.id, logger);
 
@@ -144,7 +134,5 @@ export const upsertConversationFromEvent = async (
   } catch (err) {
     logger?.error('upsertConversationFromEvent failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };

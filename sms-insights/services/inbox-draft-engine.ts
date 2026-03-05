@@ -123,7 +123,8 @@ const getCanonicalSources = (): CanonicalSources => {
 };
 
 const normalize = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
-const toEpochMs = (value: string): number => {
+const toEpochMs = (value: string | Date): number => {
+  if (value instanceof Date) return value.getTime();
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
 };
@@ -134,9 +135,9 @@ const compareChronological = (a: InboxMessageRow, b: InboxMessageRow): number =>
 };
 const orderMessagesChronologically = (messages: InboxMessageRow[]): InboxMessageRow[] =>
   [...messages].sort(compareChronological);
-const formatTimestamp = (value: string): string => {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
+const formatTimestamp = (value: string | Date): string => {
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
   return parsed.toISOString();
 };
 const sanitizeInline = (value: string): string =>

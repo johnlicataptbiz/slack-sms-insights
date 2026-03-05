@@ -8,7 +8,7 @@ import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApiRoute } from './api/routes.js';
 import registerListeners from './listeners/index.js';
-import { initDatabase, initializeSchema } from './services/db.js';
+import { initDatabase } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
 import { logger } from './services/logger.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
@@ -121,7 +121,6 @@ app.error(async (error) => {
 
     // Initialize database
     await initDatabase(app.logger);
-    await initializeSchema();
 
     // Frontend is deployed on Vercel in production. Only attempt to serve a local
     // `frontend/dist` bundle when explicitly enabled (useful for single-container dev).

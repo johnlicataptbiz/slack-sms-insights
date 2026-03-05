@@ -1,15 +1,17 @@
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
+
+const getPrisma = () => getPrismaClient();
 
 export type BookedCallRow = {
   id: string;
   slack_team_id: string;
   slack_channel_id: string;
   slack_message_ts: string;
-  event_ts: string;
+  event_ts: Date;
   text: string | null;
   raw: unknown;
-  created_at: string;
+  created_at: Date;
 };
 
 export type BookedCallReactionRow = {
@@ -17,7 +19,7 @@ export type BookedCallReactionRow = {
   reaction_name: string;
   reaction_count: number;
   users: unknown;
-  updated_at: string;
+  updated_at: Date;
 };
 
 export const upsertBookedCall = async (
@@ -31,39 +33,32 @@ export const upsertBookedCall = async (
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<BookedCallRow | null> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   try {
-    const { rows } = await pool.query<BookedCallRow>(
-      `
-      INSERT INTO booked_calls (
-        slack_team_id,
-        slack_channel_id,
-        slack_message_ts,
-        event_ts,
-        text,
-        raw
-      )
-      VALUES ($1, $2, $3, $4, $5, $6::jsonb)
-      ON CONFLICT (slack_channel_id, slack_message_ts)
-      DO UPDATE SET
-        event_ts = EXCLUDED.event_ts,
-        text = EXCLUDED.text,
-        raw = EXCLUDED.raw
-      RETURNING *
-      `,
-      [
-        input.slackTeamId,
-        input.slackChannelId,
-        input.slackMessageTs,
-        input.eventTs.toISOString(),
-        input.text,
-        JSON.stringify(input.raw ?? null),
-      ],
-    );
+    const result = await prisma.booked_calls.upsert({
+      where: {
+        slack_channel_id_slack_message_ts: {
+          slack_channel_id: input.slackChannelId,
+          slack_message_ts: input.slackMessageTs,
+        },
+      },
+      update: {
+        event_ts: input.eventTs,
+        text: input.text,
+        raw: (input.raw ?? null) as any,
+      },
+      create: {
+        slack_team_id: input.slackTeamId,
+        slack_channel_id: input.slackChannelId,
+        slack_message_ts: input.slackMessageTs,
+        event_ts: input.eventTs,
+        text: input.text,
+        raw: (input.raw ?? null) as any,
+      },
+    });
 
-    return rows[0] || null;
+    return result as unknown as BookedCallRow;
   } catch (err) {
     logger?.error?.('Failed to upsert booked call', err);
     return null;
@@ -79,31 +74,30 @@ export const upsertBookedCallReaction = async (
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<BookedCallReactionRow | null> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   try {
-    const { rows } = await pool.query<BookedCallReactionRow>(
-      `
-      INSERT INTO booked_call_reactions (
-        booked_call_id,
-        reaction_name,
-        reaction_count,
-        users,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4::jsonb, NOW())
-      ON CONFLICT (booked_call_id, reaction_name)
-      DO UPDATE SET
-        reaction_count = EXCLUDED.reaction_count,
-        users = EXCLUDED.users,
-        updated_at = NOW()
-      RETURNING *
-      `,
-      [input.bookedCallId, input.reactionName, input.reactionCount, JSON.stringify(input.users ?? null)],
-    );
+    const result = await prisma.booked_call_reactions.upsert({
+      where: {
+        booked_call_id_reaction_name: {
+          booked_call_id: input.bookedCallId,
+          reaction_name: input.reactionName,
+        },
+      },
+      update: {
+        reaction_count: input.reactionCount,
+        users: (input.users ?? null) as any,
+        updated_at: new Date(),
+      },
+      create: {
+        booked_call_id: input.bookedCallId,
+        reaction_name: input.reactionName,
+        reaction_count: input.reactionCount,
+        users: (input.users ?? null) as any,
+      },
+    });
 
-    return rows[0] || null;
+    return result as unknown as BookedCallReactionRow;
   } catch (err) {
     logger?.error?.('Failed to upsert booked call reaction', err);
     return null;
@@ -120,74 +114,51 @@ export const listBookedCallsInRange = async (
     }
   >
 > => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
-
-  const fromIso = params.from.toISOString();
-  const toIso = params.to.toISOString();
+  const prisma = getPrisma();
 
   try {
-    const { rows } = await pool.query<
-      BookedCallRow & {
-        reaction_name: string | null;
-        reaction_count: number | null;
-        users: unknown;
-      }
-    >(
-      `
-      SELECT
-        bc.*,
-        r.reaction_name,
-        r.reaction_count,
-        r.users
-      FROM booked_calls bc
-      LEFT JOIN booked_call_reactions r
-        ON r.booked_call_id = bc.id
-      WHERE bc.event_ts >= $1::timestamptz
-        AND bc.event_ts <= $2::timestamptz
-        AND ($3::text IS NULL OR bc.slack_channel_id = $3::text)
-        AND ($4::text IS NULL OR bc.slack_message_ts = $4::text)
-      ORDER BY bc.event_ts ASC
-      `,
-      [fromIso, toIso, params.channelId ?? null, params.slackMessageTs ?? null],
-    );
+    const where: any = {
+      event_ts: {
+        gte: params.from,
+        lte: params.to,
+      },
+    };
+    if (params.channelId) where.slack_channel_id = params.channelId;
+    if (params.slackMessageTs) where.slack_message_ts = params.slackMessageTs;
 
-    const byId = new Map<
-      string,
+    const rows = await prisma.booked_calls.findMany({
+      where,
+      include: {
+        booked_call_reactions: {
+          select: {
+            reaction_name: true,
+            reaction_count: true,
+            users: true,
+          },
+        },
+      },
+      orderBy: { event_ts: 'asc' },
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      slack_team_id: r.slack_team_id,
+      slack_channel_id: r.slack_channel_id,
+      slack_message_ts: r.slack_message_ts,
+      event_ts: r.event_ts,
+      text: r.text,
+      raw: r.raw,
+      created_at: r.created_at,
+      reactions: r.booked_call_reactions.map((reac) => ({
+        reaction_name: reac.reaction_name,
+        reaction_count: reac.reaction_count,
+        users: reac.users,
+      })),
+    })) as unknown as Array<
       BookedCallRow & {
         reactions: Array<Pick<BookedCallReactionRow, 'reaction_name' | 'reaction_count' | 'users'>>;
       }
-    >();
-
-    for (const r of rows) {
-      const existing =
-        byId.get(r.id) ||
-        ({
-          id: r.id,
-          slack_team_id: r.slack_team_id,
-          slack_channel_id: r.slack_channel_id,
-          slack_message_ts: r.slack_message_ts,
-          event_ts: r.event_ts,
-          text: r.text,
-          raw: r.raw,
-          created_at: r.created_at,
-          reactions: [],
-        } satisfies BookedCallRow & {
-          reactions: Array<Pick<BookedCallReactionRow, 'reaction_name' | 'reaction_count' | 'users'>>;
-        });
-
-      if (r.reaction_name) {
-        existing.reactions.push({
-          reaction_name: r.reaction_name,
-          reaction_count: r.reaction_count ?? 0,
-          users: r.users,
-        });
-      }
-
-      byId.set(r.id, existing);
-    }
-
-    return [...byId.values()];
+    >;
   } catch (err) {
     logger?.error?.('Failed to list booked calls in range', err);
     return [];

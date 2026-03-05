@@ -294,11 +294,8 @@ const pushOne = async (
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<'synced' | 'skipped' | 'error'> => {
   const existing = await getMondayBookedCallPush(
-    {
-      boardId: params.boardId,
-      slackChannelId: source.slackChannelId,
-      slackMessageTs: source.slackMessageTs,
-    },
+    source.slackChannelId,
+    source.slackMessageTs,
     logger,
   );
 

@@ -1,9 +1,10 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
 import type { ConversationRow } from './conversation-projector.js';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventRow } from './sms-event-store.js';
+
+const getPrisma = () => getPrismaClient();
 
 export type WorkItemType = 'needs_reply' | 'sla_breach' | 'hot_lead' | 'unowned' | 'followup_due';
 export type WorkItemSeverity = 'low' | 'med' | 'high';
@@ -21,13 +22,7 @@ export type WorkItemRow = {
   source_event_id: string | null;
 };
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+// No longer need getDbOrThrow as getPrisma handles error states or lazy initialization.
 
 const computeNeedsReplyDueAt = (eventTs: Date): Date => {
   // v1: simple SLA. Later: business hours + segmentation.
@@ -46,60 +41,56 @@ export const upsertNeedsReplyWorkItem = async (
   inboundEvent: SmsEventRow,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<WorkItemRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
     const dueAt = computeNeedsReplyDueAt(new Date(inboundEvent.event_ts));
     const severity = computeSeverity(inboundEvent);
 
     // Ensure only one open needs_reply per conversation.
-    // NOTE: We don't have a partial unique index yet, so we do:
-    // 1) try update existing open item
-    // 2) if none updated, insert a new one
-    const update = await client.query<WorkItemRow>(
-      `
-      UPDATE work_items
-      SET
-        rep_id = COALESCE(work_items.rep_id, $2),
-        severity = GREATEST(work_items.severity, $3),
-        due_at = LEAST(work_items.due_at, $4)
-      WHERE
-        type = 'needs_reply'
-        AND conversation_id = $1
-        AND resolved_at IS NULL
-      RETURNING *;
-    `,
-      [conversation.id, conversation.current_rep_id, severity, dueAt],
-    );
+    // We can use updateMany to try to update an existing open item.
+    // Note: for returning the updated row, updateMany doesn't help. 
+    // We'll use a transaction to find and update/create.
+    
+    return await prisma.$transaction(async (tx) => {
+      const existing = await tx.work_items.findFirst({
+        where: {
+          type: 'needs_reply',
+          conversation_id: conversation.id,
+          resolved_at: null,
+        },
+      });
 
-    if (update.rows[0]) return update.rows[0];
+      if (existing) {
+        const updated = await tx.work_items.update({
+          where: { id: existing.id },
+          data: {
+            rep_id: existing.rep_id || conversation.current_rep_id,
+            severity: (severity === 'high' || existing.severity === 'high') ? 'high' : 'med',
+            due_at: existing.due_at < dueAt ? existing.due_at : dueAt,
+          },
+        });
+        return updated as unknown as WorkItemRow;
+      }
 
-    const insert = await client.query<WorkItemRow>(
-      `
-      INSERT INTO work_items (
-        type,
-        conversation_id,
-        rep_id,
-        severity,
-        due_at,
-        source_event_id
-      )
-      VALUES ($1,$2,$3,$4,$5,$6)
-      RETURNING *;
-    `,
-      ['needs_reply', conversation.id, conversation.current_rep_id, severity, dueAt, inboundEvent.id],
-    );
+      const inserted = await tx.work_items.create({
+        data: {
+          type: 'needs_reply',
+          conversation_id: conversation.id,
+          rep_id: conversation.current_rep_id,
+          severity: severity,
+          due_at: dueAt,
+          source_event_id: inboundEvent.id,
+        },
+      });
 
-    const row = insert.rows[0] ?? null;
-    if (row) {
-      publishRealtimeEvent({ type: 'work_item_created', id: row.id, ts: new Date().toISOString() }, logger);
-    }
-    return row;
+      if (inserted) {
+        publishRealtimeEvent({ type: 'work_item_created', id: inserted.id, ts: new Date().toISOString() }, logger);
+      }
+      return inserted as unknown as WorkItemRow;
+    });
   } catch (err) {
     logger?.error('upsertNeedsReplyWorkItem failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -108,23 +99,22 @@ export const resolveNeedsReplyOnOutbound = async (
   outboundEvent: SmsEventRow,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<number> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query(
-      `
-      UPDATE work_items
-      SET resolved_at = now(), resolution = 'replied'
-      WHERE
-        type = 'needs_reply'
-        AND conversation_id = $1
-        AND resolved_at IS NULL
-        AND created_at <= $2;
-    `,
-      [conversationId, outboundEvent.event_ts],
-    );
+    const result = await prisma.work_items.updateMany({
+      where: {
+        type: 'needs_reply',
+        conversation_id: conversationId,
+        resolved_at: null,
+        created_at: { lte: new Date(outboundEvent.event_ts) },
+      },
+      data: {
+        resolved_at: new Date(),
+        resolution: 'replied',
+      },
+    });
 
-    const count = result.rowCount ?? 0;
+    const count = result.count;
     if (count > 0) {
       publishRealtimeEvent({ type: 'work_item_resolved', id: conversationId, ts: new Date().toISOString() }, logger);
     }
@@ -132,7 +122,5 @@ export const resolveNeedsReplyOnOutbound = async (
   } catch (err) {
     logger?.error('resolveNeedsReplyOnOutbound failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };

@@ -1,4 +1,6 @@
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
+
+const getPrisma = () => getPrismaClient();
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPREHENSIVE FIXES FOR ALL IDENTIFIED ISSUES
@@ -6,14 +8,12 @@ import { getPool } from './db.js';
 
 // ─── Issue #1, #2, #3: Auto-assign unassigned work items ────────────────────────
 export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors: string[] }> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
-
+  const prisma = getPrisma();
   const errors: string[] = [];
 
   // Get distribution of current workload by rep
-  const { rows: workloadRows } = await pool.query<{ rep_id: string; count: string }>(`
-    SELECT rep_id, COUNT(*)::text AS count
+  const workloadRows = await prisma.$queryRawUnsafe<{ rep_id: string; count: bigint }[]>(`
+    SELECT rep_id, COUNT(*) AS count
     FROM work_items
     WHERE resolved_at IS NULL AND rep_id IS NOT NULL
     GROUP BY rep_id
@@ -21,11 +21,11 @@ export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors:
 
   const workload: Record<string, number> = {};
   for (const row of workloadRows) {
-    workload[row.rep_id] = Number.parseInt(row.count, 10);
+    workload[row.rep_id] = Number(row.count);
   }
 
   // Get unassigned work items with their conversation's last outbound line
-  const { rows: unassignedRows } = await pool.query<{ id: string; conversation_id: string; line: string | null }>(`
+  const unassignedRows = await prisma.$queryRawUnsafe<{ id: string; conversation_id: string; line: string | null }[]>(`
     SELECT
       wi.id,
       wi.conversation_id,
@@ -61,7 +61,10 @@ export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors:
     }
 
     try {
-      await pool.query('UPDATE work_items SET rep_id = $1, updated_at = NOW() WHERE id = $2', [repId, row.id]);
+      await prisma.work_items.update({
+        where: { id: row.id },
+        data: { rep_id: repId },
+      });
       workload[repId] = (workload[repId] || 0) + 1;
       assigned++;
     } catch (err) {
@@ -86,20 +89,15 @@ export const trackDraftRejection = async (
   reason: DraftRejectionReason,
   feedback?: string,
 ): Promise<void> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
-
-  await pool.query(
-    `
-    UPDATE draft_suggestions
-    SET
-      rejection_reason = $2,
-      rejection_feedback = $3,
-      rejected_at = NOW()
-    WHERE id = $1
-  `,
-    [draftId, reason, feedback || null],
-  );
+  const prisma = getPrisma();
+  await prisma.draft_suggestions.update({
+    where: { id: draftId },
+    data: {
+      rejection_reason: reason,
+      rejection_feedback: feedback || null,
+      rejected_at: new Date(),
+    },
+  });
 };
 
 export const getDraftRejectionStats = async (): Promise<{
@@ -107,14 +105,12 @@ export const getDraftRejectionStats = async (): Promise<{
   byReason: Record<string, number>;
   commonFeedback: string[];
 }> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
-
-  const { rows } = await pool.query<{ reason: string; count: string; sample_feedback: string[] }>(`
+  const prisma = getPrisma();
+  const rows = await prisma.$queryRawUnsafe<{ reason: string; count: bigint; sample_feedback: string[] | null }[]>(`
     SELECT
-      COALESCE(rejection_reason, 'unknown') AS reason,
-      COUNT(*)::text AS count,
-      ARRAY_AGG(DISTINCT rejection_feedback) FILTER (WHERE rejection_feedback IS NOT NULL) AS sample_feedback
+      rejection_reason AS reason,
+      COUNT(*) AS count,
+      ARRAY_AGG(rejection_feedback) FILTER (WHERE rejection_feedback IS NOT NULL AND rejection_feedback != '') AS sample_feedback
     FROM draft_suggestions
     WHERE accepted = false
     GROUP BY rejection_reason
@@ -124,7 +120,7 @@ export const getDraftRejectionStats = async (): Promise<{
   const allFeedback: string[] = [];
 
   for (const row of rows) {
-    byReason[row.reason] = Number.parseInt(row.count, 10);
+    byReason[row.reason] = Number(row.count);
     if (row.sample_feedback) {
       allFeedback.push(...row.sample_feedback.slice(0, 3));
     }
@@ -142,13 +138,11 @@ export const getLineActivityBalance = async (): Promise<{
   lines: Array<{ line: string; messagesSent: number; share: number; isImbalanced: boolean }>;
   alert: string | null;
 }> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
-
-  const { rows } = await pool.query<{ line: string; count: string }>(`
+  const prisma = getPrisma();
+  const rows = await prisma.$queryRawUnsafe<{ line: string; count: bigint }[]>(`
     SELECT
       COALESCE(NULLIF(TRIM(line), ''), 'Unknown') AS line,
-      COUNT(*)::text AS count
+      COUNT(*) AS count
     FROM sms_events
     WHERE direction = 'outbound'
       AND event_ts >= NOW() - INTERVAL '7 days'
@@ -156,10 +150,10 @@ export const getLineActivityBalance = async (): Promise<{
     ORDER BY COUNT(*) DESC
   `);
 
-  const total = rows.reduce((sum, r) => sum + Number.parseInt(r.count, 10), 0);
+  const total = rows.reduce((sum, r) => sum + Number(r.count), 0);
 
   const lines = rows.map((row) => {
-    const count = Number.parseInt(row.count, 10);
+    const count = Number(row.count);
     const share = total > 0 ? (count / total) * 100 : 0;
     return {
       line: row.line,
@@ -185,11 +179,10 @@ export const getLineActivityBalance = async (): Promise<{
 
 // ─── Issue #6, #7: Auto-infer qualification from conversation text ────────────────
 export const bulkInferQualification = async (limit = 100): Promise<{ processed: number; updated: number }> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   // Get conversations with unknown qualification but recent activity
-  const { rows } = await pool.query<{ conversation_id: string; contact_phone: string }>(
+  const rows = await prisma.$queryRawUnsafe<{ conversation_id: string; contact_phone: string }[]>(
     `
     SELECT DISTINCT c.id AS conversation_id, c.contact_phone
     FROM conversations c
@@ -205,14 +198,14 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
     )
     LIMIT $1
   `,
-    [limit],
+    limit,
   );
 
   let updated = 0;
 
   for (const row of rows) {
     // Get conversation text
-    const { rows: messages } = await pool.query<{ body: string; direction: string }>(
+    const messages = await prisma.$queryRawUnsafe<{ body: string; direction: string }[]>(
       `
       SELECT body, direction
       FROM sms_events
@@ -220,7 +213,7 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
       ORDER BY event_ts
       LIMIT 50
     `,
-      [row.contact_phone],
+      row.contact_phone,
     );
 
     const inboundText = messages
@@ -616,38 +609,17 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
 
     // Update if we found anything
     if (Object.keys(inferredState).length > 0) {
-      const updates: string[] = [];
-      const values: unknown[] = [row.conversation_id];
-      let paramIndex = 2;
-
-      if (inferredState.employment) {
-        updates.push(`qualification_full_or_part_time = $${paramIndex++}`);
-        values.push(inferredState.employment);
-      }
-      if (inferredState.interest) {
-        updates.push(`qualification_coaching_interest = $${paramIndex++}`);
-        values.push(inferredState.interest);
-      }
-      if (inferredState.revenueMix) {
-        updates.push(`qualification_revenue_mix = $${paramIndex++}`);
-        values.push(inferredState.revenueMix);
-      }
-      if (inferredState.deliveryModel) {
-        updates.push(`qualification_delivery_model = $${paramIndex++}`);
-        values.push(inferredState.deliveryModel);
-      }
-
-      if (updates.length > 0) {
-        await pool.query(
-          `
-          UPDATE conversation_state
-          SET ${updates.join(', ')}, updated_at = NOW()
-          WHERE conversation_id = $1
-        `,
-          values,
-        );
-        updated++;
-      }
+      await prisma.conversation_state.update({
+        where: { conversation_id: row.conversation_id },
+        data: {
+          qualification_full_or_part_time: inferredState.employment,
+          qualification_coaching_interest: inferredState.interest,
+          qualification_revenue_mix: inferredState.revenueMix,
+          qualification_delivery_model: inferredState.deliveryModel,
+          updated_at: new Date(),
+        },
+      });
+      updated++;
     }
   }
 
@@ -679,26 +651,25 @@ export const normalizeLineName = (line: string): string => {
 };
 
 export const deduplicateLines = async (): Promise<{ updated: number }> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   // Update Jack's line variations
-  const { rowCount: jackUpdated } = await pool.query(`
+  const jackUpdated = await prisma.$executeRawUnsafe(`
     UPDATE sms_events
     SET line = 'Jack''s Personal Line (+1 817-580-9950)'
-    WHERE line LIKE '%817-580-9950%' OR line LIKE '%8175809950%'
+    WHERE (line LIKE '%817-580-9950%' OR line LIKE '%8175809950%')
       AND line != 'Jack''s Personal Line (+1 817-580-9950)'
   `);
 
   // Update Brandon's line variations
-  const { rowCount: brandonUpdated } = await pool.query(`
+  const brandonUpdated = await prisma.$executeRawUnsafe(`
     UPDATE sms_events
     SET line = 'Brandon''s Personal Line (+1 678-820-3770)'
-    WHERE line LIKE '%678-820-3770%' OR line LIKE '%6788203770%'
+    WHERE (line LIKE '%678-820-3770%' OR line LIKE '%6788203770%')
       AND line != 'Brandon''s Personal Line (+1 678-820-3770)'
   `);
 
-  return { updated: (jackUpdated || 0) + (brandonUpdated || 0) };
+  return { updated: (Number(jackUpdated) || 0) + (Number(brandonUpdated) || 0) };
 };
 
 // ─── Issue #23: Time-to-booking metric ────────────────────────────────────────────
@@ -715,15 +686,14 @@ export type TimeToBookingStats = {
 };
 
 export const getTimeToBookingStats = async (): Promise<TimeToBookingStats> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
-  const { rows } = await pool.query<{
-    avg_days: string;
-    median_days: string;
-    min_days: string;
-    max_days: string;
-  }>(`
+  const statsRows = await prisma.$queryRawUnsafe<{
+    avg_days: number | string | null;
+    median_days: number | string | null;
+    min_days: number | string | null;
+    max_days: number | string | null;
+  }[]>(`
     WITH booking_times AS (
       SELECT
         bc.event_time,
@@ -739,22 +709,22 @@ export const getTimeToBookingStats = async (): Promise<TimeToBookingStats> => {
       WHERE bc.conversation_id IS NOT NULL
     )
     SELECT
-      COALESCE(AVG(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0)::text AS avg_days,
-      COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0)::text AS median_days,
-      COALESCE(MIN(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0)::text AS min_days,
-      COALESCE(MAX(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0)::text AS max_days
+      COALESCE(AVG(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0) AS avg_days,
+      COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0) AS median_days,
+      COALESCE(MIN(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0) AS min_days,
+      COALESCE(MAX(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400), 0) AS max_days
     FROM booking_times
     WHERE first_contact IS NOT NULL
   `);
 
-  const stats = rows[0];
+  const stats = statsRows[0];
 
   // By sequence
-  const { rows: sequenceRows } = await pool.query<{
+  const sequenceRows = await prisma.$queryRawUnsafe<{
     sequence: string;
-    avg_days: string;
-    bookings: string;
-  }>(`
+    avg_days: number | string | null;
+    bookings: bigint;
+  }[]>(`
     WITH booking_times AS (
       SELECT
         bc.event_time,
@@ -779,8 +749,8 @@ export const getTimeToBookingStats = async (): Promise<TimeToBookingStats> => {
     )
     SELECT
       COALESCE(sequence, 'Manual') AS sequence,
-      AVG(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400)::text AS avg_days,
-      COUNT(*)::text AS bookings
+      AVG(EXTRACT(EPOCH FROM (event_time - first_contact)) / 86400) AS avg_days,
+      COUNT(*) AS bookings
     FROM booking_times
     WHERE first_contact IS NOT NULL
     GROUP BY sequence
@@ -789,14 +759,14 @@ export const getTimeToBookingStats = async (): Promise<TimeToBookingStats> => {
   `);
 
   return {
-    avgDays: Number.parseFloat(stats.avg_days),
-    medianDays: Number.parseFloat(stats.median_days),
-    minDays: Number.parseFloat(stats.min_days),
-    maxDays: Number.parseFloat(stats.max_days),
+    avgDays: Number(stats.avg_days),
+    medianDays: Number(stats.median_days),
+    minDays: Number(stats.min_days),
+    maxDays: Number(stats.max_days),
     bySequence: sequenceRows.map((r) => ({
       sequence: r.sequence,
-      avgDays: Number.parseFloat(r.avg_days),
-      bookings: Number.parseInt(r.bookings, 10),
+      avgDays: Number(r.avg_days),
+      bookings: Number(r.bookings),
     })),
   };
 };
@@ -818,14 +788,12 @@ export type ResponseTimeStats = {
 };
 
 export const getResponseTimeStats = async (params: { from: Date; to: Date }): Promise<ResponseTimeStats> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
-
-  const { rows } = await pool.query<{
-    avg_minutes: string;
-    median_minutes: string;
-    p95_minutes: string;
-  }>(
+  const prisma = getPrisma();
+  const rows = await prisma.$queryRawUnsafe<{
+    avg_minutes: number | string | null;
+    median_minutes: number | string | null;
+    p95_minutes: number | string | null;
+  }[]>(
     `
     WITH response_pairs AS (
       SELECT
@@ -850,23 +818,24 @@ export const getResponseTimeStats = async (params: { from: Date; to: Date }): Pr
         )
     )
     SELECT
-      COALESCE(AVG(response_minutes), 0)::text AS avg_minutes,
-      COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_minutes), 0)::text AS median_minutes,
-      COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_minutes), 0)::text AS p95_minutes
+      COALESCE(AVG(response_minutes), 0) AS avg_minutes,
+      COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY response_minutes), 0) AS median_minutes,
+      COALESCE(PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY response_minutes), 0) AS p95_minutes
     FROM response_pairs
     WHERE response_minutes > 0 AND response_minutes < 1440
   `,
-    [params.from.toISOString(), params.to.toISOString()],
+    params.from.toISOString(),
+    params.to.toISOString(),
   );
 
   const stats = rows[0];
 
   // By rep (based on line)
-  const { rows: repRows } = await pool.query<{
+  const repRows = await prisma.$queryRawUnsafe<{
     rep: string;
-    avg_minutes: string;
-    responses: string;
-  }>(
+    avg_minutes: number | string | null;
+    responses: bigint;
+  }[]>(
     `
     WITH response_pairs AS (
       SELECT
@@ -894,21 +863,22 @@ export const getResponseTimeStats = async (params: { from: Date; to: Date }): Pr
         WHEN line ILIKE '%brandon%' OR line LIKE '%678-820-3770%' THEN 'Brandon'
         ELSE 'Other'
       END AS rep,
-      AVG(response_minutes)::text AS avg_minutes,
-      COUNT(*)::text AS responses
+      AVG(response_minutes) AS avg_minutes,
+      COUNT(*) AS responses
     FROM response_pairs
     WHERE response_minutes > 0 AND response_minutes < 1440
     GROUP BY 1
     ORDER BY AVG(response_minutes)
   `,
-    [params.from.toISOString(), params.to.toISOString()],
+    params.from.toISOString(),
+    params.to.toISOString(),
   );
 
   // By hour
-  const { rows: hourRows } = await pool.query<{
-    hour: string;
-    avg_minutes: string;
-  }>(
+  const hourRows = await prisma.$queryRawUnsafe<{
+    hour: number;
+    avg_minutes: number | string | null;
+  }[]>(
     `
     WITH response_pairs AS (
       SELECT
@@ -924,28 +894,29 @@ export const getResponseTimeStats = async (params: { from: Date; to: Date }): Pr
         AND inbound.event_ts <= $2::timestamptz
     )
     SELECT
-      hour::text,
-      AVG(response_minutes)::text AS avg_minutes
+      hour::int,
+      AVG(response_minutes) AS avg_minutes
     FROM response_pairs
     WHERE response_minutes > 0 AND response_minutes < 1440
     GROUP BY hour
     ORDER BY hour
   `,
-    [params.from.toISOString(), params.to.toISOString()],
+    params.from.toISOString(),
+    params.to.toISOString(),
   );
 
   return {
-    avgMinutes: Number.parseFloat(stats.avg_minutes),
-    medianMinutes: Number.parseFloat(stats.median_minutes),
-    p95Minutes: Number.parseFloat(stats.p95_minutes),
+    avgMinutes: Number(stats.avg_minutes),
+    medianMinutes: Number(stats.median_minutes),
+    p95Minutes: Number(stats.p95_minutes),
     byRep: repRows.map((r) => ({
       rep: r.rep,
-      avgMinutes: Number.parseFloat(r.avg_minutes),
-      responses: Number.parseInt(r.responses, 10),
+      avgMinutes: Number(r.avg_minutes),
+      responses: Number(r.responses),
     })),
     byHour: hourRows.map((r) => ({
-      hour: Number.parseInt(r.hour, 10),
-      avgMinutes: Number.parseFloat(r.avg_minutes),
+      hour: Number(r.hour),
+      avgMinutes: Number(r.avg_minutes),
     })),
   };
 };
@@ -963,8 +934,7 @@ export type Goal = {
 };
 
 export const getGoals = async (): Promise<Goal[]> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   // Define goals
   const goals: Array<{
@@ -979,7 +949,7 @@ export const getGoals = async (): Promise<Goal[]> => {
       target: 3,
       unit: 'bookings',
       period: 'daily',
-      query: `SELECT COUNT(*)::text FROM booked_calls WHERE event_time >= CURRENT_DATE AT TIME ZONE 'America/Chicago'`,
+      query: `SELECT COUNT(*) AS value FROM booked_calls WHERE event_time >= CURRENT_DATE AT TIME ZONE 'America/Chicago'`,
     },
     {
       name: 'Weekly Reply Rate',
@@ -991,7 +961,7 @@ export const getGoals = async (): Promise<Goal[]> => {
           (COUNT(DISTINCT CASE WHEN direction = 'inbound' THEN contact_phone END)::float /
            NULLIF(COUNT(DISTINCT CASE WHEN direction = 'outbound' THEN contact_phone END), 0) * 100),
           0
-        )::text
+        ) AS value
         FROM sms_events WHERE event_ts >= CURRENT_DATE - INTERVAL '7 days'
       `,
     },
@@ -1005,7 +975,7 @@ export const getGoals = async (): Promise<Goal[]> => {
           (COUNT(DISTINCT CASE WHEN direction = 'inbound' AND LOWER(body) ~ '(stop|unsubscribe|cancel)' THEN contact_phone END)::float /
            NULLIF(COUNT(DISTINCT CASE WHEN direction = 'outbound' THEN contact_phone END), 0) * 100),
           0
-        )::text
+        ) AS value
         FROM sms_events WHERE event_ts >= CURRENT_DATE - INTERVAL '7 days'
       `,
     },
@@ -1014,15 +984,15 @@ export const getGoals = async (): Promise<Goal[]> => {
       target: 60,
       unit: 'bookings',
       period: 'monthly',
-      query: `SELECT COUNT(*)::text FROM booked_calls WHERE event_time >= DATE_TRUNC('month', CURRENT_DATE)`,
+      query: `SELECT COUNT(*) AS value FROM booked_calls WHERE event_time >= DATE_TRUNC('month', CURRENT_DATE)`,
     },
   ];
 
   const results: Goal[] = [];
 
   for (const goal of goals) {
-    const { rows } = await pool.query<{ value: string }>(goal.query.replace('::text', '::text AS value'));
-    const current = Number.parseFloat(rows[0]?.value || '0');
+    const rows = await prisma.$queryRawUnsafe<{ value: number | bigint }[]>(goal.query);
+    const current = Number(rows[0]?.value || 0);
 
     // For "max" targets like opt-out rate, invert the logic
     const isMaxTarget = goal.unit.includes('max');
@@ -1059,26 +1029,25 @@ export type TrendAlert = {
 };
 
 export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
   const alerts: TrendAlert[] = [];
   const now = new Date().toISOString();
 
   // Check reply rate drop
-  const { rows: replyRateRows } = await pool.query<{ today: string; last_week: string }>(`
+  const replyRateRows = await prisma.$queryRawUnsafe<{ today: number | null; last_week: number | null }[]>(`
     SELECT
       (SELECT COUNT(DISTINCT CASE WHEN direction = 'inbound' THEN contact_phone END)::float /
        NULLIF(COUNT(DISTINCT CASE WHEN direction = 'outbound' THEN contact_phone END), 0) * 100
-       FROM sms_events WHERE event_ts >= CURRENT_DATE AT TIME ZONE 'America/Chicago')::text AS today,
+       FROM sms_events WHERE event_ts >= CURRENT_DATE AT TIME ZONE 'America/Chicago') AS today,
       (SELECT COUNT(DISTINCT CASE WHEN direction = 'inbound' THEN contact_phone END)::float /
        NULLIF(COUNT(DISTINCT CASE WHEN direction = 'outbound' THEN contact_phone END), 0) * 100
        FROM sms_events WHERE event_ts >= CURRENT_DATE - INTERVAL '7 days'
-       AND event_ts < CURRENT_DATE - INTERVAL '1 day')::text AS last_week
+       AND event_ts < CURRENT_DATE - INTERVAL '1 day') AS last_week
   `);
 
-  const todayReplyRate = Number.parseFloat(replyRateRows[0]?.today || '0');
-  const lastWeekReplyRate = Number.parseFloat(replyRateRows[0]?.last_week || '0');
+  const todayReplyRate = Number(replyRateRows[0]?.today || 0);
+  const lastWeekReplyRate = Number(replyRateRows[0]?.last_week || 0);
 
   if (lastWeekReplyRate > 0 && todayReplyRate < lastWeekReplyRate * 0.7) {
     alerts.push({
@@ -1093,21 +1062,21 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
   }
 
   // Check opt-out spike
-  const { rows: optOutRows } = await pool.query<{ today: string; avg: string }>(`
+  const optOutRows = await prisma.$queryRawUnsafe<{ today: bigint; avg: number | null }[]>(`
     SELECT
       (SELECT COUNT(*) FROM sms_events
        WHERE direction = 'inbound'
        AND LOWER(body) ~ '(stop|unsubscribe|cancel)'
-       AND event_ts >= CURRENT_DATE AT TIME ZONE 'America/Chicago')::text AS today,
+       AND event_ts >= CURRENT_DATE AT TIME ZONE 'America/Chicago') AS today,
       (SELECT COUNT(*) / 7.0 FROM sms_events
        WHERE direction = 'inbound'
        AND LOWER(body) ~ '(stop|unsubscribe|cancel)'
        AND event_ts >= CURRENT_DATE - INTERVAL '7 days'
-       AND event_ts < CURRENT_DATE)::text AS avg
+       AND event_ts < CURRENT_DATE) AS avg
   `);
 
-  const todayOptOuts = Number.parseInt(optOutRows[0]?.today || '0', 10);
-  const avgOptOuts = Number.parseFloat(optOutRows[0]?.avg || '0');
+  const todayOptOuts = Number(optOutRows[0]?.today || 0);
+  const avgOptOuts = Number(optOutRows[0]?.avg || 0);
 
   if (avgOptOuts > 0 && todayOptOuts > avgOptOuts * 2) {
     alerts.push({
@@ -1122,13 +1091,13 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
   }
 
   // Check for quiet day (no activity)
-  const { rows: activityRows } = await pool.query<{ count: string }>(`
-    SELECT COUNT(*)::text AS count
+  const activityRows = await prisma.$queryRawUnsafe<{ count: bigint }[]>(`
+    SELECT COUNT(*) AS count
     FROM sms_events
     WHERE event_ts >= CURRENT_DATE AT TIME ZONE 'America/Chicago'
   `);
 
-  const todayActivity = Number.parseInt(activityRows[0]?.count || '0', 10);
+  const todayActivity = Number(activityRows[0]?.count || 0);
   const currentHour = new Date().getHours();
 
   // If after 10am and less than 10 messages, flag it
@@ -1167,23 +1136,18 @@ export const logAuditEvent = async (params: {
   details?: Record<string, unknown>;
   ipAddress?: string;
 }): Promise<void> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
-  await pool.query(
-    `
-    INSERT INTO audit_logs (action, resource_type, resource_id, user_id, details, ip_address)
-    VALUES ($1, $2, $3, $4, $5, $6)
-  `,
-    [
-      params.action,
-      params.resourceType,
-      params.resourceId,
-      params.userId || null,
-      JSON.stringify(params.details || {}),
-      params.ipAddress || null,
-    ],
-  );
+  await prisma.audit_logs.create({
+    data: {
+      action: params.action,
+      resource_type: params.resourceType,
+      resource_id: params.resourceId,
+      user_id: params.userId || null,
+      details: (params.details as any) || {},
+      ip_address: params.ipAddress || null,
+    },
+  });
 };
 
 export const getAuditLogs = async (params: {
@@ -1194,56 +1158,25 @@ export const getAuditLogs = async (params: {
   userId?: string;
   limit?: number;
 }): Promise<AuditLogEntry[]> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
-  const conditions: string[] = [];
-  const values: unknown[] = [];
-  let paramIndex = 1;
+  const where: any = {};
+  if (params.from || params.to) {
+    where.created_at = {};
+    if (params.from) where.created_at.gte = params.from;
+    if (params.to) where.created_at.lte = params.to;
+  }
+  if (params.action) where.action = params.action;
+  if (params.resourceType) where.resource_type = params.resourceType;
+  if (params.userId) where.user_id = params.userId;
 
-  if (params.from) {
-    conditions.push(`created_at >= $${paramIndex++}::timestamptz`);
-    values.push(params.from.toISOString());
-  }
-  if (params.to) {
-    conditions.push(`created_at <= $${paramIndex++}::timestamptz`);
-    values.push(params.to.toISOString());
-  }
-  if (params.action) {
-    conditions.push(`action = $${paramIndex++}`);
-    values.push(params.action);
-  }
-  if (params.resourceType) {
-    conditions.push(`resource_type = $${paramIndex++}`);
-    values.push(params.resourceType);
-  }
-  if (params.userId) {
-    conditions.push(`user_id = $${paramIndex++}`);
-    values.push(params.userId);
-  }
+  const take = params.limit || 100;
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const limit = params.limit || 100;
-
-  const { rows } = await pool.query<{
-    id: string;
-    action: string;
-    resource_type: string;
-    resource_id: string;
-    user_id: string | null;
-    details: string;
-    ip_address: string | null;
-    created_at: string;
-  }>(
-    `
-    SELECT id, action, resource_type, resource_id, user_id, details, ip_address, created_at
-    FROM audit_logs
-    ${whereClause}
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `,
-    values,
-  );
+  const rows = await prisma.audit_logs.findMany({
+    where,
+    orderBy: { created_at: 'desc' },
+    take,
+  });
 
   return rows.map((row) => ({
     id: row.id,
@@ -1251,8 +1184,8 @@ export const getAuditLogs = async (params: {
     resourceType: row.resource_type,
     resourceId: row.resource_id,
     userId: row.user_id,
-    details: typeof row.details === 'string' ? JSON.parse(row.details) : row.details,
+    details: row.details as Record<string, unknown>,
     ipAddress: row.ip_address,
-    timestamp: row.created_at,
+    timestamp: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
   }));
 };

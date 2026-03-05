@@ -1,6 +1,9 @@
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
+
+const getPrisma = () => getPrismaClient();
+// ... (rest of types and patterns same as before)
 
 export type SalesTrendPoint = {
   day: string; // YYYY-MM-DD
@@ -179,11 +182,10 @@ export const getSalesMetricsSummary = async (
   params: { from: Date; to: Date; timeZone?: string },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SalesMetricsSummary> => {
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
+  const prisma = getPrisma();
 
-  const fromIso = params.from.toISOString();
-  const toIso = params.to.toISOString();
+  const fromIso = params.from;
+  const toIso = params.to;
   const timeZone = (params.timeZone || '').trim() || DEFAULT_BUSINESS_TIMEZONE;
 
   // Attribution rules (v1):
@@ -198,25 +200,18 @@ export const getSalesMetricsSummary = async (
   // - optOuts: unique contacts with >=1 opt-out inbound in range (max 1 per contact)
   //
   // NOTE: This uses sms_events (not daily_runs text) so it can enforce unique-per-contact and 14-day attribution.
-  const { rows } = await pool.query<{
-    event_ts: string;
-    direction: 'inbound' | 'outbound' | 'unknown';
-    contact_id: string | null;
-    contact_phone: string | null;
-    aloware_user: string | null;
-    sequence: string | null;
-    body: string | null;
-  }>(
-    `
-    SELECT event_ts, direction, contact_id, contact_phone, aloware_user, sequence, body
-    FROM sms_events
-    WHERE event_ts >= $1::timestamptz
-      AND event_ts <= $2::timestamptz
-      AND direction IN ('inbound','outbound')
-    ORDER BY event_ts ASC
-    `,
-    [fromIso, toIso],
-  );
+  const rows = await prisma.sms_events.findMany({
+    where: {
+      event_ts: {
+        gte: fromIso,
+        lte: toIso,
+      },
+      direction: {
+        in: ['inbound', 'outbound'],
+      },
+    },
+    orderBy: { event_ts: 'asc' },
+  });
 
   const normalizeDigits = (value: string): string => value.replace(/\D/g, '');
   const contactKeyFor = (row: { contact_id: string | null; contact_phone: string | null }): string | null => {
@@ -225,7 +220,7 @@ export const getSalesMetricsSummary = async (
     return null;
   };
 
-  const dayKey = (ts: string): string | null => {
+  const dayKey = (ts: string | Date): string | null => {
     return dayKeyInTimeZone(ts, timeZone);
   };
 
@@ -239,6 +234,8 @@ export const getSalesMetricsSummary = async (
   }
 
   const ATTRIBUTION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+// ... (rest of the logic remains the same, but let's make sure we find and replace pool.query at the end)
+// Wait, I should provide more lines to be safe.
   // Window for finding the outbound that triggered a contact's first reply.
   // Shorter than the booking attribution window — we want the direct trigger, not a distant touch.
   const REPLY_TRIGGER_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -772,7 +769,7 @@ export const getSalesMetricsSummary = async (
   // Best-effort sequence provenance: first outbound timestamp observed in PTBizSMS history for each label.
   if (seqMap.size > 0) {
     const labels = [...seqMap.keys()];
-    const { rows: firstSeenRows } = await pool.query<{ label: string; first_seen_at: string | null }>(
+    const firstSeenRows = await prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
         COALESCE(NULLIF(TRIM(sequence), ''), $2::text) AS label,
@@ -782,7 +779,9 @@ export const getSalesMetricsSummary = async (
         AND COALESCE(NULLIF(TRIM(sequence), ''), $2::text) = ANY($1::text[])
       GROUP BY 1
       `,
-      [labels, MANUAL_SEQUENCE_LABEL, timeZone],
+      labels,
+      MANUAL_SEQUENCE_LABEL,
+      timeZone,
     );
 
     const firstSeenByLabel = new Map(
@@ -843,7 +842,7 @@ export const getSalesMetricsSummary = async (
   });
 
   return {
-    timeRange: { from: fromIso, to: toIso },
+    timeRange: { from: fromIso.toISOString(), to: toIso.toISOString() },
     totals: { ...totals, replyRatePct, manualReplyRatePct, sequenceReplyRatePct },
     trendByDay,
     topSequences,

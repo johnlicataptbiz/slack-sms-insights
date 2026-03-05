@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -7,12 +8,601 @@ datasource db {
 }
 
 model Conversation {
-  id             String    @id @db.Uuid
-  contactKey     String    @map("contact_key")
-  status         String
-  createdAt      DateTime  @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @map("updated_at") @db.Timestamptz(6)
-  nextFollowupAt DateTime? @map("next_followup_due_at") @db.Timestamptz(6)
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactKey              String                   @unique @map("contact_key")
+  contact_id              String?
+  contact_phone           String?
+  current_rep_id          String?
+  status                  String                   @default("open")
+  last_inbound_at         DateTime?                @db.Timestamptz(6)
+  last_outbound_at        DateTime?                @db.Timestamptz(6)
+  last_touch_at           DateTime?                @db.Timestamptz(6)
+  unreplied_inbound_count Int                      @default(0)
+  nextFollowupAt          DateTime?                @map("next_followup_due_at") @db.Timestamptz(6)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
+  conversation_notes      conversation_notes[]
+  conversation_state      conversation_state?
+  draft_suggestions       draft_suggestions[]
+  inbox_contact_profiles  inbox_contact_profiles[]
+  send_attempts           send_attempts[]
+  sms_events              sms_events[]
+  work_items              work_items?
 
+  @@index([contactKey], map: "idx_conversations_contact_key")
+  @@index([nextFollowupAt], map: "idx_conversations_next_followup_due")
+  @@index([current_rep_id, last_touch_at(sort: Desc)], map: "idx_conversations_rep_last_touch")
+  @@index([status], map: "idx_conversations_status")
   @@map("conversations")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model actor_directory {
+  canonical_name String   @id
+  role           String
+  aliases        String[] @default([])
+  active         Boolean  @default(true)
+  notes          String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([role, active], map: "idx_actor_directory_role_active")
+}
+
+model audit_logs {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  action        String    @db.VarChar(100)
+  resource_type String    @db.VarChar(100)
+  resource_id   String    @db.VarChar(255)
+  user_id       String?   @db.VarChar(255)
+  details       Json?     @default("{}")
+  ip_address    String?   @db.Inet
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([action], map: "idx_audit_logs_action")
+  @@index([created_at(sort: Desc)], map: "idx_audit_logs_created_at")
+}
+
+model booked_call_attribution {
+  booked_call_id             String   @id @db.Uuid
+  booked_event_ts            DateTime @db.Timestamptz(6)
+  booked_text                String?
+  canonical_booking          Boolean  @default(false)
+  mapping_method             String?
+  match_confidence           Decimal? @db.Decimal(5, 3)
+  conversation_id            String?  @db.Uuid
+  conversation_match_seconds Int?
+  setter_hint                String?
+  setter_final               String?
+  closer_final               String?
+  first_conversion           String?
+  source_bucket              String?
+  hubspot_contact_id         String?
+  lead_score                 Decimal? @db.Decimal
+  lead_score_source          String?
+  mapper_version             String   @default("v1.0")
+  created_at                 DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([conversation_id], map: "idx_booked_call_attribution_conversation_id")
+  @@index([booked_event_ts(sort: Desc)], map: "idx_booked_call_attribution_event_ts")
+  @@index([setter_final], map: "idx_booked_call_attribution_setter_final")
+}
+
+model booked_call_reactions {
+  booked_call_id String       @db.Uuid
+  reaction_name  String
+  reaction_count Int          @default(0)
+  users          Json?
+  updated_at     DateTime     @default(now()) @db.Timestamptz(6)
+  booked_calls   booked_calls @relation(fields: [booked_call_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([booked_call_id, reaction_name])
+}
+
+model booked_calls {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slack_team_id         String
+  slack_channel_id      String
+  slack_message_ts      String
+  event_ts              DateTime                @db.Timestamptz(6)
+  text                  String?
+  raw                   Json?
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  first_sms_touch_at    DateTime?               @db.Timestamptz(6)
+  booked_call_reactions booked_call_reactions[]
+
+  @@unique([slack_channel_id, slack_message_ts])
+  @@index([slack_channel_id, slack_message_ts], map: "idx_booked_calls_channel_ts")
+  @@index([event_ts(sort: Desc)], map: "idx_booked_calls_event_ts")
+}
+
+model conversation_notes {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id String       @db.Uuid
+  author          String
+  text            String
+  created_at      DateTime     @default(now()) @db.Timestamptz(6)
+  conversations   Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([conversation_id], map: "idx_conv_notes_cid")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model conversation_state {
+  conversation_id                 String       @id @db.Uuid
+  qualification_full_or_part_time String       @default("unknown")
+  qualification_niche             String?
+  qualification_revenue_mix       String       @default("unknown")
+  qualification_coaching_interest String       @default("unknown")
+  qualification_progress_step     Int          @default(0)
+  escalation_level                Int          @default(1)
+  escalation_reason               String?
+  escalation_overridden           Boolean      @default(false)
+  last_podcast_sent_at            DateTime?    @db.Timestamptz(6)
+  next_followup_due_at            DateTime?    @db.Timestamptz(6)
+  cadence_status                  String       @default("idle")
+  created_at                      DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime     @default(now()) @db.Timestamptz(6)
+  objection_tags                  String[]     @default([])
+  guardrail_override_count        Int          @default(0)
+  call_outcome                    String?
+  qualification_delivery_model    String       @default("unknown")
+  conversations                   Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([cadence_status], map: "idx_conversation_state_cadence_status")
+  @@index([qualification_coaching_interest], map: "idx_conversation_state_coaching_interest")
+  @@index([conversation_id], map: "idx_conversation_state_conversation_id")
+  @@index([escalation_level], map: "idx_conversation_state_escalation_level")
+  @@index([objection_tags], map: "idx_conversation_state_objection_tags_gin", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model conversion_examples {
+  id                       String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source_outbound_event_id String     @unique @db.Uuid
+  booked_call_label        String?
+  closed_won_label         String?
+  escalation_level         Int        @default(1)
+  structure_signature      String?
+  qualifier_snapshot       Json?
+  channel_marker           String     @default("sms")
+  created_at               DateTime   @default(now()) @db.Timestamptz(6)
+  sms_events               sms_events @relation(fields: [source_outbound_event_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([booked_call_label, escalation_level], map: "idx_conversion_examples_booked_escalation")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model daily_runs {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  timestamp     DateTime  @default(now()) @db.Timestamptz(6)
+  report_date   DateTime? @db.Date
+  channel_id    String
+  channel_name  String?
+  report_type   String
+  status        String
+  error_message String?
+  summary_text  String?
+  full_report   String?
+  duration_ms   Int?
+  created_at    DateTime  @default(now()) @db.Timestamptz(6)
+  is_legacy     Boolean   @default(false)
+
+  @@index([channel_id, timestamp(sort: Desc)], map: "idx_daily_runs_channel_timestamp")
+  @@index([is_legacy, timestamp(sort: Desc)], map: "idx_daily_runs_legacy_timestamp")
+  @@index([timestamp(sort: Desc)], map: "idx_daily_runs_timestamp")
+}
+
+model draft_suggestions {
+  id                     String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id        String       @db.Uuid
+  prompt_snapshot_hash   String
+  retrieved_exemplar_ids Json?
+  generated_text         String
+  lint_score             Float        @default(0)
+  structural_score       Float        @default(0)
+  lint_issues            Json?
+  accepted               Boolean      @default(false)
+  edited                 Boolean      @default(false)
+  send_linked_event_id   String?      @db.Uuid
+  raw                    Json?
+  created_at             DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime     @default(now()) @db.Timestamptz(6)
+  rejection_reason       String?
+  rejection_feedback     String?
+  rejected_at            DateTime?    @db.Timestamptz(6)
+  conversations          Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sms_events             sms_events?  @relation(fields: [send_linked_event_id], references: [id], onUpdate: NoAction)
+
+  @@index([conversation_id, created_at(sort: Desc)], map: "idx_draft_suggestions_conversation_created")
+}
+
+model goals {
+  id         String    @id @db.VarChar(100)
+  name       String    @db.VarChar(255)
+  target     Decimal   @db.Decimal
+  unit       String    @db.VarChar(50)
+  period     String    @db.VarChar(20)
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model inbox_contact_profiles {
+  contact_key           String        @id
+  conversation_id       String?       @db.Uuid
+  contact_id            String?
+  aloware_contact_id    String?
+  name                  String?
+  phone                 String?
+  email                 String?
+  timezone              String?
+  niche                 String?
+  revenue_mix_category  String        @default("unknown")
+  employment_status     String        @default("unknown")
+  coaching_interest     String        @default("unknown")
+  dnc                   Boolean       @default(false)
+  raw                   Json?
+  created_at            DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime      @default(now()) @db.Timestamptz(6)
+  lead_source           String?
+  sequence_id           String?
+  disposition_status_id String?
+  tags                  Json?
+  text_authorized       Boolean?
+  is_blocked            Boolean?
+  cnam_city             String?
+  cnam_state            String?
+  cnam_country          String?
+  last_engagement_at    DateTime?     @db.Timestamptz(6)
+  inbound_sms_count     Int?
+  outbound_sms_count    Int?
+  inbound_call_count    Int?
+  outbound_call_count   Int?
+  unread_count          Int?
+  lrn_line_type         String?
+  lrn_carrier           String?
+  lrn_city              String?
+  lrn_state             String?
+  lrn_country           String?
+  lrn_last_checked_at   DateTime?     @db.Timestamptz(6)
+  conversations         Conversation? @relation(fields: [conversation_id], references: [id], onUpdate: NoAction)
+
+  @@index([contact_key], map: "idx_inbox_contact_profiles_contact_key")
+  @@index([last_engagement_at(sort: Desc)], map: "idx_inbox_contact_profiles_last_engagement_at")
+  @@index([lead_source], map: "idx_inbox_contact_profiles_lead_source")
+  @@index([sequence_id], map: "idx_inbox_contact_profiles_sequence_id")
+}
+
+model lead_attribution {
+  board_id         String
+  item_id          String
+  lead_name        String?
+  contact_key      String?
+  source           String?
+  setter           String?
+  set_by           String?
+  campaign         String?
+  sequence         String?
+  lead_status      String?
+  first_touch_date DateTime? @db.Date
+  call_date        DateTime? @db.Date
+  closed_date      DateTime? @db.Date
+  item_updated_at  DateTime  @db.Timestamptz(6)
+  raw              Json?
+  synced_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id])
+  @@index([board_id, call_date(sort: Desc)], map: "idx_lead_attribution_board_call_date")
+  @@index([source], map: "idx_lead_attribution_source")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model lead_outcomes {
+  board_id         String
+  item_id          String
+  lead_name        String?
+  contact_key      String?
+  call_date        DateTime? @db.Date
+  setter           String?
+  set_by           String?
+  source           String?
+  stage            String?
+  outcome_label    String?
+  outcome_reason   String?
+  outcome_category String    @default("unknown")
+  is_booked        Boolean   @default(false)
+  item_updated_at  DateTime  @db.Timestamptz(6)
+  raw              Json?
+  synced_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id])
+  @@index([board_id, call_date(sort: Desc)], map: "idx_lead_outcomes_board_call_date")
+  @@index([outcome_category, call_date(sort: Desc)], map: "idx_lead_outcomes_category_call_date")
+  @@index([setter, call_date(sort: Desc)], map: "idx_lead_outcomes_setter_call_date")
+}
+
+model message_templates {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name       String
+  body       String
+  created_by String   @default("agent")
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model monday_board_registry {
+  board_id          String   @id
+  board_label       String
+  board_class       String
+  metric_grain      String
+  include_in_funnel Boolean  @default(false)
+  include_in_exec   Boolean  @default(false)
+  active            Boolean  @default(true)
+  owner_team        String?
+  notes             String?
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([active, board_class], map: "idx_monday_board_registry_active_class")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model monday_booked_call_pushes {
+  board_id         String
+  slack_channel_id String
+  slack_message_ts String
+  setter_bucket    String
+  monday_item_id   String?
+  status           String
+  error            String?
+  payload_json     Json?
+  pushed_at        DateTime? @db.Timestamptz(6)
+  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, slack_channel_id, slack_message_ts])
+  @@index([status, updated_at(sort: Desc)], map: "idx_monday_booked_call_pushes_status_updated")
+}
+
+model monday_call_column_history {
+  board_id        String
+  item_id         String
+  column_id       String
+  column_title    String?
+  column_type     String?
+  text_value      String?
+  value_json      Json?
+  item_updated_at DateTime @db.Timestamptz(6)
+  synced_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id, column_id, item_updated_at])
+  @@index([board_id, column_id, item_updated_at(sort: Desc)], map: "idx_monday_call_column_history_board_column_updated")
+  @@index([board_id, item_id, item_updated_at(sort: Desc)], map: "idx_monday_call_column_history_board_item_updated")
+}
+
+model monday_call_column_latest {
+  board_id        String
+  item_id         String
+  column_id       String
+  column_title    String?
+  column_type     String?
+  text_value      String?
+  value_json      Json?
+  item_updated_at DateTime @db.Timestamptz(6)
+  synced_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id, column_id])
+  @@index([board_id, column_id], map: "idx_monday_call_column_latest_board_column")
+  @@index([board_id, item_id], map: "idx_monday_call_column_latest_board_item")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model monday_call_snapshots {
+  board_id    String
+  item_id     String
+  item_name   String?
+  updated_at  DateTime  @db.Timestamptz(6)
+  call_date   DateTime? @db.Date
+  setter      String?
+  stage       String?
+  disposition String?
+  is_booked   Boolean   @default(false)
+  contact_key String?
+  raw         Json?
+  synced_at   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id])
+  @@index([board_id, updated_at(sort: Desc)], map: "idx_monday_call_snapshots_board_updated")
+  @@index([call_date], map: "idx_monday_call_snapshots_call_date")
+}
+
+model monday_column_mappings {
+  board_id     String   @id
+  mapping_json Json
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model monday_metric_facts {
+  board_id          String
+  item_id           String
+  metric_date       DateTime? @db.Date
+  metric_owner      String?
+  metric_name       String
+  metric_value_num  Float?
+  metric_value_text String?
+  status_value      String?
+  item_updated_at   DateTime  @db.Timestamptz(6)
+  raw               Json?
+  synced_at         DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id, metric_name, item_updated_at])
+  @@index([board_id, metric_date(sort: Desc)], map: "idx_monday_metric_facts_board_date")
+  @@index([metric_name, metric_date(sort: Desc)], map: "idx_monday_metric_facts_metric_name_date")
+  @@index([metric_owner, metric_date(sort: Desc)], map: "idx_monday_metric_facts_owner_date")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model monday_sync_state {
+  board_id     String    @id
+  cursor       String?
+  last_sync_at DateTime? @db.Timestamptz(6)
+  status       String?
+  error        String?
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([updated_at(sort: Desc)], map: "idx_monday_sync_state_updated_at")
+}
+
+model monday_weekly_reports {
+  week_start      DateTime @id @db.Date
+  source_board_id String?
+  summary_json    Json
+  monday_item_id  String?
+  synced_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([week_start(sort: Desc)], map: "idx_monday_weekly_reports_week_start")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model send_attempts {
+  id                 String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id    String       @db.Uuid
+  message_body       String
+  sender_identity    String?
+  line_id            String?
+  from_number        String?
+  allowlist_decision Boolean      @default(false)
+  dnc_decision       Boolean      @default(false)
+  idempotency_key    String?
+  status             String
+  retry_count        Int          @default(0)
+  request_payload    Json?
+  response_payload   Json?
+  error_message      String?
+  created_at         DateTime     @default(now()) @db.Timestamptz(6)
+  conversations      Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([conversation_id, idempotency_key], map: "uniq_send_attempts_conversation_idempotency", where: raw("(idempotency_key IS NOT NULL)"))
+  @@index([conversation_id, created_at(sort: Desc)], map: "idx_send_attempts_conversation_created")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model sequence_version_decisions {
+  sequence_label String   @id
+  status         String
+  updated_by     String?
+  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([status, updated_at(sort: Desc)], map: "idx_sequence_version_decisions_status_updated")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model setter_activity {
+  board_id         String
+  item_id          String
+  activity_date    DateTime? @db.Date
+  setter           String?
+  set_by           String?
+  source           String?
+  stage            String?
+  outcome_category String    @default("unknown")
+  is_booked        Boolean   @default(false)
+  is_closed_won    Boolean   @default(false)
+  is_closed_lost   Boolean   @default(false)
+  is_bad_timing    Boolean   @default(false)
+  is_bad_fit       Boolean   @default(false)
+  is_no_show       Boolean   @default(false)
+  is_cancelled     Boolean   @default(false)
+  item_updated_at  DateTime  @db.Timestamptz(6)
+  raw              Json?
+  synced_at        DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id])
+  @@index([outcome_category, activity_date(sort: Desc)], map: "idx_setter_activity_category_activity_date")
+  @@index([setter, activity_date(sort: Desc)], map: "idx_setter_activity_setter_activity_date")
+}
+
+model setter_feedback_dedupe {
+  channel_id String
+  thread_ts  String
+  message_ts String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([channel_id, thread_ts])
+  @@index([created_at(sort: Desc)], map: "idx_setter_feedback_dedupe_created_at")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model sms_events {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slack_team_id       String
+  slack_channel_id    String
+  slack_message_ts    String
+  event_ts            DateTime             @db.Timestamptz(6)
+  direction           String
+  contact_id          String?
+  contact_phone       String?
+  contact_name        String?
+  aloware_user        String?
+  body                String?
+  line                String?
+  sequence            String?
+  raw                 Json?
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  conversation_id     String?              @db.Uuid
+  conversion_examples conversion_examples?
+  draft_suggestions   draft_suggestions[]
+  conversations       Conversation?        @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_sms_events_conversation")
+  work_items          work_items[]
+
+  @@unique([slack_channel_id, slack_message_ts])
+  @@index([contact_id, event_ts(sort: Desc)], map: "idx_sms_events_contact_id_event_ts")
+  @@index([contact_phone, event_ts(sort: Desc)], map: "idx_sms_events_contact_phone_event_ts")
+  @@index([conversation_id, event_ts(sort: Desc)], map: "idx_sms_events_conversation_event_ts")
+  @@index([event_ts(sort: Desc)], map: "idx_sms_events_event_ts")
+}
+
+model trend_alerts {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  alert_type      String    @db.VarChar(100)
+  severity        String    @db.VarChar(20)
+  metric          String    @db.VarChar(100)
+  message         String
+  value           Decimal?  @db.Decimal
+  threshold       Decimal?  @db.Decimal
+  acknowledged_at DateTime? @db.Timestamptz(6)
+  acknowledged_by String?   @db.VarChar(255)
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([created_at(sort: Desc)], map: "idx_trend_alerts_created_at")
+}
+
+model user_send_preferences {
+  user_id             String   @id
+  default_line_id     Int?
+  default_from_number String?
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([updated_at(sort: Desc)], map: "idx_user_send_preferences_updated")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model work_items {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type            String
+  conversation_id String       @unique(map: "uniq_open_needs_reply_per_conversation", where: raw("((type = 'needs_reply'::text) AND (resolved_at IS NULL))")) @db.Uuid
+  rep_id          String?
+  severity        String       @default("med")
+  created_at      DateTime     @default(now()) @db.Timestamptz(6)
+  due_at          DateTime     @db.Timestamptz(6)
+  resolved_at     DateTime?    @db.Timestamptz(6)
+  resolution      String?
+  source_event_id String?      @db.Uuid
+  conversations   Conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  sms_events      sms_events?  @relation(fields: [source_event_id], references: [id], onUpdate: NoAction)
+
+  @@index([rep_id, resolved_at, due_at], map: "idx_work_items_rep_resolved_due")
+  @@index([type, resolved_at, due_at], map: "idx_work_items_type_resolved_due")
 }

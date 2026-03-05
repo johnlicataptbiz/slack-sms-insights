@@ -1,7 +1,9 @@
 import type { Logger } from '@slack/bolt';
 import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallsSummary } from './booked-calls.js';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { getSalesMetricsSummary } from './sales-metrics.js';
+
+const getPrisma = () => getPrismaClient();
 import { buildCanonicalSalesMetricsSlice } from './sales-metrics-contract.js';
 import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone, resolveTimeZone } from './time-range.js';
@@ -502,25 +504,23 @@ const buildTimingMetrics = async (
   tz: string,
   logger?: Pick<Logger, 'debug' | 'warn' | 'error'>,
 ): Promise<ScoreboardV2['timing']> => {
-  const pool = getPool();
-  if (!pool) {
-    return { medianTimeToFirstReplyMinutes: null, replyRateByDayOfWeek: [] };
-  }
+  const prisma = getPrisma();
 
   try {
-    const { rows } = await pool.query<{
-      event_ts: string;
+    const rows = await prisma.$queryRawUnsafe<{
+      event_ts: Date | string;
       direction: 'inbound' | 'outbound' | 'unknown';
       contact_id: string | null;
       contact_phone: string | null;
-    }>(
+    }[]>(
       `SELECT event_ts, direction, contact_id, contact_phone
        FROM sms_events
        WHERE event_ts >= $1::timestamptz
          AND event_ts <= $2::timestamptz
          AND direction IN ('inbound','outbound')
        ORDER BY event_ts ASC`,
-      [from.toISOString(), to.toISOString()],
+      from.toISOString(),
+      to.toISOString(),
     );
 
     const normalizeKey = (r: { contact_id: string | null; contact_phone: string | null }): string | null => {
@@ -634,11 +634,10 @@ const buildPeopleContactedBySequence = async (
   to: Date,
   logger?: Pick<Logger, 'debug' | 'warn' | 'error'>,
 ): Promise<Map<string, number>> => {
-  const pool = getPool();
-  if (!pool) return new Map();
+  const prisma = getPrisma();
 
   try {
-    const { rows } = await pool.query<{ label: string; unique_contacts: string }>(
+    const rows = await prisma.$queryRawUnsafe<{ label: string; unique_contacts: number | bigint }[]>(
       `SELECT
          COALESCE(NULLIF(TRIM(sequence), ''), 'No sequence (manual/direct)') AS label,
          COUNT(DISTINCT COALESCE(contact_id, regexp_replace(contact_phone, '\\D', '', 'g'))) AS unique_contacts
@@ -647,9 +646,10 @@ const buildPeopleContactedBySequence = async (
          AND event_ts <= $2::timestamptz
          AND direction = 'outbound'
        GROUP BY 1`,
-      [from.toISOString(), to.toISOString()],
+      from.toISOString(),
+      to.toISOString(),
     );
-    return new Map(rows.map((r) => [r.label, Number.parseInt(r.unique_contacts, 10) || 0]));
+    return new Map(rows.map((r) => [r.label, Number(r.unique_contacts) || 0]));
   } catch (error) {
     logger?.error?.('scoreboard: failed to build people-contacted-by-sequence', error);
     return new Map();

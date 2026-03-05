@@ -1,39 +1,25 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
 import type { ConversationRow } from './conversation-projector.js';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import type { SmsEventRow } from './sms-event-store.js';
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+const getPrisma = () => getPrismaClient();
+
+// No longer need getDbOrThrow as getPrisma handles error states or lazy initialization.
 
 export const getConversationById = async (
   id: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationRow | null> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query<ConversationRow>(
-      `
-      SELECT *
-      FROM conversations
-      WHERE id = $1
-      LIMIT 1;
-      `,
-      [id],
-    );
-    return result.rows[0] ?? null;
+    const result = await prisma.conversation.findUnique({
+      where: { id },
+    });
+    return result as unknown as ConversationRow | null;
   } catch (err) {
     logger?.error('getConversationById failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -44,34 +30,36 @@ export const listSmsEventsForConversation = async (
 ): Promise<
   Array<Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>>
 > => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    // Prefer exact conversation_id. Keep contact fallback for historical rows not yet linked.
-    const result = await client.query<
-      Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>
-    >(
-      `
-      SELECT id, direction, body, event_ts, slack_channel_id, slack_message_ts
-      FROM sms_events
-      WHERE
-        conversation_id = $1::uuid
-        OR (
-          conversation_id IS NULL
-          AND (($2::text IS NOT NULL AND contact_id = $2::text)
-            OR ($2::text IS NULL AND $3::text IS NOT NULL AND contact_phone = $3::text))
-        )
-      ORDER BY event_ts DESC
-      LIMIT $4;
-      `,
-      [conversation.id, conversation.contact_id ?? null, conversation.contact_phone ?? null, limit],
-    );
+    const results = await prisma.sms_events.findMany({
+      where: {
+        OR: [
+          { conversation_id: conversation.id },
+          {
+            conversation_id: null,
+            OR: [
+              conversation.contact_id ? { contact_id: conversation.contact_id } : {},
+              (!conversation.contact_id && conversation.contact_phone) ? { contact_phone: conversation.contact_phone } : {},
+            ].filter(obj => Object.keys(obj).length > 0) as any,
+          },
+        ],
+      },
+      orderBy: { event_ts: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        direction: true,
+        body: true,
+        event_ts: true,
+        slack_channel_id: true,
+        slack_message_ts: true,
+      },
+    });
 
-    return result.rows;
+    return results as unknown as Array<Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>>;
   } catch (err) {
     logger?.error('listSmsEventsForConversation failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };

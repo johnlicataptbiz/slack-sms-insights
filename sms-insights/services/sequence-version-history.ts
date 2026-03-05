@@ -1,8 +1,11 @@
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { parseLeadMagnetAndVersion } from './scoreboard.js';
 
+const getPrisma = () => getPrismaClient();
+
 export type SequenceVersionHistoryRow = {
+// ... (rest of type definitions same as before)
   label: string;
   leadMagnet: string;
   version: string;
@@ -32,16 +35,15 @@ export const getSequenceVersionHistory = async (
   const lookbackDays = Number.isFinite(options?.lookbackDays)
     ? Math.min(Math.max(Math.trunc(options?.lookbackDays ?? 365), 7), 3650)
     : 365;
-  const pool = getPool();
-  if (!pool) throw new Error('Database not initialized');
-  const client = await pool.connect();
+  const prisma = getPrisma();
+
   try {
-    const result = await client.query<SequenceBodyAggregate>(
+    const rows = await prisma.$queryRawUnsafe<SequenceBodyAggregate[]>(
       `
       WITH normalized AS (
         SELECT
           TRIM(sequence) AS label,
-          REGEXP_REPLACE(TRIM(body), 's+', ' ', 'g') AS body,
+          REGEXP_REPLACE(TRIM(body), '\\s+', ' ', 'g') AS body,
           event_ts
         FROM sms_events
         WHERE direction = 'outbound'
@@ -61,11 +63,11 @@ export const getSequenceVersionHistory = async (
       GROUP BY label, body
       ORDER BY label ASC, sent_count DESC, MAX(event_ts) DESC
       `,
-      [lookbackDays],
+      lookbackDays,
     );
 
     const byLabel = new Map<string, SequenceVersionHistoryRow>();
-    for (const row of result.rows) {
+    for (const row of rows) {
       const parsed = parseLeadMagnetAndVersion(row.label);
       const existing = byLabel.get(row.label);
       if (!existing) {
@@ -102,7 +104,5 @@ export const getSequenceVersionHistory = async (
   } catch (error) {
     logger?.error?.('getSequenceVersionHistory failed', error);
     throw error;
-  } finally {
-    client.release();
   }
 };

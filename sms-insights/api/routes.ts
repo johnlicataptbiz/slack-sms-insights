@@ -35,7 +35,7 @@ import { getConversationById, listSmsEventsForConversation } from '../services/c
 import { getCronStatusSnapshot } from '../services/cron-scheduler.js';
 import { detectRunOutliers, parseRunMetrics } from '../services/daily-report-summary.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
-import { getPool } from '../services/db.js';
+import { getPrisma } from '../services/prisma.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
 import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
 import { generateCrmNotesSuggestion } from '../services/inbox-crm-notes-engine.js';
@@ -70,6 +70,7 @@ import {
   updateObjectionTags,
   upsertConversionExample,
   VALID_CALL_OUTCOMES,
+  type InboxMessageRow,
 } from '../services/inbox-store.js';
 import { buildMessageLinkPreviews } from '../services/link-previews.js';
 import {
@@ -735,18 +736,16 @@ const handleGetRuntimeStatus: RequestHandler = async (_req, res, _logger, origin
 };
 
 const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
-  const dbPool = getPool();
+  const prisma = getPrisma();
   let dbStatus: 'ok' | 'warn' | 'error' = 'warn';
-  let dbDetail = 'Database pool is not initialized';
-  if (dbPool) {
-    try {
-      await dbPool.query('SELECT 1');
-      dbStatus = 'ok';
-      dbDetail = 'Database query check passed';
-    } catch (error) {
-      dbStatus = 'error';
-      dbDetail = `Database query check failed: ${error instanceof Error ? error.message : String(error)}`;
-    }
+  let dbDetail = 'Prisma client is not initialized';
+  try {
+    await prisma.$queryRawUnsafe('SELECT 1');
+    dbStatus = 'ok';
+    dbDetail = 'Prisma query check passed';
+  } catch (error) {
+    dbStatus = 'error';
+    dbDetail = `Prisma query check failed: ${error instanceof Error ? error.message : String(error)}`;
   }
 
   const prismaRuntime = await getPrismaRuntimeStatus();
@@ -756,7 +755,7 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
   const buildSha = getBuildSha();
   const hasBuildSha = buildSha !== 'unknown';
   const criticalFailure = dbStatus === 'error' || streamTokenConfig.status === 'error';
-  const hasWarnings = dbStatus === 'warn' || streamTokenConfig.status === 'warn' || !hasBuildSha;
+  const hasWarnings = (dbStatus as string) === 'warn' || (streamTokenConfig.status as string) === 'warn' || !hasBuildSha;
 
   const status = criticalFailure ? 'degraded' : hasWarnings ? 'degraded' : 'ok';
 
@@ -957,7 +956,7 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
   };
 
   const validation = validateQuery(listRunsSchema, queryParams);
-  if (!validation.success) {
+  if (validation.success === false) {
     sendJson(
       res,
       400,
@@ -1575,7 +1574,7 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
   };
 
   const validation = validateQuery(salesMetricsSchema, queryParams);
-  if (!validation.success) {
+  if (validation.success === false) {
     sendJson(
       res,
       400,
@@ -1824,7 +1823,7 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
   };
 
   const validation = validateQuery(workItemsQuerySchema, queryParams);
-  if (!validation.success) {
+  if (validation.success === false) {
     sendJson(
       res,
       400,
@@ -1973,15 +1972,15 @@ const toInboxConversationV2 = (row: {
   current_rep_id: string | null;
   status: 'open' | 'closed' | 'dnc';
   profile_dnc: boolean | null;
-  last_inbound_at: string | null;
-  last_outbound_at: string | null;
-  last_touch_at: string | null;
+  last_inbound_at: string | Date | null;
+  last_outbound_at: string | Date | null;
+  last_touch_at: string | Date | null;
   unreplied_inbound_count: number;
   open_needs_reply_count: number;
-  needs_reply_due_at: string | null;
+  needs_reply_due_at: string | Date | null;
   last_message_direction: 'inbound' | 'outbound' | 'unknown' | null;
   last_message_body: string | null;
-  last_message_at: string | null;
+  last_message_at: string | Date | null;
   latest_outbound_user: string | null;
   latest_outbound_line: string | null;
   state_qualification_full_or_part_time: 'full_time' | 'part_time' | 'unknown' | null;
@@ -1993,13 +1992,18 @@ const toInboxConversationV2 = (row: {
   state_escalation_reason: string | null;
   state_escalation_overridden: boolean | null;
   state_cadence_status: 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool' | null;
-  state_next_followup_due_at: string | null;
-  state_last_podcast_sent_at: string | null;
+  state_next_followup_due_at: string | Date | null;
+  state_last_podcast_sent_at: string | Date | null;
   state_objection_tags?: string[] | null;
   state_call_outcome?: string | null;
   state_guardrail_override_count?: number | null;
   monday_booked?: boolean | null;
 }) => {
+  const toIso = (val: string | Date | null) => {
+    if (!val) return null;
+    if (val instanceof Date) return val.toISOString();
+    return val;
+  };
   const ownerFromRep = repDisplayName(row.current_rep_id);
   const ownerFromUser = inferOwnerLabelFromHint(row.latest_outbound_user);
   const ownerFromLine = inferOwnerLabelFromHint(row.latest_outbound_line);
@@ -2023,16 +2027,16 @@ const toInboxConversationV2 = (row: {
     ownerSource,
     status: row.status,
     dnc: row.status === 'dnc' || row.profile_dnc === true,
-    lastInboundAt: row.last_inbound_at,
-    lastOutboundAt: row.last_outbound_at,
-    lastTouchAt: row.last_touch_at,
+    lastInboundAt: toIso(row.last_inbound_at),
+    lastOutboundAt: toIso(row.last_outbound_at),
+    lastTouchAt: toIso(row.last_touch_at),
     unrepliedInboundCount: row.unreplied_inbound_count,
     openNeedsReplyCount: row.open_needs_reply_count,
-    needsReplyDueAt: row.needs_reply_due_at,
+    needsReplyDueAt: toIso(row.needs_reply_due_at),
     lastMessage: {
       direction: row.last_message_direction,
       body: row.last_message_body,
-      createdAt: row.last_message_at,
+      createdAt: toIso(row.last_message_at),
     },
     qualification: {
       fullOrPartTime: row.state_qualification_full_or_part_time || 'unknown',
@@ -2048,8 +2052,8 @@ const toInboxConversationV2 = (row: {
       reason: row.state_escalation_reason || null,
       overridden: row.state_escalation_overridden === true,
       cadenceStatus: row.state_cadence_status || 'idle',
-      nextFollowupDueAt: row.state_next_followup_due_at || null,
-      lastPodcastSentAt: row.state_last_podcast_sent_at || null,
+      nextFollowupDueAt: toIso(row.state_next_followup_due_at),
+      lastPodcastSentAt: toIso(row.state_last_podcast_sent_at),
     },
     objectionTags: row.state_objection_tags || [],
     callOutcome: row.state_call_outcome || null,
@@ -2057,6 +2061,19 @@ const toInboxConversationV2 = (row: {
     mondayBooked: row.monday_booked === true,
   };
 };
+
+const toInboxMessageV2 = (row: InboxMessageRow) => ({
+  id: row.id,
+  conversation_id: row.conversation_id,
+  event_ts: row.event_ts instanceof Date ? row.event_ts.toISOString() : row.event_ts,
+  direction: row.direction,
+  body: row.body,
+  sequence: row.sequence,
+  line: row.line,
+  aloware_user: row.aloware_user,
+  slack_channel_id: row.slack_channel_id,
+  slack_message_ts: row.slack_message_ts,
+});
 
 const getConversationIdFromPath = (req: IncomingMessage): string | null => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
@@ -2570,7 +2587,7 @@ const handleGetInboxConversationDetailV2: RequestHandler = async (req, res, logg
       slack_message_ts: event.slack_message_ts,
     }));
     messages.sort((a, b) => {
-      const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
+      const byTime = a.event_ts.getTime() - b.event_ts.getTime();
       if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
       return a.id.localeCompare(b.id);
     });
@@ -2731,7 +2748,7 @@ const handlePostInboxDraftV2: RequestHandler = async (req, res, logger, origin) 
       slack_message_ts: event.slack_message_ts,
     }));
     messages.sort((a, b) => {
-      const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
+      const byTime = a.event_ts.getTime() - b.event_ts.getTime();
       if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
       return a.id.localeCompare(b.id);
     });
@@ -2861,7 +2878,8 @@ const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origi
     slack_message_ts: string;
   }>;
   try {
-    messages = await listMessagesForConversation(conversationId, 250, logger);
+    const rawMessages = await listMessagesForConversation(conversationId, 250, logger);
+    messages = rawMessages.map(m => toInboxMessageV2(m));
   } catch (error) {
     logger?.warn?.('CRM notes: failed to load v2 message rows; falling back to legacy events', {
       conversationId,
@@ -2893,7 +2911,7 @@ const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origi
         slack_message_ts: event.slack_message_ts,
       }));
       messages.sort((a, b) => {
-        const byTime = Date.parse(a.event_ts) - Date.parse(b.event_ts);
+        const byTime = a.event_ts.getTime() - b.event_ts.getTime();
         if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
         return a.id.localeCompare(b.id);
       });

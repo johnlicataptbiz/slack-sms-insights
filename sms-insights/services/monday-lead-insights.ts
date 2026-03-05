@@ -1,5 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrisma } from './prisma.js';
 import { type MondayLeadScope, resolveMondayLeadScope } from './monday-governed-analytics.js';
 
 type MondayLeadInsightsParams = {
@@ -102,10 +102,10 @@ const toPositiveInt = (value: number | undefined, fallback: number, max = 100): 
 
 export const getMondayLeadInsights = async (
   params: MondayLeadInsightsParams,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, 'warn' | 'error'>,
 ): Promise<MondayLeadInsights> => {
   const requestedScope: MondayLeadScope = params.scope || 'curated';
-  const pool = getPool();
+  const prisma = getPrisma();
   const scopeResolution = await resolveMondayLeadScope(
     {
       scope: requestedScope,
@@ -116,44 +116,6 @@ export const getMondayLeadInsights = async (
   const includedBoards = scopeResolution.includedBoardIds;
   const excludedBoards = scopeResolution.excludedBoardIds;
 
-  if (!pool) {
-    return {
-      window: {
-        fromDay: params.fromDay,
-        toDay: params.toDay,
-        timeZone: params.timeZone,
-        scope: requestedScope,
-      },
-      includedBoards,
-      excludedBoards,
-      totals: {
-        leads: 0,
-        booked: 0,
-        closedWon: 0,
-        closedLost: 0,
-        badTiming: 0,
-        badFit: 0,
-        noShow: 0,
-        cancelled: 0,
-      },
-      outcomesByCategory: [],
-      topSources: [],
-      topSetters: [],
-      activityByDay: [],
-      mondaySyncState: [],
-      dataQuality: {
-        attributionRows: 0,
-        sourceCoveragePct: 0,
-        campaignCoveragePct: 0,
-        setByCoveragePct: 0,
-        touchpointsCoveragePct: 0,
-        staleBoards: 0,
-        erroredBoards: 0,
-        emptyBoards: 0,
-      },
-    };
-  }
-
   const sourceLimit = toPositiveInt(params.sourceLimit, 12, 50);
   const setterLimit = toPositiveInt(params.setterLimit, 12, 50);
   const boardFilter = buildBoardFilter(includedBoards, 3);
@@ -162,16 +124,18 @@ export const getMondayLeadInsights = async (
   try {
     const [totalsResult, outcomesResult, sourcesResult, settersResult, activityResult, syncStateResult, qualityResult] =
       await Promise.all([
-        pool.query<{
-          leads: number;
-          booked: number;
-          closed_won: number;
-          closed_lost: number;
-          bad_timing: number;
-          bad_fit: number;
-          no_show: number;
-          cancelled: number;
-        }>(
+        prisma.$queryRawUnsafe<
+          Array<{
+            leads: number | bigint;
+            booked: number | bigint;
+            closed_won: number | bigint;
+            closed_lost: number | bigint;
+            bad_timing: number | bigint;
+            bad_fit: number | bigint;
+            no_show: number | bigint;
+            cancelled: number | bigint;
+          }>
+        >(
           `
         SELECT
           COUNT(*)::int AS leads,
@@ -186,9 +150,9 @@ export const getMondayLeadInsights = async (
         WHERE COALESCE(call_date, item_updated_at::date) BETWEEN $1::date AND $2::date
         ${boardFilter.clause}
         `,
-          baseValues,
+          ...baseValues,
         ),
-        pool.query<{ category: string; count: number }>(
+        prisma.$queryRawUnsafe<Array<{ category: string; count: number | bigint }>>(
           `
         SELECT outcome_category AS category, COUNT(*)::int AS count
         FROM lead_outcomes
@@ -197,9 +161,9 @@ export const getMondayLeadInsights = async (
         GROUP BY outcome_category
         ORDER BY count DESC, outcome_category ASC
         `,
-          baseValues,
+          ...baseValues,
         ),
-        pool.query<{ source: string; count: number }>(
+        prisma.$queryRawUnsafe<Array<{ source: string; count: number | bigint }>>(
           `
         SELECT
           COALESCE(NULLIF(BTRIM(source), ''), 'Unknown') AS source,
@@ -211,19 +175,22 @@ export const getMondayLeadInsights = async (
         ORDER BY count DESC, source ASC
         LIMIT $${baseValues.length + 1}
         `,
-          [...baseValues, sourceLimit],
+          ...baseValues,
+          sourceLimit,
         ),
-        pool.query<{
-          setter: string;
-          leads: number;
-          booked: number;
-          closed_won: number;
-          closed_lost: number;
-          bad_timing: number;
-          bad_fit: number;
-          no_show: number;
-          cancelled: number;
-        }>(
+        prisma.$queryRawUnsafe<
+          Array<{
+            setter: string;
+            leads: number | bigint;
+            booked: number | bigint;
+            closed_won: number | bigint;
+            closed_lost: number | bigint;
+            bad_timing: number | bigint;
+            bad_fit: number | bigint;
+            no_show: number | bigint;
+            cancelled: number | bigint;
+          }>
+        >(
           `
         SELECT
           COALESCE(NULLIF(BTRIM(setter), ''), 'Unassigned') AS setter,
@@ -242,19 +209,22 @@ export const getMondayLeadInsights = async (
         ORDER BY leads DESC, setter ASC
         LIMIT $${baseValues.length + 1}
         `,
-          [...baseValues, setterLimit],
+          ...baseValues,
+          setterLimit,
         ),
-        pool.query<{
-          day: string;
-          leads: number;
-          booked: number;
-          closed_won: number;
-          closed_lost: number;
-          bad_timing: number;
-          bad_fit: number;
-          no_show: number;
-          cancelled: number;
-        }>(
+        prisma.$queryRawUnsafe<
+          Array<{
+            day: string;
+            leads: number | bigint;
+            booked: number | bigint;
+            closed_won: number | bigint;
+            closed_lost: number | bigint;
+            bad_timing: number | bigint;
+            bad_fit: number | bigint;
+            no_show: number | bigint;
+            cancelled: number | bigint;
+          }>
+        >(
           `
         SELECT
           activity_date::text AS day,
@@ -272,15 +242,17 @@ export const getMondayLeadInsights = async (
         GROUP BY activity_date
         ORDER BY activity_date ASC
         `,
-          baseValues,
+          ...baseValues,
         ),
-        pool.query<{
-          board_id: string;
-          status: string | null;
-          last_sync_at: string | null;
-          updated_at: string | null;
-          error: string | null;
-        }>(
+        prisma.$queryRawUnsafe<
+          Array<{
+            board_id: string;
+            status: string | null;
+            last_sync_at: Date | string | null;
+            updated_at: Date | string | null;
+            error: string | null;
+          }>
+        >(
           `
         SELECT
           board_id,
@@ -293,18 +265,20 @@ export const getMondayLeadInsights = async (
         ORDER BY updated_at DESC
         LIMIT 10
         `,
-          includedBoards.length ? [includedBoards] : [],
+          ...(includedBoards.length ? [[includedBoards]] : []),
         ),
-        pool.query<{
-          attribution_rows: number;
-          source_populated: number;
-          campaign_populated: number;
-          set_by_populated: number;
-          touchpoints_populated: number;
-          stale_boards: number;
-          errored_boards: number;
-          empty_boards: number;
-        }>(
+        prisma.$queryRawUnsafe<
+          Array<{
+            attribution_rows: number | bigint;
+            source_populated: number | bigint;
+            campaign_populated: number | bigint;
+            set_by_populated: number | bigint;
+            touchpoints_populated: number | bigint;
+            stale_boards: number | bigint;
+            errored_boards: number | bigint;
+            empty_boards: number | bigint;
+          }>
+        >(
           `
         WITH board_set AS (
           SELECT UNNEST($1::text[]) AS board_id
@@ -359,13 +333,15 @@ export const getMondayLeadInsights = async (
         CROSS JOIN touchpoints t
         CROSS JOIN sync_health s
         `,
-          [includedBoards, params.fromDay, params.toDay],
+          includedBoards,
+          params.fromDay,
+          params.toDay,
         ),
       ]);
 
-    const totalsRow = totalsResult.rows[0];
-    const qualityRow = qualityResult.rows[0];
-    const attributionRows = qualityRow?.attribution_rows || 0;
+    const totalsRow = totalsResult[0];
+    const qualityRow = qualityResult[0];
+    const attributionRows = Number(qualityRow?.attribution_rows || 0);
     const toPct = (numerator: number, denominator: number): number => {
       if (denominator <= 0) return 0;
       return Math.round((numerator / denominator) * 10000) / 100;
@@ -380,65 +356,97 @@ export const getMondayLeadInsights = async (
       includedBoards,
       excludedBoards,
       totals: {
-        leads: totalsRow?.leads || 0,
-        booked: totalsRow?.booked || 0,
-        closedWon: totalsRow?.closed_won || 0,
-        closedLost: totalsRow?.closed_lost || 0,
-        badTiming: totalsRow?.bad_timing || 0,
-        badFit: totalsRow?.bad_fit || 0,
-        noShow: totalsRow?.no_show || 0,
-        cancelled: totalsRow?.cancelled || 0,
+        leads: Number(totalsRow?.leads || 0),
+        booked: Number(totalsRow?.booked || 0),
+        closedWon: Number(totalsRow?.closed_won || 0),
+        closedLost: Number(totalsRow?.closed_lost || 0),
+        badTiming: Number(totalsRow?.bad_timing || 0),
+        badFit: Number(totalsRow?.bad_fit || 0),
+        noShow: Number(totalsRow?.no_show || 0),
+        cancelled: Number(totalsRow?.cancelled || 0),
       },
-      outcomesByCategory: outcomesResult.rows.map((row) => ({
+      outcomesByCategory: outcomesResult.map((row: { category: string; count: number | bigint }) => ({
         category: row.category,
-        count: row.count,
+        count: Number(row.count),
       })),
-      topSources: sourcesResult.rows.map((row) => ({
+      topSources: sourcesResult.map((row: { source: string; count: number | bigint }) => ({
         source: row.source,
-        count: row.count,
+        count: Number(row.count),
       })),
-      topSetters: settersResult.rows.map((row) => ({
-        setter: row.setter,
-        leads: row.leads,
-        booked: row.booked,
-        closedWon: row.closed_won,
-        closedLost: row.closed_lost,
-        badTiming: row.bad_timing,
-        badFit: row.bad_fit,
-        noShow: row.no_show,
-        cancelled: row.cancelled,
-      })),
-      activityByDay: activityResult.rows.map((row) => ({
-        day: row.day,
-        leads: row.leads,
-        booked: row.booked,
-        closedWon: row.closed_won,
-        closedLost: row.closed_lost,
-        badTiming: row.bad_timing,
-        badFit: row.bad_fit,
-        noShow: row.no_show,
-        cancelled: row.cancelled,
-      })),
-      mondaySyncState: syncStateResult.rows.map((row) => ({
-        boardId: row.board_id,
-        status: row.status,
-        lastSyncAt: row.last_sync_at,
-        updatedAt: row.updated_at,
-        error: row.error,
-      })),
+      topSetters: settersResult.map(
+        (row: {
+          setter: string;
+          leads: number | bigint;
+          booked: number | bigint;
+          closed_won: number | bigint;
+          closed_lost: number | bigint;
+          bad_timing: number | bigint;
+          bad_fit: number | bigint;
+          no_show: number | bigint;
+          cancelled: number | bigint;
+        }) => ({
+          setter: row.setter,
+          leads: Number(row.leads),
+          booked: Number(row.booked),
+          closedWon: Number(row.closed_won),
+          closedLost: Number(row.closed_lost),
+          badTiming: Number(row.bad_timing),
+          badFit: Number(row.bad_fit),
+          noShow: Number(row.no_show),
+          cancelled: Number(row.cancelled),
+        }),
+      ),
+      activityByDay: activityResult.map(
+        (row: {
+          day: string;
+          leads: number | bigint;
+          booked: number | bigint;
+          closed_won: number | bigint;
+          closed_lost: number | bigint;
+          bad_timing: number | bigint;
+          bad_fit: number | bigint;
+          no_show: number | bigint;
+          cancelled: number | bigint;
+        }) => ({
+          day: row.day,
+          leads: Number(row.leads),
+          booked: Number(row.booked),
+          closedWon: Number(row.closed_won),
+          closedLost: Number(row.closed_lost),
+          badTiming: Number(row.bad_timing),
+          badFit: Number(row.bad_fit),
+          noShow: Number(row.no_show),
+          cancelled: Number(row.cancelled),
+        }),
+      ),
+      mondaySyncState: syncStateResult.map(
+        (row: {
+          board_id: string;
+          status: string | null;
+          last_sync_at: Date | string | null;
+          updated_at: Date | string | null;
+          error: string | null;
+        }) => ({
+          boardId: row.board_id,
+          status: row.status,
+          lastSyncAt: row.last_sync_at ? String(row.last_sync_at) : null,
+          updatedAt: row.updated_at ? String(row.updated_at) : null,
+          error: row.error,
+        }),
+      ),
       dataQuality: {
         attributionRows,
-        sourceCoveragePct: toPct(qualityRow?.source_populated || 0, attributionRows),
-        campaignCoveragePct: toPct(qualityRow?.campaign_populated || 0, attributionRows),
-        setByCoveragePct: toPct(qualityRow?.set_by_populated || 0, attributionRows),
-        touchpointsCoveragePct: toPct(qualityRow?.touchpoints_populated || 0, attributionRows),
-        staleBoards: qualityRow?.stale_boards || 0,
-        erroredBoards: qualityRow?.errored_boards || 0,
-        emptyBoards: qualityRow?.empty_boards || 0,
+        sourceCoveragePct: toPct(Number(qualityRow?.source_populated || 0), attributionRows),
+        campaignCoveragePct: toPct(Number(qualityRow?.campaign_populated || 0), attributionRows),
+        setByCoveragePct: toPct(Number(qualityRow?.set_by_populated || 0), attributionRows),
+        touchpointsCoveragePct: toPct(Number(qualityRow?.touchpoints_populated || 0), attributionRows),
+        staleBoards: Number(qualityRow?.stale_boards || 0),
+        erroredBoards: Number(qualityRow?.errored_boards || 0),
+        emptyBoards: Number(qualityRow?.empty_boards || 0),
       },
     };
   } catch (error) {
-    logger?.warn?.('Failed to build monday lead insights', error);
+    logger?.error?.('Failed to build monday lead insights', error);
     throw error;
   }
 };

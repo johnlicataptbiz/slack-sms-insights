@@ -1,7 +1,8 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { publishRealtimeEvent } from './realtime.js';
+
+const getPrisma = () => getPrismaClient();
 
 export type WorkItemListRow = {
   id: string;
@@ -22,13 +23,7 @@ export type WorkItemListRow = {
   unreplied_inbound_count: number;
 };
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+// No longer need getDbOrThrow as getPrisma handles error states or lazy initialization.
 
 export type WorkItemCursor = {
   dueAt: string;
@@ -68,88 +63,53 @@ export const listOpenWorkItems = async (
   params: ListOpenWorkItemsParams,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ListOpenWorkItemsResult> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const where: string[] = ['wi.resolved_at IS NULL'];
-    const values: Array<string | number | boolean | null> = [];
-    let i = 1;
-
-    if (params.type) {
-      where.push(`wi.type = $${i++}`);
-      values.push(params.type);
-    }
-    if (params.repId) {
-      where.push(`wi.rep_id = $${i++}`);
-      values.push(params.repId);
-    }
-    if (params.severity) {
-      where.push(`wi.severity = $${i++}`);
-      values.push(params.severity);
-    }
-    if (params.overdueOnly) {
-      where.push('wi.due_at < NOW()');
-    }
-    if (params.dueBefore) {
-      where.push(`wi.due_at < $${i++}`);
-      values.push(params.dueBefore);
-    }
-
-    // Cursor pagination (preferred): stable ordering by (due_at, id)
-    if (params.cursor) {
-      // Note: this assumes we are ordering by due_at ASC.
-      // If we want to paginate forward, we look for items > cursor.
-      // Since due_at can be null, we need to handle that if we allow null due_at in sorting.
-      // For now assuming due_at is not null for open items we care about ordering.
-      where.push(`(wi.due_at, wi.id) > ($${i++}::timestamptz, $${i++}::uuid)`);
-      values.push(params.cursor.dueAt, params.cursor.id);
-    }
-
     const limit = Math.max(1, Math.min(params.limit, 200));
-    // Fetch limit + 1 to know if there is a next page
-    const fetchLimit = limit + 1;
+    const where: any = {
+      resolved_at: null,
+    };
 
-    // Legacy offset pagination (fallback)
-    let offsetSql = '';
-    if (typeof params.offset === 'number' && !params.cursor) {
-      values.push(Math.max(0, params.offset));
-      const offsetParam = `$${i++}`;
-      offsetSql = ` OFFSET ${offsetParam}`;
-    }
+    if (params.type) where.type = params.type;
+    if (params.repId) where.rep_id = params.repId;
+    if (params.severity) where.severity = params.severity;
+    if (params.overdueOnly) where.due_at = { lt: new Date() };
+    if (params.dueBefore) where.due_at = { lt: new Date(params.dueBefore) };
 
-    // Add limit param
-    values.push(fetchLimit);
-    const limitParam = `$${i++}`;
+    const results = await prisma.work_items.findMany({
+      where,
+      include: {
+        conversations: true,
+      },
+      orderBy: [
+        { due_at: 'asc' },
+        { id: 'asc' },
+      ],
+      take: limit + 1,
+      cursor: params.cursor ? { id: params.cursor.id } : undefined,
+      skip: params.offset || (params.cursor ? 1 : undefined),
+    });
 
-    const sql = `
-      SELECT
-        wi.id,
-        wi.type,
-        wi.severity,
-        wi.due_at,
-        wi.created_at,
-        wi.resolved_at,
-        wi.rep_id,
-        c.id as conversation_id,
-        c.contact_key,
-        c.contact_id,
-        c.contact_phone,
-        c.last_inbound_at,
-        c.last_outbound_at,
-        c.last_touch_at,
-        c.unreplied_inbound_count
-      FROM work_items wi
-      JOIN conversations c ON c.id = wi.conversation_id
-      WHERE ${where.join(' AND ')}
-      ORDER BY wi.due_at ASC, wi.id ASC
-      LIMIT ${limitParam}${offsetSql};
-    `;
+    const hasMore = results.length > limit;
+    const itemsRaw = hasMore ? results.slice(0, limit) : results;
 
-    const result = await client.query<WorkItemListRow>(sql, values);
-    const rows = result.rows;
-
-    const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
+    const items: WorkItemListRow[] = itemsRaw.map((wi: any) => ({
+      id: wi.id,
+      type: wi.type,
+      severity: wi.severity as any,
+      due_at: wi.due_at.toISOString(),
+      created_at: wi.created_at.toISOString(),
+      resolved_at: wi.resolved_at ? wi.resolved_at.toISOString() : null,
+      rep_id: wi.rep_id,
+      conversation_id: wi.conversations.id,
+      contact_key: wi.conversations.contactKey,
+      contact_id: wi.conversations.contact_id,
+      contact_phone: wi.conversations.contact_phone,
+      last_inbound_at: wi.conversations.last_inbound_at ? wi.conversations.last_inbound_at.toISOString() : null,
+      last_outbound_at: wi.conversations.last_outbound_at ? wi.conversations.last_outbound_at.toISOString() : null,
+      last_touch_at: wi.conversations.last_touch_at ? wi.conversations.last_touch_at.toISOString() : null,
+      unreplied_inbound_count: wi.conversations.unreplied_inbound_count,
+    }));
 
     const last = items.at(-1);
     const nextCursor: WorkItemCursor | null = hasMore && last ? { dueAt: last.due_at, id: last.id } : null;
@@ -158,8 +118,6 @@ export const listOpenWorkItems = async (
   } catch (err) {
     logger?.error('listOpenWorkItems failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -167,24 +125,17 @@ export const resolveWorkItem = async (
   id: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<boolean> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query(
-      `
-      UPDATE work_items
-      SET resolved_at = NOW()
-      WHERE id = $1 AND resolved_at IS NULL
-      RETURNING id, conversation_id, type
-      `,
-      [id],
-    );
+    const result = await prisma.work_items.updateMany({
+      where: { id, resolved_at: null },
+      data: { resolved_at: new Date() },
+    });
 
-    if (result.rowCount && result.rowCount > 0) {
-      const row = result.rows[0];
+    if (result.count > 0) {
       publishRealtimeEvent({
         type: 'work-item-updated',
-        payload: { id: row.id, status: 'resolved', resolvedAt: new Date().toISOString() },
+        payload: { id, status: 'resolved', resolvedAt: new Date().toISOString() },
       });
       return true;
     }
@@ -192,8 +143,6 @@ export const resolveWorkItem = async (
   } catch (err) {
     logger?.error('resolveWorkItem failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 
@@ -202,24 +151,18 @@ export const assignWorkItem = async (
   repId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<boolean> => {
-  const pool = getDbOrThrow();
-  const client = await pool.connect();
+  const prisma = getPrisma();
   try {
-    const result = await client.query(
-      `
-      UPDATE work_items
-      SET rep_id = $2
-      WHERE id = $1
-      RETURNING id, rep_id
-      `,
-      [id, repId],
-    );
+    const result = await prisma.work_items.update({
+      where: { id },
+      data: { rep_id: repId },
+      select: { id: true, rep_id: true },
+    });
 
-    if (result.rowCount && result.rowCount > 0) {
-      const row = result.rows[0];
+    if (result) {
       publishRealtimeEvent({
         type: 'work-item-updated',
-        payload: { id: row.id, repId: row.rep_id },
+        payload: { id: result.id, repId: result.rep_id },
       });
       return true;
     }
@@ -227,8 +170,6 @@ export const assignWorkItem = async (
   } catch (err) {
     logger?.error('assignWorkItem failed', err);
     throw err;
-  } finally {
-    client.release();
   }
 };
 

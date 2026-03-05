@@ -1,5 +1,7 @@
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
+
+const getPrisma = () => getPrismaClient();
 
 export type MondaySyncStatus = 'idle' | 'running' | 'success' | 'error';
 export type MondayBoardClass =
@@ -149,7 +151,7 @@ export type MondayNormalizedLeadInput = {
   raw?: unknown | null;
 };
 
-const getDb = () => getPool();
+// getDb and getPool removal; using getPrisma instead.
 
 const normalizeText = (value: string | null | undefined): string | null => {
   if (!value) return null;
@@ -234,13 +236,12 @@ export const getMondaySyncState = async (
   boardId: string,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondaySyncStateRow | null> => {
-  const pool = getDb();
-  if (!pool) return null;
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<MondaySyncStateRow>('SELECT * FROM monday_sync_state WHERE board_id = $1 LIMIT 1', [
-      boardId,
-    ]);
-    return result.rows[0] || null;
+    const result = await prisma.monday_sync_state.findUnique({
+      where: { board_id: boardId },
+    });
+    return result as unknown as MondaySyncStateRow | null;
   } catch (error) {
     logger?.warn?.('Failed to read monday sync state', error);
     return null;
@@ -251,14 +252,12 @@ export const getMondayBoardRegistry = async (
   boardId: string,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondayBoardRegistryRow | null> => {
-  const pool = getDb();
-  if (!pool) return null;
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<MondayBoardRegistryRow>(
-      'SELECT * FROM monday_board_registry WHERE board_id = $1 LIMIT 1',
-      [boardId],
-    );
-    return result.rows[0] || null;
+    const result = await prisma.monday_board_registry.findUnique({
+      where: { board_id: boardId },
+    });
+    return result as unknown as MondayBoardRegistryRow | null;
   } catch (error) {
     logger?.warn?.('Failed to read monday board registry row', error);
     return null;
@@ -279,61 +278,65 @@ export const upsertMondayBoardRegistry = async (
   },
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
+  const prisma = getPrisma();
   try {
-    await pool.query(
-      `
-      INSERT INTO monday_board_registry (
-        board_id,
-        board_label,
-        board_class,
-        metric_grain,
-        include_in_funnel,
-        include_in_exec,
-        active,
-        owner_team,
-        notes,
-        updated_at
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CURRENT_TIMESTAMP)
-      ON CONFLICT (board_id)
-      DO UPDATE SET
-        board_label = EXCLUDED.board_label,
-        board_class = EXCLUDED.board_class,
-        metric_grain = EXCLUDED.metric_grain,
-        include_in_funnel = EXCLUDED.include_in_funnel,
-        include_in_exec = EXCLUDED.include_in_exec,
-        active = EXCLUDED.active,
-        owner_team = EXCLUDED.owner_team,
-        notes = EXCLUDED.notes,
-        updated_at = CURRENT_TIMESTAMP
-      `,
-      [
-        params.boardId,
-        params.boardLabel,
-        params.boardClass,
-        params.metricGrain,
-        params.includeInFunnel === true,
-        params.includeInExec === true,
-        params.active !== false,
-        params.ownerTeam ?? null,
-        params.notes ?? null,
-      ],
-    );
+    await prisma.monday_board_registry.upsert({
+      where: { board_id: params.boardId },
+      update: {
+        board_label: params.boardLabel,
+        board_class: params.boardClass,
+        metric_grain: params.metricGrain,
+        include_in_funnel: params.includeInFunnel === true,
+        include_in_exec: params.includeInExec === true,
+        active: params.active !== false,
+        owner_team: params.ownerTeam ?? null,
+        notes: params.notes ?? null,
+        updated_at: new Date(),
+      },
+      create: {
+        board_id: params.boardId,
+        board_label: params.boardLabel,
+        board_class: params.boardClass,
+        metric_grain: params.metricGrain,
+        include_in_funnel: params.includeInFunnel === true,
+        include_in_exec: params.includeInExec === true,
+        active: params.active !== false,
+        owner_team: params.ownerTeam ?? null,
+        notes: params.notes ?? null,
+        updated_at: new Date(),
+      },
+    });
   } catch (error) {
     logger?.warn?.('Failed to upsert monday board registry row', error);
   }
 };
 
-export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Promise<MondayBoardRegistryRow[]> => {
-  const pool = getDb();
-  if (!pool) return [];
+export const listPendingMondayBookedCallPushes = async (
+  logger?: Pick<Logger, 'warn'>,
+): Promise<MondayBookedCallPushRow[]> => {
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<MondayBoardRegistryRow>(
-      'SELECT * FROM monday_board_registry ORDER BY board_label ASC, board_id ASC',
-    );
-    return result.rows;
+    const result = await prisma.monday_booked_call_pushes.findMany({
+      where: { status: 'pending' },
+      orderBy: { updated_at: 'asc' },
+    });
+    return result as unknown as MondayBookedCallPushRow[];
+  } catch (error) {
+    logger?.warn?.('Failed to list pending monday booked call pushes', error);
+    return [];
+  }
+};
+
+export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Promise<MondayBoardRegistryRow[]> => {
+  const prisma = getPrisma();
+  try {
+    const result = await prisma.monday_board_registry.findMany({
+      orderBy: [
+        { board_label: 'asc' },
+        { board_id: 'asc' },
+      ],
+    });
+    return result as unknown as MondayBoardRegistryRow[];
   } catch (error) {
     logger?.warn?.('Failed to list monday board registry', error);
     return [];
@@ -341,13 +344,16 @@ export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Pr
 };
 
 export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): Promise<ActorDirectoryRow[]> => {
-  const pool = getDb();
-  if (!pool) return [];
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<ActorDirectoryRow>(
-      'SELECT * FROM actor_directory WHERE active = TRUE ORDER BY role ASC, canonical_name ASC',
-    );
-    return result.rows;
+    const result = await prisma.actor_directory.findMany({
+      where: { active: true },
+      orderBy: [
+        { role: 'asc' },
+        { canonical_name: 'asc' },
+      ],
+    });
+    return result as unknown as ActorDirectoryRow[];
   } catch (error) {
     logger?.warn?.('Failed to list actor directory', error);
     return [];
@@ -364,24 +370,26 @@ export const upsertMondaySyncState = async (
   },
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
-
+  const prisma = getPrisma();
   try {
-    await pool.query(
-      `
-      INSERT INTO monday_sync_state (board_id, cursor, last_sync_at, status, error, updated_at)
-      VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-      ON CONFLICT (board_id)
-      DO UPDATE SET
-        cursor = EXCLUDED.cursor,
-        last_sync_at = EXCLUDED.last_sync_at,
-        status = EXCLUDED.status,
-        error = EXCLUDED.error,
-        updated_at = CURRENT_TIMESTAMP
-      `,
-      [params.boardId, params.cursor ?? null, params.lastSyncAt ?? null, params.status ?? null, params.error ?? null],
-    );
+    await prisma.monday_sync_state.upsert({
+      where: { board_id: params.boardId },
+      update: {
+        cursor: params.cursor ?? null,
+        last_sync_at: params.lastSyncAt ?? null,
+        status: params.status ?? null,
+        error: params.error ?? null,
+        updated_at: new Date(),
+      },
+      create: {
+        board_id: params.boardId,
+        cursor: params.cursor ?? null,
+        last_sync_at: params.lastSyncAt ?? null,
+        status: params.status ?? null,
+        error: params.error ?? null,
+        updated_at: new Date(),
+      },
+    });
   } catch (error) {
     logger?.warn?.('Failed to upsert monday sync state', error);
   }
@@ -392,21 +400,20 @@ export const saveMondayColumnMapping = async (
   mapping: unknown,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
-
+  const prisma = getPrisma();
   try {
-    await pool.query(
-      `
-      INSERT INTO monday_column_mappings (board_id, mapping_json, updated_at)
-      VALUES ($1, $2::jsonb, CURRENT_TIMESTAMP)
-      ON CONFLICT (board_id)
-      DO UPDATE SET
-        mapping_json = EXCLUDED.mapping_json,
-        updated_at = CURRENT_TIMESTAMP
-      `,
-      [boardId, JSON.stringify(mapping ?? {})],
-    );
+    await prisma.monday_column_mappings.upsert({
+      where: { board_id: boardId },
+      update: {
+        mapping_json: (mapping ?? {}) as any,
+        updated_at: new Date(),
+      },
+      create: {
+        board_id: boardId,
+        mapping_json: (mapping ?? {}) as any,
+        updated_at: new Date(),
+      },
+    });
   } catch (error) {
     logger?.warn?.('Failed to save monday column mapping', error);
   }
@@ -416,72 +423,77 @@ export const getMondayColumnMapping = async (
   boardId: string,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<unknown | null> => {
-  const pool = getDb();
-  if (!pool) return null;
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<{ mapping_json: unknown }>(
-      'SELECT mapping_json FROM monday_column_mappings WHERE board_id = $1 LIMIT 1',
-      [boardId],
-    );
-    return result.rows[0]?.mapping_json ?? null;
+    const result = await prisma.monday_column_mappings.findUnique({
+      where: { board_id: boardId },
+      select: { mapping_json: true },
+    });
+    return result?.mapping_json ?? null;
   } catch (error) {
     logger?.warn?.('Failed to read monday column mapping', error);
     return null;
   }
 };
 
+export const deleteMondayCallSnapshots = async (
+  boardId: string,
+  itemIds: string[],
+  logger?: Pick<Logger, 'warn'>,
+): Promise<void> => {
+  const prisma = getPrisma();
+  if (!itemIds.length) return;
+  try {
+    await prisma.monday_call_snapshots.deleteMany({
+      where: {
+        board_id: boardId,
+        item_id: { in: itemIds },
+      } as any,
+    });
+  } catch (error) {
+    logger?.warn?.('Failed to delete monday call snapshots', error);
+  }
+};
 export const upsertMondayCallSnapshot = async (
   input: MondayCallSnapshotInput,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
-
+  const prisma = getPrisma();
   try {
-    await pool.query(
-      `
-      INSERT INTO monday_call_snapshots (
-        board_id,
-        item_id,
-        item_name,
-        updated_at,
-        call_date,
-        setter,
-        stage,
-        disposition,
-        is_booked,
-        contact_key,
-        raw,
-        synced_at
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,CURRENT_TIMESTAMP)
-      ON CONFLICT (board_id, item_id)
-      DO UPDATE SET
-        item_name = EXCLUDED.item_name,
-        updated_at = EXCLUDED.updated_at,
-        call_date = EXCLUDED.call_date,
-        setter = EXCLUDED.setter,
-        stage = EXCLUDED.stage,
-        disposition = EXCLUDED.disposition,
-        is_booked = EXCLUDED.is_booked,
-        contact_key = EXCLUDED.contact_key,
-        raw = EXCLUDED.raw,
-        synced_at = CURRENT_TIMESTAMP
-      `,
-      [
-        input.boardId,
-        input.itemId,
-        input.itemName ?? null,
-        input.updatedAt,
-        input.callDate ?? null,
-        input.setter ?? null,
-        input.stage ?? null,
-        input.disposition ?? null,
-        input.isBooked === true,
-        input.contactKey ?? null,
-        JSON.stringify(input.raw ?? null),
-      ],
-    );
+    await prisma.monday_call_snapshots.upsert({
+      where: {
+        board_id_item_id: {
+          board_id: input.boardId,
+          item_id: input.itemId,
+        },
+      },
+      update: {
+        item_name: input.itemName ?? null,
+        updated_at: input.updatedAt,
+        call_date: input.callDate ?? null,
+        setter: input.setter ?? null,
+        stage: input.stage ?? null,
+        disposition: input.disposition ?? null,
+        is_booked: input.isBooked === true,
+        contact_key: input.contactKey ?? null,
+        raw: (input.raw ?? null) as any,
+        synced_at: new Date(),
+      },
+      create: {
+        board_id: input.boardId,
+        item_id: input.itemId,
+        item_name: input.itemName ?? null,
+        updated_at: input.updatedAt,
+        call_date: input.callDate ?? null,
+        setter: input.setter ?? null,
+        stage: input.stage ?? null,
+        disposition: input.disposition ?? null,
+        is_booked: input.isBooked === true,
+        contact_key: input.contactKey ?? null,
+        raw: (input.raw ?? null) as any,
+        synced_at: new Date(),
+      },
+    });
   } catch (error) {
     logger?.warn?.('Failed to upsert monday call snapshot', error);
   }
@@ -491,8 +503,7 @@ export const upsertMondayCallColumnValues = async (
   input: MondayCallColumnValuesUpsertInput,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
+  const prisma = getPrisma();
   if (!input.values.length) return;
 
   const payload = input.values.map((value) => ({
@@ -504,105 +515,99 @@ export const upsertMondayCallColumnValues = async (
   }));
 
   try {
-    await pool.query('BEGIN');
-    await pool.query(
-      `
-      WITH incoming AS (
-        SELECT *
-        FROM jsonb_to_recordset($1::jsonb) AS t(
-          column_id TEXT,
-          column_title TEXT,
-          column_type TEXT,
-          text_value TEXT,
-          value_json JSONB
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe(
+        `
+        WITH incoming AS (
+          SELECT *
+          FROM jsonb_to_recordset($1::jsonb) AS t(
+            column_id TEXT,
+            column_title TEXT,
+            column_type TEXT,
+            text_value TEXT,
+            value_json JSONB
+          )
         )
-      )
-      INSERT INTO monday_call_column_latest (
-        board_id,
-        item_id,
-        column_id,
-        column_title,
-        column_type,
-        text_value,
-        value_json,
-        item_updated_at,
-        synced_at
-      )
-      SELECT
-        $2,
-        $3,
-        incoming.column_id,
-        incoming.column_title,
-        incoming.column_type,
-        incoming.text_value,
-        incoming.value_json,
-        $4,
-        CURRENT_TIMESTAMP
-      FROM incoming
-      ON CONFLICT (board_id, item_id, column_id)
-      DO UPDATE SET
-        column_title = EXCLUDED.column_title,
-        column_type = EXCLUDED.column_type,
-        text_value = EXCLUDED.text_value,
-        value_json = EXCLUDED.value_json,
-        item_updated_at = EXCLUDED.item_updated_at,
-        synced_at = CURRENT_TIMESTAMP
-      `,
-      [JSON.stringify(payload), input.boardId, input.itemId, input.itemUpdatedAt],
-    );
-
-    await pool.query(
-      `
-      WITH incoming AS (
-        SELECT *
-        FROM jsonb_to_recordset($1::jsonb) AS t(
-          column_id TEXT,
-          column_title TEXT,
-          column_type TEXT,
-          text_value TEXT,
-          value_json JSONB
+        INSERT INTO monday_call_column_latest (
+          board_id,
+          item_id,
+          column_id,
+          column_title,
+          column_type,
+          text_value,
+          value_json,
+          item_updated_at,
+          synced_at
         )
-      )
-      INSERT INTO monday_call_column_history (
-        board_id,
-        item_id,
-        column_id,
-        column_title,
-        column_type,
-        text_value,
-        value_json,
-        item_updated_at,
-        synced_at
-      )
-      SELECT
-        $2,
-        $3,
-        incoming.column_id,
-        incoming.column_title,
-        incoming.column_type,
-        incoming.text_value,
-        incoming.value_json,
-        $4,
-        CURRENT_TIMESTAMP
-      FROM incoming
-      ON CONFLICT (board_id, item_id, column_id, item_updated_at)
-      DO UPDATE SET
-        column_title = EXCLUDED.column_title,
-        column_type = EXCLUDED.column_type,
-        text_value = EXCLUDED.text_value,
-        value_json = EXCLUDED.value_json,
-        synced_at = CURRENT_TIMESTAMP
-      `,
-      [JSON.stringify(payload), input.boardId, input.itemId, input.itemUpdatedAt],
-    );
+        SELECT
+          $2,
+          $3,
+          incoming.column_id,
+          incoming.column_title,
+          incoming.column_type,
+          incoming.text_value,
+          incoming.value_json,
+          $4,
+          CURRENT_TIMESTAMP
+        FROM incoming
+        ON CONFLICT (board_id, item_id, column_id)
+        DO UPDATE SET
+          column_title = EXCLUDED.column_title,
+          column_type = EXCLUDED.column_type,
+          text_value = EXCLUDED.text_value,
+          value_json = EXCLUDED.value_json,
+          item_updated_at = EXCLUDED.item_updated_at,
+          synced_at = CURRENT_TIMESTAMP
+        `,
+        JSON.stringify(payload), input.boardId, input.itemId, input.itemUpdatedAt
+      );
 
-    await pool.query('COMMIT');
+      await tx.$queryRawUnsafe(
+        `
+        WITH incoming AS (
+          SELECT *
+          FROM jsonb_to_recordset($1::jsonb) AS t(
+            column_id TEXT,
+            column_title TEXT,
+            column_type TEXT,
+            text_value TEXT,
+            value_json JSONB
+          )
+        )
+        INSERT INTO monday_call_column_history (
+          board_id,
+          item_id,
+          column_id,
+          column_title,
+          column_type,
+          text_value,
+          value_json,
+          item_updated_at,
+          synced_at
+        )
+        SELECT
+          $2,
+          $3,
+          incoming.column_id,
+          incoming.column_title,
+          incoming.column_type,
+          incoming.text_value,
+          incoming.value_json,
+          $4,
+          CURRENT_TIMESTAMP
+        FROM incoming
+        ON CONFLICT (board_id, item_id, column_id, item_updated_at)
+        DO UPDATE SET
+          column_title = EXCLUDED.column_title,
+          column_type = EXCLUDED.column_type,
+          text_value = EXCLUDED.text_value,
+          value_json = EXCLUDED.value_json,
+          synced_at = CURRENT_TIMESTAMP
+        `,
+        JSON.stringify(payload), input.boardId, input.itemId, input.itemUpdatedAt
+      );
+    });
   } catch (error) {
-    try {
-      await pool.query('ROLLBACK');
-    } catch {
-      // no-op
-    }
     logger?.warn?.('Failed to upsert monday call column values', error);
   }
 };
@@ -611,8 +616,7 @@ export const upsertNormalizedMondayLeadRecords = async (
   input: MondayNormalizedLeadInput,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
+  const prisma = getPrisma();
 
   const outcomeLabel =
     findTextBySignals(input.columns, ['outcome', 'result', 'disposition', 'status']) || input.stage || null;
@@ -647,47 +651,45 @@ export const upsertNormalizedMondayLeadRecords = async (
   const activityDate = callDate || closedDate || firstTouchDate || input.itemUpdatedAt.toISOString().slice(0, 10);
 
   try {
-    await pool.query('BEGIN');
-
-    await pool.query(
-      `
-      INSERT INTO lead_outcomes (
-        board_id,
-        item_id,
-        lead_name,
-        contact_key,
-        call_date,
-        setter,
-        set_by,
-        source,
-        stage,
-        outcome_label,
-        outcome_reason,
-        outcome_category,
-        is_booked,
-        item_updated_at,
-        raw,
-        synced_at
-      )
-      VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,CURRENT_TIMESTAMP)
-      ON CONFLICT (board_id, item_id)
-      DO UPDATE SET
-        lead_name = EXCLUDED.lead_name,
-        contact_key = EXCLUDED.contact_key,
-        call_date = EXCLUDED.call_date,
-        setter = EXCLUDED.setter,
-        set_by = EXCLUDED.set_by,
-        source = EXCLUDED.source,
-        stage = EXCLUDED.stage,
-        outcome_label = EXCLUDED.outcome_label,
-        outcome_reason = EXCLUDED.outcome_reason,
-        outcome_category = EXCLUDED.outcome_category,
-        is_booked = EXCLUDED.is_booked,
-        item_updated_at = EXCLUDED.item_updated_at,
-        raw = EXCLUDED.raw,
-        synced_at = CURRENT_TIMESTAMP
-      `,
-      [
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe(
+        `
+        INSERT INTO lead_outcomes (
+          board_id,
+          item_id,
+          lead_name,
+          contact_key,
+          call_date,
+          setter,
+          set_by,
+          source,
+          stage,
+          outcome_label,
+          outcome_reason,
+          outcome_category,
+          is_booked,
+          item_updated_at,
+          raw,
+          synced_at
+        )
+        VALUES ($1,$2,$3,$4,$5::date,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,CURRENT_TIMESTAMP)
+        ON CONFLICT (board_id, item_id)
+        DO UPDATE SET
+          lead_name = EXCLUDED.lead_name,
+          contact_key = EXCLUDED.contact_key,
+          call_date = EXCLUDED.call_date,
+          setter = EXCLUDED.setter,
+          set_by = EXCLUDED.set_by,
+          source = EXCLUDED.source,
+          stage = EXCLUDED.stage,
+          outcome_label = EXCLUDED.outcome_label,
+          outcome_reason = EXCLUDED.outcome_reason,
+          outcome_category = EXCLUDED.outcome_category,
+          is_booked = EXCLUDED.is_booked,
+          item_updated_at = EXCLUDED.item_updated_at,
+          raw = EXCLUDED.raw,
+          synced_at = CURRENT_TIMESTAMP
+        `,
         input.boardId,
         input.itemId,
         normalizeText(input.itemName),
@@ -702,49 +704,47 @@ export const upsertNormalizedMondayLeadRecords = async (
         outcomeCategory,
         input.isBooked === true,
         input.itemUpdatedAt,
-        JSON.stringify(input.raw ?? null),
-      ],
-    );
+        JSON.stringify(input.raw ?? null)
+      );
 
-    await pool.query(
-      `
-      INSERT INTO lead_attribution (
-        board_id,
-        item_id,
-        lead_name,
-        contact_key,
-        source,
-        setter,
-        set_by,
-        campaign,
-        sequence,
-        lead_status,
-        first_touch_date,
-        call_date,
-        closed_date,
-        item_updated_at,
-        raw,
-        synced_at
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date,$12::date,$13::date,$14,$15::jsonb,CURRENT_TIMESTAMP)
-      ON CONFLICT (board_id, item_id)
-      DO UPDATE SET
-        lead_name = EXCLUDED.lead_name,
-        contact_key = EXCLUDED.contact_key,
-        source = EXCLUDED.source,
-        setter = EXCLUDED.setter,
-        set_by = EXCLUDED.set_by,
-        campaign = EXCLUDED.campaign,
-        sequence = EXCLUDED.sequence,
-        lead_status = EXCLUDED.lead_status,
-        first_touch_date = EXCLUDED.first_touch_date,
-        call_date = EXCLUDED.call_date,
-        closed_date = EXCLUDED.closed_date,
-        item_updated_at = EXCLUDED.item_updated_at,
-        raw = EXCLUDED.raw,
-        synced_at = CURRENT_TIMESTAMP
-      `,
-      [
+      await tx.$queryRawUnsafe(
+        `
+        INSERT INTO lead_attribution (
+          board_id,
+          item_id,
+          lead_name,
+          contact_key,
+          source,
+          setter,
+          set_by,
+          campaign,
+          sequence,
+          lead_status,
+          first_touch_date,
+          call_date,
+          closed_date,
+          item_updated_at,
+          raw,
+          synced_at
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date,$12::date,$13::date,$14,$15::jsonb,CURRENT_TIMESTAMP)
+        ON CONFLICT (board_id, item_id)
+        DO UPDATE SET
+          lead_name = EXCLUDED.lead_name,
+          contact_key = EXCLUDED.contact_key,
+          source = EXCLUDED.source,
+          setter = EXCLUDED.setter,
+          set_by = EXCLUDED.set_by,
+          campaign = EXCLUDED.campaign,
+          sequence = EXCLUDED.sequence,
+          lead_status = EXCLUDED.lead_status,
+          first_touch_date = EXCLUDED.first_touch_date,
+          call_date = EXCLUDED.call_date,
+          closed_date = EXCLUDED.closed_date,
+          item_updated_at = EXCLUDED.item_updated_at,
+          raw = EXCLUDED.raw,
+          synced_at = CURRENT_TIMESTAMP
+        `,
         input.boardId,
         input.itemId,
         normalizeText(input.itemName),
@@ -759,57 +759,55 @@ export const upsertNormalizedMondayLeadRecords = async (
         callDate,
         closedDate,
         input.itemUpdatedAt,
-        JSON.stringify(input.raw ?? null),
-      ],
-    );
+        JSON.stringify(input.raw ?? null)
+      );
 
-    await pool.query(
-      `
-      INSERT INTO setter_activity (
-        board_id,
-        item_id,
-        activity_date,
-        setter,
-        set_by,
-        source,
-        stage,
-        outcome_category,
-        is_booked,
-        is_closed_won,
-        is_closed_lost,
-        is_bad_timing,
-        is_bad_fit,
-        is_no_show,
-        is_cancelled,
-        item_updated_at,
-        raw,
-        synced_at
-      )
-      VALUES (
-        $1,$2,$3::date,$4,$5,$6,$7,$8,$9,
-        $10,$11,$12,$13,$14,$15,
-        $16,$17::jsonb,CURRENT_TIMESTAMP
-      )
-      ON CONFLICT (board_id, item_id)
-      DO UPDATE SET
-        activity_date = EXCLUDED.activity_date,
-        setter = EXCLUDED.setter,
-        set_by = EXCLUDED.set_by,
-        source = EXCLUDED.source,
-        stage = EXCLUDED.stage,
-        outcome_category = EXCLUDED.outcome_category,
-        is_booked = EXCLUDED.is_booked,
-        is_closed_won = EXCLUDED.is_closed_won,
-        is_closed_lost = EXCLUDED.is_closed_lost,
-        is_bad_timing = EXCLUDED.is_bad_timing,
-        is_bad_fit = EXCLUDED.is_bad_fit,
-        is_no_show = EXCLUDED.is_no_show,
-        is_cancelled = EXCLUDED.is_cancelled,
-        item_updated_at = EXCLUDED.item_updated_at,
-        raw = EXCLUDED.raw,
-        synced_at = CURRENT_TIMESTAMP
-      `,
-      [
+      await tx.$queryRawUnsafe(
+        `
+        INSERT INTO setter_activity (
+          board_id,
+          item_id,
+          activity_date,
+          setter,
+          set_by,
+          source,
+          stage,
+          outcome_category,
+          is_booked,
+          is_closed_won,
+          is_closed_lost,
+          is_bad_timing,
+          is_bad_fit,
+          is_no_show,
+          is_cancelled,
+          item_updated_at,
+          raw,
+          synced_at
+        )
+        VALUES (
+          $1,$2,$3::date,$4,$5,$6,$7,$8,$9,
+          $10,$11,$12,$13,$14,$15,
+          $16,$17::jsonb,CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (board_id, item_id)
+        DO UPDATE SET
+          activity_date = EXCLUDED.activity_date,
+          setter = EXCLUDED.setter,
+          set_by = EXCLUDED.set_by,
+          source = EXCLUDED.source,
+          stage = EXCLUDED.stage,
+          outcome_category = EXCLUDED.outcome_category,
+          is_booked = EXCLUDED.is_booked,
+          is_closed_won = EXCLUDED.is_closed_won,
+          is_closed_lost = EXCLUDED.is_closed_lost,
+          is_bad_timing = EXCLUDED.is_bad_timing,
+          is_bad_fit = EXCLUDED.is_bad_fit,
+          is_no_show = EXCLUDED.is_no_show,
+          is_cancelled = EXCLUDED.is_cancelled,
+          item_updated_at = EXCLUDED.item_updated_at,
+          raw = EXCLUDED.raw,
+          synced_at = CURRENT_TIMESTAMP
+        `,
         input.boardId,
         input.itemId,
         activityDate,
@@ -826,17 +824,10 @@ export const upsertNormalizedMondayLeadRecords = async (
         outcomeCategory === 'no_show',
         outcomeCategory === 'cancelled',
         input.itemUpdatedAt,
-        JSON.stringify(input.raw ?? null),
-      ],
-    );
-
-    await pool.query('COMMIT');
+        JSON.stringify(input.raw ?? null)
+      );
+    });
   } catch (error) {
-    try {
-      await pool.query('ROLLBACK');
-    } catch {
-      // no-op
-    }
     logger?.warn?.('Failed to upsert normalized monday lead records', error);
   }
 };
@@ -854,8 +845,7 @@ export const upsertMondayMetricFacts = async (
   input: MondayMetricFactInput,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
+  const prisma = getPrisma();
 
   const metricDate =
     parseIsoDate(input.callDate) ||
@@ -898,7 +888,7 @@ export const upsertMondayMetricFacts = async (
   if (!payload.length) return;
 
   try {
-    await pool.query(
+    await prisma.$queryRawUnsafe(
       `
       WITH incoming AS (
         SELECT *
@@ -946,7 +936,12 @@ export const upsertMondayMetricFacts = async (
         raw = EXCLUDED.raw,
         synced_at = CURRENT_TIMESTAMP
       `,
-      [JSON.stringify(payload), input.boardId, input.itemId, metricDate, metricOwner, input.itemUpdatedAt],
+      JSON.stringify(payload),
+      input.boardId,
+      input.itemId,
+      metricDate,
+      metricOwner,
+      input.itemUpdatedAt
     );
   } catch (error) {
     logger?.warn?.('Failed to upsert monday metric facts', error);
@@ -956,44 +951,46 @@ export const upsertMondayMetricFacts = async (
 export const purgeMondayNormalizedRowsForNonFunnelBoards = async (
   logger?: Pick<Logger, 'warn'>,
 ): Promise<{ leadOutcomesDeleted: number; leadAttributionDeleted: number; setterActivityDeleted: number }> => {
-  const pool = getDb();
-  if (!pool) return { leadOutcomesDeleted: 0, leadAttributionDeleted: 0, setterActivityDeleted: 0 };
+  const prisma = getPrisma();
   try {
-    const leadOutcomes = await pool.query<{ count: string }>(`
-      DELETE FROM lead_outcomes lo
-      WHERE EXISTS (
-        SELECT 1
-        FROM monday_board_registry br
-        WHERE br.board_id = lo.board_id
-          AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
-      )
-      RETURNING 1
-    `);
-    const leadAttribution = await pool.query<{ count: string }>(`
-      DELETE FROM lead_attribution la
-      WHERE EXISTS (
-        SELECT 1
-        FROM monday_board_registry br
-        WHERE br.board_id = la.board_id
-          AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
-      )
-      RETURNING 1
-    `);
-    const setterActivity = await pool.query<{ count: string }>(`
-      DELETE FROM setter_activity sa
-      WHERE EXISTS (
-        SELECT 1
-        FROM monday_board_registry br
-        WHERE br.board_id = sa.board_id
-          AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
-      )
-      RETURNING 1
-    `);
-    return {
-      leadOutcomesDeleted: leadOutcomes.rowCount || 0,
-      leadAttributionDeleted: leadAttribution.rowCount || 0,
-      setterActivityDeleted: setterActivity.rowCount || 0,
-    };
+    return await prisma.$transaction(async (tx) => {
+      const leadOutcomes = await tx.$queryRawUnsafe<{ count: string }>(`
+        DELETE FROM lead_outcomes lo
+        WHERE EXISTS (
+          SELECT 1
+          FROM monday_board_registry br
+          WHERE br.board_id = lo.board_id
+            AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
+        )
+        RETURNING 1
+      `);
+      const leadAttribution = await tx.$queryRawUnsafe<{ count: string }>(`
+        DELETE FROM lead_attribution la
+        WHERE EXISTS (
+          SELECT 1
+          FROM monday_board_registry br
+          WHERE br.board_id = la.board_id
+            AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
+        )
+        RETURNING 1
+      `);
+      const setterActivity = await tx.$queryRawUnsafe<{ count: string }>(`
+        DELETE FROM setter_activity sa
+        WHERE EXISTS (
+          SELECT 1
+          FROM monday_board_registry br
+          WHERE br.board_id = sa.board_id
+            AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
+        )
+        RETURNING 1
+      `);
+
+      return {
+        leadOutcomesDeleted: Array.isArray(leadOutcomes) ? leadOutcomes.length : 0,
+        leadAttributionDeleted: Array.isArray(leadAttribution) ? leadAttribution.length : 0,
+        setterActivityDeleted: Array.isArray(setterActivity) ? setterActivity.length : 0,
+      };
+    });
   } catch (error) {
     logger?.warn?.('Failed to purge non-funnel monday normalized rows', error);
     return { leadOutcomesDeleted: 0, leadAttributionDeleted: 0, setterActivityDeleted: 0 };
@@ -1008,39 +1005,21 @@ export const listMondayCallSnapshotsInRange = async (
   },
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondayCallSnapshotRow[]> => {
-  const pool = getDb();
-  if (!pool) return [];
-
-  const values: Array<string | Date> = [params.from, params.to];
-  let where = 'WHERE updated_at >= $1::timestamptz AND updated_at <= $2::timestamptz';
-  if (params.boardId) {
-    values.push(params.boardId);
-    where += ` AND board_id = $${values.length}`;
-  }
-
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<MondayCallSnapshotRow>(
-      `
-      SELECT
-        board_id,
-        item_id,
-        item_name,
-        updated_at,
-        call_date,
-        setter,
-        stage,
-        disposition,
-        is_booked,
-        contact_key,
-        raw,
-        synced_at
-      FROM monday_call_snapshots
-      ${where}
-      ORDER BY updated_at DESC
-      `,
-      values,
-    );
-    return result.rows;
+    const where: any = {
+      updated_at: {
+        gte: params.from,
+        lte: params.to,
+      },
+    };
+    if (params.boardId) where.board_id = params.boardId;
+
+    const result = await prisma.monday_call_snapshots.findMany({
+      where,
+      orderBy: { updated_at: 'desc' },
+    });
+    return result as unknown as MondayCallSnapshotRow[];
   } catch (error) {
     logger?.warn?.('Failed to list monday call snapshots', error);
     return [];
@@ -1051,28 +1030,14 @@ export const getLatestMondaySyncStatus = async (
   boardId?: string,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondaySyncStateRow | null> => {
-  const pool = getDb();
-  if (!pool) return null;
-
-  const values: string[] = [];
-  let where = '';
-  if (boardId) {
-    values.push(boardId);
-    where = `WHERE board_id = $${values.length}`;
-  }
-
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<MondaySyncStateRow>(
-      `
-      SELECT *
-      FROM monday_sync_state
-      ${where}
-      ORDER BY updated_at DESC
-      LIMIT 1
-      `,
-      values,
-    );
-    return result.rows[0] || null;
+    const result = await prisma.monday_sync_state.findMany({
+      where: boardId ? { board_id: boardId } : {},
+      orderBy: { updated_at: 'desc' },
+      take: 1,
+    });
+    return (result[0] as unknown as MondaySyncStateRow) || null;
   } catch (error) {
     logger?.warn?.('Failed to read monday sync status', error);
     return null;
@@ -1089,29 +1054,24 @@ export const upsertMondayWeeklyReport = async (
   },
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
-
+  const prisma = getPrisma();
   try {
-    await pool.query(
-      `
-      INSERT INTO monday_weekly_reports (week_start, source_board_id, summary_json, monday_item_id, synced_at)
-      VALUES ($1::date, $2, $3::jsonb, $4, $5)
-      ON CONFLICT (week_start)
-      DO UPDATE SET
-        source_board_id = EXCLUDED.source_board_id,
-        summary_json = EXCLUDED.summary_json,
-        monday_item_id = EXCLUDED.monday_item_id,
-        synced_at = EXCLUDED.synced_at
-      `,
-      [
-        params.weekStart,
-        params.sourceBoardId ?? null,
-        JSON.stringify(params.summaryJson ?? {}),
-        params.mondayItemId ?? null,
-        params.syncedAt ?? new Date(),
-      ],
-    );
+    await prisma.monday_weekly_reports.upsert({
+      where: { week_start: new Date(params.weekStart) },
+      update: {
+        source_board_id: params.sourceBoardId ?? null,
+        summary_json: (params.summaryJson ?? {}) as any,
+        monday_item_id: params.mondayItemId ?? null,
+        synced_at: params.syncedAt ?? new Date(),
+      },
+      create: {
+        week_start: new Date(params.weekStart),
+        source_board_id: params.sourceBoardId ?? null,
+        summary_json: (params.summaryJson ?? {}) as any,
+        monday_item_id: params.mondayItemId ?? null,
+        synced_at: params.syncedAt ?? new Date(),
+      },
+    });
   } catch (error) {
     logger?.warn?.('Failed to upsert monday weekly report', error);
   }
@@ -1121,19 +1081,12 @@ export const getMondayWeeklyReport = async (
   weekStart: string,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondayWeeklyReportRow | null> => {
-  const pool = getDb();
-  if (!pool) return null;
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<MondayWeeklyReportRow>(
-      `
-      SELECT week_start::text, source_board_id, summary_json, monday_item_id, synced_at
-      FROM monday_weekly_reports
-      WHERE week_start = $1::date
-      LIMIT 1
-      `,
-      [weekStart],
-    );
-    return result.rows[0] || null;
+    const result = await prisma.monday_weekly_reports.findUnique({
+      where: { week_start: new Date(weekStart) },
+    });
+    return result as unknown as MondayWeeklyReportRow | null;
   } catch (error) {
     logger?.warn?.('Failed to read monday weekly report', error);
     return null;
@@ -1141,41 +1094,21 @@ export const getMondayWeeklyReport = async (
 };
 
 export const getMondayBookedCallPush = async (
-  params: {
-    boardId: string;
-    slackChannelId: string;
-    slackMessageTs: string;
-  },
+  slackChannelId: string,
+  slackMessageTs: string,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondayBookedCallPushRow | null> => {
-  const pool = getDb();
-  if (!pool) return null;
-
+  const prisma = getPrisma();
   try {
-    const result = await pool.query<MondayBookedCallPushRow>(
-      `
-      SELECT
-        board_id,
-        slack_channel_id,
-        slack_message_ts,
-        setter_bucket,
-        monday_item_id,
-        status,
-        error,
-        payload_json,
-        pushed_at,
-        updated_at
-      FROM monday_booked_call_pushes
-      WHERE board_id = $1
-        AND slack_channel_id = $2
-        AND slack_message_ts = $3
-      LIMIT 1
-      `,
-      [params.boardId, params.slackChannelId, params.slackMessageTs],
-    );
-    return result.rows[0] || null;
+    const result = await prisma.monday_booked_call_pushes.findFirst({
+      where: {
+        slack_channel_id: slackChannelId,
+        slack_message_ts: slackMessageTs,
+      },
+    });
+    return result as unknown as MondayBookedCallPushRow | null;
   } catch (error) {
-    logger?.warn?.('Failed to read monday booked call push state', error);
+    logger?.warn?.('Failed to read monday booked call push', error);
     return null;
   }
 };
@@ -1186,56 +1119,47 @@ export const upsertMondayBookedCallPush = async (
     slackChannelId: string;
     slackMessageTs: string;
     setterBucket: string;
-    status: MondayBookedCallPushStatus;
     mondayItemId?: string | null;
+    status: MondayBookedCallPushStatus;
     error?: string | null;
-    payloadJson?: unknown;
+    payloadJson: unknown;
     pushedAt?: Date | null;
   },
   logger?: Pick<Logger, 'warn'>,
 ): Promise<void> => {
-  const pool = getDb();
-  if (!pool) return;
-
+  const prisma = getPrisma();
   try {
-    await pool.query(
-      `
-      INSERT INTO monday_booked_call_pushes (
-        board_id,
-        slack_channel_id,
-        slack_message_ts,
-        setter_bucket,
-        monday_item_id,
-        status,
-        error,
-        payload_json,
-        pushed_at,
-        updated_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, CURRENT_TIMESTAMP)
-      ON CONFLICT (board_id, slack_channel_id, slack_message_ts)
-      DO UPDATE SET
-        setter_bucket = EXCLUDED.setter_bucket,
-        monday_item_id = EXCLUDED.monday_item_id,
-        status = EXCLUDED.status,
-        error = EXCLUDED.error,
-        payload_json = EXCLUDED.payload_json,
-        pushed_at = EXCLUDED.pushed_at,
-        updated_at = CURRENT_TIMESTAMP
-      `,
-      [
-        params.boardId,
-        params.slackChannelId,
-        params.slackMessageTs,
-        params.setterBucket,
-        params.mondayItemId ?? null,
-        params.status,
-        params.error ?? null,
-        JSON.stringify(params.payloadJson ?? null),
-        params.pushedAt ?? null,
-      ],
-    );
+    await prisma.monday_booked_call_pushes.upsert({
+      where: {
+        board_id_slack_channel_id_slack_message_ts: {
+          board_id: params.boardId,
+          slack_channel_id: params.slackChannelId,
+          slack_message_ts: params.slackMessageTs,
+        },
+      },
+      update: {
+        setter_bucket: params.setterBucket,
+        monday_item_id: params.mondayItemId ?? null,
+        status: params.status,
+        error: params.error ?? null,
+        payload_json: (params.payloadJson ?? {}) as any,
+        pushed_at: params.pushedAt ?? null,
+        updated_at: new Date(),
+      },
+      create: {
+        board_id: params.boardId,
+        slack_channel_id: params.slackChannelId,
+        slack_message_ts: params.slackMessageTs,
+        setter_bucket: params.setterBucket,
+        monday_item_id: params.mondayItemId ?? null,
+        status: params.status,
+        error: params.error ?? null,
+        payload_json: (params.payloadJson ?? {}) as any,
+        pushed_at: params.pushedAt ?? null,
+        updated_at: new Date(),
+      },
+    });
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday booked call push state', error);
+    logger?.warn?.('Failed to upsert monday booked call push', error);
   }
 };

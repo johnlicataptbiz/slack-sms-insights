@@ -1,6 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import type { Pool } from 'pg';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 
 export type QualificationMetric = {
   count: number;
@@ -52,13 +51,7 @@ export type SequenceQualificationBreakdown = {
   topNiches: Array<{ niche: string; count: number; pct: number }>;
 };
 
-const getDbOrThrow = (): Pool => {
-  const pool = getPool();
-  if (!pool) {
-    throw new Error('Database not initialized');
-  }
-  return pool;
-};
+const getPrisma = () => getPrismaClient();
 
 /**
  * Build qualification breakdown per sequence for a given time window.
@@ -72,41 +65,11 @@ export const buildSequenceQualificationBreakdown = async (params: {
   logger?: Pick<Logger, 'debug' | 'warn'>;
 }): Promise<SequenceQualificationBreakdown[]> => {
   const { from, to, timezone, minConversations = 5, logger } = params;
-  const pool = getDbOrThrow();
+  const prisma = getPrisma();
 
   logger?.debug?.('[sequence-qualification] Building breakdown', { from, to, timezone });
 
-  const result = await pool.query<{
-    sequence_label: string;
-    total_conversations: number;
-    monday_linked_contacts: number;
-    monday_total_outcomes: number;
-    monday_booked_count: number;
-    monday_closed_won_count: number;
-    monday_closed_lost_count: number;
-    monday_no_show_count: number;
-    monday_cancelled_count: number;
-    monday_bad_timing_count: number;
-    monday_bad_fit_count: number;
-    monday_other_count: number;
-    monday_unknown_count: number;
-    full_time_count: number;
-    part_time_count: number;
-    unknown_employment_count: number;
-    mostly_cash_count: number;
-    mostly_insurance_count: number;
-    balanced_mix_count: number;
-    unknown_revenue_count: number;
-    brick_and_mortar_count: number;
-    mobile_count: number;
-    online_count: number;
-    hybrid_count: number;
-    unknown_delivery_count: number;
-    high_interest_count: number;
-    medium_interest_count: number;
-    low_interest_count: number;
-    unknown_interest_count: number;
-  }>(
+  const rows = await prisma.$queryRawUnsafe<any[]>(
     `
     WITH sequence_first_touch AS (
       -- Find the first outbound message per conversation and its sequence
@@ -207,34 +170,37 @@ export const buildSequenceQualificationBreakdown = async (params: {
     HAVING COUNT(*) >= $3
     ORDER BY total_conversations DESC
     `,
-    [from, to, minConversations, timezone],
+    from,
+    to,
+    minConversations,
+    timezone,
   );
 
   // Fetch all sample quotes and top niches for all rows in parallel (one Promise.all across all rows).
   const enrichmentResults = await Promise.all(
-    result.rows.map((row) =>
+    rows.map((row) =>
       Promise.all([
-        fetchSampleQuote(pool, row.sequence_label, 'full_time', 'qualification_full_or_part_time', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'part_time', 'qualification_full_or_part_time', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'mostly_cash', 'qualification_revenue_mix', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'mostly_insurance', 'qualification_revenue_mix', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'balanced', 'qualification_revenue_mix', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'brick_and_mortar', 'qualification_delivery_model', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'mobile', 'qualification_delivery_model', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'online', 'qualification_delivery_model', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'hybrid', 'qualification_delivery_model', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'high', 'qualification_coaching_interest', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'medium', 'qualification_coaching_interest', from, to),
-        fetchSampleQuote(pool, row.sequence_label, 'low', 'qualification_coaching_interest', from, to),
-        fetchTopNiches(pool, row.sequence_label, from, to),
+        fetchSampleQuote(row.sequence_label, 'full_time', 'qualification_full_or_part_time', from, to),
+        fetchSampleQuote(row.sequence_label, 'part_time', 'qualification_full_or_part_time', from, to),
+        fetchSampleQuote(row.sequence_label, 'mostly_cash', 'qualification_revenue_mix', from, to),
+        fetchSampleQuote(row.sequence_label, 'mostly_insurance', 'qualification_revenue_mix', from, to),
+        fetchSampleQuote(row.sequence_label, 'balanced', 'qualification_revenue_mix', from, to),
+        fetchSampleQuote(row.sequence_label, 'brick_and_mortar', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(row.sequence_label, 'mobile', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(row.sequence_label, 'online', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(row.sequence_label, 'hybrid', 'qualification_delivery_model', from, to),
+        fetchSampleQuote(row.sequence_label, 'high', 'qualification_coaching_interest', from, to),
+        fetchSampleQuote(row.sequence_label, 'medium', 'qualification_coaching_interest', from, to),
+        fetchSampleQuote(row.sequence_label, 'low', 'qualification_coaching_interest', from, to),
+        fetchTopNiches(row.sequence_label, from, to),
       ]),
     ),
   );
 
   const breakdowns: SequenceQualificationBreakdown[] = [];
 
-  for (let i = 0; i < result.rows.length; i++) {
-    const row = result.rows[i];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
     if (!row) {
       continue;
     }
@@ -376,14 +342,14 @@ export const buildSequenceQualificationBreakdown = async (params: {
  * Fetch a sample quote from an inbound message that demonstrates the qualification signal.
  */
 async function fetchSampleQuote(
-  pool: Pool,
   sequenceLabel: string,
   value: string,
   column: string,
   from: string,
   to: string,
 ): Promise<string | null> {
-  const result = await pool.query<{ body: string }>(
+  const prisma = getPrisma();
+  const results = await prisma.$queryRawUnsafe<any[]>(
     `
     WITH sequence_first_touch AS (
       SELECT DISTINCT ON (conversation_id)
@@ -400,7 +366,7 @@ async function fetchSampleQuote(
     FROM sequence_first_touch sft
     JOIN conversation_state cs ON cs.conversation_id = sft.conversation_id
     JOIN sms_events se ON se.conversation_id = sft.conversation_id
-    WHERE cs.${column} = $4
+    WHERE cs.\`${column}\` = $4
       AND se.direction = 'inbound'
       AND se.body IS NOT NULL
       AND se.body != ''
@@ -409,13 +375,16 @@ async function fetchSampleQuote(
     ORDER BY se.event_ts DESC
     LIMIT 1
     `,
-    [from, to, sequenceLabel, value],
+    from,
+    to,
+    sequenceLabel,
+    value,
   );
 
-  if (result.rows.length === 0) return null;
+  if (results.length === 0) return null;
 
   // Clean up the quote - truncate and remove newlines
-  const quote = result.rows[0].body.replace(/\n/g, ' ').trim();
+  const quote = results[0].body.replace(/\n/g, ' ').trim();
   return quote.length > 120 ? `${quote.slice(0, 117)}...` : quote;
 }
 
@@ -423,12 +392,12 @@ async function fetchSampleQuote(
  * Fetch top niches mentioned for a sequence.
  */
 async function fetchTopNiches(
-  pool: Pool,
   sequenceLabel: string,
   from: string,
   to: string,
 ): Promise<Array<{ niche: string; count: number; pct: number }>> {
-  const result = await pool.query<{ niche: string; count: string }>(
+  const prisma = getPrisma();
+  const results = await prisma.$queryRawUnsafe<any[]>(
     `
     WITH sequence_first_touch AS (
       SELECT DISTINCT ON (conversation_id)
@@ -458,12 +427,14 @@ async function fetchTopNiches(
     ORDER BY count DESC
     LIMIT 5
     `,
-    [from, to, sequenceLabel],
+    from,
+    to,
+    sequenceLabel,
   );
 
-  const total = result.rows.reduce((sum, row) => sum + Number(row.count), 0);
+  const total = results.reduce((sum, row) => sum + Number(row.count), 0);
 
-  return result.rows.map((row) => ({
+  return results.map((row) => ({
     niche: row.niche,
     count: Number(row.count),
     pct: (Number(row.count) / total) * 100,

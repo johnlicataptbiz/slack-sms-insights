@@ -1,16 +1,8 @@
 import type { Logger } from '@slack/bolt';
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
 import { publishRealtimeEvent } from './realtime.js';
 
-let getPoolImpl: typeof getPool = getPool;
-
-export const __setGetPoolForTests = (next: typeof getPool): void => {
-  getPoolImpl = next;
-};
-
-export const __resetGetPoolForTests = (): void => {
-  getPoolImpl = getPool;
-};
+const getPrisma = () => getPrismaClient();
 
 export type DailyRunInput = {
   channelId: string;
@@ -24,37 +16,30 @@ export type DailyRunInput = {
   durationMs?: number;
   isLegacy?: boolean;
 };
-
 export const logDailyRun = async (
   input: DailyRunInput,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<string | null> => {
-  const pool = getPoolImpl();
-  if (!pool) {
-    logger?.debug('Database not initialized; skipping run log');
-    return null;
-  }
+  const prisma = getPrisma();
 
   try {
-    const result = await pool.query(
-      `INSERT INTO daily_runs (channel_id, channel_name, report_date, report_type, status, error_message, summary_text, full_report, duration_ms, is_legacy)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING id`,
-      [
-        input.channelId,
-        input.channelName || null,
-        input.reportDate || null,
-        input.reportType,
-        input.status,
-        input.errorMessage || null,
-        input.summaryText || null,
-        input.fullReport || null,
-        input.durationMs || null,
-        input.isLegacy === true,
-      ],
-    );
+    const run = await prisma.daily_runs.create({
+      data: {
+        channel_id: input.channelId,
+        channel_name: input.channelName || null,
+        report_date: input.reportDate ? new Date(input.reportDate) : null,
+        report_type: input.reportType,
+        status: input.status,
+        error_message: input.errorMessage || null,
+        summary_text: input.summaryText || null,
+        full_report: input.fullReport || null,
+        duration_ms: input.durationMs || null,
+        is_legacy: input.isLegacy === true,
+      },
+      select: { id: true },
+    });
 
-    const runId = result.rows[0]?.id;
+    const runId = run.id;
     logger?.debug(`Logged daily run: ${runId}`);
 
     if (runId) {
@@ -107,60 +92,50 @@ export const getDailyRuns = async (
   } = {},
   logger?: Pick<Logger, 'warn'>,
 ): Promise<DailyRunRow[]> => {
-  const pool = getPoolImpl();
-  if (!pool) {
-    return [];
-  }
+  const prisma = getPrisma();
 
   try {
-    const params: Array<string | number> = [];
 
-    // Base filter (applies to both raw + canonical)
-    let where = 'WHERE 1=1';
+    if (options.raw) {
+      const where: any = {};
+      if (options.channelId) where.channel_id = options.channelId;
+      if (options.daysBack) {
+        where.timestamp = {
+          gt: new Date(Date.now() - options.daysBack * 24 * 60 * 60 * 1000),
+        };
+      }
+      const legacyMode = options.legacyMode || 'exclude';
+      if (legacyMode === 'exclude') where.is_legacy = false;
+      else if (legacyMode === 'only') where.is_legacy = true;
 
+      const results = await prisma.daily_runs.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        take: options.limit,
+        skip: options.offset,
+      });
+      return results as unknown as DailyRunRow[];
+    }
+
+    // Use $queryRaw for complex window function
+    // We'll build the WHERE clause manually for $queryRaw
+    let rawWhere = 'WHERE 1=1';
+    const rawParams: any[] = [];
     if (options.channelId) {
-      params.push(options.channelId);
-      where += ` AND channel_id = $${params.length}`;
+      rawParams.push(options.channelId);
+      rawWhere += ` AND channel_id = $${rawParams.length}`;
     }
-
     if (options.daysBack) {
-      // Keep this as a literal interval to avoid parameter type issues.
-      where += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
+      rawWhere += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
     }
-
     const legacyMode = options.legacyMode || 'exclude';
     if (legacyMode === 'exclude') {
-      where += ' AND COALESCE(is_legacy, FALSE) = FALSE';
+      rawWhere += ' AND COALESCE(is_legacy, FALSE) = FALSE';
     } else if (legacyMode === 'only') {
-      where += ' AND COALESCE(is_legacy, FALSE) = TRUE';
+      rawWhere += ' AND COALESCE(is_legacy, FALSE) = TRUE';
     }
 
-    // Raw mode: preserve existing behavior for debugging/back-compat.
-    if (options.raw) {
-      let query = `SELECT * FROM daily_runs ${where} ORDER BY timestamp DESC`;
-
-      if (options.limit) {
-        params.push(options.limit);
-        query += ` LIMIT $${params.length}`;
-      }
-
-      if (options.offset) {
-        params.push(options.offset);
-        query += ` OFFSET $${params.length}`;
-      }
-
-      const result = await pool.query<DailyRunRow>(query, params);
-      return result.rows;
-    }
-
-    // Canonical mode: 1 run per (channel_id, report_type, day)
-    // day = COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date)
-    // Ranking:
-    //   1) non-placeholder over placeholder
-    //   2) status: success > pending > error
-    //   3) latest timestamp
-    //   4) stable tie-breaker by id
-    const canonicalQuery = `
+    const query = `
       WITH ranked AS (
         SELECT
           *,
@@ -194,7 +169,7 @@ export const getDailyRuns = async (
               id DESC
           ) AS rn
         FROM daily_runs
-        ${where}
+        ${rawWhere}
       )
       SELECT
         id,
@@ -213,23 +188,12 @@ export const getDailyRuns = async (
       FROM ranked
       WHERE rn = 1
       ORDER BY timestamp DESC
+      ${options.limit ? `LIMIT ${options.limit}` : ''}
+      ${options.offset ? `OFFSET ${options.offset}` : ''}
     `;
 
-    // Apply pagination to canonical results.
-    let pagedQuery = canonicalQuery;
-
-    if (options.limit) {
-      params.push(options.limit);
-      pagedQuery += ` LIMIT $${params.length}`;
-    }
-
-    if (options.offset) {
-      params.push(options.offset);
-      pagedQuery += ` OFFSET $${params.length}`;
-    }
-
-    const result = await pool.query<DailyRunRow>(pagedQuery, params);
-    return result.rows;
+    const result = await prisma.$queryRawUnsafe<DailyRunRow[]>(query, ...rawParams);
+    return result;
   } catch (error) {
     logger?.warn('Failed to fetch daily runs:', error);
     return [];
@@ -237,14 +201,13 @@ export const getDailyRuns = async (
 };
 
 export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>): Promise<DailyRunRow | null> => {
-  const pool = getPoolImpl();
-  if (!pool) {
-    return null;
-  }
+  const prisma = getPrisma();
 
   try {
-    const result = await pool.query<DailyRunRow>('SELECT * FROM daily_runs WHERE id = $1', [id]);
-    return result.rows[0] || null;
+    const result = await prisma.daily_runs.findUnique({
+      where: { id },
+    });
+    return result as unknown as DailyRunRow | null;
   } catch (error) {
     logger?.warn('Failed to fetch daily run by ID:', error);
     return null;
@@ -252,20 +215,29 @@ export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>)
 };
 
 export const getChannelsWithRuns = async (logger?: Pick<Logger, 'warn'>): Promise<ChannelWithRunsRow[]> => {
-  const pool = getPoolImpl();
-  if (!pool) {
-    return [];
-  }
+  const prisma = getPrisma();
 
   try {
-    const result = await pool.query<ChannelWithRunsRow>(
-      `SELECT DISTINCT channel_id, channel_name, COUNT(*) as run_count
-       FROM daily_runs
-       WHERE COALESCE(is_legacy, FALSE) = FALSE
-       GROUP BY channel_id, channel_name
-       ORDER BY COUNT(*) DESC`,
-    );
-    return result.rows;
+    const result = await prisma.daily_runs.groupBy({
+      by: ['channel_id', 'channel_name'],
+      where: {
+        is_legacy: false,
+      },
+      _count: {
+        _all: true,
+      },
+      orderBy: {
+        _count: {
+          channel_id: 'desc',
+        },
+      },
+    });
+
+    return result.map(r => ({
+      channel_id: r.channel_id,
+      channel_name: r.channel_name,
+      run_count: String(r._count._all),
+    }));
   } catch (error) {
     logger?.warn('Failed to fetch channels with runs:', error);
     return [];

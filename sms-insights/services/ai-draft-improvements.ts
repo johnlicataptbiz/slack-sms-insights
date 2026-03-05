@@ -1,4 +1,6 @@
-import { getPool } from './db.js';
+import { getPrismaClient } from './prisma.js';
+
+const getPrisma = () => getPrismaClient();
 
 /**
  * AI Draft Improvement Service
@@ -129,13 +131,10 @@ export async function getHighPerformingTemplates(limit = 10): Promise<
     sequence: string | null;
   }>
 > {
-  const pool = getPool();
-  if (!pool) {
-    return [];
-  }
+  const prisma = getPrisma();
 
   // Find outbound messages that led to replies or bookings
-  const result = await pool.query(
+  const rows = await prisma.$queryRawUnsafe<any[]>(
     `
     WITH outbound_performance AS (
       SELECT
@@ -174,10 +173,10 @@ export async function getHighPerformingTemplates(limit = 10): Promise<
     ORDER BY (reply_count::float / sent_count) * (1 + booking_count::float / GREATEST(1, reply_count)) DESC
     LIMIT $1
   `,
-    [limit],
+    limit,
   );
 
-  return result.rows.map((row) => ({
+  return rows.map((row) => ({
     body: row.body,
     replyRate: Number.parseFloat(row.reply_rate) || 0,
     bookingRate: Number.parseFloat(row.booking_rate) || 0,
@@ -193,35 +192,30 @@ export async function getDraftAcceptancePatterns(): Promise<{
   rejectedPatterns: string[];
   recommendations: string[];
 }> {
-  const pool = getPool();
-  if (!pool) {
-    return { acceptedPatterns: [], rejectedPatterns: [], recommendations: ['Database not connected'] };
-  }
+  const prisma = getPrisma();
 
   // Get accepted drafts
-  const accepted = await pool.query(`
-    SELECT draft_body, lint_score, structural_score
-    FROM draft_suggestions
-    WHERE accepted = true
-    ORDER BY created_at DESC
-    LIMIT 50
-  `);
+  const accepted = await prisma.draft_suggestions.findMany({
+    where: { accepted: true },
+    select: { generated_text: true, lint_score: true, structural_score: true },
+    orderBy: { created_at: 'desc' },
+    take: 50,
+  });
 
   // Get rejected drafts
-  const rejected = await pool.query(`
-    SELECT draft_body, lint_score, structural_score
-    FROM draft_suggestions
-    WHERE accepted = false
-    ORDER BY created_at DESC
-    LIMIT 50
-  `);
+  const rejected = await prisma.draft_suggestions.findMany({
+    where: { accepted: false },
+    select: { generated_text: true, lint_score: true, structural_score: true },
+    orderBy: { created_at: 'desc' },
+    take: 50,
+  });
 
   const acceptedPatterns: string[] = [];
   const rejectedPatterns: string[] = [];
   const recommendations: string[] = [];
 
   // Analyze patterns
-  if (accepted.rows.length === 0 && rejected.rows.length > 0) {
+  if (accepted.length === 0 && rejected.length > 0) {
     recommendations.push('No drafts have been accepted yet. Consider:');
     recommendations.push('- Making drafts shorter and more conversational');
     recommendations.push('- Including specific call-to-actions');
@@ -230,15 +224,15 @@ export async function getDraftAcceptancePatterns(): Promise<{
   }
 
   // Find common patterns in rejected drafts
-  for (const row of rejected.rows) {
-    const body = row.draft_body || '';
+  for (const row of rejected) {
+    const body = row.generated_text || '';
     if (body.length > 200) {
       rejectedPatterns.push('Too long (>200 chars)');
     }
     if (!body.includes('?')) {
       rejectedPatterns.push('No question/CTA');
     }
-    if (body.match(/\bI\b/g)?.length > 3) {
+    if ((body.match(/\bI\b/g)?.length ?? 0) > 3) {
       rejectedPatterns.push('Too self-focused (many "I" statements)');
     }
   }

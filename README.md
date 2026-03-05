@@ -66,7 +66,33 @@ PT Biz SMS Insights is a comprehensive analytics platform that:
 
 ## 🚀 Getting Started
 
-For a comprehensive guide to setting up your local development environment, see the **[Onboarding Document](docs/setup/ONBOARDING.md)**.
+Use this sequence if you are onboarding for the first time:
+
+1. **Quick setup (5 minutes):** [docs/setup/QUICK_START.md](docs/setup/QUICK_START.md)
+2. **Full onboarding:** [docs/setup/ONBOARDING.md](docs/setup/ONBOARDING.md)
+3. **Detailed local development:** [docs/setup/LOCAL_DEV.md](docs/setup/LOCAL_DEV.md)
+
+### Quick Start (Monorepo)
+
+```bash
+# from repository root
+cd sms-insights && npm install
+cd ../frontend && npm install
+```
+
+Run both apps in separate terminals:
+
+```bash
+# Terminal 1 (backend API + Slack app)
+cd sms-insights
+npm run dev
+
+# Terminal 2 (frontend)
+cd frontend
+npm run dev
+```
+
+Frontend defaults to `http://localhost:5173`.
 
 ## 📁 Project Structure
 
@@ -215,13 +241,13 @@ See [DEPLOYMENT.md](docs/setup/DEPLOYMENT.md) for detailed instructions.
 
 ### Running Tests
 ```bash
-# Backend tests
+# Backend test suite
 cd sms-insights
 npm test
 
-# Frontend tests (when implemented)
+# Frontend unit tests (Vitest)
 cd frontend
-npm test
+npx vitest run
 ```
 
 ### Code Quality
@@ -230,7 +256,7 @@ npm test
 cd sms-insights
 npm run lint
 
-# Type check frontend
+# Type check frontend (v2 tsconfig)
 cd frontend
 npm run typecheck:v2
 ```
@@ -270,15 +296,53 @@ See [LOCAL_DEV.md](docs/setup/LOCAL_DEV.md) for more troubleshooting.
 - **Vercel Analytics**: Dashboard → Analytics
 - **Database**: Railway dashboard → PostgreSQL
 
+## 🧭 Usage Guide
+
+### Common Local Workflows
+
+**Start backend only**
+```bash
+cd sms-insights
+npm run dev
+```
+
+**Start frontend only**
+```bash
+cd frontend
+npm run dev
+```
+
+**Build backend + frontend bundle path**
+```bash
+cd sms-insights
+npm run build
+```
+
+**Frontend production build**
+```bash
+cd frontend
+npm run build
+```
+
+**Run backend lint and tests**
+```bash
+cd sms-insights
+npm run lint
+npm test
+```
+
+### Useful Script Families (backend)
+
+From `sms-insights/`:
+- `npm run backfill:slack`
+- `npm run backfill:booked-calls`
+- `npm run sync:monday`
+- `npm run rebuild:monday:governed`
+- `npm run regenerate:runs`
+
 ## 🤝 Contributing
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-See [CONTRIBUTING.md](docs/development/CONTRIBUTING.md) for detailed guidelines.
+Follow [CONTRIBUTING.md](docs/development/CONTRIBUTING.md) for branch strategy, coding standards, and PR workflow.
 
 ## 📝 License
 

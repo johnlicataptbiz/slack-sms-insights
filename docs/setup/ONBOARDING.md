@@ -71,42 +71,59 @@ The system is composed of three main parts: a **backend service**, a **frontend 
 - Slack CLI
 - A development Slack workspace on a paid plan
 
-### 3.1. Backend & Frontend Setup
+### 3.1 Backend & Frontend Setup
 
-1.  **Clone and Install:**
-    ```bash
-    git clone <repo-url>
-    cd SlackCLI
+1. **Clone and install dependencies**
+   ```bash
+   git clone <repo-url>
+   cd SlackCLI
 
-    # Install backend dependencies
-    cd sms-insights
-    npm install
+   # backend
+   cd sms-insights
+   npm install
 
-    # Install frontend dependencies
-    cd ../frontend
-    npm install
-    ```
+   # frontend
+   cd ../frontend
+   npm install
+   ```
 
-2.  **Configure Environment:**
-    ```bash
-    # In the sms-insights directory
-    cp .env.example .env
-    ```
-    Edit `.env` with your credentials. `DATABASE_URL`, `SLACK_BOT_TOKEN`, and `SLACK_APP_TOKEN` are required.
+2. **Configure environment**
+   ```bash
+   cd sms-insights
+   cp .env.example .env
+   ```
+   Edit `.env` and provide at minimum:
+   - `DATABASE_URL`
+   - `SLACK_BOT_TOKEN`
+   - `SLACK_APP_TOKEN`
+   - `DASHBOARD_PASSWORD` (for dashboard auth)
 
-3.  **Start Development Servers:**
-    ```bash
-    # Terminal 1: Start backend
-    cd sms-insights
-    npm run dev
+3. **Run local development**
+   ```bash
+   # Terminal 1 (backend)
+   cd sms-insights
+   npm run dev
 
-    # Terminal 2: Start frontend
-    cd frontend
-    npm run dev
-    ```
-    The dashboard will be available at `http://localhost:5173`.
+   # Terminal 2 (frontend)
+   cd frontend
+   npm run dev
+   ```
+   Frontend is available at `http://localhost:5173`.
 
-### 3.2. Slack Workflow Setup
+4. **Run validation checks**
+   ```bash
+   # backend lint + tests
+   cd sms-insights
+   npm run lint
+   npm test
+
+   # frontend typecheck + tests
+   cd frontend
+   npm run typecheck:v2
+   npx vitest run
+   ```
+
+### 3.2 Slack Workflow Setup
 
 The `sms-insights-workflow` project automates the daily request for SMS reports.
 
@@ -135,7 +152,35 @@ SlackCLI/
 └── docs/                      # Documentation
 ```
 
-## 5. Deployment
+## 5. Usage Guide
+
+### Common day-to-day commands
+
+```bash
+# start backend
+cd sms-insights && npm run dev
+
+# start frontend
+cd frontend && npm run dev
+
+# backend production build (+ frontend build if present)
+cd sms-insights && npm run build
+
+# frontend production build
+cd frontend && npm run build
+```
+
+### Backend utility scripts
+
+From `sms-insights/`:
+- `npm run backfill:slack`
+- `npm run backfill:booked-calls`
+- `npm run backfill:contact-profiles`
+- `npm run sync:monday`
+- `npm run rebuild:monday:governed`
+- `npm run regenerate:runs`
+
+## 6. Deployment
 
 ### Backend (Railway)
 
@@ -163,7 +208,7 @@ When deploying, you will be prompted to create a production trigger. To target t
 SMS_REPORT_USE_PRODUCTION_CHANNEL=true slack trigger create --trigger-def triggers/daily_sms_report_scheduled_trigger.ts
 ```
 
-## 6. Key Technologies
+## 7. Key Technologies
 
 | Layer | Technology | Purpose |
 |-------|-----------|---------|

@@ -693,6 +693,46 @@ const getBuildSha = (): string => {
   );
 };
 
+const handleGetRuntimeStatus: RequestHandler = async (_req, res, _logger, origin) => {
+  const streamTokenConfig = getStreamTokenSecretConfigStatus();
+  const slackAuthRuntime = getSlackAuthRuntimeStatus();
+  const prismaRuntime = await getPrismaRuntimeStatus();
+  const buildSha = getBuildSha();
+
+  sendJson(
+    res,
+    200,
+    {
+      ok: streamTokenConfig.status !== 'error' && slackAuthRuntime.status !== 'error',
+      service: 'ptbizsms-api',
+      appName: 'ptbizsms',
+      time: new Date().toISOString(),
+      checks: {
+        slack_auth: {
+          status: slackAuthRuntime.status,
+          detail: slackAuthRuntime.detail,
+          updatedAt: slackAuthRuntime.updatedAt,
+        },
+        stream_token_config: {
+          status: streamTokenConfig.status,
+          configured: streamTokenConfig.configured,
+          detail: streamTokenConfig.reason,
+        },
+        prisma_accelerate: {
+          status: prismaRuntime.status,
+          configured: prismaRuntime.configured,
+          detail: prismaRuntime.detail,
+        },
+        build_sha: {
+          status: buildSha === 'unknown' ? 'warn' : 'ok',
+          value: buildSha,
+        },
+      },
+    },
+    origin,
+  );
+};
+
 const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
   const dbPool = getPool();
   let dbStatus: 'ok' | 'warn' | 'error' = 'warn';
@@ -4148,6 +4188,7 @@ const routeMatches = (pathname: string, pattern: string): boolean => {
 
 const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/health', public: true, handler: handleApiHealth },
+  { method: 'GET', path: '/api/runtime-status', public: true, handler: handleGetRuntimeStatus },
   { method: 'GET', path: '/api/oauth/start', public: true, handler: handleOauthStart },
   { method: 'GET', path: '/api/oauth/callback', public: true, handler: handleOauthCallback },
   { method: 'POST', path: '/api/runs', public: true, csrf: false, rateLimitBucket: 'none', handler: handlePostRun },

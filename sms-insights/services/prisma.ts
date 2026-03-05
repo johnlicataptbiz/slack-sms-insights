@@ -111,19 +111,31 @@ export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
       detail: prismaDetail ? `${baseDetail} · ${prismaDetail}` : baseDetail,
     };
   } catch (error) {
-    if (error instanceof Error && error.message.includes('prisma+postgres://')) {
-      return {
-        status: 'warn',
-        configured: false,
-        detail: error.message,
-      };
-    }
-    if (error instanceof Error && error.message.includes('Missing PRISMA_ACCELERATE_URL')) {
-      return {
-        status: 'warn',
-        configured: false,
-        detail: error.message,
-      };
+    if (error instanceof Error) {
+      if (error.message.includes('prisma+postgres://')) {
+        return {
+          status: 'warn',
+          configured: false,
+          detail: error.message,
+        };
+      }
+      if (error.message.includes('Missing PRISMA_ACCELERATE_URL')) {
+        return {
+          status: 'warn',
+          configured: false,
+          detail: error.message,
+        };
+      }
+      if (
+        error.message.includes('PrismaClient') &&
+        (error.message.includes('PrismaClientOptions') || error.message.includes('datasourceUrl'))
+      ) {
+        return {
+          status: 'warn',
+          configured: true,
+          detail: `Prisma runtime configuration warning: ${error.message}`,
+        };
+      }
     }
     return {
       status: 'error',

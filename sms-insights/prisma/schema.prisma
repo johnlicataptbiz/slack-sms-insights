@@ -8,10 +8,10 @@ datasource db {
 
 model Conversation {
   id             String    @id @db.Uuid
-  contactKey     String    @map("contact_key")
-  status         String
-  createdAt      DateTime  @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime  @map("updated_at") @db.Timestamptz(6)
+  contactKey     String    @map("contact_key") @index
+  status         String    @index
+  createdAt      DateTime  @map("created_at") @db.Timestamptz(6) @index
+  updatedAt      DateTime  @map("updated_at") @db.Timestamptz(6) @index
   nextFollowupAt DateTime? @map("next_followup_due_at") @db.Timestamptz(6)
 
   @@map("conversations")

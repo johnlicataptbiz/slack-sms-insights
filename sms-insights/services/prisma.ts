@@ -46,11 +46,19 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
     process.env.PRISMA_ACCELERATE_URL = config.url;
   }
 
+  const prismaClientOptions = {
+    datasources: {
+      db: {
+        url: config.url,
+      },
+    },
+  };
+
   if (config.mode === 'accelerate') {
-    return new PrismaClient().$extends(withAccelerate()) as unknown as PrismaClient;
+    return new PrismaClient(prismaClientOptions).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
-  return new PrismaClient();
+  return new PrismaClient(prismaClientOptions);
 };
 
 export const getPrismaClient = (): PrismaRuntimeClient => {
@@ -111,6 +119,7 @@ export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
       detail: prismaDetail ? `${baseDetail} · ${prismaDetail}` : baseDetail,
     };
   } catch (error) {
+    console.error('Prisma runtime status check failed:', error);
     if (error instanceof Error) {
       if (error.message.includes('prisma+postgres://')) {
         return {

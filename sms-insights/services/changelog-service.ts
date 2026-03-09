@@ -119,11 +119,42 @@ function formatDescription(message: string): string {
  */
 export function generateChangelog(days: number = 365): ChangelogTimeline {
   try {
-    const repoRoot = resolve(process.cwd(), '..');
-    const gitDir = resolve(repoRoot, '.git');
+    // Try multiple possible locations for git repo
+    const possibleRoots = [
+      process.cwd(),
+      resolve(process.cwd(), '..'),
+      resolve(process.cwd(), '../..'),
+      '/app', // Railway common path
+      '/workspace', // Common container path
+    ];
     
-    if (!existsSync(gitDir)) {
-      throw new Error('Git repository not found');
+    let repoRoot: string | null = null;
+    for (const root of possibleRoots) {
+      const gitDir = resolve(root, '.git');
+      if (existsSync(gitDir)) {
+        repoRoot = root;
+        break;
+      }
+    }
+    
+    if (!repoRoot) {
+      console.warn('[changelog] Git repository not found in any of:', possibleRoots);
+      // Return empty but valid timeline
+      return {
+        entries: [],
+        totalCount: 0,
+        dateRange: {
+          from: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+          to: new Date().toISOString()
+        },
+        stats: {
+          features: 0,
+          fixes: 0,
+          refactors: 0,
+          docs: 0,
+          other: 0
+        }
+      };
     }
     
     // Get git log with format: hash|date|author|message

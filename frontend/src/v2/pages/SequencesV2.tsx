@@ -13,6 +13,7 @@ import { SequencePerformanceTable, type MergedSeqRow } from '../components/Seque
 import { CompliancePanel } from '../components/CompliancePanel';
 import { TimingPanel } from '../components/TimingPanel';
 import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
+import { ChangelogPanel } from '../components/ChangelogPanel';
 
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
@@ -308,6 +309,7 @@ export default function SequencesV2() {
         subtitle={`Performance across all active sequences · ${MODE_LABELS[mode]}`}
         right={
           <div className="V2ControlsRow">
+            <ChangelogPanel />
             <div className="V2ExecToggles">
               <button
                 type="button"

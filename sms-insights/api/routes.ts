@@ -97,6 +97,7 @@ import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
 import { buildSequenceQualificationBreakdown } from '../services/sequence-qualification-analytics.js';
+import { getChangelogTimeline, getChangelogByDateRange } from '../services/changelog-service.js';
 import {
   isSequenceVersionStatus,
   listSequenceVersionDecisions,
@@ -4119,6 +4120,36 @@ const handleGetMondayBoardCatalogV2: RequestHandler = async (req, res, logger, o
   }
 };
 
+const handleGetChangelogV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const daysRaw = Number.parseInt(url.searchParams.get('days') || '30', 10);
+  const days = Number.isFinite(daysRaw) ? Math.max(1, Math.min(365, daysRaw)) : 30;
+
+  try {
+    const timeline = await getChangelogByDateRange({ days, logger });
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: timeline,
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch changelog:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to fetch changelog',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
 const handleGetMondayScorecardsV2: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   let resolved: ReturnType<typeof resolveMetricsRange>;
@@ -4240,6 +4271,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/sequences/qualification', handler: handleGetSequenceQualificationV2 },
   { method: 'GET', path: '/api/v2/sequences/version-history', handler: handleGetSequenceVersionHistoryV2 },
   { method: 'POST', path: '/api/v2/sequences/version-decisions', handler: handlePostSequenceVersionDecisionV2 },
+  { method: 'GET', path: '/api/v2/changelog', handler: handleGetChangelogV2 },
   { method: 'GET', path: '/api/v2/inbox/send-config', handler: handleGetInboxSendConfigV2 },
   { method: 'POST', path: '/api/v2/inbox/send-config/default', handler: handlePostInboxSendDefaultV2 },
   { method: 'GET', path: '/api/v2/inbox/conversations', handler: handleGetInboxConversationsV2 },

@@ -1441,6 +1441,23 @@ export type SequenceQualificationBreakdown = {
   };
 };
 
+export const useV2Changelog = (params: { days?: number } = {}) => {
+  const { days = 30 } = params;
+  
+  return useQuery({
+    queryKey: ['v2', 'changelog', days],
+    queryFn: async () => {
+      const response = await client.get<ApiEnvelope<ChangelogTimeline>>(
+        `/api/v2/changelog?days=${days}`
+      );
+      return response as ApiEnvelope<ChangelogTimeline>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
 export const useV2SequenceQualification = (params: { range: '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string }) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);

@@ -751,3 +751,35 @@ export type SetterAssistPerformanceRowV2 = {
   joined_count: number;
   reply_rate_pct: number;
 };
+
+// ─── Changelog Types ─────────────────────────────────────────────────────────
+
+export type ChangelogEntryType = 'feature' | 'fix' | 'refactor' | 'style' | 'docs' | 'chore' | 'other';
+
+export type ChangelogEntry = {
+  hash: string;
+  date: string;
+  message: string;
+  author: string;
+  type: ChangelogEntryType;
+  category: string;
+  description: string;
+};
+
+export type ChangelogStats = {
+  features: number;
+  fixes: number;
+  refactors: number;
+  docs: number;
+  other: number;
+};
+
+export type ChangelogTimeline = {
+  entries: ChangelogEntry[];
+  totalCount: number;
+  dateRange: {
+    from: string;
+    to: string;
+  };
+  stats: ChangelogStats;
+};

@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import type { UnattributedAuditRow } from '../../api/v2-types';
-import { V2Panel, V2State } from './V2Primitives';
+import { V2Panel, V2State, V2Skeleton } from './V2Primitives';
+import { exportToCSV, formatDateForFilename } from '../../utils/export';
 
 // Formatting utilities
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -87,16 +88,130 @@ interface SequencePerformanceTableProps {
   mergedRows: MergedSeqRow[];
   unattributedAuditRows?: UnattributedAuditRow[] | undefined;
   modeLabel: string;
+  mode?: string;
+}
+
+type SortKey = 'label' | 'messagesSent' | 'replyRatePct' | 'canonicalBookedCalls' | 'bookingRatePct' | 'optOutRatePct';
+type SortOrder = 'asc' | 'desc';
+
+interface ColumnVisibility {
+  version: boolean;
+  volume: boolean;
+  replyRate: boolean;
+  bookingRate: boolean;
+  optOuts: boolean;
+  gaps: boolean;
+}
+
+interface TableControlsProps {
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  sortBy: SortKey;
+  sortOrder: SortOrder;
+  onSortChange: (key: SortKey) => void;
+  onSortOrderToggle: () => void;
+  columnVisibility: ColumnVisibility;
+  onColumnVisibilityChange: (key: keyof ColumnVisibility) => void;
+  onExport: () => void;
+  resultsCount: number;
+  totalCount: number;
+}
+
+function TableControls({
+  searchQuery,
+  onSearchChange,
+  sortBy,
+  sortOrder,
+  onSortChange,
+  onSortOrderToggle,
+  columnVisibility,
+  onColumnVisibilityChange,
+  onExport,
+  resultsCount,
+  totalCount,
+}: TableControlsProps) {
+  return (
+    <div className="V2TableControls">
+      {/* Search */}
+      <div className="V2TableControls__search">
+        <input
+          type="text"
+          placeholder="Search sequences..."
+          value={searchQuery}
+          onChange={(e) => onSearchChange(e.target.value)}
+          className="V2TableControls__searchInput"
+        />
+      </div>
+
+      {/* Sort Controls */}
+      <div className="V2TableControls__sort">
+        <select
+          value={sortBy}
+          onChange={(e) => onSortChange(e.target.value as SortKey)}
+          className="V2TableControls__select"
+        >
+          <option value="label">Sequence Name</option>
+          <option value="messagesSent">Messages Sent</option>
+          <option value="replyRatePct">Reply Rate</option>
+          <option value="canonicalBookedCalls">Booked Calls</option>
+          <option value="bookingRatePct">Booking Rate</option>
+          <option value="optOutRatePct">Opt-Out Rate</option>
+        </select>
+        <button
+          onClick={onSortOrderToggle}
+          className="V2TableControls__sortBtn"
+          title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+        >
+          {sortOrder === 'asc' ? '↑' : '↓'}
+        </button>
+      </div>
+
+      {/* Column Visibility */}
+      <div className="V2TableControls__columns">
+        {Object.entries(columnVisibility).map(([key, visible]) => (
+          <button
+            key={key}
+            onClick={() => onColumnVisibilityChange(key as keyof ColumnVisibility)}
+            className={`V2TableControls__chip ${visible ? 'is-active' : ''}`}
+            title={key}
+          >
+            {key === 'version' && 'Ver'}
+            {key === 'volume' && 'Vol'}
+            {key === 'replyRate' && 'Reply'}
+            {key === 'bookingRate' && 'Book'}
+            {key === 'optOuts' && 'Opt-out'}
+            {key === 'gaps' && 'Gaps'}
+          </button>
+        ))}
+      </div>
+
+      {/* Export & Results */}
+      <div className="V2TableControls__actions">
+        <span className="V2TableControls__count">
+          {resultsCount} of {totalCount}
+        </span>
+        <button onClick={onExport} className="V2TableControls__exportBtn">
+          Export CSV
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function SequenceFamilyGroup({ 
   family, 
   familyRows, 
-  unattributedAuditRows = [] 
+  unattributedAuditRows = [],
+  columnVisibility,
+  sortBy,
+  sortOrder,
 }: { 
   family: string; 
   familyRows: MergedSeqRow[];
   unattributedAuditRows?: UnattributedAuditRow[];
+  columnVisibility: ColumnVisibility;
+  sortBy: SortKey;
+  sortOrder: SortOrder;
 }) {
   const {
     sortedVersions,
@@ -257,12 +372,57 @@ function SequenceFamilyGroup({
 export function SequencePerformanceTable({ 
   mergedRows, 
   modeLabel, 
-  unattributedAuditRows = [] 
+  unattributedAuditRows = [],
+  mode = '7d',
 }: SequencePerformanceTableProps) {
-  const { familyEntries, activeSequenceCount, uniqueFamilyCount } = useMemo(() => {
-    const filteredRows = mergedRows.filter((r) => !r.isManual);
+  // State for table controls
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('canonicalBookedCalls');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
+    version: true,
+    volume: true,
+    replyRate: true,
+    bookingRate: true,
+    optOuts: true,
+    gaps: true,
+  });
 
-    const grouped = filteredRows.reduce((acc, row) => {
+  // Filter and sort rows
+  const processedRows = useMemo(() => {
+    let rows = mergedRows.filter((r) => !r.isManual);
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      rows = rows.filter(r => 
+        r.label.toLowerCase().includes(query) ||
+        r.leadMagnet.toLowerCase().includes(query) ||
+        r.version.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply sorting
+    rows = [...rows].sort((a, b) => {
+      let aVal: number | string = a[sortBy];
+      let bVal: number | string = b[sortBy];
+      
+      if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = (bVal as string).toLowerCase();
+      }
+      
+      if (aVal < bVal) return sortOrder === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return rows;
+  }, [mergedRows, searchQuery, sortBy, sortOrder]);
+
+  // Group by family
+  const { familyEntries, activeSequenceCount, uniqueFamilyCount } = useMemo(() => {
+    const grouped = processedRows.reduce((acc, row) => {
       const family = row.leadMagnet || 'Not Captured Yet';
       if (!acc[family]) acc[family] = [];
       acc[family].push(row);
@@ -271,10 +431,29 @@ export function SequencePerformanceTable({
 
     return {
       familyEntries: Object.entries(grouped),
-      activeSequenceCount: filteredRows.length,
+      activeSequenceCount: processedRows.length,
       uniqueFamilyCount: Object.keys(grouped).length,
     };
-  }, [mergedRows]);
+  }, [processedRows]);
+
+  // Export handler
+  const handleExport = () => {
+    const filename = `sequences-${mode}-${formatDateForFilename()}.csv`;
+    exportToCSV(processedRows, filename);
+  };
+
+  // Toggle column visibility
+  const toggleColumn = (key: keyof ColumnVisibility) => {
+    setColumnVisibility(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  // Toggle sort order
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
 
   if (activeSequenceCount === 0) {
     return (
@@ -289,13 +468,30 @@ export function SequencePerformanceTable({
       title="Sequence Performance Dashboard"
       caption={`Iterative tracking across ${uniqueFamilyCount} sequence families · ${modeLabel} · Booked = Slack-verified`}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+      <TableControls
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        sortBy={sortBy}
+        sortOrder={sortOrder}
+        onSortChange={setSortBy}
+        onSortOrderToggle={toggleSortOrder}
+        columnVisibility={columnVisibility}
+        onColumnVisibilityChange={toggleColumn}
+        onExport={handleExport}
+        resultsCount={processedRows.length}
+        totalCount={mergedRows.filter(r => !r.isManual).length}
+      />
+      
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
         {familyEntries.map(([family, familyRows]) => (
           <SequenceFamilyGroup 
             key={family} 
             family={family} 
             familyRows={familyRows} 
             unattributedAuditRows={unattributedAuditRows}
+            columnVisibility={columnVisibility}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
           />
         ))}
       </div>

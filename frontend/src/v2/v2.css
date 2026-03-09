@@ -6976,6 +6976,149 @@ display: inline-block;
 }
 
 /* ============================================================
+   SEQUENCES V2 — TABLE CONTROLS
+   ============================================================ */
+
+.V2TableControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(7, 19, 36, 0.08);
+  border-radius: var(--v2-radius-md);
+  margin-bottom: 1rem;
+  align-items: center;
+}
+
+.V2TableControls__search {
+  flex: 1;
+  min-width: 200px;
+}
+
+.V2TableControls__searchInput {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  border: 1px solid rgba(7, 19, 36, 0.12);
+  border-radius: var(--v2-radius-sm);
+  font-size: 0.9rem;
+  background: white;
+  transition: border-color 150ms ease;
+}
+
+.V2TableControls__searchInput:focus {
+  outline: none;
+  border-color: var(--v2-accent);
+}
+
+.V2TableControls__sort {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.V2TableControls__select {
+  padding: 0.6rem 1rem;
+  border: 1px solid rgba(7, 19, 36, 0.12);
+  border-radius: var(--v2-radius-sm);
+  font-size: 0.85rem;
+  background: white;
+  cursor: pointer;
+}
+
+.V2TableControls__sortBtn {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(7, 19, 36, 0.12);
+  border-radius: var(--v2-radius-sm);
+  background: white;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 150ms ease;
+}
+
+.V2TableControls__sortBtn:hover {
+  background: rgba(17, 184, 214, 0.08);
+  border-color: var(--v2-accent);
+}
+
+.V2TableControls__columns {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.V2TableControls__chip {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(7, 19, 36, 0.12);
+  border-radius: 999px;
+  background: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+  color: var(--v2-muted);
+}
+
+.V2TableControls__chip:hover {
+  border-color: var(--v2-accent);
+  color: var(--v2-accent);
+}
+
+.V2TableControls__chip.is-active {
+  background: var(--v2-accent);
+  border-color: var(--v2-accent);
+  color: white;
+}
+
+.V2TableControls__actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-left: auto;
+}
+
+.V2TableControls__count {
+  font-size: 0.8rem;
+  color: var(--v2-muted);
+  font-weight: 500;
+}
+
+.V2TableControls__exportBtn {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-accent);
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.V2TableControls__exportBtn:hover {
+  background: var(--v2-accent-strong);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(17, 184, 214, 0.3);
+}
+
+@media (max-width: 768px) {
+  .V2TableControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .V2TableControls__search {
+    min-width: 100%;
+  }
+
+  .V2TableControls__actions {
+    margin-left: 0;
+    justify-content: space-between;
+    width: 100%;
+  }
+}
+
+/* ============================================================
    SEQUENCES V2 — TIMING PANEL
    ============================================================ */
 

@@ -103,11 +103,13 @@
   - [x] 16.4 Reorganize content into tab sections
   - [x] 16.5 Add per-section loading states
 
-- [ ] 17. Table Improvements (Phase 2)
-  - [ ] 17.1 Add column visibility toggle
-  - [ ] 17.2 Implement sorting by all numeric columns
-  - [ ] 17.3 Add search/filter by sequence name
-  - [ ] 17.4 Add results count indicator
+- [x] 17. Table Improvements (Phase 2)
+  - [x] 17.1 Add column visibility toggle
+  - [x] 17.2 Implement sorting by all numeric columns
+  - [x] 17.3 Add search/filter by sequence name
+  - [x] 17.4 Add results count indicator
+  - [x] 17.5 Add CSV export button
+  - [x] 17.6 Add TableControls component with full UI
 
 - [x] 18. Export Functionality
   - [x] 18.1 Create export utility in frontend/src/utils/export.ts

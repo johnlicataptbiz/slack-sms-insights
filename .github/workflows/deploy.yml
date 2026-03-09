@@ -13,11 +13,6 @@ jobs:
         with:
           fetch-depth: 0  # Full git history for changelog
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
@@ -26,4 +21,4 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway up --service sms-insights
+          railway up --service sms-insights --no-build

@@ -6,6 +6,7 @@ import {
   useV2SequenceQualification,
 } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
+import { ReplyTimingPanel } from '../components/ReplyTimingPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline } from '../components/V2Primitives';
 import { SequencePerformanceTable, type MergedSeqRow } from '../components/SequencePerformanceTable';
@@ -472,6 +473,16 @@ export default function SequencesV2() {
           </div>
         </V2Panel>
       )}
+
+      {/* ── Reply Timing Insights ── */}
+      <ReplyTimingPanel
+        timing={timing}
+        sequences={mergedRows.map(r => ({
+          label: r.label,
+          medianTimeToFirstReplyMinutes: r.medianTimeToFirstReplyMinutes,
+          avgTimeToFirstReplyMinutes: r.avgTimeToFirstReplyMinutes,
+        }))}
+      />
 
       {/* ── Sequence Qualification Breakdown ── */}
       <V2Panel

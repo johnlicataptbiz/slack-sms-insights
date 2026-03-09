@@ -1,387 +1,370 @@
-/* ============================================================
-   SEQUENCE QUALIFICATION BREAKDOWN
-   ============================================================ */
+/* SequenceQualificationBreakdown Styles */
 
-.sequence-qualification-breakdown {
-  display: grid;
-  gap: 1.5rem;
+.SequenceQualificationBreakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.breakdown-header {
+.SequenceQualificationBreakdown__empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--v2-text-dim);
+  font-size: 0.9rem;
+  background: var(--v2-surface);
+  border-radius: 8px;
+  border: 1px dashed var(--v2-border);
+}
+
+/* Sequence Card */
+.SequenceCard {
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.2s ease;
+}
+
+.SequenceCard:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.SequenceCard--expanded {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.SequenceCard__header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  flex-wrap: wrap;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid rgba(7, 19, 36, 0.1);
+  padding: 0.875rem 1rem;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
 }
 
-.breakdown-header h2 {
-  margin: 0;
-  font-family: var(--v2-font-display);
-  font-size: 1.25rem;
+.SequenceCard__header:hover {
+  background: var(--v2-surface-hover);
+}
+
+.SequenceCard__title {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.SequenceCard__name {
+  font-weight: 600;
+  color: var(--v2-text);
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.SequenceCard__count {
+  font-size: 0.75rem;
+  color: var(--v2-text-dim);
+}
+
+.SequenceCard__summary {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--v2-text-dim);
+  flex-shrink: 0;
 }
 
-.breakdown-summary {
+.SequenceCard__summaryItem {
+  padding: 0.25rem 0.5rem;
+  background: var(--v2-surface-elevated);
+  border-radius: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.SequenceCard__summaryDivider {
+  color: var(--v2-border);
+  font-size: 0.6rem;
+}
+
+.SequenceCard__chevron {
+  font-size: 0.75rem;
+  color: var(--v2-text-dim);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.SequenceCard__chevron--up {
+  transform: rotate(180deg);
+}
+
+/* Card Body */
+.SequenceCard__body {
+  padding: 1rem;
+  border-top: 1px solid var(--v2-border);
+  background: var(--v2-surface-subtle);
+}
+
+.SequenceCard__section {
+  margin-bottom: 1.25rem;
+}
+
+.SequenceCard__section:last-child {
+  margin-bottom: 0;
+}
+
+.SequenceCard__sectionTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--v2-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.625rem;
+}
+
+.SequenceCard__badges {
   display: flex;
-  gap: 1rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.summary-stat {
-  font-size: 0.85rem;
-  color: var(--v2-muted);
-  background: rgba(245, 250, 255, 0.85);
-  padding: 0.4rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid rgba(7, 19, 36, 0.1);
+.SequenceCard__niches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
 }
 
-.summary-stat strong {
+/* Qualification Badge */
+.QualificationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.625rem;
+  background: var(--v2-surface);
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  position: relative;
+  cursor: help;
+  transition: transform 0.15s ease;
+}
+
+.QualificationBadge:hover {
+  transform: translateY(-1px);
+}
+
+.QualificationBadge__label {
+  font-weight: 500;
   color: var(--v2-text);
-  font-family: var(--v2-font-display);
 }
 
-.summary-stat.success {
-  background: rgba(19, 185, 129, 0.1);
-  border-color: rgba(19, 185, 129, 0.25);
-  color: var(--v2-positive);
+.QualificationBadge__value {
+  font-weight: 700;
 }
 
-.summary-stat.warning {
-  background: rgba(245, 157, 13, 0.1);
-  border-color: rgba(245, 157, 13, 0.25);
-  color: var(--v2-warning);
+.QualificationBadge__count {
+  font-size: 0.7rem;
+  color: var(--v2-text-dim);
+  background: var(--v2-surface-elevated);
+  padding: 0.125rem 0.25rem;
+  border-radius: 3px;
 }
 
-.sequence-cards {
-  display: grid;
-  gap: 1rem;
+/* Tooltip */
+.QualificationBadge__tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--v2-surface-elevated);
+  border: 1px solid var(--v2-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  max-width: 280px;
+  z-index: 100;
+  animation: tooltipFadeIn 0.15s ease;
 }
 
-.sequence-card {
-  border: 1px solid rgba(7, 19, 36, 0.12);
-  border-radius: var(--v2-radius-md);
-  background: rgba(255, 255, 255, 0.95);
-  overflow: hidden;
-  transition: border-color 200ms ease, box-shadow 200ms ease;
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
-.sequence-card:hover {
-  border-color: rgba(17, 184, 214, 0.3);
-  box-shadow: 0 4px 16px rgba(7, 19, 36, 0.08);
+.QualificationBadge__tooltipLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--v2-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.375rem;
 }
 
-.sequence-card.expanded {
-  border-color: rgba(17, 184, 214, 0.4);
-  box-shadow: 0 6px 24px rgba(7, 19, 36, 0.12);
+.QualificationBadge__tooltipQuote {
+  font-size: 0.8rem;
+  color: var(--v2-text);
+  font-style: italic;
+  line-height: 1.4;
 }
 
-.sequence-header {
+/* Niche Tag */
+.NicheTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--v2-accent-subtle);
+  color: var(--v2-accent);
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: default;
+  transition: background-color 0.15s ease;
+}
+
+.NicheTag:hover {
+  background: var(--v2-accent);
+  color: white;
+}
+
+.NicheTag__count {
+  font-size: 0.7rem;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.125rem 0.25rem;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+/* Monday Outcomes Summary */
+.MondayOutcomesSummary {
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-border);
+  border-radius: 6px;
+  padding: 0.75rem;
+}
+
+.MondayOutcomesSummary__empty {
+  font-size: 0.8rem;
+  color: var(--v2-text-dim);
+  font-style: italic;
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.MondayOutcomesSummary__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  cursor: pointer;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 250, 255, 0.9));
-  transition: background 200ms ease;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--v2-border);
 }
 
-.sequence-header:hover {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(232, 249, 252, 0.95));
+.MondayOutcomesSummary__linked {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--v2-text);
 }
 
-.sequence-title h3 {
-  margin: 0;
-  font-family: var(--v2-font-display);
+.MondayOutcomesSummary__total {
+  font-size: 0.75rem;
+  color: var(--v2-text-dim);
+}
+
+.MondayOutcomesSummary__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.MondayOutcomesSummary__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--v2-surface-subtle);
+  border-radius: 4px;
+  text-align: center;
+}
+
+.MondayOutcomesSummary__item--booked {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.MondayOutcomesSummary__item--closedWon {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.MondayOutcomesSummary__item--noShow {
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.MondayOutcomesSummary__item--cancelled {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.MondayOutcomesSummary__label {
+  font-size: 0.65rem;
+  color: var(--v2-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.25rem;
+}
+
+.MondayOutcomesSummary__value {
   font-size: 1rem;
   font-weight: 700;
   color: var(--v2-text);
 }
 
-.sequence-meta {
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 0.35rem;
-  flex-wrap: wrap;
+.MondayOutcomesSummary__pct {
+  font-size: 0.7rem;
+  color: var(--v2-text-dim);
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  background: rgba(7, 19, 36, 0.06);
-  border: 1px solid rgba(7, 19, 36, 0.1);
-  color: var(--v2-muted);
-}
-
-.badge.success {
-  background: rgba(19, 185, 129, 0.12);
-  border-color: rgba(19, 185, 129, 0.3);
-  color: var(--v2-positive);
-}
-
-.badge.warning {
-  background: rgba(245, 157, 13, 0.12);
-  border-color: rgba(245, 157, 13, 0.3);
-  color: var(--v2-warning);
-}
-
-.expand-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid rgba(7, 19, 36, 0.15);
-  background: rgba(255, 255, 255, 0.9);
-  display: grid;
-  place-content: center;
-  cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
-  color: var(--v2-muted);
-  flex-shrink: 0;
-}
-
-.expand-btn:hover {
-  border-color: rgba(17, 184, 214, 0.4);
-  background: rgba(17, 184, 214, 0.1);
-  color: var(--v2-accent);
-  transform: scale(1.05);
-}
-
-.sequence-details {
-  padding: 1.25rem;
-  border-top: 1px solid rgba(7, 19, 36, 0.08);
-  background: rgba(245, 250, 255, 0.5);
-}
-
-.metrics-grid {
-  display: grid;
-  gap: 1.5rem;
-}
-
-.metric-section {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.metric-section h4 {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--v2-muted);
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.metric-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 0.75rem;
-}
-
-.metric-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border-radius: var(--v2-radius-sm);
-  background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(7, 19, 36, 0.1);
-  transition: transform 150ms ease, box-shadow 150ms ease;
-}
-
-.metric-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(7, 19, 36, 0.08);
-}
-
-.metric-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  display: grid;
-  place-content: center;
-  flex-shrink: 0;
-}
-
-.metric-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.metric-value {
-  font-family: var(--v2-font-display);
-  font-size: 1.1rem;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.metric-percentage {
+.MondayOutcomesSummary__other {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--v2-border);
   font-size: 0.75rem;
-  font-weight: 600;
-  opacity: 0.7;
-  margin-left: 0.25rem;
-}
-
-.metric-label {
-  font-size: 0.72rem;
-  color: var(--v2-muted);
-  font-weight: 600;
-}
-
-.metric-note {
-  font-size: 0.78rem;
-  color: var(--v2-muted);
-  margin-top: 0.25rem;
-}
-
-.niche-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.niche-tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  background: rgba(17, 184, 214, 0.1);
-  border: 1px solid rgba(17, 184, 214, 0.25);
-  color: var(--v2-accent-strong);
-}
-
-.quotes-section {
-  margin-top: 0.5rem;
-}
-
-.quotes-list {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.quote-card {
-  padding: 0.85rem 1rem;
-  border-radius: var(--v2-radius-sm);
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(7, 19, 36, 0.1);
-  border-left: 3px solid var(--v2-accent);
-}
-
-.quote-text {
-  margin: 0;
-  font-size: 0.85rem;
-  line-height: 1.5;
-  color: var(--v2-text);
-  font-style: italic;
-}
-
-.quote-source {
-  display: inline-flex;
-  margin-top: 0.55rem;
-  padding: 0.18rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--v2-accent-strong);
-  background: rgba(17, 184, 214, 0.12);
-  border: 1px solid rgba(17, 184, 214, 0.25);
-}
-
-.quotes-empty {
-  font-size: 0.8rem;
-  color: var(--v2-muted);
-  padding: 0.4rem 0.2rem;
-}
-
-.quote-date {
-  display: block;
-  margin-top: 0.5rem;
-  font-size: 0.68rem;
-  color: var(--v2-muted);
-  font-weight: 600;
-}
-
-/* Loading State */
-.sequence-qualification-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 3rem;
-  color: var(--v2-muted);
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(17, 184, 214, 0.2);
-  border-top-color: var(--v2-accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* Empty State */
-.sequence-qualification-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 3rem;
-  color: var(--v2-muted);
+  color: var(--v2-text-dim);
   text-align: center;
-}
-
-.sequence-qualification-empty p {
-  margin: 0;
-  font-size: 0.9rem;
-  max-width: 300px;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .breakdown-header {
-    flex-direction: column;
-    align-items: flex-start;
+  .SequenceCard__header {
+    flex-wrap: wrap;
+    gap: 0.5rem;
   }
-
-  .metric-row {
-    grid-template-columns: 1fr;
+  
+  .SequenceCard__summary {
+    width: 100%;
+    order: 3;
+    margin-top: 0.25rem;
   }
-
-  .sequence-header {
-    padding: 0.85rem 1rem;
+  
+  .MondayOutcomesSummary__grid {
+    grid-template-columns: repeat(2, 1fr);
   }
-
-  .sequence-details {
-    padding: 1rem;
-  }
-
-  .metric-card {
-    padding: 0.6rem;
+  
+  .QualificationBadge__tooltip {
+    left: 0;
+    right: 0;
+    transform: none;
+    min-width: auto;
+    max-width: none;
   }
 }

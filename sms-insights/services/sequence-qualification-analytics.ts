@@ -366,7 +366,7 @@ async function fetchSampleQuote(
     FROM sequence_first_touch sft
     JOIN conversation_state cs ON cs.conversation_id = sft.conversation_id
     JOIN sms_events se ON se.conversation_id = sft.conversation_id
-    WHERE cs.\`${column}\` = $4
+    WHERE cs."${column}" = $4
       AND se.direction = 'inbound'
       AND se.body IS NOT NULL
       AND se.body != ''

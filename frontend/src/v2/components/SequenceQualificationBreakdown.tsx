@@ -1,450 +1,395 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Briefcase, DollarSign, Target, ChevronDown, ChevronUp, TrendingUp, Building2, BarChart3 } from 'lucide-react';
-import type { SequenceQualificationItem } from '../../api/v2Queries';
+import { V2Panel, V2Skeleton } from './V2Primitives';
+import './SequenceQualificationBreakdown.css';
 
-if (typeof document !== 'undefined') {
-  void import('./SequenceQualificationBreakdown.css');
-}
+export type QualField = {
+  count: number;
+  pct: number;
+  sampleQuote: string | null;
+};
 
-type Props = {
+export type SequenceQualificationItem = {
+  sequenceLabel: string;
+  totalConversations: number;
+  mondayOutcomes?: {
+    linkedContacts: number;
+    totalOutcomes: number;
+    booked: number;
+    closedWon: number;
+    closedLost: number;
+    noShow: number;
+    cancelled: number;
+    badTiming: number;
+    badFit: number;
+    other: number;
+    unknown: number;
+    bookedPct: number;
+    closedWonPct: number;
+    noShowPct: number;
+    cancelledPct: number;
+  };
+  // Employment
+  fullTime: QualField;
+  partTime: QualField;
+  unknownEmployment: QualField;
+  // Revenue mix
+  mostlyCash: QualField;
+  mostlyInsurance: QualField;
+  balancedMix: QualField;
+  unknownRevenue: QualField;
+  // Delivery model
+  brickAndMortar: QualField;
+  mobile: QualField;
+  online: QualField;
+  hybrid: QualField;
+  unknownDelivery: QualField;
+  // Coaching interest
+  highInterest: QualField;
+  mediumInterest: QualField;
+  lowInterest: QualField;
+  unknownInterest: QualField;
+  // Niches
+  topNiches: Array<{ niche: string; count: number }>;
+};
+
+export type SequenceQualificationBreakdownProps = {
   items: SequenceQualificationItem[];
-  isLoading?: boolean;
+  isLoading: boolean;
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/** Number of conversations with at least one non-unknown qualification field */
-const computeWithQualData = (item: SequenceQualificationItem): number => {
-  const knownEmployment = item.fullTime.count + item.partTime.count;
-  const knownRevenue = item.mostlyCash.count + item.mostlyInsurance.count + item.balancedMix.count;
-  const knownDelivery = item.brickAndMortar.count + item.mobile.count + item.online.count + item.hybrid.count;
-  const knownInterest = item.highInterest.count + item.mediumInterest.count + item.lowInterest.count;
-  return Math.max(knownEmployment, knownRevenue, knownDelivery, knownInterest);
-};
-
-const EMPTY_MONDAY_OUTCOMES = {
-  linkedContacts: 0,
-  totalOutcomes: 0,
-  booked: 0,
-  closedWon: 0,
-  closedLost: 0,
-  noShow: 0,
-  cancelled: 0,
-  badTiming: 0,
-  badFit: 0,
-  other: 0,
-  unknown: 0,
-  bookedPct: 0,
-  closedWonPct: 0,
-  noShowPct: 0,
-  cancelledPct: 0,
-};
-
-const getMondayOutcomes = (item: SequenceQualificationItem) => item.mondayOutcomes ?? EMPTY_MONDAY_OUTCOMES;
-
-type SampleQuoteItem = { label: string; quote: string; count: number };
-
-/** Collect non-null sample quotes from all fields, dedupe, and rank by signal strength. */
-const collectSampleQuotes = (item: SequenceQualificationItem): SampleQuoteItem[] => {
-  const candidates: SampleQuoteItem[] = [
-    { label: 'Full-time', quote: item.fullTime.sampleQuote ?? '', count: item.fullTime.count },
-    { label: 'Part-time', quote: item.partTime.sampleQuote ?? '', count: item.partTime.count },
-    { label: 'Mostly Cash', quote: item.mostlyCash.sampleQuote ?? '', count: item.mostlyCash.count },
-    { label: 'Mostly Insurance', quote: item.mostlyInsurance.sampleQuote ?? '', count: item.mostlyInsurance.count },
-    { label: 'Balanced Mix', quote: item.balancedMix.sampleQuote ?? '', count: item.balancedMix.count },
-    { label: 'Brick & Mortar', quote: item.brickAndMortar.sampleQuote ?? '', count: item.brickAndMortar.count },
-    { label: 'Mobile', quote: item.mobile.sampleQuote ?? '', count: item.mobile.count },
-    { label: 'Online', quote: item.online.sampleQuote ?? '', count: item.online.count },
-    { label: 'Hybrid', quote: item.hybrid.sampleQuote ?? '', count: item.hybrid.count },
-    { label: 'High Interest', quote: item.highInterest.sampleQuote ?? '', count: item.highInterest.count },
-    { label: 'Medium Interest', quote: item.mediumInterest.sampleQuote ?? '', count: item.mediumInterest.count },
-    { label: 'Low Interest', quote: item.lowInterest.sampleQuote ?? '', count: item.lowInterest.count },
-  ].filter((entry) => entry.quote.trim().length > 0 && entry.count > 0);
-
-  const seen = new Set<string>();
-  const deduped: SampleQuoteItem[] = [];
-  for (const entry of candidates) {
-    const key = entry.quote.trim().toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push({ ...entry, quote: entry.quote.trim() });
-  }
-
-  deduped.sort((a, b) => b.count - a.count);
-  return deduped;
-};
-
-// ─── MetricCard ──────────────────────────────────────────────────────────────
-
-const MetricCard: React.FC<{
+const QualificationBadge: React.FC<{
   label: string;
   count: number;
   pct: number;
-  icon: React.ReactNode;
-  color: string;
+  color: 'blue' | 'green' | 'purple' | 'orange' | 'gray';
   sampleQuote?: string | null;
-}> = ({ label, count, pct, icon, color, sampleQuote }) => (
-  <div 
-    className="metric-card" 
-    title={sampleQuote ?? undefined}
-    aria-label={sampleQuote ? `${label}: ${count} (${Math.round(pct)}%). Sample quote: ${sampleQuote}` : `${label}: ${count} (${Math.round(pct)}%)`}
-    role={sampleQuote ? "tooltip" : undefined}
-  >
-    <div className="metric-icon" style={{ backgroundColor: `${color}20`, color }} aria-hidden="true">
-      {icon}
-    </div>
-    <div className="metric-content">
-      <div className="metric-value" style={{ color }}>
-        {count}
-        <span className="metric-percentage">({Math.round(pct)}%)</span>
-      </div>
-      <div className="metric-label">{label}</div>
-    </div>
-  </div>
-);
+}> = ({ label, count, pct, color, sampleQuote }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
 
-// ─── SequenceCard ─────────────────────────────────────────────────────────────
+  const colorMap = {
+    blue: 'var(--v2-accent)',
+    green: 'var(--v2-success)',
+    purple: 'var(--v2-purple, #8b5cf6)',
+    orange: 'var(--v2-warning)',
+    gray: 'var(--v2-text-dim)',
+  };
+
+  return (
+    <div
+      className="QualificationBadge"
+      style={{ borderColor: colorMap[color] }}
+      onMouseEnter={() => sampleQuote && setShowTooltip(true)}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      <span className="QualificationBadge__label">{label}</span>
+      <span className="QualificationBadge__value" style={{ color: colorMap[color] }}>
+        {pct.toFixed(0)}%
+      </span>
+      <span className="QualificationBadge__count">({count})</span>
+      
+      {showTooltip && sampleQuote && (
+        <div className="QualificationBadge__tooltip">
+          <div className="QualificationBadge__tooltipLabel">Sample quote:</div>
+          <div className="QualificationBadge__tooltipQuote">"{sampleQuote}"</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const NicheTag: React.FC<{
+  niche: string;
+  count: number;
+  total: number;
+}> = ({ niche, count, total }) => {
+  const pct = total > 0 ? (count / total) * 100 : 0;
+  
+  return (
+    <span className="NicheTag" title={`${count} mentions (${pct.toFixed(1)}%)`}>
+      {niche}
+      <span className="NicheTag__count">{count}</span>
+    </span>
+  );
+};
+
+const MondayOutcomesSummary: React.FC<{
+  outcomes: SequenceQualificationItem['mondayOutcomes'];
+}> = ({ outcomes }) => {
+  if (!outcomes || outcomes.totalOutcomes === 0) {
+    return <div className="MondayOutcomesSummary__empty">No Monday outcomes linked</div>;
+  }
+
+  return (
+    <div className="MondayOutcomesSummary">
+      <div className="MondayOutcomesSummary__header">
+        <span className="MondayOutcomesSummary__linked">
+          {outcomes.linkedContacts} contacts linked
+        </span>
+        <span className="MondayOutcomesSummary__total">
+          {outcomes.totalOutcomes} total outcomes
+        </span>
+      </div>
+      
+      <div className="MondayOutcomesSummary__grid">
+        <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--booked">
+          <span className="MondayOutcomesSummary__label">Booked</span>
+          <span className="MondayOutcomesSummary__value">{outcomes.booked}</span>
+          <span className="MondayOutcomesSummary__pct">{outcomes.bookedPct.toFixed(1)}%</span>
+        </div>
+        
+        <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--closedWon">
+          <span className="MondayOutcomesSummary__label">Closed Won</span>
+          <span className="MondayOutcomesSummary__value">{outcomes.closedWon}</span>
+          <span className="MondayOutcomesSummary__pct">{outcomes.closedWonPct.toFixed(1)}%</span>
+        </div>
+        
+        <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--noShow">
+          <span className="MondayOutcomesSummary__label">No Show</span>
+          <span className="MondayOutcomesSummary__value">{outcomes.noShow}</span>
+          <span className="MondayOutcomesSummary__pct">{outcomes.noShowPct.toFixed(1)}%</span>
+        </div>
+        
+        <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--cancelled">
+          <span className="MondayOutcomesSummary__label">Cancelled</span>
+          <span className="MondayOutcomesSummary__value">{outcomes.cancelled}</span>
+          <span className="MondayOutcomesSummary__pct">{outcomes.cancelledPct.toFixed(1)}%</span>
+        </div>
+      </div>
+      
+      {outcomes.badTiming > 0 && (
+        <div className="MondayOutcomesSummary__other">
+          Bad Timing: {outcomes.badTiming} • Bad Fit: {outcomes.badFit} • Other: {outcomes.other + outcomes.unknown}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const SequenceCard: React.FC<{
   item: SequenceQualificationItem;
   isExpanded: boolean;
   onToggle: () => void;
 }> = ({ item, isExpanded, onToggle }) => {
-  const withQualData = computeWithQualData(item);
-  const monday = getMondayOutcomes(item);
-  const qualificationRate = item.totalConversations > 0
-    ? Math.round((withQualData / item.totalConversations) * 100)
-    : 0;
-  const sampleQuotes = collectSampleQuotes(item);
-  const detailsId = `sequence-details-${item.sequenceLabel.replace(/\s+/g, '-')}`;
+  const total = item.totalConversations;
+  
+  // Calculate summary stats for collapsed view
+  const hasFullTime = item.fullTime.count > item.partTime.count;
+  const dominantRevenue = 
+    item.mostlyCash.count > item.mostlyInsurance.count && item.mostlyCash.count > item.balancedMix.count
+      ? 'Cash'
+      : item.mostlyInsurance.count > item.mostlyCash.count && item.mostlyInsurance.count > item.balancedMix.count
+        ? 'Insurance'
+        : item.balancedMix.count > 0 ? 'Mixed' : 'Unknown';
+  
+  const coachingInterest = 
+    item.highInterest.count > item.mediumInterest.count && item.highInterest.count > item.lowInterest.count
+      ? 'High'
+      : item.mediumInterest.count > item.highInterest.count && item.mediumInterest.count > item.lowInterest.count
+        ? 'Medium'
+        : item.lowInterest.count > 0 ? 'Low' : 'Unknown';
 
   return (
-    <motion.div
-      className={`sequence-card ${isExpanded ? 'expanded' : ''}`}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <button 
-        id={`header-${detailsId}`}
-        className="sequence-header" 
-        onClick={onToggle}
-        aria-expanded={isExpanded}
-        aria-controls={detailsId}
-        style={{ width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
-      >
-        <div className="sequence-title">
-          <h3>{item.sequenceLabel}</h3>
-          <div className="sequence-meta">
-            <span className="badge">{item.totalConversations} conversations</span>
-            <span className={`badge ${qualificationRate > 50 ? 'success' : 'warning'}`}>
-              {qualificationRate}% qualified
+    <div className={`SequenceCard ${isExpanded ? 'SequenceCard--expanded' : ''}`}>
+      <div className="SequenceCard__header" onClick={onToggle}>
+        <div className="SequenceCard__title">
+          <span className="SequenceCard__name">{item.sequenceLabel}</span>
+          <span className="SequenceCard__count">{total.toLocaleString()} conversations</span>
+        </div>
+        
+        {!isExpanded && (
+          <div className="SequenceCard__summary">
+            <span className="SequenceCard__summaryItem" title="Employment">
+              {hasFullTime ? 'FT' : 'PT'} {((hasFullTime ? item.fullTime.pct : item.partTime.pct)).toFixed(0)}%
+            </span>
+            <span className="SequenceCard__summaryDivider">•</span>
+            <span className="SequenceCard__summaryItem" title="Revenue Model">
+              {dominantRevenue} {((dominantRevenue === 'Cash' ? item.mostlyCash.pct : 
+                dominantRevenue === 'Insurance' ? item.mostlyInsurance.pct : 
+                dominantRevenue === 'Mixed' ? item.balancedMix.pct : 0)).toFixed(0)}%
+            </span>
+            <span className="SequenceCard__summaryDivider">•</span>
+            <span className="SequenceCard__summaryItem" title="Coaching Interest">
+              {coachingInterest} Interest
             </span>
           </div>
-        </div>
-        <div className="expand-btn" aria-hidden="true">
-          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </div>
-      </button>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            id={detailsId}
-            className="sequence-details"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            role="region"
-            aria-labelledby={`header-${detailsId}`}
-          >
-            <div className="metrics-grid">
-              {/* Employment */}
-              <div className="metric-section">
-                <h4>
-                  <Briefcase size={16} />
-                  Employment Status
-                </h4>
-                <div className="metric-row">
-                  <MetricCard
-                    label="Full-time"
-                    count={item.fullTime.count}
-                    pct={item.fullTime.pct}
-                    icon={<Briefcase size={16} />}
-                    color="#22c55e"
-                    sampleQuote={item.fullTime.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Part-time"
-                    count={item.partTime.count}
-                    pct={item.partTime.pct}
-                    icon={<Briefcase size={16} />}
-                    color="#3b82f6"
-                    sampleQuote={item.partTime.sampleQuote}
-                  />
-                </div>
-              </div>
-
-              {/* Revenue Mix */}
-              <div className="metric-section">
-                <h4>
-                  <DollarSign size={16} />
-                  Revenue Mix
-                </h4>
-                <div className="metric-row">
-                  <MetricCard
-                    label="Mostly Cash"
-                    count={item.mostlyCash.count}
-                    pct={item.mostlyCash.pct}
-                    icon={<DollarSign size={16} />}
-                    color="#10b981"
-                    sampleQuote={item.mostlyCash.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Mostly Insurance"
-                    count={item.mostlyInsurance.count}
-                    pct={item.mostlyInsurance.pct}
-                    icon={<DollarSign size={16} />}
-                    color="#8b5cf6"
-                    sampleQuote={item.mostlyInsurance.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Balanced"
-                    count={item.balancedMix.count}
-                    pct={item.balancedMix.pct}
-                    icon={<DollarSign size={16} />}
-                    color="#f59e0b"
-                    sampleQuote={item.balancedMix.sampleQuote}
-                  />
-                </div>
-              </div>
-
-              {/* Delivery Model */}
-              <div className="metric-section">
-                <h4>
-                  <Building2 size={16} />
-                  Clinic Setup
-                </h4>
-                <div className="metric-row">
-                  <MetricCard
-                    label="Brick & Mortar"
-                    count={item.brickAndMortar.count}
-                    pct={item.brickAndMortar.pct}
-                    icon={<Building2 size={16} />}
-                    color="#6366f1"
-                    sampleQuote={item.brickAndMortar.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Mobile"
-                    count={item.mobile.count}
-                    pct={item.mobile.pct}
-                    icon={<Building2 size={16} />}
-                    color="#0ea5e9"
-                    sampleQuote={item.mobile.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Online"
-                    count={item.online.count}
-                    pct={item.online.pct}
-                    icon={<Building2 size={16} />}
-                    color="#14b8a6"
-                    sampleQuote={item.online.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Hybrid"
-                    count={item.hybrid.count}
-                    pct={item.hybrid.pct}
-                    icon={<Building2 size={16} />}
-                    color="#f97316"
-                    sampleQuote={item.hybrid.sampleQuote}
-                  />
-                </div>
-              </div>
-
-              {/* Coaching Interest */}
-              <div className="metric-section">
-                <h4>
-                  <Target size={16} />
-                  Coaching Interest
-                </h4>
-                <div className="metric-row">
-                  <MetricCard
-                    label="High Interest"
-                    count={item.highInterest.count}
-                    pct={item.highInterest.pct}
-                    icon={<TrendingUp size={16} />}
-                    color="#22c55e"
-                    sampleQuote={item.highInterest.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Medium Interest"
-                    count={item.mediumInterest.count}
-                    pct={item.mediumInterest.pct}
-                    icon={<TrendingUp size={16} />}
-                    color="#f59e0b"
-                    sampleQuote={item.mediumInterest.sampleQuote}
-                  />
-                  <MetricCard
-                    label="Low Interest"
-                    count={item.lowInterest.count}
-                    pct={item.lowInterest.pct}
-                    icon={<TrendingUp size={16} />}
-                    color="#ef4444"
-                    sampleQuote={item.lowInterest.sampleQuote}
-                  />
-                </div>
-              </div>
-
-              {/* Monday Outcomes */}
-              <div className="metric-section">
-                <h4>
-                  <BarChart3 size={16} />
-                  Monday Outcomes
-                </h4>
-                {monday.totalOutcomes > 0 ? (
-                  <>
-                    <div className="metric-row">
-                      <MetricCard
-                        label="Booked"
-                        count={monday.booked}
-                        pct={monday.bookedPct}
-                        icon={<BarChart3 size={16} />}
-                        color="#16a34a"
-                      />
-                      <MetricCard
-                        label="Closed Won"
-                        count={monday.closedWon}
-                        pct={monday.closedWonPct}
-                        icon={<BarChart3 size={16} />}
-                        color="#2563eb"
-                      />
-                      <MetricCard
-                        label="No-Show"
-                        count={monday.noShow}
-                        pct={monday.noShowPct}
-                        icon={<BarChart3 size={16} />}
-                        color="#ea580c"
-                      />
-                      <MetricCard
-                        label="Cancelled"
-                        count={monday.cancelled}
-                        pct={monday.cancelledPct}
-                        icon={<BarChart3 size={16} />}
-                        color="#dc2626"
-                      />
-                    </div>
-                    <div className="metric-note">
-                      Matched Monday leads: <strong>{monday.linkedContacts}</strong> contacts ·{' '}
-                      <strong>{monday.totalOutcomes}</strong> outcome records in this window.
-                    </div>
-                  </>
-                ) : (
-                  <div className="quotes-empty">No matched Monday outcomes for this sequence in this date range.</div>
-                )}
-              </div>
-
-              {/* Top Niches */}
-              {item.topNiches.length > 0 && (
-                <div className="metric-section">
-                  <h4>Top Niches</h4>
-                  <div className="niche-tags">
-                    {item.topNiches.slice(0, 5).map((niche, idx) => (
-                      <span key={idx} className="niche-tag">
-                        {niche.niche} ({niche.count})
-                      </span>
-                    ))}
-                  </div>
-                </div>
+        )}
+        
+        <span className={`SequenceCard__chevron ${isExpanded ? 'SequenceCard__chevron--up' : ''}`}>
+          ▼
+        </span>
+      </div>
+      
+      {isExpanded && (
+        <div className="SequenceCard__body">
+          {/* Employment Status */}
+          <div className="SequenceCard__section">
+            <h5 className="SequenceCard__sectionTitle">Employment Status</h5>
+            <div className="SequenceCard__badges">
+              <QualificationBadge
+                label="Full-time"
+                count={item.fullTime.count}
+                pct={item.fullTime.pct}
+                color="blue"
+                sampleQuote={item.fullTime.sampleQuote}
+              />
+              <QualificationBadge
+                label="Part-time"
+                count={item.partTime.count}
+                pct={item.partTime.pct}
+                color="purple"
+                sampleQuote={item.partTime.sampleQuote}
+              />
+              {item.unknownEmployment.count > 0 && (
+                <QualificationBadge
+                  label="Unknown"
+                  count={item.unknownEmployment.count}
+                  pct={item.unknownEmployment.pct}
+                  color="gray"
+                />
               )}
-
-              {/* Sample Quotes */}
-              <div className="metric-section quotes-section">
-                <h4>What Leads Are Saying</h4>
-                {sampleQuotes.length > 0 ? (
-                  <div className="quotes-list">
-                    {sampleQuotes.slice(0, 4).map((sample, idx) => (
-                      <div key={idx} className="quote-card">
-                        <p className="quote-text">"{sample.quote}"</p>
-                        <div className="quote-source">{sample.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="quotes-empty">No qualifying lead quotes found in this date range yet.</div>
-                )}
+            </div>
+          </div>
+          
+          {/* Revenue Mix */}
+          <div className="SequenceCard__section">
+            <h5 className="SequenceCard__sectionTitle">Revenue Model</h5>
+            <div className="SequenceCard__badges">
+              <QualificationBadge
+                label="Mostly Cash"
+                count={item.mostlyCash.count}
+                pct={item.mostlyCash.pct}
+                color="green"
+                sampleQuote={item.mostlyCash.sampleQuote}
+              />
+              <QualificationBadge
+                label="Mostly Insurance"
+                count={item.mostlyInsurance.count}
+                pct={item.mostlyInsurance.pct}
+                color="blue"
+                sampleQuote={item.mostlyInsurance.sampleQuote}
+              />
+              <QualificationBadge
+                label="Balanced Mix"
+                count={item.balancedMix.count}
+                pct={item.balancedMix.pct}
+                color="purple"
+                sampleQuote={item.balancedMix.sampleQuote}
+              />
+              {item.unknownRevenue.count > 0 && (
+                <QualificationBadge
+                  label="Unknown"
+                  count={item.unknownRevenue.count}
+                  pct={item.unknownRevenue.pct}
+                  color="gray"
+                />
+              )}
+            </div>
+          </div>
+          
+          {/* Coaching Interest */}
+          <div className="SequenceCard__section">
+            <h5 className="SequenceCard__sectionTitle">Coaching Interest</h5>
+            <div className="SequenceCard__badges">
+              <QualificationBadge
+                label="High"
+                count={item.highInterest.count}
+                pct={item.highInterest.pct}
+                color="green"
+                sampleQuote={item.highInterest.sampleQuote}
+              />
+              <QualificationBadge
+                label="Medium"
+                count={item.mediumInterest.count}
+                pct={item.mediumInterest.pct}
+                color="blue"
+                sampleQuote={item.mediumInterest.sampleQuote}
+              />
+              <QualificationBadge
+                label="Low"
+                count={item.lowInterest.count}
+                pct={item.lowInterest.pct}
+                color="orange"
+                sampleQuote={item.lowInterest.sampleQuote}
+              />
+              {item.unknownInterest.count > 0 && (
+                <QualificationBadge
+                  label="Unknown"
+                  count={item.unknownInterest.count}
+                  pct={item.unknownInterest.pct}
+                  color="gray"
+                />
+              )}
+            </div>
+          </div>
+          
+          {/* Top Niches */}
+          {item.topNiches.length > 0 && (
+            <div className="SequenceCard__section">
+              <h5 className="SequenceCard__sectionTitle">Top Niches Mentioned</h5>
+              <div className="SequenceCard__niches">
+                {item.topNiches.map((niche) => (
+                  <NicheTag
+                    key={niche.niche}
+                    niche={niche.niche}
+                    count={niche.count}
+                    total={total}
+                  />
+                ))}
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          )}
+          
+          {/* Monday Outcomes */}
+          {item.mondayOutcomes && item.mondayOutcomes.totalOutcomes > 0 && (
+            <div className="SequenceCard__section">
+              <h5 className="SequenceCard__sectionTitle">Monday.com Outcomes</h5>
+              <MondayOutcomesSummary outcomes={item.mondayOutcomes} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 
-// ─── Main Component ───────────────────────────────────────────────────────────
-
-export const SequenceQualificationBreakdown: React.FC<Props> = ({ items, isLoading }) => {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+export const SequenceQualificationBreakdown: React.FC<SequenceQualificationBreakdownProps> = ({
+  items,
+  isLoading,
+}) => {
+  const [expandedSequence, setExpandedSequence] = useState<string | null>(null);
 
   if (isLoading) {
     return (
-      <div className="sequence-qualification-loading">
-        <div className="spinner" />
-        <p>Loading sequence qualification data...</p>
-      </div>
+      <V2Panel title="Lead Qualification by Sequence" caption="Loading qualification data...">
+        <V2Skeleton height={200} />
+      </V2Panel>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="sequence-qualification-empty">
-        <Users size={48} />
-        <p>No sequence qualification data available for this time period.</p>
-      </div>
+      <V2Panel title="Lead Qualification by Sequence" caption="Self-identified lead attributes from qualification inference">
+        <div className="SequenceQualificationBreakdown__empty">
+          No qualification data available for the selected time period.
+        </div>
+      </V2Panel>
     );
   }
 
-  // Summary stats
-  const totalConversations = items.reduce((sum, item) => sum + item.totalConversations, 0);
-  const totalWithQualification = items.reduce((sum, item) => sum + computeWithQualData(item), 0);
-  const avgQualificationRate = totalConversations > 0
-    ? Math.round((totalWithQualification / totalConversations) * 100)
-    : 0;
-
   return (
-    <div className="sequence-qualification-breakdown">
-      <div className="breakdown-header">
-        <h2>
-          <Users size={24} />
-          Lead Qualification by Sequence
-        </h2>
-        <div className="breakdown-summary">
-          <span className="summary-stat">
-            <strong>{items.length}</strong> sequences
-          </span>
-          <span className="summary-stat">
-            <strong>{totalConversations}</strong> conversations
-          </span>
-          <span className={`summary-stat ${avgQualificationRate > 50 ? 'success' : 'warning'}`}>
-            <strong>{avgQualificationRate}%</strong> qualified
-          </span>
-        </div>
-      </div>
-
-      <div className="sequence-cards">
-        {items.map((item) => (
-          <SequenceCard
-            key={item.sequenceLabel}
-            item={item}
-            isExpanded={expandedId === item.sequenceLabel}
-            onToggle={() => setExpandedId(
-              expandedId === item.sequenceLabel ? null : item.sequenceLabel
-            )}
-          />
-        ))}
-      </div>
+    <div className="SequenceQualificationBreakdown">
+      {items.map((item) => (
+        <SequenceCard
+          key={item.sequenceLabel}
+          item={item}
+          isExpanded={expandedSequence === item.sequenceLabel}
+          onToggle={() => setExpandedSequence(
+            expandedSequence === item.sequenceLabel ? null : item.sequenceLabel
+          )}
+        />
+      ))}
     </div>
   );
 };
+
+export default SequenceQualificationBreakdown;

@@ -2,6 +2,12 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../frontend"
 		}
-	]
+	],
+	"settings": {
+		"git.ignoreLimitWarning": true
+	}
 }

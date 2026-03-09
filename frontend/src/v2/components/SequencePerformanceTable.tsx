@@ -29,6 +29,9 @@ export interface MergedSeqRow {
   isManual: boolean;
   uniqueReplied: number;
   smsReplyPct: number | null;
+  // Reply timing fields
+  medianTimeToFirstReplyMinutes?: number | null;
+  avgTimeToFirstReplyMinutes?: number | null;
 }
 
 const parseVersionParts = (value: string): number[] | null => {

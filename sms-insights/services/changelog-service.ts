@@ -115,6 +115,54 @@ function formatDescription(message: string): string {
 }
 
 /**
+ * Get build SHA from environment variables
+ */
+function getBuildSha(): string {
+  return (
+    (process.env.BUILD_SHA || '').trim() ||
+    (process.env.VERCEL_GIT_COMMIT_SHA || '').trim() ||
+    (process.env.RAILWAY_GIT_COMMIT_SHA || '').trim() ||
+    'unknown'
+  );
+}
+
+/**
+ * Get deployment info from environment
+ */
+function getDeploymentInfo(): {
+  sha: string;
+  branch: string;
+  service: string;
+  deployedAt: string;
+} {
+  const sha = getBuildSha();
+  const branch = (process.env.RAILWAY_GIT_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main').trim();
+  const service = (process.env.RAILWAY_SERVICE_NAME || process.env.VERCEL_PROJECT_NAME || 'ptbizsms-api').trim();
+  
+  // Use current time as deployment time (best approximation)
+  const deployedAt = new Date().toISOString();
+  
+  return { sha, branch, service, deployedAt };
+}
+
+/**
+ * Generate fallback changelog entry from deployment info
+ */
+function generateDeploymentEntry(): ChangelogEntry {
+  const info = getDeploymentInfo();
+  
+  return {
+    hash: info.sha.substring(0, 7),
+    date: info.deployedAt,
+    message: `Deployment: ${info.service} (${info.branch})`,
+    author: 'Railway Deploy',
+    type: 'other',
+    category: 'Infrastructure',
+    description: `Current deployment: ${info.sha.substring(0, 7)} on ${info.branch}`
+  };
+}
+
+/**
  * Parse git log and generate changelog entries
  */
 export function generateChangelog(days: number = 365): ChangelogTimeline {
@@ -137,14 +185,18 @@ export function generateChangelog(days: number = 365): ChangelogTimeline {
       }
     }
     
+    // If no git repo found, return deployment info as fallback
     if (!repoRoot) {
-      console.warn('[changelog] Git repository not found in any of:', possibleRoots);
-      // Return empty but valid timeline
+      console.warn('[changelog] Git repository not found, using deployment info fallback');
+      
+      const deploymentEntry = generateDeploymentEntry();
+      const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      
       return {
-        entries: [],
-        totalCount: 0,
+        entries: [deploymentEntry],
+        totalCount: 1,
         dateRange: {
-          from: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+          from: fromDate.toISOString(),
           to: new Date().toISOString()
         },
         stats: {
@@ -152,7 +204,7 @@ export function generateChangelog(days: number = 365): ChangelogTimeline {
           fixes: 0,
           refactors: 0,
           docs: 0,
-          other: 0
+          other: 1
         }
       };
     }

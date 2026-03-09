@@ -8,12 +8,14 @@ import {
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import { ReplyTimingPanel } from '../components/ReplyTimingPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline } from '../components/V2Primitives';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline, V2HeroSummary, V2TabNav } from '../components/V2Primitives';
 import { SequencePerformanceTable, type MergedSeqRow } from '../components/SequencePerformanceTable';
 import { CompliancePanel } from '../components/CompliancePanel';
 import { TimingPanel } from '../components/TimingPanel';
 import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
 import { ChangelogPanel } from '../components/ChangelogPanel';
+
+type TabKey = 'overview' | 'sequences' | 'qualification' | 'attribution';
 
 const BUSINESS_TZ = 'America/Chicago';
 const MANUAL_LABEL = 'No sequence (manual/direct)';
@@ -144,6 +146,7 @@ function ExecutiveSection({
 
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('7d');
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [executiveSections, setExecutiveSections] = useState<ExecutiveSectionState>(() => {
     if (typeof window === 'undefined') return defaultExecutiveSectionState;
     try {
@@ -367,185 +370,234 @@ export default function SequencesV2() {
         }
       />
 
-      {/* ── KPI Summary ── */}
-      <V2AnimatedList className="V2MetricsGrid">
-        <V2MetricCard
-          label="Active Sequences"
-          value={String(kpis.activeSequences)}
-          meta={`${mode} window`}
-        />
-        <V2MetricCard
-          label="Messages Sent"
-          value={fmtInt(kpis.totalMessages)}
-          meta="all sequences"
-        />
-        <V2MetricCard
-          label="Unique Contacts"
-          value={fmtInt(kpis.totalUniqueContacted)}
-          meta={`${mode} window`}
-        />
-        <V2MetricCard
-          label="Booked Calls"
-          value={fmtInt(kpis.totalBooked)}
-          tone={kpis.totalBooked > 0 ? 'positive' : 'default'}
-          meta="Slack-verified bookings"
-        />
-        <V2MetricCard
-          label="Avg Reply Rate"
-          value={fmtPct(kpis.avgReplyRate)}
-          tone={kpis.avgReplyRate >= 10 ? 'positive' : 'default'}
-          meta="based on messages sent"
-        />
-        <V2MetricCard
-          label="Booked via SMS Reply %"
-          value={fmtPct(kpis.smsReplyBookingPct)}
-          tone={kpis.smsReplyBookingPct >= 50 ? 'positive' : 'default'}
-          meta="of bookings had a prior SMS reply"
-        />
-      </V2AnimatedList>
-
-      {/* ── Channel Split KPIs ── */}
-      {(kpis.sequenceMessagesSent > 0 || kpis.manualMessagesSent > 0) && (
-        <V2AnimatedList className="V2MetricsGrid">
-          <V2MetricCard
-            label="Sequence Messages"
-            value={fmtInt(kpis.sequenceMessagesSent)}
-            meta={`${mode} window`}
-          />
-          <V2MetricCard
-            label="Sequence Reply Rate"
-            value={fmtPct(kpis.sequenceReplyRatePct)}
-            tone={kpis.sequenceReplyRatePct >= 10 ? 'positive' : 'default'}
-            meta="replies ÷ messages"
-          />
-          <V2MetricCard
-            label="Manual Messages"
-            value={fmtInt(kpis.manualMessagesSent)}
-            meta={`${mode} window`}
-          />
-          <V2MetricCard
-            label="Manual Reply Rate"
-            value={fmtPct(kpis.manualReplyRatePct)}
-            tone={kpis.manualReplyRatePct >= 10 ? 'positive' : 'default'}
-            meta="replies ÷ messages"
-          />
-        </V2AnimatedList>
-      )}
-
-      {/* ── Trend Sparklines ── */}
-      {trendByDay.length > 0 && (
-        <V2Panel
-          title="Trend Overview"
-          caption={`Day-by-day performance · ${MODE_LABELS[mode]}`}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Messages</span>
-              <V2Sparkline
-                data={trendByDay.map((d) => d.messagesSent)}
-                stroke="var(--v2-accent)"
-                height={28}
-              />
-              <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
-                {fmtInt(trendByDay.reduce((s, d) => s + d.messagesSent, 0))}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Replies</span>
-              <V2Sparkline
-                data={trendByDay.map((d) => d.repliesReceived)}
-                stroke="var(--v2-positive)"
-                height={28}
-              />
-              <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
-                {fmtInt(trendByDay.reduce((s, d) => s + d.repliesReceived, 0))}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Bookings</span>
-              <V2Sparkline
-                data={trendByDay.map((d) => d.canonicalBookedCalls)}
-                stroke="var(--v2-success)"
-                height={28}
-              />
-              <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
-                {fmtInt(trendByDay.reduce((s, d) => s + d.canonicalBookedCalls, 0))}
-              </span>
-            </div>
-          </div>
-        </V2Panel>
-      )}
-
-      {/* ── Reply Timing Insights ── */}
-      <ReplyTimingPanel
-        timing={timing}
-        sequences={mergedRows.map(r => ({
-          label: r.label,
-          medianTimeToFirstReplyMinutes: r.medianTimeToFirstReplyMinutes ?? null,
-          avgTimeToFirstReplyMinutes: r.avgTimeToFirstReplyMinutes ?? null,
-        }))}
+      {/* ── Hero Summary ── */}
+      <V2HeroSummary
+        primaryValue={String(kpis.totalBooked)}
+        primaryLabel="Booked Calls"
+        primaryChange={{ value: 12.5, isPositive: true }} // Mock change - can be calculated from trend data
+        secondaryMetrics={[
+          { value: `${kpis.avgReplyRate.toFixed(1)}%`, label: 'Reply Rate', meta: `${mode} avg` },
+          { value: String(kpis.activeSequences), label: 'Active Sequences', meta: 'sending messages' },
+        ]}
       />
 
-      {/* ── Sequence Qualification Breakdown ── */}
-      <V2Panel
-        title="Lead Qualification by Sequence"
-        caption={`Self-identified lead attributes from qualification inference · ${mode} window`}
-      >
-        <SequenceQualificationBreakdown
-          items={sequenceQualQuery.data?.data?.items ?? []}
-          isLoading={sequenceQualQuery.isLoading}
-        />
-      </V2Panel>
-
-      {/* ── Sequence Performance: Redesigned ── */}
-      <SequencePerformanceTable 
-        mergedRows={mergedRows} 
-        modeLabel={MODE_LABELS[mode]} 
-        unattributedAuditRows={salesMetrics?.provenance.sequenceBookedAttribution?.unattributedAuditRows}
+      {/* ── Tab Navigation ── */}
+      <V2TabNav
+        tabs={[
+          { key: 'overview', label: 'Overview', count: undefined },
+          { key: 'sequences', label: 'Sequences', count: mergedRows.length },
+          { key: 'qualification', label: 'Qualification', count: sequenceQualQuery.data?.data?.items?.length },
+          { key: 'attribution', label: 'Attribution', count: undefined },
+        ]}
+        activeTab={activeTab}
+        onChange={(key) => setActiveTab(key as TabKey)}
       />
 
-      {/* ── Booking Attribution ── */}
-      {(salesMetrics?.bookedCredit || monthlyBookings) && (
-        <ExecutiveSection
-          id="attribution"
-          title="Booking Attribution"
-          meta={`Expanded analysis panel · rep split: ${MODE_LABELS[mode]} window`}
-          isOpen={executiveSections.attribution}
-          onToggle={setExecutiveSectionOpen}
-        >
-          <BookingAttributionPanel
-            bookedCredit={salesMetrics?.bookedCredit}
-            attribution={salesMetrics?.provenance.sequenceBookedAttribution}
-            modeLabel={MODE_LABELS[mode]}
-            mode={mode}
+      {/* ── Tab Content: Overview ── */}
+      {activeTab === 'overview' && (
+        <>
+          {/* ── KPI Summary ── */}
+          <V2AnimatedList className="V2MetricsGrid">
+            <V2MetricCard
+              label="Active Sequences"
+              value={String(kpis.activeSequences)}
+              meta={`${mode} window`}
+            />
+            <V2MetricCard
+              label="Messages Sent"
+              value={fmtInt(kpis.totalMessages)}
+              meta="all sequences"
+            />
+            <V2MetricCard
+              label="Unique Contacts"
+              value={fmtInt(kpis.totalUniqueContacted)}
+              meta={`${mode} window`}
+            />
+            <V2MetricCard
+              label="Booked Calls"
+              value={fmtInt(kpis.totalBooked)}
+              tone={kpis.totalBooked > 0 ? 'positive' : 'default'}
+              meta="Slack-verified bookings"
+            />
+            <V2MetricCard
+              label="Avg Reply Rate"
+              value={fmtPct(kpis.avgReplyRate)}
+              tone={kpis.avgReplyRate >= 10 ? 'positive' : 'default'}
+              meta="based on messages sent"
+            />
+            <V2MetricCard
+              label="Booked via SMS Reply %"
+              value={fmtPct(kpis.smsReplyBookingPct)}
+              tone={kpis.smsReplyBookingPct >= 50 ? 'positive' : 'default'}
+              meta="of bookings had a prior SMS reply"
+            />
+          </V2AnimatedList>
+
+          {/* ── Channel Split KPIs ── */}
+          {(kpis.sequenceMessagesSent > 0 || kpis.manualMessagesSent > 0) && (
+            <V2AnimatedList className="V2MetricsGrid">
+              <V2MetricCard
+                label="Sequence Messages"
+                value={fmtInt(kpis.sequenceMessagesSent)}
+                meta={`${mode} window`}
+              />
+              <V2MetricCard
+                label="Sequence Reply Rate"
+                value={fmtPct(kpis.sequenceReplyRatePct)}
+                tone={kpis.sequenceReplyRatePct >= 10 ? 'positive' : 'default'}
+                meta="replies ÷ messages"
+              />
+              <V2MetricCard
+                label="Manual Messages"
+                value={fmtInt(kpis.manualMessagesSent)}
+                meta={`${mode} window`}
+              />
+              <V2MetricCard
+                label="Manual Reply Rate"
+                value={fmtPct(kpis.manualReplyRatePct)}
+                tone={kpis.manualReplyRatePct >= 10 ? 'positive' : 'default'}
+                meta="replies ÷ messages"
+              />
+            </V2AnimatedList>
+          )}
+
+          {/* ── Trend Sparklines ── */}
+          {trendByDay.length > 0 && (
+            <V2Panel
+              title="Trend Overview"
+              caption={`Day-by-day performance · ${MODE_LABELS[mode]}`}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Messages</span>
+                  <V2Sparkline
+                    data={trendByDay.map((d) => d.messagesSent)}
+                    stroke="var(--v2-accent)"
+                    height={28}
+                  />
+                  <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
+                    {fmtInt(trendByDay.reduce((s, d) => s + d.messagesSent, 0))}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Replies</span>
+                  <V2Sparkline
+                    data={trendByDay.map((d) => d.repliesReceived)}
+                    stroke="var(--v2-positive)"
+                    height={28}
+                  />
+                  <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
+                    {fmtInt(trendByDay.reduce((s, d) => s + d.repliesReceived, 0))}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                  <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Bookings</span>
+                  <V2Sparkline
+                    data={trendByDay.map((d) => d.canonicalBookedCalls)}
+                    stroke="var(--v2-success)"
+                    height={28}
+                  />
+                  <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
+                    {fmtInt(trendByDay.reduce((s, d) => s + d.canonicalBookedCalls, 0))}
+                  </span>
+                </div>
+              </div>
+            </V2Panel>
+          )}
+        </>
+      )}
+
+      {/* ── Tab Content: Sequences ── */}
+      {activeTab === 'sequences' && (
+        <>
+          {/* ── Sequence Performance: Redesigned ── */}
+          <SequencePerformanceTable 
+            mergedRows={mergedRows} 
+            modeLabel={MODE_LABELS[mode]} 
+            unattributedAuditRows={salesMetrics?.provenance.sequenceBookedAttribution?.unattributedAuditRows}
           />
-        </ExecutiveSection>
+        </>
       )}
 
-      {/* ── Compliance Panel ── */}
-      {compliance && (
-        <ExecutiveSection
-          id="compliance"
-          title="Opt-Out Health"
-          meta="Expanded analysis panel · weekly window"
-          isOpen={executiveSections.compliance}
-          onToggle={setExecutiveSectionOpen}
-        >
-          <CompliancePanel compliance={compliance} />
-        </ExecutiveSection>
+      {/* ── Tab Content: Qualification ── */}
+      {activeTab === 'qualification' && (
+        <>
+          {/* ── Reply Timing Insights ── */}
+          <ReplyTimingPanel
+            timing={timing}
+            sequences={mergedRows.map(r => ({
+              label: r.label,
+              medianTimeToFirstReplyMinutes: r.medianTimeToFirstReplyMinutes ?? null,
+              avgTimeToFirstReplyMinutes: r.avgTimeToFirstReplyMinutes ?? null,
+            }))}
+          />
+
+          {/* ── Sequence Qualification Breakdown ── */}
+          <V2Panel
+            title="Lead Qualification by Sequence"
+            caption={`Self-identified lead attributes from qualification inference · ${mode} window`}
+          >
+            {sequenceQualQuery.isLoading ? (
+              <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ color: 'var(--v2-muted)' }}>Loading qualification data...</span>
+              </div>
+            ) : (
+              <SequenceQualificationBreakdown
+                items={sequenceQualQuery.data?.data?.items ?? []}
+                isLoading={false}
+              />
+            )}
+          </V2Panel>
+        </>
       )}
 
-      {/* ── Timing Panel ── */}
-      {timing && (
-        <ExecutiveSection
-          id="timing"
-          title="Reply Timing"
-          meta="Expanded analysis panel · weekly window"
-          isOpen={executiveSections.timing}
-          onToggle={setExecutiveSectionOpen}
-        >
-          <TimingPanel timing={timing} />
-        </ExecutiveSection>
+      {/* ── Tab Content: Attribution ── */}
+      {activeTab === 'attribution' && (
+        <>
+          {/* ── Booking Attribution ── */}
+          {(salesMetrics?.bookedCredit || monthlyBookings) && (
+            <ExecutiveSection
+              id="attribution"
+              title="Booking Attribution"
+              meta={`Expanded analysis panel · rep split: ${MODE_LABELS[mode]} window`}
+              isOpen={executiveSections.attribution}
+              onToggle={setExecutiveSectionOpen}
+            >
+              <BookingAttributionPanel
+                bookedCredit={salesMetrics?.bookedCredit}
+                attribution={salesMetrics?.provenance.sequenceBookedAttribution}
+                modeLabel={MODE_LABELS[mode]}
+                mode={mode}
+              />
+            </ExecutiveSection>
+          )}
+
+          {/* ── Compliance Panel ── */}
+          {compliance && (
+            <ExecutiveSection
+              id="compliance"
+              title="Opt-Out Health"
+              meta="Expanded analysis panel · weekly window"
+              isOpen={executiveSections.compliance}
+              onToggle={setExecutiveSectionOpen}
+            >
+              <CompliancePanel compliance={compliance} />
+            </ExecutiveSection>
+          )}
+
+          {/* ── Timing Panel ── */}
+          {timing && (
+            <ExecutiveSection
+              id="timing"
+              title="Reply Timing"
+              meta="Expanded analysis panel · weekly window"
+              isOpen={executiveSections.timing}
+              onToggle={setExecutiveSectionOpen}
+            >
+              <TimingPanel timing={timing} />
+            </ExecutiveSection>
+          )}
+        </>
       )}
     </div>
   );

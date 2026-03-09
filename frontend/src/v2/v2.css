@@ -6742,6 +6742,240 @@ display: inline-block;
 }
 
 /* ============================================================
+   SEQUENCES V2 — HERO SUMMARY
+   ============================================================ */
+
+.V2HeroSummary {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 2rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, var(--v2-surface) 0%, var(--v2-surface-elev) 100%);
+  border: 1px solid rgba(7, 19, 36, 0.1);
+  border-left: 4px solid var(--v2-accent);
+  border-radius: var(--v2-radius-lg);
+  box-shadow: var(--v2-shadow-1);
+  margin-bottom: var(--v2-space-4);
+}
+
+.V2HeroSummary__primary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-right: 2rem;
+  border-right: 1px solid rgba(7, 19, 36, 0.08);
+}
+
+.V2HeroSummary__value {
+  font-family: var(--v2-font-display);
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--v2-accent);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.V2HeroSummary__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--v2-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.V2HeroSummary__change {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(7, 19, 36, 0.05);
+  width: fit-content;
+  margin-top: 0.25rem;
+}
+
+.V2HeroSummary__change.is-positive {
+  color: var(--v2-positive);
+  background: rgba(19, 185, 129, 0.12);
+}
+
+.V2HeroSummary__change.is-negative {
+  color: var(--v2-critical);
+  background: rgba(239, 76, 98, 0.12);
+}
+
+.V2HeroSummary__secondary {
+  display: contents;
+}
+
+.V2HeroSummary__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem 0;
+}
+
+.V2HeroSummary__metricValue {
+  font-family: var(--v2-font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--v2-text);
+  line-height: 1;
+}
+
+.V2HeroSummary__metricLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--v2-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.V2HeroSummary__metricMeta {
+  font-size: 0.7rem;
+  color: var(--v2-muted);
+  opacity: 0.8;
+}
+
+/* ============================================================
+   SEQUENCES V2 — TAB NAVIGATION
+   ============================================================ */
+
+.V2TabNav {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  border: 1px solid rgba(7, 19, 36, 0.1);
+  position: sticky;
+  top: calc(var(--v2-topbar-height) + 1rem);
+  z-index: 20;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  margin-bottom: var(--v2-space-4);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.V2TabNav::-webkit-scrollbar {
+  display: none;
+}
+
+.V2TabNav__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.2rem;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--v2-muted);
+  font: 600 0.85rem/1 var(--v2-font-ui);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.V2TabNav__btn:hover {
+  color: var(--v2-text);
+  background: rgba(7, 19, 36, 0.04);
+}
+
+.V2TabNav__btn.is-active {
+  background: var(--v2-accent);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(17, 184, 214, 0.3);
+}
+
+.V2TabNav__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+/* ============================================================
+   SEQUENCES V2 — MOBILE RESPONSIVENESS
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .V2HeroSummary {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  .V2HeroSummary__primary {
+    padding-right: 0;
+    padding-bottom: 1.5rem;
+    border-right: none;
+    border-bottom: 1px solid rgba(7, 19, 36, 0.08);
+  }
+
+  .V2HeroSummary__value {
+    font-size: 2.5rem;
+  }
+
+  .V2HeroSummary__change {
+    margin: 0.25rem auto 0;
+  }
+
+  .V2HeroSummary__secondary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .V2HeroSummary__metric {
+    padding: 0.5rem;
+  }
+
+  .V2HeroSummary__metricValue {
+    font-size: 1.5rem;
+  }
+
+  .V2TabNav {
+    top: var(--v2-topbar-height-mobile);
+    padding: 0.4rem;
+    gap: 0.35rem;
+  }
+
+  .V2TabNav__btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .V2HeroSummary__secondary {
+    grid-template-columns: 1fr;
+  }
+
+  .V2HeroSummary__metric {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.35rem 0;
+  }
+
+  .V2HeroSummary__metricValue {
+    font-size: 1.25rem;
+  }
+}
+
+/* ============================================================
    SEQUENCES V2 — TIMING PANEL
    ============================================================ */
 

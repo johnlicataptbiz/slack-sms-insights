@@ -807,6 +807,105 @@ export function V2Skeleton({
   );
 }
 
+// ─── Hero Summary ────────────────────────────────────────────────────────────
+export function V2HeroSummary({
+  primaryValue,
+  primaryLabel,
+  primaryChange,
+  secondaryMetrics,
+}: {
+  primaryValue: string;
+  primaryLabel: string;
+  primaryChange?: { value: number; isPositive: boolean };
+  secondaryMetrics: Array<{
+    value: string;
+    label: string;
+    meta?: string;
+  }>;
+}) {
+  return (
+    <motion.section
+      className="V2HeroSummary"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: easing.smooth }}
+    >
+      <div className="V2HeroSummary__primary">
+        <motion.span
+          className="V2HeroSummary__value"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ delay: 0.2, ...springs.bouncy }}
+        >
+          {primaryValue}
+        </motion.span>
+        <span className="V2HeroSummary__label">{primaryLabel}</span>
+        {primaryChange && (
+          <motion.span
+            className={`V2HeroSummary__change ${primaryChange.isPositive ? 'is-positive' : 'is-negative'}`}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            {primaryChange.isPositive ? '↑' : '↓'} {Math.abs(primaryChange.value).toFixed(1)}%
+          </motion.span>
+        )}
+      </div>
+      <div className="V2HeroSummary__secondary">
+        {secondaryMetrics.map((metric, index) => (
+          <motion.div
+            key={metric.label}
+            className="V2HeroSummary__metric"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 + index * 0.1 }}
+          >
+            <span className="V2HeroSummary__metricValue">{metric.value}</span>
+            <span className="V2HeroSummary__metricLabel">{metric.label}</span>
+            {metric.meta && (
+              <span className="V2HeroSummary__metricMeta">{metric.meta}</span>
+            )}
+          </motion.div>
+        ))}
+      </div>
+    </motion.section>
+  );
+}
+
+// ─── Tab Navigation ──────────────────────────────────────────────────────────
+export function V2TabNav({
+  tabs,
+  activeTab,
+  onChange,
+}: {
+  tabs: Array<{ key: string; label: string; count?: number }>;
+  activeTab: string;
+  onChange: (key: string) => void;
+}) {
+  return (
+    <motion.nav
+      className="V2TabNav"
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: 0.1 }}
+    >
+      {tabs.map((tab) => (
+        <button
+          key={tab.key}
+          type="button"
+          className={`V2TabNav__btn ${activeTab === tab.key ? 'is-active' : ''}`}
+          onClick={() => onChange(tab.key)}
+        >
+          {tab.label}
+          {tab.count !== undefined && (
+            <span className="V2TabNav__count">{tab.count}</span>
+          )}
+        </button>
+      ))}
+    </motion.nav>
+  );
+}
+
 // ─── Badge ───────────────────────────────────────────────────────────────────
 export function V2Badge({
   children,

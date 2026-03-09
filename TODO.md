@@ -134,10 +134,13 @@
   - [x] 21.3 Add clear filters button
   - [x] 21.4 Add filter state management
 
-- [ ] 22. Table Pagination
-  - [ ] 22.1 Add pagination for large sequence families (>10 versions)
-  - [ ] 22.2 Add items per page selector (10, 25, 50, 100)
-  - [ ] 22.3 Add pagination info display
+- [x] 22. Table Pagination
+  - [x] 22.1 Add PaginationState interface
+  - [x] 22.2 Add pagination logic with family-level pagination
+  - [x] 22.3 Add Pagination component with prev/next controls
+  - [x] 22.4 Add items per page selector (5, 10, 25, 50)
+  - [x] 22.5 Add pagination info display (showing X-Y of Z)
+  - [x] 22.6 Reset pagination when filters change
 
 - [ ] 23. Performance Optimizations
   - [ ] 23.1 Virtualize long lists for better scroll performance

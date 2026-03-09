@@ -7139,6 +7139,81 @@ display: inline-block;
   box-shadow: 0 4px 12px rgba(17, 184, 214, 0.3);
 }
 
+/* ============================================================
+   SEQUENCES V2 — PAGINATION
+   ============================================================ */
+
+.V2Pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(7, 19, 36, 0.08);
+  border-radius: var(--v2-radius-md);
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.V2Pagination__info {
+  font-size: 0.85rem;
+  color: var(--v2-muted);
+  font-weight: 500;
+}
+
+.V2Pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.V2Pagination__btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(7, 19, 36, 0.12);
+  border-radius: var(--v2-radius-sm);
+  background: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+  color: var(--v2-text);
+}
+
+.V2Pagination__btn:hover:not(:disabled) {
+  background: rgba(17, 184, 214, 0.08);
+  border-color: var(--v2-accent);
+}
+
+.V2Pagination__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.V2Pagination__page {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--v2-text);
+  padding: 0 0.5rem;
+}
+
+.V2Pagination__size {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--v2-muted);
+}
+
+.V2Pagination__select {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(7, 19, 36, 0.12);
+  border-radius: var(--v2-radius-sm);
+  font-size: 0.85rem;
+  background: white;
+  cursor: pointer;
+}
+
 @media (max-width: 768px) {
   .V2TableControls {
     flex-direction: column;
@@ -7153,6 +7228,15 @@ display: inline-block;
     margin-left: 0;
     justify-content: space-between;
     width: 100%;
+  }
+  
+  .V2Pagination {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .V2Pagination__controls {
+    order: -1;
   }
 }
 

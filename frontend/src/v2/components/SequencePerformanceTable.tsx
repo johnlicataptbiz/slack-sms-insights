@@ -110,6 +110,11 @@ interface FilterState {
   leadMagnetFilter: string | null;
 }
 
+interface PaginationState {
+  page: number;
+  pageSize: number;
+}
+
 interface TableControlsProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -258,6 +263,71 @@ function TableControls({
         <button onClick={onExport} className="V2TableControls__exportBtn">
           Export CSV
         </button>
+      </div>
+    </div>
+  );
+}
+
+interface PaginationProps {
+  page: number;
+  totalPages: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+  totalItems: number;
+}
+
+function Pagination({
+  page,
+  totalPages,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  totalItems,
+}: PaginationProps) {
+  const startItem = (page - 1) * pageSize + 1;
+  const endItem = Math.min(page * pageSize, totalItems);
+
+  return (
+    <div className="V2Pagination">
+      <div className="V2Pagination__info">
+        Showing {startItem}-{endItem} of {totalItems} families
+      </div>
+      
+      <div className="V2Pagination__controls">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="V2Pagination__btn"
+        >
+          ← Prev
+        </button>
+        
+        <span className="V2Pagination__page">
+          Page {page} of {totalPages}
+        </span>
+        
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="V2Pagination__btn"
+        >
+          Next →
+        </button>
+      </div>
+      
+      <div className="V2Pagination__size">
+        <select
+          value={pageSize}
+          onChange={(e) => onPageSizeChange(Number(e.target.value))}
+          className="V2Pagination__select"
+        >
+          <option value={5}>5</option>
+          <option value={10}>10</option>
+          <option value={25}>25</option>
+          <option value={50}>50</option>
+        </select>
+        <span>per page</span>
       </div>
     </div>
   );
@@ -468,6 +538,12 @@ export function SequencePerformanceTable({
     leadMagnetFilter: null,
   });
   
+  // Pagination state
+  const [pagination, setPagination] = useState<PaginationState>({
+    page: 1,
+    pageSize: 10,
+  });
+  
   // Load column visibility from localStorage
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
     if (typeof window === 'undefined') {
@@ -556,8 +632,14 @@ export function SequencePerformanceTable({
     return rows;
   }, [mergedRows, searchQuery, sortBy, sortOrder, filters]);
 
-  // Group by family
-  const { familyEntries, activeSequenceCount, uniqueFamilyCount } = useMemo(() => {
+  // Group by family with pagination
+  const { 
+    familyEntries, 
+    activeSequenceCount, 
+    uniqueFamilyCount,
+    totalPages,
+    paginatedFamilies 
+  } = useMemo(() => {
     const grouped = processedRows.reduce((acc, row) => {
       const family = row.leadMagnet || 'Not Captured Yet';
       if (!acc[family]) acc[family] = [];
@@ -565,12 +647,28 @@ export function SequencePerformanceTable({
       return acc;
     }, {} as Record<string, MergedSeqRow[]>);
 
+    const allFamilies = Object.entries(grouped);
+    const totalFamilies = allFamilies.length;
+    const totalPages = Math.ceil(totalFamilies / pagination.pageSize);
+    
+    // Paginate families
+    const startIndex = (pagination.page - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    const paginatedFamilies = allFamilies.slice(startIndex, endIndex);
+
     return {
-      familyEntries: Object.entries(grouped),
+      familyEntries: paginatedFamilies,
       activeSequenceCount: processedRows.length,
-      uniqueFamilyCount: Object.keys(grouped).length,
+      uniqueFamilyCount: totalFamilies,
+      totalPages,
+      paginatedFamilies,
     };
-  }, [processedRows]);
+  }, [processedRows, pagination]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, page: 1 }));
+  }, [filters, searchQuery]);
 
   // Export handler
   const handleExport = () => {
@@ -634,6 +732,17 @@ export function SequencePerformanceTable({
           />
         ))}
       </div>
+      
+      {totalPages > 1 && (
+        <Pagination
+          page={pagination.page}
+          totalPages={totalPages}
+          pageSize={pagination.pageSize}
+          onPageChange={(page) => setPagination(prev => ({ ...prev, page }))}
+          onPageSizeChange={(pageSize) => setPagination({ page: 1, pageSize })}
+          totalItems={uniqueFamilyCount}
+        />
+      )}
     </V2Panel>
   );
 }

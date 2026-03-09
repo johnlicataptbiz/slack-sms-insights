@@ -103,6 +103,13 @@ interface ColumnVisibility {
   gaps: boolean;
 }
 
+interface FilterState {
+  minReplyRate: number | null;
+  minBookings: number | null;
+  showOnlyChampions: boolean;
+  leadMagnetFilter: string | null;
+}
+
 interface TableControlsProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -115,6 +122,9 @@ interface TableControlsProps {
   onExport: () => void;
   resultsCount: number;
   totalCount: number;
+  filters: FilterState;
+  onFilterChange: (filters: FilterState) => void;
+  leadMagnets: string[];
 }
 
 function TableControls({
@@ -129,7 +139,23 @@ function TableControls({
   onExport,
   resultsCount,
   totalCount,
+  filters,
+  onFilterChange,
+  leadMagnets,
 }: TableControlsProps) {
+  const hasActiveFilters = filters.minReplyRate !== null || 
+    filters.minBookings !== null || 
+    filters.leadMagnetFilter !== null;
+
+  const clearFilters = () => {
+    onFilterChange({
+      minReplyRate: null,
+      minBookings: null,
+      showOnlyChampions: false,
+      leadMagnetFilter: null,
+    });
+  };
+
   return (
     <div className="V2TableControls">
       {/* Search */}
@@ -164,6 +190,45 @@ function TableControls({
         >
           {sortOrder === 'asc' ? '↑' : '↓'}
         </button>
+      </div>
+
+      {/* Advanced Filters */}
+      <div className="V2TableControls__filters">
+        <select
+          value={filters.leadMagnetFilter || ''}
+          onChange={(e) => onFilterChange({ ...filters, leadMagnetFilter: e.target.value || null })}
+          className="V2TableControls__select"
+        >
+          <option value="">All Lead Magnets</option>
+          {leadMagnets.map(lm => (
+            <option key={lm} value={lm}>{lm}</option>
+          ))}
+        </select>
+        
+        <input
+          type="number"
+          placeholder="Min reply %"
+          value={filters.minReplyRate || ''}
+          onChange={(e) => onFilterChange({ ...filters, minReplyRate: e.target.value ? Number(e.target.value) : null })}
+          className="V2TableControls__filterInput"
+          min="0"
+          max="100"
+        />
+        
+        <input
+          type="number"
+          placeholder="Min bookings"
+          value={filters.minBookings || ''}
+          onChange={(e) => onFilterChange({ ...filters, minBookings: e.target.value ? Number(e.target.value) : null })}
+          className="V2TableControls__filterInput"
+          min="0"
+        />
+        
+        {hasActiveFilters && (
+          <button onClick={clearFilters} className="V2TableControls__clearBtn">
+            Clear
+          </button>
+        )}
       </div>
 
       {/* Column Visibility */}
@@ -395,6 +460,14 @@ export function SequencePerformanceTable({
   const [sortBy, setSortBy] = useState<SortKey>('canonicalBookedCalls');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   
+  // Advanced filters
+  const [filters, setFilters] = useState<FilterState>({
+    minReplyRate: null,
+    minBookings: null,
+    showOnlyChampions: false,
+    leadMagnetFilter: null,
+  });
+  
   // Load column visibility from localStorage
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
     if (typeof window === 'undefined') {
@@ -454,6 +527,17 @@ export function SequencePerformanceTable({
       );
     }
 
+    // Apply advanced filters
+    if (filters.minReplyRate !== null) {
+      rows = rows.filter(r => r.replyRatePct >= filters.minReplyRate!);
+    }
+    if (filters.minBookings !== null) {
+      rows = rows.filter(r => r.canonicalBookedCalls >= filters.minBookings!);
+    }
+    if (filters.leadMagnetFilter) {
+      rows = rows.filter(r => r.leadMagnet === filters.leadMagnetFilter);
+    }
+
     // Apply sorting
     rows = [...rows].sort((a, b) => {
       let aVal: number | string = a[sortBy];
@@ -470,7 +554,7 @@ export function SequencePerformanceTable({
     });
 
     return rows;
-  }, [mergedRows, searchQuery, sortBy, sortOrder]);
+  }, [mergedRows, searchQuery, sortBy, sortOrder, filters]);
 
   // Group by family
   const { familyEntries, activeSequenceCount, uniqueFamilyCount } = useMemo(() => {
@@ -532,6 +616,9 @@ export function SequencePerformanceTable({
         onExport={handleExport}
         resultsCount={processedRows.length}
         totalCount={mergedRows.filter(r => !r.isManual).length}
+        filters={filters}
+        onFilterChange={setFilters}
+        leadMagnets={Array.from(new Set(mergedRows.map(r => r.leadMagnet).filter(Boolean)))}
       />
       
       <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>

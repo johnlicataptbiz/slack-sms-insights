@@ -7041,6 +7041,44 @@ display: inline-block;
   border-color: var(--v2-accent);
 }
 
+.V2TableControls__filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.V2TableControls__filterInput {
+  width: 100px;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid rgba(7, 19, 36, 0.12);
+  border-radius: var(--v2-radius-sm);
+  font-size: 0.85rem;
+  background: white;
+}
+
+.V2TableControls__filterInput:focus {
+  outline: none;
+  border-color: var(--v2-accent);
+}
+
+.V2TableControls__clearBtn {
+  padding: 0.6rem 1rem;
+  border: 1px solid rgba(239, 76, 98, 0.3);
+  border-radius: var(--v2-radius-sm);
+  background: rgba(239, 76, 98, 0.08);
+  color: var(--v2-critical);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.V2TableControls__clearBtn:hover {
+  background: rgba(239, 76, 98, 0.15);
+  border-color: rgba(239, 76, 98, 0.5);
+}
+
 .V2TableControls__columns {
   display: flex;
   gap: 0.35rem;

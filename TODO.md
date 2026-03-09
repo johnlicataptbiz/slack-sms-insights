@@ -128,11 +128,11 @@
   - [x] 20.2 Update table header to reflect visible columns only
   - [x] 20.3 Persist column visibility to localStorage
 
-- [ ] 21. Advanced Filtering
-  - [ ] 21.1 Add date range filter for sequence first seen
-  - [ ] 21.2 Add metric threshold filters (min reply rate, min bookings)
-  - [ ] 21.3 Add lead magnet filter dropdown
-  - [ ] 21.4 Add "show only champions" filter
+- [x] 21. Advanced Filtering
+  - [x] 21.1 Add metric threshold filters (min reply rate, min bookings)
+  - [x] 21.2 Add lead magnet filter dropdown
+  - [x] 21.3 Add clear filters button
+  - [x] 21.4 Add filter state management
 
 - [ ] 22. Table Pagination
   - [ ] 22.1 Add pagination for large sequence families (>10 versions)

@@ -1,0 +1,2842 @@
+{
+  "generatedAt": "2026-03-09T22:56:00.856Z",
+  "daysIncluded": 365,
+  "totalCount": 315,
+  "entries": [
+    {
+      "hash": "dd5ef85",
+      "date": "2026-03-09T17:52:24-05:00",
+      "message": "ci: add GitHub Actions workflow for Railway deployment",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add GitHub Actions workflow for Railway deployment"
+    },
+    {
+      "hash": "d233ee2",
+      "date": "2026-03-09T17:45:51-05:00",
+      "message": "fix: Cast JSON columns to jsonb in inbox_contact_profiles upsert",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Cast JSON columns to jsonb in inbox_contact_profiles upsert"
+    },
+    {
+      "hash": "52fefad",
+      "date": "2026-03-09T16:57:23-05:00",
+      "message": "docs: update TODO to mark all UI improvement phases complete",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "UI/UX",
+      "description": "Update TODO to mark all UI improvement phases complete"
+    },
+    {
+      "hash": "5a6a8ad",
+      "date": "2026-03-09T16:56:42-05:00",
+      "message": "feat(sequences): complete Phase 3 - performance optimizations",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Complete Phase 3 - performance optimizations"
+    },
+    {
+      "hash": "45b7495",
+      "date": "2026-03-09T16:56:03-05:00",
+      "message": "feat(sequences): implement Phase 3 - table pagination",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement Phase 3 - table pagination"
+    },
+    {
+      "hash": "19fe783",
+      "date": "2026-03-09T16:54:09-05:00",
+      "message": "feat(sequences): implement Phase 3 - advanced filtering",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Implement Phase 3 - advanced filtering"
+    },
+    {
+      "hash": "1caa30a",
+      "date": "2026-03-09T16:51:37-05:00",
+      "message": "feat(sequences): implement Phase 3 - column visibility functionality",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Implement Phase 3 - column visibility functionality"
+    },
+    {
+      "hash": "535ef73",
+      "date": "2026-03-09T16:44:00-05:00",
+      "message": "feat(sequences): implement Phase 2 table improvements - sorting, filtering, export",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement Phase 2 table improvements - sorting, filtering, export"
+    },
+    {
+      "hash": "683eb4e",
+      "date": "2026-03-09T16:39:43-05:00",
+      "message": "feat(sequences): implement Phase 1 UI improvements - Hero Summary + Tabbed Navigation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Implement Phase 1 UI improvements - Hero Summary + Tabbed Navigation"
+    },
+    {
+      "hash": "c6273ac",
+      "date": "2026-03-09T15:46:45-05:00",
+      "message": "feat(changelog): Add deployment info fallback for Railway environments",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add deployment info fallback for Railway environments"
+    },
+    {
+      "hash": "fc74535",
+      "date": "2026-03-09T15:44:25-05:00",
+      "message": "fix(changelog): Support Railway deployment paths for git history",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Support Railway deployment paths for git history"
+    },
+    {
+      "hash": "b56a003",
+      "date": "2026-03-09T15:30:03-05:00",
+      "message": "fix: resolve TypeScript type error in CRM notes handler - properly convert event_ts to Date",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Resolve TypeScript type error in CRM notes handler - properly convert event_ts to Date"
+    },
+    {
+      "hash": "0e80c79",
+      "date": "2026-03-09T15:25:42-05:00",
+      "message": "docs: add comprehensive implementation plan for changelog feature and database migration",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add comprehensive implementation plan for changelog feature and database migration"
+    },
+    {
+      "hash": "df05b72",
+      "date": "2026-03-09T15:19:22-05:00",
+      "message": "fix: resolve TypeScript type error in CRM notes handler - event_ts Date/string compatibility",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Resolve TypeScript type error in CRM notes handler - event_ts Date/string compatibility"
+    },
+    {
+      "hash": "fff42f5",
+      "date": "2026-03-09T14:59:30-05:00",
+      "message": "feat: add changelog feature to dashboard",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add changelog feature to dashboard"
+    },
+    {
+      "hash": "ac6d63f",
+      "date": "2026-03-09T14:42:37-05:00",
+      "message": "feat: Add comprehensive changelog feature with git history timeline",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add comprehensive changelog feature with git history timeline"
+    },
+    {
+      "hash": "42af26b",
+      "date": "2026-03-09T14:32:14-05:00",
+      "message": "feat: Database migration verification + Enhanced Sequences Dashboard",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Database migration verification + Enhanced Sequences Dashboard"
+    },
+    {
+      "hash": "f84e77d",
+      "date": "2026-03-09T08:35:08-05:00",
+      "message": "Stage all changes: updates to SequencePerformanceTable, SequencesV2, aloware-analytics, inbox-store, prisma, qualification-inference, scoreboard; add new utility scripts and GEMINI.md",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Stage all changes: updates to SequencePerformanceTable, SequencesV2, aloware-analytics, inbox-sto..."
+    },
+    {
+      "hash": "8a2df05",
+      "date": "2026-03-05T14:12:57-06:00",
+      "message": "style: add CSS fallbacks for color-mix() to support older browsers",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Add CSS fallbacks for color-mix() to support older browsers"
+    },
+    {
+      "hash": "2a3830c",
+      "date": "2026-03-05T14:07:37-06:00",
+      "message": "refactor: align sequence dashboard tests with experiment dashboard UI and fix type errors",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Align sequence dashboard tests with experiment dashboard UI and fix type errors"
+    },
+    {
+      "hash": "7fad5c3",
+      "date": "2026-03-05T13:35:32-06:00",
+      "message": "feat(sequences): transform sequences page into an experiment dashboard with deltas and gap tracking",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Transform sequences page into an experiment dashboard with deltas and gap tracking"
+    },
+    {
+      "hash": "c3a937e",
+      "date": "2026-03-05T12:49:49-06:00",
+      "message": "chore: migrate to Prisma ORM, fix type errors, clean up DB layer",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Migrate to Prisma ORM, fix type errors, clean up DB layer"
+    },
+    {
+      "hash": "9a3d753",
+      "date": "2026-03-05T09:17:42-06:00",
+      "message": "docs: update AGENTS.md with comprehensive operational reference",
+      "author": "Jack Licata",
+      "type": "docs",
+      "category": "General",
+      "description": "Update AGENTS.md with comprehensive operational reference"
+    },
+    {
+      "hash": "51d0f37",
+      "date": "2026-03-05T08:43:28-06:00",
+      "message": "Remove password gate from ptbizsms.com - now publicly accessible",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Authentication",
+      "description": "Remove password gate from ptbizsms.com - now publicly accessible"
+    },
+    {
+      "hash": "bd3aae8",
+      "date": "2026-03-05T08:38:03-06:00",
+      "message": "Code quality improvements: app.ts, prisma schema, package.json updates",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Database",
+      "description": "Code quality improvements: app.ts, prisma schema, package.json updates"
+    },
+    {
+      "hash": "21f5572",
+      "date": "2026-03-05T07:32:40-06:00",
+      "message": "fix: 5 audit fixes + logo update to smslogofinal.png",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "5 audit fixes + logo update to smslogofinal.png"
+    },
+    {
+      "hash": "47544a8",
+      "date": "2026-03-05T00:16:03-06:00",
+      "message": "Optimize Prisma DB configuration",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Database",
+      "description": "Optimize Prisma DB configuration"
+    },
+    {
+      "hash": "3de4698",
+      "date": "2026-03-04T22:00:52-06:00",
+      "message": "fix(crm-notes): final fixes",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Final fixes"
+    },
+    {
+      "hash": "d2d2279",
+      "date": "2026-03-04T21:50:04-06:00",
+      "message": "fix(crm-notes): embed prompt inline, raise token limit to 2000, timeout to 45s",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Embed prompt inline, raise token limit to 2000, timeout to 45s"
+    },
+    {
+      "hash": "d07da2c",
+      "date": "2026-03-04T21:24:59-06:00",
+      "message": "fix: CRM notes + skeleton UI + error retry buttons",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "CRM notes + skeleton UI + error retry buttons"
+    },
+    {
+      "hash": "7a859ab",
+      "date": "2026-03-04T20:45:38-06:00",
+      "message": "fix: wire PasswordGate auth gate and add global 401 interceptor",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "Wire PasswordGate auth gate and add global 401 interceptor"
+    },
+    {
+      "hash": "126a1d5",
+      "date": "2026-03-04T19:58:20-06:00",
+      "message": "Refactor SequencesV2, improve accessibility, optimize performance, and add tests",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Refactor SequencesV2, improve accessibility, optimize performance, and add tests"
+    },
+    {
+      "hash": "94edc36",
+      "date": "2026-03-04T19:30:49-06:00",
+      "message": "feat: remove password gate, add runtime-status endpoint, improve prisma error handling",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Remove password gate, add runtime-status endpoint, improve prisma error handling"
+    },
+    {
+      "hash": "9137dc6",
+      "date": "2026-03-04T17:35:50-06:00",
+      "message": "fix: reduce false not-captured sequence attribution",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Reduce false not-captured sequence attribution"
+    },
+    {
+      "hash": "ec78783",
+      "date": "2026-03-04T17:09:18-06:00",
+      "message": "refactor: apply pending analytics and v2 dashboard updates",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Apply pending analytics and v2 dashboard updates"
+    },
+    {
+      "hash": "8fdf264",
+      "date": "2026-03-04T17:07:58-06:00",
+      "message": "fix: remove performance risk alert and clarify section tabs",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Performance",
+      "description": "Remove performance risk alert and clarify section tabs"
+    },
+    {
+      "hash": "86f7fc5",
+      "date": "2026-03-04T13:58:02-06:00",
+      "message": "fix: unblock sequences page from slow qual endpoint",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Unblock sequences page from slow qual endpoint"
+    },
+    {
+      "hash": "300ca73",
+      "date": "2026-03-04T11:49:03-06:00",
+      "message": "add regression test for sequence-origin booking attribution",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add regression test for sequence-origin booking attribution"
+    },
+    {
+      "hash": "39ece62",
+      "date": "2026-03-04T11:39:41-06:00",
+      "message": "unify sequence contact and booking metrics by selected window",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Unify sequence contact and booking metrics by selected window"
+    },
+    {
+      "hash": "efb89ba",
+      "date": "2026-03-04T11:18:23-06:00",
+      "message": "improve sequence core metrics clarity in v2 table",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Database",
+      "description": "Improve sequence core metrics clarity in v2 table"
+    },
+    {
+      "hash": "6964525",
+      "date": "2026-03-04T10:58:55-06:00",
+      "message": "remove dashboard password gate",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Remove dashboard password gate"
+    },
+    {
+      "hash": "23b7273",
+      "date": "2026-03-04T07:47:38-06:00",
+      "message": "Improve runs clarity, sequence grouping, and CRM notes resilience",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Improve runs clarity, sequence grouping, and CRM notes resilience"
+    },
+    {
+      "hash": "7685527",
+      "date": "2026-03-03T17:06:56-06:00",
+      "message": "refactor(insights): compact monday pipeline card UI",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Integrations",
+      "description": "Compact monday pipeline card UI"
+    },
+    {
+      "hash": "f8ffb17",
+      "date": "2026-03-03T16:57:47-06:00",
+      "message": "refactor(inbox): reduce text-heavy UI in v2 inbox",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Reduce text-heavy UI in v2 inbox"
+    },
+    {
+      "hash": "92fc07f",
+      "date": "2026-03-03T16:50:29-06:00",
+      "message": "fix(inbox): harden aloware ingest and add skip-rate monitoring",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Harden aloware ingest and add skip-rate monitoring"
+    },
+    {
+      "hash": "30bd177",
+      "date": "2026-03-03T15:56:02-06:00",
+      "message": "feat(crm-notes): enrich notes with slack booked call details",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Enrich notes with slack booked call details"
+    },
+    {
+      "hash": "fbdc075",
+      "date": "2026-03-03T15:53:56-06:00",
+      "message": "feat(inbox): add CRM notes suggestion workflow and UI wiring",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add CRM notes suggestion workflow and UI wiring"
+    },
+    {
+      "hash": "8bd939d",
+      "date": "2026-03-03T15:47:26-06:00",
+      "message": "refactor(inbox): make setter assist feedback-only",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Database",
+      "description": "Make setter assist feedback-only"
+    },
+    {
+      "hash": "fc075b2",
+      "date": "2026-03-03T15:41:02-06:00",
+      "message": "Fix inbox virtualized row overlap and improve tag contrast",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix inbox virtualized row overlap and improve tag contrast"
+    },
+    {
+      "hash": "95011c3",
+      "date": "2026-03-03T15:35:14-06:00",
+      "message": "Implement governed Monday analytics model across app and data pipeline",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Implement governed Monday analytics model across app and data pipeline"
+    },
+    {
+      "hash": "c3a1141",
+      "date": "2026-03-03T15:33:40-06:00",
+      "message": "Enhance setter inbox workflow and link preview tracking",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Enhance setter inbox workflow and link preview tracking"
+    },
+    {
+      "hash": "c0ec254",
+      "date": "2026-03-03T14:52:19-06:00",
+      "message": "Add support for syncing additional Monday boards",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add support for syncing additional Monday boards"
+    },
+    {
+      "hash": "557c66f",
+      "date": "2026-03-03T13:38:41-06:00",
+      "message": "Add inbox infinite scroll and clearer row timestamps",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add inbox infinite scroll and clearer row timestamps"
+    },
+    {
+      "hash": "f2008fd",
+      "date": "2026-03-03T13:22:15-06:00",
+      "message": "Fix inbox live sync without full screen refresh",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix inbox live sync without full screen refresh"
+    },
+    {
+      "hash": "bc5b2ae",
+      "date": "2026-03-03T12:42:04-06:00",
+      "message": "Persist dashboard login sessions across deploys via signed cookies",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Persist dashboard login sessions across deploys via signed cookies"
+    },
+    {
+      "hash": "0de05d6",
+      "date": "2026-03-03T12:37:13-06:00",
+      "message": "Enable live inbox qualification sync while composer is open",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Enable live inbox qualification sync while composer is open"
+    },
+    {
+      "hash": "ad25d6e",
+      "date": "2026-03-03T12:32:54-06:00",
+      "message": "Harden inbox send reliability and improve draft quality guardrails",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Harden inbox send reliability and improve draft quality guardrails"
+    },
+    {
+      "hash": "a788ab0",
+      "date": "2026-03-03T11:59:17-06:00",
+      "message": "Expand sequence analytics windows and add Monday outcomes context",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Expand sequence analytics windows and add Monday outcomes context"
+    },
+    {
+      "hash": "f84576b",
+      "date": "2026-03-03T11:24:29-06:00",
+      "message": "Fix qualification inference pipeline and run delivery-model backfill",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Fix qualification inference pipeline and run delivery-model backfill"
+    },
+    {
+      "hash": "7109d6a",
+      "date": "2026-03-03T10:52:59-06:00",
+      "message": "Make qualification inference much more lenient - expand keyword signals for all 4 vars + add delivery model extraction",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Make qualification inference much more lenient - expand keyword signals for all 4 vars + add deli..."
+    },
+    {
+      "hash": "d28232e",
+      "date": "2026-03-03T10:46:54-06:00",
+      "message": "Add delivery model as 4th qualification variable end-to-end",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add delivery model as 4th qualification variable end-to-end"
+    },
+    {
+      "hash": "04ab8e0",
+      "date": "2026-03-03T10:45:28-06:00",
+      "message": "Add deliveryModel to QualificationStateV2 frontend types and InboxV2 state",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add deliveryModel to QualificationStateV2 frontend types and InboxV2 state"
+    },
+    {
+      "hash": "792a543",
+      "date": "2026-03-03T09:52:08-06:00",
+      "message": "Upgrade draft prompt: Clinical Biz Closer voice, escalation compression, revenue ladder, human SMS tone",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Upgrade draft prompt: Clinical Biz Closer voice, escalation compression, revenue ladder, human SM..."
+    },
+    {
+      "hash": "633f9f2",
+      "date": "2026-03-03T09:34:43-06:00",
+      "message": "Add xAI (Grok) provider support for AI draft generation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add xAI (Grok) provider support for AI draft generation"
+    },
+    {
+      "hash": "654f0dd",
+      "date": "2026-03-03T09:00:19-06:00",
+      "message": "Improve inbox draft matching with playbook-weighted retrieval",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Improve inbox draft matching with playbook-weighted retrieval"
+    },
+    {
+      "hash": "3d64552",
+      "date": "2026-03-03T08:37:22-06:00",
+      "message": "Make V2 primary UI and enhance sequences UX/diffing",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Make V2 primary UI and enhance sequences UX/diffing"
+    },
+    {
+      "hash": "5606af8",
+      "date": "2026-03-03T07:59:01-06:00",
+      "message": "Fix Inbox render loop and streamline V2 top nav",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix Inbox render loop and streamline V2 top nav"
+    },
+    {
+      "hash": "0078785",
+      "date": "2026-03-03T07:08:05-06:00",
+      "message": "Update favicon and apple touch icon to PT Biz SMS mark",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Update favicon and apple touch icon to PT Biz SMS mark"
+    },
+    {
+      "hash": "dbdcf89",
+      "date": "2026-03-03T07:04:27-06:00",
+      "message": "Refresh PT Biz SMS branding for tab title and sidebar logos",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Refresh PT Biz SMS branding for tab title and sidebar logos"
+    },
+    {
+      "hash": "9a2b7ee",
+      "date": "2026-03-03T06:18:01-06:00",
+      "message": "Guard Inbox contact tags rendering against missing API fields",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Guard Inbox contact tags rendering against missing API fields"
+    },
+    {
+      "hash": "d45a536",
+      "date": "2026-03-02T23:27:15-06:00",
+      "message": "Wire Inbox Aloware sequence controls and enrichment panel",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Wire Inbox Aloware sequence controls and enrichment panel"
+    },
+    {
+      "hash": "ecaf4a8",
+      "date": "2026-03-02T23:16:17-06:00",
+      "message": "Add Monday lead insights card to V2 performance page",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add Monday lead insights card to V2 performance page"
+    },
+    {
+      "hash": "cf9a298",
+      "date": "2026-03-02T23:04:29-06:00",
+      "message": "Enable feature-gated Monday maintenance jobs at startup",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Enable feature-gated Monday maintenance jobs at startup"
+    },
+    {
+      "hash": "9be0a4a",
+      "date": "2026-03-02T23:04:05-06:00",
+      "message": "Add admin Monday lead insights endpoint",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add admin Monday lead insights endpoint"
+    },
+    {
+      "hash": "0b92816",
+      "date": "2026-03-02T22:41:05-06:00",
+      "message": "Normalize Monday sales call data into lead analytics tables",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Database",
+      "description": "Normalize Monday sales call data into lead analytics tables"
+    },
+    {
+      "hash": "5ebfcb1",
+      "date": "2026-03-02T22:07:32-06:00",
+      "message": "Add admin cron-status API endpoint",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add admin cron-status API endpoint"
+    },
+    {
+      "hash": "c10089a",
+      "date": "2026-03-02T22:02:10-06:00",
+      "message": "Add Aloware sync + LRN refresh pipeline and nightly cron",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add Aloware sync + LRN refresh pipeline and nightly cron"
+    },
+    {
+      "hash": "5bcffbf",
+      "date": "2026-03-02T19:32:20-06:00",
+      "message": "Add sequence version history, diff workflow, and status actions",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add sequence version history, diff workflow, and status actions"
+    },
+    {
+      "hash": "a2f8f82",
+      "date": "2026-03-02T18:26:36-06:00",
+      "message": "Add setter-voice draft workflow and draft quality analytics",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add setter-voice draft workflow and draft quality analytics"
+    },
+    {
+      "hash": "15db181",
+      "date": "2026-03-02T18:03:51-06:00",
+      "message": "Integrate form validation, radix selects, and date-fns in v2 inbox/runs",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Integrate form validation, radix selects, and date-fns in v2 inbox/runs"
+    },
+    {
+      "hash": "5762ed7",
+      "date": "2026-03-02T17:48:42-06:00",
+      "message": "feat(v2): apply floating-ui overlays across shared components and runs",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Apply floating-ui overlays across shared components and runs"
+    },
+    {
+      "hash": "15fc066",
+      "date": "2026-03-02T17:40:36-06:00",
+      "message": "feat(inbox): use floating-ui for templates popover positioning",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Use floating-ui for templates popover positioning"
+    },
+    {
+      "hash": "37d44d5",
+      "date": "2026-03-02T17:34:54-06:00",
+      "message": "feat(inbox): add resizable composer panels and library integration map",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add resizable composer panels and library integration map"
+    },
+    {
+      "hash": "fe8b7a0",
+      "date": "2026-03-02T17:31:49-06:00",
+      "message": "Revert \"chore(frontend): prune unused 2026 stack dependencies\"",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Revert \"chore(frontend): prune unused 2026 stack dependencies\""
+    },
+    {
+      "hash": "6a70ea8",
+      "date": "2026-03-02T17:31:38-06:00",
+      "message": "chore(frontend): prune unused 2026 stack dependencies",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Prune unused 2026 stack dependencies"
+    },
+    {
+      "hash": "dc1c113",
+      "date": "2026-03-02T17:31:04-06:00",
+      "message": "fix(v2): stabilize shell command palette integration",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Stabilize shell command palette integration"
+    },
+    {
+      "hash": "c5ab1f8",
+      "date": "2026-03-02T17:01:24-06:00",
+      "message": "fix: InboxV2 missing composerPrimary closing div + prettier format",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "InboxV2 missing composerPrimary closing div + prettier format"
+    },
+    {
+      "hash": "d569083",
+      "date": "2026-03-02T15:50:20-06:00",
+      "message": "feat(deps): install 2026 core stack — Radix UI complete set, TanStack Table/Virtual, vaul, cmdk, floating-ui, react-resizable-panels, auto-animate, Vercel AI SDK, react-day-picker, Three.js + R3F + drei",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Install 2026 core stack — Radix UI complete set, TanStack Table/Virtual, vaul, cmdk, floating-ui,..."
+    },
+    {
+      "hash": "b55dd89",
+      "date": "2026-03-02T15:33:16-06:00",
+      "message": "fix: resolve NaN% qualified in SequenceQualificationBreakdown",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Resolve NaN% qualified in SequenceQualificationBreakdown"
+    },
+    {
+      "hash": "dc2e95a",
+      "date": "2026-03-02T15:23:23-06:00",
+      "message": "chore: mark Phase 5 steps 6-8 complete in TODO",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Mark Phase 5 steps 6-8 complete in TODO"
+    },
+    {
+      "hash": "2816642",
+      "date": "2026-03-02T14:54:40-06:00",
+      "message": "chore: add prisma baseline migration for prisma postgres",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add prisma baseline migration for prisma postgres"
+    },
+    {
+      "hash": "e1cbf8e",
+      "date": "2026-03-02T14:42:55-06:00",
+      "message": "feat: enhance inbox and qualification services",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Enhance inbox and qualification services"
+    },
+    {
+      "hash": "243c2d6",
+      "date": "2026-03-02T14:10:16-06:00",
+      "message": "Stabilize v2 typecheck, tests, and backend runtime guards",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Stabilize v2 typecheck, tests, and backend runtime guards"
+    },
+    {
+      "hash": "c448373",
+      "date": "2026-03-02T13:39:45-06:00",
+      "message": "Run prisma generate during backend build",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Database",
+      "description": "Run prisma generate during backend build"
+    },
+    {
+      "hash": "d7b50cc",
+      "date": "2026-03-02T13:37:45-06:00",
+      "message": "Add Prisma Accelerate integration and Railway DB URL compatibility",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add Prisma Accelerate integration and Railway DB URL compatibility"
+    },
+    {
+      "hash": "9de8737",
+      "date": "2026-03-02T13:09:26-06:00",
+      "message": "stabilize runtime, harden auth/secrets, and align platform config",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Authentication",
+      "description": "Stabilize runtime, harden auth/secrets, and align platform config"
+    },
+    {
+      "hash": "f0995a0",
+      "date": "2026-03-02T11:32:48-06:00",
+      "message": "docs: add consolidated AGENTS command reference",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add consolidated AGENTS command reference"
+    },
+    {
+      "hash": "5e9fa26",
+      "date": "2026-02-27T15:38:06-06:00",
+      "message": "fix(ci): disable Vercel deploy temporarily - token needs refresh",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Disable Vercel deploy temporarily - token needs refresh"
+    },
+    {
+      "hash": "12538c3",
+      "date": "2026-02-27T15:29:06-06:00",
+      "message": "feat: Integrate SequenceQualificationBreakdown into SequencesV2 page",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Integrate SequenceQualificationBreakdown into SequencesV2 page"
+    },
+    {
+      "hash": "e1b6983",
+      "date": "2026-02-27T15:27:15-06:00",
+      "message": "feat: Add sequence qualification analytics for SequencesV2 dashboard",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add sequence qualification analytics for SequencesV2 dashboard"
+    },
+    {
+      "hash": "58099a4",
+      "date": "2026-02-27T13:43:57-06:00",
+      "message": "fix(ci): disable Railway deploy temporarily, keep Vercel frontend deploy",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Disable Railway deploy temporarily, keep Vercel frontend deploy"
+    },
+    {
+      "hash": "68f1233",
+      "date": "2026-02-27T13:41:23-06:00",
+      "message": "fix(ci): use railway up instead of deprecated --service flag",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Use railway up instead of deprecated --service flag"
+    },
+    {
+      "hash": "2b5a27b",
+      "date": "2026-02-27T13:34:40-06:00",
+      "message": "fix(ci): build frontend from correct working directory",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Build frontend from correct working directory"
+    },
+    {
+      "hash": "645ee7c",
+      "date": "2026-02-27T13:20:09-06:00",
+      "message": "Add V2RiskAlert CSS styling for High Opt-Out Risk warning banner",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add V2RiskAlert CSS styling for High Opt-Out Risk warning banner"
+    },
+    {
+      "hash": "857c53d",
+      "date": "2026-02-27T12:44:03-06:00",
+      "message": "fix(qualification): expand regex patterns to capture more lead signals",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Expand regex patterns to capture more lead signals"
+    },
+    {
+      "hash": "848f27c",
+      "date": "2026-02-27T12:21:08-06:00",
+      "message": "feat: live conversion-example ingestion on every inbound reply",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Data Pipeline",
+      "description": "Live conversion-example ingestion on every inbound reply"
+    },
+    {
+      "hash": "3a184c6",
+      "date": "2026-02-27T10:35:54-06:00",
+      "message": "chore: update TODO with Phase 4 bug fix notes",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Update TODO with Phase 4 bug fix notes"
+    },
+    {
+      "hash": "e70f5c3",
+      "date": "2026-02-27T09:38:11-06:00",
+      "message": "fix: sort runs by reportDate; default @mention to daily report in Aloware channel",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Sort runs by reportDate; default @mention to daily report in Aloware channel"
+    },
+    {
+      "hash": "e22f9c2",
+      "date": "2026-02-27T09:11:55-06:00",
+      "message": "fix(runs): detail panel always visible on desktop; fix date stamp off-by-one",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Detail panel always visible on desktop; fix date stamp off-by-one"
+    },
+    {
+      "hash": "86895ec",
+      "date": "2026-02-27T08:37:03-06:00",
+      "message": "chore(scripts): add manifest push helper scripts",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add manifest push helper scripts"
+    },
+    {
+      "hash": "5e690f4",
+      "date": "2026-02-27T08:36:25-06:00",
+      "message": "feat(slack): rich Block Kit bot - slash commands, scoreboard, App Home, action buttons",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Rich Block Kit bot - slash commands, scoreboard, App Home, action buttons"
+    },
+    {
+      "hash": "d9d02ae",
+      "date": "2026-02-26T10:43:32-06:00",
+      "message": "feat(training): apply PT Biz language patterns to qualification inference",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Apply PT Biz language patterns to qualification inference"
+    },
+    {
+      "hash": "3852c3c",
+      "date": "2026-02-26T10:20:27-06:00",
+      "message": "feat: add data migration scripts for qualification inference",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add data migration scripts for qualification inference"
+    },
+    {
+      "hash": "baa6259",
+      "date": "2026-02-26T10:02:51-06:00",
+      "message": "feat: add qualification inference script",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add qualification inference script"
+    },
+    {
+      "hash": "8d5d3e7",
+      "date": "2026-02-26T10:01:06-06:00",
+      "message": "feat: security headers, rate limiting, code splitting, AI draft improvements",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Security headers, rate limiting, code splitting, AI draft improvements"
+    },
+    {
+      "hash": "3bfb6df",
+      "date": "2026-02-26T08:59:05-06:00",
+      "message": "feat: add conversion export script for GPT training",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add conversion export script for GPT training"
+    },
+    {
+      "hash": "cb021df",
+      "date": "2026-02-26T08:46:45-06:00",
+      "message": "feat: comprehensive fixes for all 41 identified issues",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Comprehensive fixes for all 41 identified issues"
+    },
+    {
+      "hash": "5e987f2",
+      "date": "2026-02-26T07:40:51-06:00",
+      "message": "refactor: remove ROI/revenue metrics from dashboard",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Remove ROI/revenue metrics from dashboard"
+    },
+    {
+      "hash": "038fe83",
+      "date": "2026-02-26T03:15:55-06:00",
+      "message": "fix: resolveMetricsRange function call signature",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "ResolveMetricsRange function call signature"
+    },
+    {
+      "hash": "2917c1e",
+      "date": "2026-02-26T03:01:34-06:00",
+      "message": "feat(analytics): comprehensive KPI reporting enhancements",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Comprehensive KPI reporting enhancements"
+    },
+    {
+      "hash": "0ff370f",
+      "date": "2026-02-26T02:50:25-06:00",
+      "message": "feat(ui): comprehensive Framer Motion UI/UX polish",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Comprehensive Framer Motion UI/UX polish"
+    },
+    {
+      "hash": "21939fd",
+      "date": "2026-02-26T02:36:02-06:00",
+      "message": "Initial commit: Database migration enhancements",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Database",
+      "description": "Initial commit: Database migration enhancements"
+    },
+    {
+      "hash": "37cf536",
+      "date": "2026-02-26T01:01:35-06:00",
+      "message": "Set password gate to bigbizin26 and add documentation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "Set password gate to bigbizin26 and add documentation"
+    },
+    {
+      "hash": "7e49912",
+      "date": "2026-02-26T00:58:27-06:00",
+      "message": "Add report-trends service for SMS insights",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add report-trends service for SMS insights"
+    },
+    {
+      "hash": "0fae0d5",
+      "date": "2026-02-25T22:23:18-06:00",
+      "message": "fix: resolve workspace diagnostic errors (CI actions, webkit prefixes, aria-label)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Resolve workspace diagnostic errors (CI actions, webkit prefixes, aria-label)"
+    },
+    {
+      "hash": "781ae7a",
+      "date": "2026-02-25T22:10:44-06:00",
+      "message": "chore: track previously untracked files",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Track previously untracked files"
+    },
+    {
+      "hash": "c077e65",
+      "date": "2026-02-25T22:08:55-06:00",
+      "message": "fix(ts): resolve new TS errors introduced by motion/toast commit",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Resolve new TS errors introduced by motion/toast commit"
+    },
+    {
+      "hash": "53531e0",
+      "date": "2026-02-25T22:02:06-06:00",
+      "message": "feat: animated PasswordGate login page with framer-motion",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "Animated PasswordGate login page with framer-motion"
+    },
+    {
+      "hash": "2d3fc54",
+      "date": "2026-02-25T21:53:39-06:00",
+      "message": "feat(v2): add framer-motion animations and sonner toast notifications",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add framer-motion animations and sonner toast notifications"
+    },
+    {
+      "hash": "f567957",
+      "date": "2026-02-25T20:59:15-06:00",
+      "message": "Wire Monday booked calls end-to-end: badge in list, trail in sidebar, SQL name-key fix",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Wire Monday booked calls end-to-end: badge in list, trail in sidebar, SQL name-key fix"
+    },
+    {
+      "hash": "e9f1778",
+      "date": "2026-02-25T20:38:32-06:00",
+      "message": "Fix Monday booked-call snapshot mapping + force resync; link inbox mondayTrail by name key",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix Monday booked-call snapshot mapping + force resync; link inbox mondayTrail by name key"
+    },
+    {
+      "hash": "b5d51f9",
+      "date": "2026-02-25T20:13:58-06:00",
+      "message": "Inbox guardrails: stage gating, opt-out auto-DNC, rate limit cleanup; add qualification backfill",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Inbox guardrails: stage gating, opt-out auto-DNC, rate limit cleanup; add qualification backfill"
+    },
+    {
+      "hash": "58202ce",
+      "date": "2026-02-25T17:32:23-06:00",
+      "message": "fix: apply all 23 code review fixes to SequencesV2.tsx and v2.css",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Apply all 23 code review fixes to SequencesV2.tsx and v2.css"
+    },
+    {
+      "hash": "f3726ec",
+      "date": "2026-02-25T14:58:36-06:00",
+      "message": "fix: show version number (v1.2) instead of Legacy badge in Sequences table",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Show version number (v1.2) instead of Legacy badge in Sequences table"
+    },
+    {
+      "hash": "bf8ebf5",
+      "date": "2026-02-25T13:51:14-06:00",
+      "message": "fix: differentiate duplicate 'Calls Booked' KPI labels in definitions panel",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Differentiate duplicate 'Calls Booked' KPI labels in definitions panel"
+    },
+    {
+      "hash": "49434a6",
+      "date": "2026-02-25T13:02:52-06:00",
+      "message": "feat: PT Biz language pass — all 6 V2 pages + default route fix",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "PT Biz language pass — all 6 V2 pages + default route fix"
+    },
+    {
+      "hash": "72ffb5e",
+      "date": "2026-02-25T11:11:23-06:00",
+      "message": "fix(sequences): rename Unique→Contacts column to clarify it means unique people reached, not unique replies",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Rename Unique→Contacts column to clarify it means unique people reached, not unique replies"
+    },
+    {
+      "hash": "0fd8fc1",
+      "date": "2026-02-25T09:37:09-06:00",
+      "message": "fix: revert legacy Sequences.tsx to remove react-chartjs-2 import (build fix)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Revert legacy Sequences.tsx to remove react-chartjs-2 import (build fix)"
+    },
+    {
+      "hash": "4a2a28d",
+      "date": "2026-02-25T09:26:03-06:00",
+      "message": "feat(sequences): complete SequencesV2 rewrite with all panels and CSS",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Complete SequencesV2 rewrite with all panels and CSS"
+    },
+    {
+      "hash": "e297eff",
+      "date": "2026-02-25T08:29:10-06:00",
+      "message": "Commit remaining Phase 2 changes",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Commit remaining Phase 2 changes"
+    },
+    {
+      "hash": "714f304",
+      "date": "2026-02-25T07:21:28-06:00",
+      "message": "fix: add production URLs to call and podcast link detection patterns",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Add production URLs to call and podcast link detection patterns"
+    },
+    {
+      "hash": "9bb5449",
+      "date": "2026-02-25T01:17:45-06:00",
+      "message": "Phase 2: Stage gating, guardrails, auto-snooze, API contract fix, UX improvements",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Phase 2: Stage gating, guardrails, auto-snooze, API contract fix, UX improvements"
+    },
+    {
+      "hash": "35a481c",
+      "date": "2026-02-24T23:45:22-06:00",
+      "message": "chore: remove stale worktree directories",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Remove stale worktree directories"
+    },
+    {
+      "hash": "3fb1c95",
+      "date": "2026-02-24T23:37:37-06:00",
+      "message": "Phase 1+3: inbox flash-fix, status toggle, segment counter, bounce errors, call outcomes, objection tags, guardrail override, analytics, docs reorganization, migration scripts",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Phase 1+3: inbox flash-fix, status toggle, segment counter, bounce errors, call outcomes, objecti..."
+    },
+    {
+      "hash": "5a300e4",
+      "date": "2026-02-24T18:29:26-06:00",
+      "message": "fix: email-first attribution lookup (email → profile → phone → sms_events takes priority)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Email-first attribution lookup (email → profile → phone → sms_events takes priority)"
+    },
+    {
+      "hash": "7891473",
+      "date": "2026-02-24T18:12:29-06:00",
+      "message": "fix: flip attribution priority to fuzzy-first (lead magnet as primary)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Flip attribution priority to fuzzy-first (lead magnet as primary)"
+    },
+    {
+      "hash": "335cdc5",
+      "date": "2026-02-24T17:59:54-06:00",
+      "message": "feat: convertedViaSequence badge in booking attribution audit rows",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "ConvertedViaSequence badge in booking attribution audit rows"
+    },
+    {
+      "hash": "bb87c5d",
+      "date": "2026-02-24T17:32:30-06:00",
+      "message": "feat: email→profile→phone attribution path + vite CORS origin override for Railway proxy",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Email→profile→phone attribution path + vite CORS origin override for Railway proxy"
+    },
+    {
+      "hash": "38dfb16",
+      "date": "2026-02-24T16:43:38-06:00",
+      "message": "feat: SMS phone-number attribution as primary sequence source",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "SMS phone-number attribution as primary sequence source"
+    },
+    {
+      "hash": "315671d",
+      "date": "2026-02-24T16:00:38-06:00",
+      "message": "fix(sequences): remove cross-window data mixing",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Remove cross-window data mixing"
+    },
+    {
+      "hash": "bb9cbc4",
+      "date": "2026-02-24T15:54:38-06:00",
+      "message": "feat(v2): SequencesV2 full rewrite + RunsV2 booked-calls fallback fix",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "SequencesV2 full rewrite + RunsV2 booked-calls fallback fix"
+    },
+    {
+      "hash": "5ac88a2",
+      "date": "2026-02-24T13:30:35-06:00",
+      "message": "chore: mark task 6 complete — cron confirmed in Railway logs (19:27 UTC)",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "AI & ML",
+      "description": "Mark task 6 complete — cron confirmed in Railway logs (19:27 UTC)"
+    },
+    {
+      "hash": "0cdcd28",
+      "date": "2026-02-24T13:20:52-06:00",
+      "message": "feat: daily runs fix — interval cron (6 AM CT), staleness banner + redesigned RunsV2 cards",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Daily runs fix — interval cron (6 AM CT), staleness banner + redesigned RunsV2 cards"
+    },
+    {
+      "hash": "3319e76",
+      "date": "2026-02-24T12:17:22-06:00",
+      "message": "fix(inbox): redesign conversation cards with flat 3-row layout, fix overflow clipping of tags row",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Redesign conversation cards with flat 3-row layout, fix overflow clipping of tags row"
+    },
+    {
+      "hash": "4cdac9b",
+      "date": "2026-02-24T11:46:15-06:00",
+      "message": "fix: default range to 7d in v2 sales-metrics when no params provided",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Default range to 7d in v2 sales-metrics when no params provided"
+    },
+    {
+      "hash": "bdec9c2",
+      "date": "2026-02-24T11:41:08-06:00",
+      "message": "fix: remove debug console.log leaking bearer token in OAuth callback",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Authentication",
+      "description": "Remove debug console.log leaking bearer token in OAuth callback"
+    },
+    {
+      "hash": "02d273a",
+      "date": "2026-02-24T11:39:46-06:00",
+      "message": "fix: restore range default to 7d and fix v2 booked call counts",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Restore range default to 7d and fix v2 booked call counts"
+    },
+    {
+      "hash": "3e685c8",
+      "date": "2026-02-24T10:42:09-06:00",
+      "message": "fix: switch DB scripts to private Railway endpoint, remove hardcoded public URL",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Switch DB scripts to private Railway endpoint, remove hardcoded public URL"
+    },
+    {
+      "hash": "e2991cf",
+      "date": "2026-02-23T23:15:22-06:00",
+      "message": "fix: address lint errors + include v2 API and features",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Address lint errors + include v2 API and features"
+    },
+    {
+      "hash": "6654b73",
+      "date": "2026-02-23T21:15:53-06:00",
+      "message": "fix(insights): setter sets now use payload.bookedCredit instead of stale weekly summary window",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Setter sets now use payload.bookedCredit instead of stale weekly summary window"
+    },
+    {
+      "hash": "f5f8ff6",
+      "date": "2026-02-23T21:02:09-06:00",
+      "message": "TODO: mark inbox chat thread layout fix tasks complete",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "TODO: mark inbox chat thread layout fix tasks complete"
+    },
+    {
+      "hash": "df9c0e6",
+      "date": "2026-02-23T20:56:50-06:00",
+      "message": "InboxV2: fix chat thread layout — auto-scroll to bottom, flex modal body, 480px thread height",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "InboxV2: fix chat thread layout — auto-scroll to bottom, flex modal body, 480px thread height"
+    },
+    {
+      "hash": "1713720",
+      "date": "2026-02-23T20:33:37-06:00",
+      "message": "InboxV2: refresh button + 2-col composer modal (qual/escalation/send-line); SequencesV2: remove unused TS var; gitignore cpu profiles",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "InboxV2: refresh button + 2-col composer modal (qual/escalation/send-line); SequencesV2: remove u..."
+    },
+    {
+      "hash": "2abea2a",
+      "date": "2026-02-23T20:30:47-06:00",
+      "message": "Mark all Daily Activity tasks complete in TODO",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Mark all Daily Activity tasks complete in TODO"
+    },
+    {
+      "hash": "50b0ec0",
+      "date": "2026-02-23T19:29:29-06:00",
+      "message": "Daily Activity overhaul: 4 KPI cards, status borders, setter split bar, saved views toggle",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Daily Activity overhaul: 4 KPI cards, status borders, setter split bar, saved views toggle"
+    },
+    {
+      "hash": "a84e59b",
+      "date": "2026-02-23T18:56:05-06:00",
+      "message": "fix(inbox): infer sender from message body for sequence messages",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Infer sender from message body for sequence messages"
+    },
+    {
+      "hash": "66028de",
+      "date": "2026-02-23T18:51:00-06:00",
+      "message": "fix(attribution): use raw Aloware sequence field for canonicalBookedCalls instead of HubSpot fuzzy match",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Use raw Aloware sequence field for canonicalBookedCalls instead of HubSpot fuzzy match"
+    },
+    {
+      "hash": "cf989c1",
+      "date": "2026-02-23T18:46:53-06:00",
+      "message": "fix(sequences): simplify KPI cards, add attribution breakdown panel with multi-day convo context",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Simplify KPI cards, add attribution breakdown panel with multi-day convo context"
+    },
+    {
+      "hash": "756e3c4",
+      "date": "2026-02-23T18:35:29-06:00",
+      "message": "fix(inbox): fix avatar clipping, card height, preview text, DASHBOARD-PASSWORD-USER speaker name",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix avatar clipping, card height, preview text, DASHBOARD-PASSWORD-USER speaker name"
+    },
+    {
+      "hash": "e0f9633",
+      "date": "2026-02-23T17:56:10-06:00",
+      "message": "tighten inbox UI: stronger cards, bigger avatar, health ring track, bolder stats",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Dashboard",
+      "description": "Tighten inbox UI: stronger cards, bigger avatar, health ring track, bolder stats"
+    },
+    {
+      "hash": "1588a29",
+      "date": "2026-02-23T17:42:07-06:00",
+      "message": "feat: Visual UI improvements - Sequences risk indicators, Inbox CSS, new dashboard components",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Visual UI improvements - Sequences risk indicators, Inbox CSS, new dashboard components"
+    },
+    {
+      "hash": "4dec64d",
+      "date": "2026-02-23T17:16:04-06:00",
+      "message": "Update V2 frontend components - InboxV2, InsightsV2, V2Primitives and v2.css",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Dashboard",
+      "description": "Update V2 frontend components - InboxV2, InsightsV2, V2Primitives and v2.css"
+    },
+    {
+      "hash": "3874c22",
+      "date": "2026-02-23T14:11:22-06:00",
+      "message": "fix: Sent message now persists in chat thread",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Sent message now persists in chat thread"
+    },
+    {
+      "hash": "5d47ae6",
+      "date": "2026-02-23T14:07:33-06:00",
+      "message": "feat: Add visual feedback for SMS sending in Inbox",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add visual feedback for SMS sending in Inbox"
+    },
+    {
+      "hash": "17e210c",
+      "date": "2026-02-23T13:47:55-06:00",
+      "message": "Redesign inbox composer modal: smaller chat-style popup with conversation history",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Dashboard",
+      "description": "Redesign inbox composer modal: smaller chat-style popup with conversation history"
+    },
+    {
+      "hash": "9b9476f",
+      "date": "2026-02-23T13:38:33-06:00",
+      "message": "Fix: Add missing selectedWindowMeta variable in InsightsV2.tsx",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add missing selectedWindowMeta variable in InsightsV2.tsx"
+    },
+    {
+      "hash": "d9204ef",
+      "date": "2026-02-23T12:08:01-06:00",
+      "message": "feat: add Slack scopes for Jack/Brandon reaction attribution testing",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add Slack scopes for Jack/Brandon reaction attribution testing"
+    },
+    {
+      "hash": "5e5f6b5",
+      "date": "2026-02-23T11:29:37-06:00",
+      "message": "Add Open Graph meta tags and update favicon icons",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add Open Graph meta tags and update favicon icons"
+    },
+    {
+      "hash": "cc3a4f8",
+      "date": "2026-02-23T10:46:14-06:00",
+      "message": "feat: set v2 as default UI mode; simplify UI terminology",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Set v2 as default UI mode; simplify UI terminology"
+    },
+    {
+      "hash": "1337dcd",
+      "date": "2026-02-23T09:00:35-06:00",
+      "message": "chore: ignore cocoindex MCP server cache directory",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Performance",
+      "description": "Ignore cocoindex MCP server cache directory"
+    },
+    {
+      "hash": "baf5c02",
+      "date": "2026-02-23T08:38:24-06:00",
+      "message": "fix(slack): clean up manifest - remove placeholder shortcuts/commands, fix org_deploy_enabled",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Clean up manifest - remove placeholder shortcuts/commands, fix org_deploy_enabled"
+    },
+    {
+      "hash": "d097454",
+      "date": "2026-02-23T08:35:22-06:00",
+      "message": "chore: add backfill:booked-calls npm script for easy Railway CLI execution",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add backfill:booked-calls npm script for easy Railway CLI execution"
+    },
+    {
+      "hash": "bcb8372",
+      "date": "2026-02-23T08:34:42-06:00",
+      "message": "fix(slack): add reaction_added + reaction_removed to manifest bot_events",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add reaction_added + reaction_removed to manifest bot_events"
+    },
+    {
+      "hash": "5c9066e",
+      "date": "2026-02-23T08:28:20-06:00",
+      "message": "fix(insights): weekly summary stats use rolling 7d trend data instead of current calendar week",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Weekly summary stats use rolling 7d trend data instead of current calendar week"
+    },
+    {
+      "hash": "d96728b",
+      "date": "2026-02-23T08:00:34-06:00",
+      "message": "fix(v2): restore V2Shell layout and original pages",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Restore V2Shell layout and original pages"
+    },
+    {
+      "hash": "dac4d89",
+      "date": "2026-02-23T07:26:49-06:00",
+      "message": "feat: implement code quality improvements",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Implement code quality improvements"
+    },
+    {
+      "hash": "10ef7f7",
+      "date": "2026-02-23T00:25:37-06:00",
+      "message": "fix(v2): show runs when sales metrics unavailable",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Show runs when sales metrics unavailable"
+    },
+    {
+      "hash": "696ab24",
+      "date": "2026-02-23T00:15:44-06:00",
+      "message": "feat(v2): tailwind v4 + shadcn dashboard layout",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Tailwind v4 + shadcn dashboard layout"
+    },
+    {
+      "hash": "d26f070",
+      "date": "2026-02-22T21:00:07-06:00",
+      "message": "Encode live-vs-snapshot semantics in v2 API contracts",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Encode live-vs-snapshot semantics in v2 API contracts"
+    },
+    {
+      "hash": "f4c57bc",
+      "date": "2026-02-22T20:55:19-06:00",
+      "message": "Clarify live dashboard KPI splits and remove diagnostic hints card",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Clarify live dashboard KPI splits and remove diagnostic hints card"
+    },
+    {
+      "hash": "b34979b",
+      "date": "2026-02-22T20:27:58-06:00",
+      "message": "Fix sequence reply-link attribution when booked-call phone is missing",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix sequence reply-link attribution when booked-call phone is missing"
+    },
+    {
+      "hash": "4e84ec0",
+      "date": "2026-02-22T20:08:27-06:00",
+      "message": "Simplify desktop shell UI and declutter runs/sequences pages",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Simplify desktop shell UI and declutter runs/sequences pages"
+    },
+    {
+      "hash": "e8b3272",
+      "date": "2026-02-22T20:05:28-06:00",
+      "message": "Compute per-rep reply rate in sales metrics leaderboard",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Compute per-rep reply rate in sales metrics leaderboard"
+    },
+    {
+      "hash": "692ef1f",
+      "date": "2026-02-22T20:02:11-06:00",
+      "message": "Make insights summary range-aware and fix setter avg reply source",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Make insights summary range-aware and fix setter avg reply source"
+    },
+    {
+      "hash": "56da7a1",
+      "date": "2026-02-22T19:54:39-06:00",
+      "message": "Fix runs/sequences attribution semantics and add regressions",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Fix runs/sequences attribution semantics and add regressions"
+    },
+    {
+      "hash": "f5aef02",
+      "date": "2026-02-22T19:39:13-06:00",
+      "message": "feat: disable monday outbound sync and polish v2 inbox ux",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Disable monday outbound sync and polish v2 inbox ux"
+    },
+    {
+      "hash": "5c9b9aa",
+      "date": "2026-02-22T14:46:16-06:00",
+      "message": "fix(auth): disable slack oauth path and route to password gate",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Disable slack oauth path and route to password gate"
+    },
+    {
+      "hash": "3a385c8",
+      "date": "2026-02-22T14:34:15-06:00",
+      "message": "fix(auth): replace slack sign-in loop with password session login",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Replace slack sign-in loop with password session login"
+    },
+    {
+      "hash": "20f5755",
+      "date": "2026-02-22T14:11:58-06:00",
+      "message": "feat(ui): add interactive qualification and escalation state cards",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add interactive qualification and escalation state cards"
+    },
+    {
+      "hash": "a53bf8b",
+      "date": "2026-02-22T14:00:58-06:00",
+      "message": "fix(inbox): make draft generation context-aware and expose fallback mode",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Make draft generation context-aware and expose fallback mode"
+    },
+    {
+      "hash": "8f309f9",
+      "date": "2026-02-22T13:51:11-06:00",
+      "message": "feat: execute audit hardening plan and repo lint cleanup",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Execute audit hardening plan and repo lint cleanup"
+    },
+    {
+      "hash": "ec0d100",
+      "date": "2026-02-22T13:44:50-06:00",
+      "message": "feat(inbox): run qualification inference during sms ingestion",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Run qualification inference during sms ingestion"
+    },
+    {
+      "hash": "103a63f",
+      "date": "2026-02-22T13:37:06-06:00",
+      "message": "feat(ui): redesign inbox draft-send modal experience",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Redesign inbox draft-send modal experience"
+    },
+    {
+      "hash": "dad9c19",
+      "date": "2026-02-22T13:30:54-06:00",
+      "message": "feat(inbox): auto-populate qualification state from conversation text",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Auto-populate qualification state from conversation text"
+    },
+    {
+      "hash": "ad86ace",
+      "date": "2026-02-22T12:27:18-06:00",
+      "message": "fix(api): reject non-uuid inbox conversation ids",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Reject non-uuid inbox conversation ids"
+    },
+    {
+      "hash": "833b006",
+      "date": "2026-02-22T12:25:36-06:00",
+      "message": "improve(aloware): surface detailed API error messages on send",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "AI & ML",
+      "description": "Improve(aloware): surface detailed API error messages on send"
+    },
+    {
+      "hash": "38e32c8",
+      "date": "2026-02-22T12:22:57-06:00",
+      "message": "chore(debug): log token env lengths at startup",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Bug Fixes",
+      "description": "Log token env lengths at startup"
+    },
+    {
+      "hash": "71a31de",
+      "date": "2026-02-22T11:16:10-06:00",
+      "message": "chore(aloware): redact api token in error logs",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Integrations",
+      "description": "Redact api token in error logs"
+    },
+    {
+      "hash": "fb99f01",
+      "date": "2026-02-22T11:05:49-06:00",
+      "message": "fix(inbox): use latest thread context for draft generation",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Use latest thread context for draft generation"
+    },
+    {
+      "hash": "fc873e8",
+      "date": "2026-02-22T10:55:13-06:00",
+      "message": "fix(inbox): show participant names and dropdown-only line select",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Show participant names and dropdown-only line select"
+    },
+    {
+      "hash": "860338b",
+      "date": "2026-02-22T10:50:05-06:00",
+      "message": "fix(v2): align logo left and add focused run detail mode",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Align logo left and add focused run detail mode"
+    },
+    {
+      "hash": "43f6a4a",
+      "date": "2026-02-22T10:10:49-06:00",
+      "message": "feat(runs): show run booked metric vs slack total and owner split",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Show run booked metric vs slack total and owner split"
+    },
+    {
+      "hash": "c453e6f",
+      "date": "2026-02-22T10:06:50-06:00",
+      "message": "feat(inbox): open draft composer in floating modal",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Open draft composer in floating modal"
+    },
+    {
+      "hash": "710bb4f",
+      "date": "2026-02-22T09:59:02-06:00",
+      "message": "Improve inbox owner clarity and add manual send line selection",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Improve inbox owner clarity and add manual send line selection"
+    },
+    {
+      "hash": "0b83467",
+      "date": "2026-02-22T07:53:31-06:00",
+      "message": "Fix inbox draft fallback and move composer to top of thread",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix inbox draft fallback and move composer to top of thread"
+    },
+    {
+      "hash": "13de44e",
+      "date": "2026-02-22T07:48:48-06:00",
+      "message": "Fix daily run reporting day labels and persist report date",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Fix daily run reporting day labels and persist report date"
+    },
+    {
+      "hash": "d4d684f",
+      "date": "2026-02-21T23:26:53-06:00",
+      "message": "Replace Slack auth with password gate and cookie session",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Replace Slack auth with password gate and cookie session"
+    },
+    {
+      "hash": "973627f",
+      "date": "2026-02-21T23:18:30-06:00",
+      "message": "Ship V2 inbox flow, attribution split metrics, and shell UX updates",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Dashboard",
+      "description": "Ship V2 inbox flow, attribution split metrics, and shell UX updates"
+    },
+    {
+      "hash": "711edec",
+      "date": "2026-02-21T22:28:11-06:00",
+      "message": "Revert \"chore: include inbox draft engine source file\"",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Dashboard",
+      "description": "Revert \"chore: include inbox draft engine source file\""
+    },
+    {
+      "hash": "e021ef5",
+      "date": "2026-02-21T22:27:45-06:00",
+      "message": "chore: include inbox draft engine source file",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Dashboard",
+      "description": "Include inbox draft engine source file"
+    },
+    {
+      "hash": "e4390c5",
+      "date": "2026-02-21T22:26:20-06:00",
+      "message": "feat: ship v2 dashboard, monday sync/writeback, and rollout controls",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Ship v2 dashboard, monday sync/writeback, and rollout controls"
+    },
+    {
+      "hash": "4145adc",
+      "date": "2026-02-21T15:17:37-06:00",
+      "message": "Remove sidebar logo text and enlarge top-left logo",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Remove sidebar logo text and enlarge top-left logo"
+    },
+    {
+      "hash": "72b0e71",
+      "date": "2026-02-21T15:10:04-06:00",
+      "message": "Increase sidebar logo size and enlarge favicon artwork",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Increase sidebar logo size and enlarge favicon artwork"
+    },
+    {
+      "hash": "3a9d2c8",
+      "date": "2026-02-21T15:06:11-06:00",
+      "message": "Change sidebar background from black to dark gray",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Change sidebar background from black to dark gray"
+    },
+    {
+      "hash": "f5d5272",
+      "date": "2026-02-21T15:03:20-06:00",
+      "message": "Remove scoring and competitive framing from rep scorecards",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Remove scoring and competitive framing from rep scorecards"
+    },
+    {
+      "hash": "f0326b5",
+      "date": "2026-02-21T14:59:50-06:00",
+      "message": "Set black sidebar and apply raw top logo without framing",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Set black sidebar and apply raw top logo without framing"
+    },
+    {
+      "hash": "e734bea",
+      "date": "2026-02-21T14:57:19-06:00",
+      "message": "Update favicon assets from new provided PT Biz image",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Update favicon assets from new provided PT Biz image"
+    },
+    {
+      "hash": "6f8fce1",
+      "date": "2026-02-21T14:29:13-06:00",
+      "message": "Add day-by-day navigation controls to Sequences page",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add day-by-day navigation controls to Sequences page"
+    },
+    {
+      "hash": "63e0b73",
+      "date": "2026-02-21T14:24:16-06:00",
+      "message": "Use sidebar logo directly without frame or favicon styling",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "General",
+      "description": "Use sidebar logo directly without frame or favicon styling"
+    },
+    {
+      "hash": "7c0f058",
+      "date": "2026-02-21T14:20:05-06:00",
+      "message": "Replace sidebar logo with clean mark and remove pill framing",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Replace sidebar logo with clean mark and remove pill framing"
+    },
+    {
+      "hash": "64ad170",
+      "date": "2026-02-21T14:12:00-06:00",
+      "message": "Replace sidebar logo treatment with dark icon and remove pill overlays",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Replace sidebar logo treatment with dark icon and remove pill overlays"
+    },
+    {
+      "hash": "edfb0a8",
+      "date": "2026-02-21T14:00:27-06:00",
+      "message": "Remove in-page logo pills and keep branding in sidebar",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Remove in-page logo pills and keep branding in sidebar"
+    },
+    {
+      "hash": "4a62568",
+      "date": "2026-02-21T12:15:57-06:00",
+      "message": "Replace favicon with new PT Biz image and high-contrast background",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Replace favicon with new PT Biz image and high-contrast background"
+    },
+    {
+      "hash": "8d70393",
+      "date": "2026-02-21T11:48:55-06:00",
+      "message": "Set custom site favicon from PT Biz image",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Set custom site favicon from PT Biz image"
+    },
+    {
+      "hash": "faec5c7",
+      "date": "2026-02-21T11:44:22-06:00",
+      "message": "Integrate PT Biz logo across shell, insights, and scorecards",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Integrate PT Biz logo across shell, insights, and scorecards"
+    },
+    {
+      "hash": "caff806",
+      "date": "2026-02-21T11:36:21-06:00",
+      "message": "Redesign Jack and Brandon pages into scorecard player cards",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "UI/UX",
+      "description": "Redesign Jack and Brandon pages into scorecard player cards"
+    },
+    {
+      "hash": "01c57d2",
+      "date": "2026-02-21T11:23:38-06:00",
+      "message": "Redesign Team Insights into high-level command view",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "UI/UX",
+      "description": "Redesign Team Insights into high-level command view"
+    },
+    {
+      "hash": "674b461",
+      "date": "2026-02-21T09:36:41-06:00",
+      "message": "Remove confusing booked-rate percentages from sequences",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Remove confusing booked-rate percentages from sequences"
+    },
+    {
+      "hash": "aa0bb67",
+      "date": "2026-02-21T09:33:03-06:00",
+      "message": "Simplify sequence labels and booked rate math",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Simplify sequence labels and booked rate math"
+    },
+    {
+      "hash": "e6b1e92",
+      "date": "2026-02-21T09:03:08-06:00",
+      "message": "Add Slack booked-call attribution by sequence in Sequences view",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add Slack booked-call attribution by sequence in Sequences view"
+    },
+    {
+      "hash": "258d0f4",
+      "date": "2026-02-21T08:34:31-06:00",
+      "message": "Add Sequences deep-dive tab with full per-sequence KPIs",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add Sequences deep-dive tab with full per-sequence KPIs"
+    },
+    {
+      "hash": "cd5ff10",
+      "date": "2026-02-21T08:26:21-06:00",
+      "message": "Default attribution and rep views to previous business day",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Default attribution and rep views to previous business day"
+    },
+    {
+      "hash": "652e77f",
+      "date": "2026-02-21T01:12:14-06:00",
+      "message": "Use business-day carry-over for rep and attribution views",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Use business-day carry-over for rep and attribution views"
+    },
+    {
+      "hash": "edc66e3",
+      "date": "2026-02-21T01:06:25-06:00",
+      "message": "Fix run detail day resolution for ISO report_date",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Fix run detail day resolution for ISO report_date"
+    },
+    {
+      "hash": "ddfda84",
+      "date": "2026-02-21T01:02:33-06:00",
+      "message": "Archive and regenerate daily runs with legacy folder UI",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "AI & ML",
+      "description": "Archive and regenerate daily runs with legacy folder UI"
+    },
+    {
+      "hash": "593043c",
+      "date": "2026-02-21T00:24:40-06:00",
+      "message": "Normalize dashboard metrics contract and business-day range handling",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Normalize dashboard metrics contract and business-day range handling"
+    },
+    {
+      "hash": "1166916",
+      "date": "2026-02-20T23:56:34-06:00",
+      "message": "feat(frontend): remove required oauth gate for dashboard",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Remove required oauth gate for dashboard"
+    },
+    {
+      "hash": "cbf5d8b",
+      "date": "2026-02-20T23:38:55-06:00",
+      "message": "fix(build): skip frontend build when absent in deploy context",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Skip frontend build when absent in deploy context"
+    },
+    {
+      "hash": "f4f3f61",
+      "date": "2026-02-20T23:35:52-06:00",
+      "message": "fix: harden auth/oauth and ship listener/build reliability updates",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Authentication",
+      "description": "Harden auth/oauth and ship listener/build reliability updates"
+    },
+    {
+      "hash": "a67dace",
+      "date": "2026-02-20T23:14:48-06:00",
+      "message": "fix: update booked calls logic to use user ID for attribution",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Update booked calls logic to use user ID for attribution"
+    },
+    {
+      "hash": "451b74a",
+      "date": "2026-02-20T22:56:40-06:00",
+      "message": "chore: commit changes",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Commit changes"
+    },
+    {
+      "hash": "6f5fef7",
+      "date": "2026-02-20T15:08:24-06:00",
+      "message": "Attribution: show diagnostics if sales-metrics stays loading",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Attribution: show diagnostics if sales-metrics stays loading"
+    },
+    {
+      "hash": "0ba0f7a",
+      "date": "2026-02-20T14:44:00-06:00",
+      "message": "Fix Vercel rewrites so /assets are not rewritten to index.html",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Fix Vercel rewrites so /assets are not rewritten to index.html"
+    },
+    {
+      "hash": "ab027f1",
+      "date": "2026-02-20T14:34:15-06:00",
+      "message": "Add API timeout + show error details/retry on Attribution Deep Dive",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add API timeout + show error details/retry on Attribution Deep Dive"
+    },
+    {
+      "hash": "4f19ec9",
+      "date": "2026-02-20T13:48:15-06:00",
+      "message": "Fix Attribution Deep Dive loading (stable React Query params) and add Vercel API rewrites",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Fix Attribution Deep Dive loading (stable React Query params) and add Vercel API rewrites"
+    },
+    {
+      "hash": "66c5b83",
+      "date": "2026-02-20T10:16:18-06:00",
+      "message": "Fix rep scorecard loading (stable React Query params)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fix rep scorecard loading (stable React Query params)"
+    },
+    {
+      "hash": "65bc851",
+      "date": "2026-02-20T10:12:01-06:00",
+      "message": "API: make dashboard GET endpoints public (no auth)",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "API: make dashboard GET endpoints public (no auth)"
+    },
+    {
+      "hash": "db5a910",
+      "date": "2026-02-20T09:48:11-06:00",
+      "message": "Dashboard: improve trust (dates), rep scorecard errors, local auth guard",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Dashboard: improve trust (dates), rep scorecard errors, local auth guard"
+    },
+    {
+      "hash": "d9be218",
+      "date": "2026-02-19T14:13:45-06:00",
+      "message": "Fix RunDetail typing for report_date",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Fix RunDetail typing for report_date"
+    },
+    {
+      "hash": "f0e4851",
+      "date": "2026-02-19T14:09:09-06:00",
+      "message": "Daily Runs: add source-of-truth metrics panel",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Daily Runs: add source-of-truth metrics panel"
+    },
+    {
+      "hash": "3641bbb",
+      "date": "2026-02-19T13:43:24-06:00",
+      "message": "Add rep scorecards + attribution deep dive pages",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add rep scorecards + attribution deep dive pages"
+    },
+    {
+      "hash": "f584268",
+      "date": "2026-02-19T13:40:50-06:00",
+      "message": "Split reply rates + exclude manual outbounds after sequence replies",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Split reply rates + exclude manual outbounds after sequence replies"
+    },
+    {
+      "hash": "5b7cc45",
+      "date": "2026-02-19T13:37:50-06:00",
+      "message": "Filter booked calls chatter in #bookedcalls",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Filter booked calls chatter in #bookedcalls"
+    },
+    {
+      "hash": "96495a0",
+      "date": "2026-02-19T13:18:00-06:00",
+      "message": "Improve UX copy + fix local DB timeouts + dashboard key warning",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Improve UX copy + fix local DB timeouts + dashboard key warning"
+    },
+    {
+      "hash": "33cbbf9",
+      "date": "2026-02-19T12:59:44-06:00",
+      "message": "Slack booked calls source of truth + rep attribution breakdown",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Slack booked calls source of truth + rep attribution breakdown"
+    },
+    {
+      "hash": "736b86f",
+      "date": "2026-02-19T12:21:18-06:00",
+      "message": "Sales-first Insights + sales-metrics attribution + daily runs backfill",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Sales-first Insights + sales-metrics attribution + daily runs backfill"
+    },
+    {
+      "hash": "f4decb8",
+      "date": "2026-02-18T17:34:24-06:00",
+      "message": "Fix Insights initial 401 by setting token before queries",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix Insights initial 401 by setting token before queries"
+    },
+    {
+      "hash": "5079cf0",
+      "date": "2026-02-18T15:25:02-06:00",
+      "message": "Make realtime optional when SSE fails",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Make realtime optional when SSE fails"
+    },
+    {
+      "hash": "f525d21",
+      "date": "2026-02-18T15:23:30-06:00",
+      "message": "Fix EventSource init (remove invalid options)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix EventSource init (remove invalid options)"
+    },
+    {
+      "hash": "a9dfd65",
+      "date": "2026-02-18T15:18:56-06:00",
+      "message": "\"Add",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "\"Add"
+    },
+    {
+      "hash": "a4de925",
+      "date": "2026-02-18T13:59:53-06:00",
+      "message": "Use credentials for SSE EventSource",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Use credentials for SSE EventSource"
+    },
+    {
+      "hash": "cfe22de",
+      "date": "2026-02-18T13:58:19-06:00",
+      "message": "Fix CORS origin handling for Vercel dashboard",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix CORS origin handling for Vercel dashboard"
+    },
+    {
+      "hash": "c1ba25a",
+      "date": "2026-02-18T12:43:14-06:00",
+      "message": "Remove Inbox from command center UI",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Dashboard",
+      "description": "Remove Inbox from command center UI"
+    },
+    {
+      "hash": "806b07a",
+      "date": "2026-02-18T11:20:15-06:00",
+      "message": "Fix production Slack login URL (use VITE_API_URL)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Fix production Slack login URL (use VITE_API_URL)"
+    },
+    {
+      "hash": "2e2fc9d",
+      "date": "2026-02-18T10:36:38-06:00",
+      "message": "Guardrail prompt size; realtime runs updates via SSE",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "AI & ML",
+      "description": "Guardrail prompt size; realtime runs updates via SSE"
+    },
+    {
+      "hash": "e5505e3",
+      "date": "2026-02-18T09:56:24-06:00",
+      "message": "chore: restore green checks and tighten types",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Restore green checks and tighten types"
+    },
+    {
+      "hash": "b34c96b",
+      "date": "2026-02-18T08:16:15-06:00",
+      "message": "feat: Enhanced SMS analytics UI with rich data visualization",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Enhanced SMS analytics UI with rich data visualization"
+    },
+    {
+      "hash": "785eb8a",
+      "date": "2026-02-18T00:33:25-06:00",
+      "message": "Phase 2: Real-time SSE integration and Conversation Drill-in logic",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Phase 2: Real-time SSE integration and Conversation Drill-in logic"
+    },
+    {
+      "hash": "8751d63",
+      "date": "2026-02-18T00:22:27-06:00",
+      "message": "Add diagnostic logging for DATABASE_URL",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add diagnostic logging for DATABASE_URL"
+    },
+    {
+      "hash": "417ccef",
+      "date": "2026-02-18T00:16:55-06:00",
+      "message": "Add detailed error logging to metrics endpoint",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add detailed error logging to metrics endpoint"
+    },
+    {
+      "hash": "d059597",
+      "date": "2026-02-18T00:14:29-06:00",
+      "message": "Redesign dashboard architecture and implement new API endpoints",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Redesign dashboard architecture and implement new API endpoints"
+    },
+    {
+      "hash": "9a466b2",
+      "date": "2026-02-17T23:47:11-06:00",
+      "message": "Update vercel.json build config",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Infrastructure",
+      "description": "Update vercel.json build config"
+    },
+    {
+      "hash": "71482d3",
+      "date": "2026-02-17T23:46:00-06:00",
+      "message": "Fix Vercel build config and add SMS seeding script",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Fix Vercel build config and add SMS seeding script"
+    },
+    {
+      "hash": "f08ddfb",
+      "date": "2026-02-17T23:29:53-06:00",
+      "message": "Realtime conversation updates + Inbox UI polish",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Dashboard",
+      "description": "Realtime conversation updates + Inbox UI polish"
+    },
+    {
+      "hash": "6c54c81",
+      "date": "2026-02-17T22:10:43-06:00",
+      "message": "feat: operational inbox foundation (sms events, work items, inbox UI)",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Operational inbox foundation (sms events, work items, inbox UI)"
+    },
+    {
+      "hash": "0897069",
+      "date": "2026-02-17T21:32:15-06:00",
+      "message": "Remove OAuth functionality",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Authentication",
+      "description": "Remove OAuth functionality"
+    },
+    {
+      "hash": "92821f3",
+      "date": "2026-02-17T21:24:42-06:00",
+      "message": "Sync latest changes: Update frontend components, remove sample files, add new scripts and services, update dependencies",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Sync latest changes: Update frontend components, remove sample files, add new scripts and service..."
+    },
+    {
+      "hash": "304003e",
+      "date": "2026-02-17T16:50:54-06:00",
+      "message": "Fix: Update dependencies to resolve build errors",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Update dependencies to resolve build errors"
+    },
+    {
+      "hash": "a5943e4",
+      "date": "2026-02-17T16:48:12-06:00",
+      "message": "Fix: Prevent feedback loop and improve self-identification",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Prevent feedback loop and improve self-identification"
+    },
+    {
+      "hash": "30b2de6",
+      "date": "2026-02-17T16:47:14-06:00",
+      "message": "Fix: Improve sequence detection in parser",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Improve sequence detection in parser"
+    },
+    {
+      "hash": "b24eda6",
+      "date": "2026-02-17T16:28:52-06:00",
+      "message": "Fix: Add more specific check for manual messages",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add more specific check for manual messages"
+    },
+    {
+      "hash": "a9e11f1",
+      "date": "2026-02-17T16:27:53-06:00",
+      "message": "Fix: Adjust parser to correctly identify automated messages",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Adjust parser to correctly identify automated messages"
+    },
+    {
+      "hash": "9235b40",
+      "date": "2026-02-17T15:56:09-06:00",
+      "message": "fix(setter-feedback): treat CLAUDE_ASSISTANT_USER_ID=DISABLED (sentinel) as disabled; add test",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Treat CLAUDE_ASSISTANT_USER_ID=DISABLED (sentinel) as disabled; add test"
+    },
+    {
+      "hash": "6270a3e",
+      "date": "2026-02-17T15:45:29-06:00",
+      "message": "fix(messages): ignore other-app/bot posts (except daily snapshots); add tests",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Ignore other-app/bot posts (except daily snapshots); add tests"
+    },
+    {
+      "hash": "cc85ac1",
+      "date": "2026-02-17T15:42:50-06:00",
+      "message": "feat(setter-feedback): persistent dedupe (DB-backed) + fallback, tests, docs",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Persistent dedupe (DB-backed) + fallback, tests, docs"
+    },
+    {
+      "hash": "5d88007",
+      "date": "2026-02-17T15:30:56-06:00",
+      "message": "feat(setter-feedback): add dedupe (TTL) + tests; doc update",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add dedupe (TTL) + tests; doc update"
+    },
+    {
+      "hash": "a1af7c9",
+      "date": "2026-02-17T14:41:19-06:00",
+      "message": "fix(setter-feedback): skip automated sequence messages; add tests and README note",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Skip automated sequence messages; add tests and README note"
+    },
+    {
+      "hash": "2fce1bd",
+      "date": "2026-02-17T14:37:54-06:00",
+      "message": "safeguard: don't tag watcher users when CLAUDE_ASSISTANT_USER_ID matches a watcher (prevent self-tagging)",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Safeguard: don't tag watcher users when CLAUDE_ASSISTANT_USER_ID matches a watcher (prevent self-..."
+    },
+    {
+      "hash": "67db11d",
+      "date": "2026-02-17T10:58:47-06:00",
+      "message": "Fix vercel.json to remove secret reference",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix vercel.json to remove secret reference"
+    },
+    {
+      "hash": "7ab8c4d",
+      "date": "2026-02-17T10:49:02-06:00",
+      "message": "Add daily report dashboard with PostgreSQL + React frontend",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add daily report dashboard with PostgreSQL + React frontend"
+    },
+    {
+      "hash": "192e570",
+      "date": "2026-02-17T09:24:26-06:00",
+      "message": "Commit workspace snapshots",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Commit workspace snapshots"
+    },
+    {
+      "hash": "1857366",
+      "date": "2026-02-16T13:19:37-06:00",
+      "message": "Refine AI coaching prompts for PT Biz tone and suppress repo mode",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Refine AI coaching prompts for PT Biz tone and suppress repo mode"
+    },
+    {
+      "hash": "6f96e13",
+      "date": "2026-02-16T13:18:10-06:00",
+      "message": "Final cleanup of purge script",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Final cleanup of purge script"
+    },
+    {
+      "hash": "7f3f8e5",
+      "date": "2026-02-16T13:15:50-06:00",
+      "message": "Cleanup dev entries, temporary scripts, and debug logs",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Bug Fixes",
+      "description": "Cleanup dev entries, temporary scripts, and debug logs"
+    },
+    {
+      "hash": "340d0ac",
+      "date": "2026-02-16T13:14:42-06:00",
+      "message": "Remove retro trigger script",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Remove retro trigger script"
+    },
+    {
+      "hash": "5a16ab8",
+      "date": "2026-02-16T13:14:38-06:00",
+      "message": "Tag setters in coaching feedback and fix direction detection",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Tag setters in coaching feedback and fix direction detection"
+    },
+    {
+      "hash": "147213b",
+      "date": "2026-02-16T12:55:02-06:00",
+      "message": "Fix HubSpot contact link format",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix HubSpot contact link format"
+    },
+    {
+      "hash": "aff22d4",
+      "date": "2026-02-16T12:54:50-06:00",
+      "message": "Enhance Lead Watcher with deep links, AI coaching, and assignment transparency",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "AI & ML",
+      "description": "Enhance Lead Watcher with deep links, AI coaching, and assignment transparency"
+    },
+    {
+      "hash": "2f68eb4",
+      "date": "2026-02-16T12:49:09-06:00",
+      "message": "Implement AI-driven Setter Feedback for Jack and Brandon",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement AI-driven Setter Feedback for Jack and Brandon"
+    },
+    {
+      "hash": "d1fe795",
+      "date": "2026-02-16T12:38:24-06:00",
+      "message": "Enhance Lead Watcher robustness and integrate HubSpot sync",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Integrations",
+      "description": "Enhance Lead Watcher robustness and integrate HubSpot sync"
+    },
+    {
+      "hash": "a6a3ec9",
+      "date": "2026-02-16T10:42:37-06:00",
+      "message": "feat: Premium Block Kit UI for daily reports and Global Error Reporting",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Premium Block Kit UI for daily reports and Global Error Reporting"
+    },
+    {
+      "hash": "7342162",
+      "date": "2026-02-16T10:41:48-06:00",
+      "message": "feat: Upgrade Lead Watcher alerts to Block Kit UI",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Upgrade Lead Watcher alerts to Block Kit UI"
+    },
+    {
+      "hash": "9c527c0",
+      "date": "2026-02-16T10:33:33-06:00",
+      "message": "Add root .gitignore",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add root .gitignore"
+    },
+    {
+      "hash": "678ba7f",
+      "date": "2026-02-16T10:32:09-06:00",
+      "message": "Initial commit of Slack CLI monorepo",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Initial commit of Slack CLI monorepo"
+    },
+    {
+      "hash": "2f826ce",
+      "date": "2026-02-16T10:36:31-06:00",
+      "message": "Initial commit",
+      "author": "johnlicataptbiz",
+      "type": "other",
+      "category": "General",
+      "description": "Initial commit"
+    }
+  ]
+}

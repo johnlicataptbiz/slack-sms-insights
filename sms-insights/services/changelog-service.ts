@@ -163,9 +163,67 @@ function generateDeploymentEntry(): ChangelogEntry {
 }
 
 /**
+ * Load changelog from JSON file (build-time generated)
+ */
+function loadChangelogFromJson(): ChangelogEntry[] | null {
+  try {
+    const jsonPath = resolve(process.cwd(), 'changelog.json');
+    if (!existsSync(jsonPath)) {
+      return null;
+    }
+    
+    const content = readFileSync(jsonPath, 'utf-8');
+    const data = JSON.parse(content);
+    
+    if (data.entries && Array.isArray(data.entries)) {
+      console.log(`[changelog] Loaded ${data.entries.length} entries from changelog.json`);
+      return data.entries as ChangelogEntry[];
+    }
+    
+    return null;
+  } catch (error) {
+    console.warn('[changelog] Error loading changelog.json:', error);
+    return null;
+  }
+}
+
+/**
  * Parse git log and generate changelog entries
  */
 export function generateChangelog(days: number = 365): ChangelogTimeline {
+  // First, try to load from build-time JSON file
+  const jsonEntries = loadChangelogFromJson();
+  if (jsonEntries) {
+    // Filter entries by date range
+    const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const filteredEntries = jsonEntries.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate >= cutoffDate;
+    });
+    
+    // Calculate stats
+    const stats: ChangelogStats = {
+      features: filteredEntries.filter(e => e.type === 'feature').length,
+      fixes: filteredEntries.filter(e => e.type === 'fix').length,
+      refactors: filteredEntries.filter(e => e.type === 'refactor').length,
+      docs: filteredEntries.filter(e => e.type === 'docs').length,
+      other: filteredEntries.filter(e => 
+        !['feature', 'fix', 'refactor', 'docs'].includes(e.type)
+      ).length
+    };
+    
+    return {
+      entries: filteredEntries,
+      totalCount: filteredEntries.length,
+      dateRange: {
+        from: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+        to: new Date().toISOString()
+      },
+      stats
+    };
+  }
+  
+  // Fallback: Try to read from git directly (for local development)
   try {
     // Try multiple possible locations for git repo
     const possibleRoots = [

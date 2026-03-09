@@ -481,8 +481,8 @@ export default function SequencesV2() {
         timing={timing}
         sequences={mergedRows.map(r => ({
           label: r.label,
-          medianTimeToFirstReplyMinutes: r.medianTimeToFirstReplyMinutes,
-          avgTimeToFirstReplyMinutes: r.avgTimeToFirstReplyMinutes,
+          medianTimeToFirstReplyMinutes: r.medianTimeToFirstReplyMinutes ?? null,
+          avgTimeToFirstReplyMinutes: r.avgTimeToFirstReplyMinutes ?? null,
         }))}
       />
 

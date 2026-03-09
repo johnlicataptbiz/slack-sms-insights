@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { client } from './client';
 import {
+  assertChangelogEnvelope,
   assertCrmNotesSuggestionEnvelope,
   assertMondayBoardCatalogV2Envelope,
   assertDraftSuggestionEnvelope,
@@ -26,6 +27,7 @@ import type {
   BoardCatalogV2,
   CallOutcomeV2,
   ChannelsV2,
+  ChangelogTimeline,
   CrmNotesSuggestionV2,
   DraftSuggestionV2,
   InboxSendConfigV2,
@@ -1447,9 +1449,8 @@ export const useV2Changelog = (params: { days?: number } = {}) => {
   return useQuery({
     queryKey: ['v2', 'changelog', days],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<ChangelogTimeline>>(
-        `/api/v2/changelog?days=${days}`
-      );
+      const response = await client.get<unknown>(`/api/v2/changelog?days=${days}`);
+      assertChangelogEnvelope(response);
       return response as ApiEnvelope<ChangelogTimeline>;
     },
     staleTime: 5 * 60 * 1000,

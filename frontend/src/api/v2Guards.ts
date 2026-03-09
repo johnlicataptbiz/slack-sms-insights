@@ -2,6 +2,7 @@ import type {
   ApiEnvelope,
   BoardCatalogV2,
   ChannelsV2,
+  ChangelogTimeline,
   DraftSuggestionV2,
   InboxSendConfigV2,
   InboxConversationDetailV2,
@@ -366,4 +367,21 @@ export function assertSequenceVersionHistoryV2Envelope(
   if (!isNumber(value.data.lookbackDays)) {
     throw new Error('Invalid sequence version history response: lookbackDays must be number');
   }
+}
+
+export function assertChangelogEnvelope(value: unknown): asserts value is ApiEnvelope<ChangelogTimeline> {
+  if (!isObject(value)) throw new Error('Invalid changelog response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid changelog response: data must be object');
+  if (!Array.isArray(value.data.entries)) throw new Error('Invalid changelog response: entries must be array');
+  if (!isNumber(value.data.totalCount)) throw new Error('Invalid changelog response: totalCount must be number');
+  if (!isObject(value.data.dateRange)) throw new Error('Invalid changelog response: dateRange must be object');
+  if (!isString(value.data.dateRange.from)) throw new Error('Invalid changelog response: dateRange.from must be string');
+  if (!isString(value.data.dateRange.to)) throw new Error('Invalid changelog response: dateRange.to must be string');
+  if (!isObject(value.data.stats)) throw new Error('Invalid changelog response: stats must be object');
+  if (!isNumber(value.data.stats.features)) throw new Error('Invalid changelog response: stats.features must be number');
+  if (!isNumber(value.data.stats.fixes)) throw new Error('Invalid changelog response: stats.fixes must be number');
+  if (!isNumber(value.data.stats.refactors)) throw new Error('Invalid changelog response: stats.refactors must be number');
+  if (!isNumber(value.data.stats.docs)) throw new Error('Invalid changelog response: stats.docs must be number');
+  if (!isNumber(value.data.stats.other)) throw new Error('Invalid changelog response: stats.other must be number');
 }

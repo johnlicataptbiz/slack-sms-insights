@@ -1,14 +1,25 @@
-import { execSync } from 'node:child_process';
-import type { Logger } from '@slack/bolt';
+import { execSync } from 'child_process';
+import { readFileSync, existsSync } from 'fs';
+import { resolve } from 'path';
+
+export type ChangelogEntryType = 'feature' | 'fix' | 'refactor' | 'style' | 'docs' | 'chore' | 'other';
 
 export type ChangelogEntry = {
   hash: string;
   date: string;
   message: string;
   author: string;
-  type: 'feature' | 'fix' | 'refactor' | 'style' | 'docs' | 'chore' | 'other';
+  type: ChangelogEntryType;
   category: string;
   description: string;
+};
+
+export type ChangelogStats = {
+  features: number;
+  fixes: number;
+  refactors: number;
+  docs: number;
+  other: number;
 };
 
 export type ChangelogTimeline = {
@@ -18,151 +29,283 @@ export type ChangelogTimeline = {
     from: string;
     to: string;
   };
-  stats: {
-    features: number;
-    fixes: number;
-    refactors: number;
-    docs: number;
-    other: number;
-  };
+  stats: ChangelogStats;
 };
 
-const parseCommitType = (message: string): ChangelogEntry['type'] => {
-  const lowerMsg = message.toLowerCase();
-  if (lowerMsg.startsWith('feat') || lowerMsg.includes('add ') || lowerMsg.includes('implement')) return 'feature';
-  if (lowerMsg.startsWith('fix')) return 'fix';
-  if (lowerMsg.startsWith('refactor')) return 'refactor';
-  if (lowerMsg.startsWith('style')) return 'style';
-  if (lowerMsg.startsWith('docs')) return 'docs';
-  if (lowerMsg.startsWith('chore')) return 'chore';
-  return 'other';
+// Keywords that indicate commit type
+const TYPE_KEYWORDS: Record<ChangelogEntryType, string[]> = {
+  feature: ['feat', 'feature', 'add', 'implement', 'new', 'introduce', 'create'],
+  fix: ['fix', 'bugfix', 'hotfix', 'resolve', 'patch', 'correct', 'repair'],
+  refactor: ['refactor', 'rewrite', 'restructure', 'optimize', 'improve', 'enhance', 'clean', 'simplify'],
+  style: ['style', 'ui', 'design', 'css', 'visual', 'layout', 'format', 'styling'],
+  docs: ['docs', 'documentation', 'readme', 'comment', 'guide', 'doc'],
+  chore: ['chore', 'deps', 'dependency', 'update', 'bump', 'upgrade', 'maint', 'maintenance'],
+  other: []
 };
 
-const extractCategory = (message: string): string => {
-  // Extract category from scope in parentheses or common keywords
-  const scopeMatch = message.match(/\(([^)]+)\)/);
-  if (scopeMatch) return scopeMatch[1];
+// Category patterns for grouping
+const CATEGORY_PATTERNS: Record<string, string[]> = {
+  'Database': ['database', 'db', 'prisma', 'migration', 'schema', 'table', 'postgres', 'sql'],
+  'Dashboard': ['dashboard', 'v2', 'sequences', 'inbox', 'analytics', 'metrics', 'kpi', 'chart'],
+  'AI & ML': ['ai', 'ml', 'openai', 'gpt', 'draft', 'suggestion', 'inference', 'qualification', 'smart'],
+  'Integrations': ['slack', 'monday', 'aloware', 'integration', 'sync', 'webhook', 'api'],
+  'Authentication': ['auth', 'login', 'password', 'session', 'csrf', 'security', 'verify'],
+  'Performance': ['perf', 'performance', 'cache', 'speed', 'optimize', 'fast', 'slow'],
+  'Infrastructure': ['deploy', 'railway', 'vercel', 'docker', 'infra', 'build', 'ci', 'cd'],
+  'Bug Fixes': ['fix', 'bug', 'error', 'crash', 'broken', 'issue', 'problem'],
+  'UI/UX': ['ui', 'ux', 'design', 'layout', 'style', 'component', 'modal', 'panel', 'button'],
+  'Data Pipeline': ['pipeline', 'ingest', 'backfill', 'etl', 'sync', 'import', 'export']
+};
+
+/**
+ * Determine commit type based on message keywords
+ */
+function determineType(message: string): ChangelogEntryType {
+  const lowerMessage = message.toLowerCase();
   
-  const lowerMsg = message.toLowerCase();
-  if (lowerMsg.includes('inbox')) return 'Inbox';
-  if (lowerMsg.includes('sequence')) return 'Sequences';
-  if (lowerMsg.includes('dashboard')) return 'Dashboard';
-  if (lowerMsg.includes('analytics')) return 'Analytics';
-  if (lowerMsg.includes('crm')) return 'CRM';
-  if (lowerMsg.includes('monday')) return 'Monday.com';
-  if (lowerMsg.includes('prisma') || lowerMsg.includes('database') || lowerMsg.includes('db')) return 'Database';
-  if (lowerMsg.includes('qualification')) return 'Qualification';
-  if (lowerMsg.includes('draft') || lowerMsg.includes('ai')) return 'AI/Drafts';
-  if (lowerMsg.includes('auth') || lowerMsg.includes('password') || lowerMsg.includes('login')) return 'Auth';
-  if (lowerMsg.includes('deploy') || lowerMsg.includes('vercel') || lowerMsg.includes('railway')) return 'Infrastructure';
+  for (const [type, keywords] of Object.entries(TYPE_KEYWORDS)) {
+    if (type === 'other') continue;
+    for (const keyword of keywords) {
+      if (lowerMessage.includes(keyword)) {
+        return type as ChangelogEntryType;
+      }
+    }
+  }
+  
+  return 'other';
+}
+
+/**
+ * Determine category based on message content
+ */
+function determineCategory(message: string): string {
+  const lowerMessage = message.toLowerCase();
+  
+  for (const [category, patterns] of Object.entries(CATEGORY_PATTERNS)) {
+    for (const pattern of patterns) {
+      if (lowerMessage.includes(pattern)) {
+        return category;
+      }
+    }
+  }
   
   return 'General';
-};
+}
 
-const cleanMessage = (message: string): string => {
-  // Remove conventional commit prefix
-  return message
-    .replace(/^(feat|fix|refactor|style|docs|chore|test)(\([^)]+\))?:\s*/i, '')
-    .replace(/^Stage all changes:\s*/i, '')
-    .trim();
-};
-
-export const getChangelogTimeline = async (params?: {
-  limit?: number;
-  fromDate?: string;
-  toDate?: string;
-  logger?: Pick<Logger, 'debug' | 'warn'>;
-}): Promise<ChangelogTimeline> => {
-  const { limit = 100, fromDate, toDate, logger } = params || {};
+/**
+ * Clean and format commit message for display
+ */
+function formatDescription(message: string): string {
+  // Remove conventional commit prefix (e.g., "feat:", "fix:", etc.)
+  let cleaned = message.replace(/^[a-z]+(\([^)]+\))?:\s*/i, '');
   
+  // Remove issue references
+  cleaned = cleaned.replace(/#\d+/g, '');
+  
+  // Capitalize first letter
+  cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+  
+  // Trim and limit length
+  cleaned = cleaned.trim();
+  if (cleaned.length > 120) {
+    cleaned = cleaned.substring(0, 117) + '...';
+  }
+  
+  return cleaned;
+}
+
+/**
+ * Parse git log and generate changelog entries
+ */
+export function generateChangelog(days: number = 365): ChangelogTimeline {
   try {
-    // Build git log command
-    let cmd = `git log --all --author="jack" --author="Jack" --author="licata" --pretty=format:"%h|%ad|%s|%an" --date=short -n ${limit}`;
+    const repoRoot = resolve(process.cwd(), '..');
+    const gitDir = resolve(repoRoot, '.git');
     
-    if (fromDate) {
-      cmd += ` --since="${fromDate}"`;
-    }
-    if (toDate) {
-      cmd += ` --until="${toDate}"`;
+    if (!existsSync(gitDir)) {
+      throw new Error('Git repository not found');
     }
     
-    logger?.debug?.('[changelog] Executing git command');
+    // Get git log with format: hash|date|author|message
+    const format = '%H|%aI|%an|%s';
+    const since = days > 0 ? `--since="${days} days ago"` : '';
+    const command = `git log ${since} --pretty=format:"${format}" --no-merges`;
     
-    const output = execSync(cmd, { 
-      cwd: process.cwd(),
+    const output = execSync(command, {
+      cwd: repoRoot,
       encoding: 'utf-8',
-      timeout: 10000 
+      maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large histories
     });
     
     const lines = output.trim().split('\n').filter(Boolean);
-    
-    const entries: ChangelogEntry[] = lines.map(line => {
-      const [hash, date, message, author] = line.split('|');
-      
-      return {
-        hash: hash || '',
-        date: date || '',
-        message: message || '',
-        author: author || 'Jack Licata',
-        type: parseCommitType(message || ''),
-        category: extractCategory(message || ''),
-        description: cleanMessage(message || ''),
-      };
-    });
-    
-    // Calculate stats
-    const stats = {
-      features: entries.filter(e => e.type === 'feature').length,
-      fixes: entries.filter(e => e.type === 'fix').length,
-      refactors: entries.filter(e => e.type === 'refactor').length,
-      docs: entries.filter(e => e.type === 'docs').length,
-      other: entries.filter(e => !['feature', 'fix', 'refactor', 'docs'].includes(e.type)).length,
+    const entries: ChangelogEntry[] = [];
+    const stats: ChangelogStats = {
+      features: 0,
+      fixes: 0,
+      refactors: 0,
+      docs: 0,
+      other: 0
     };
     
-    const dates = entries.map(e => e.date).filter(Boolean);
+    let earliestDate: Date | null = null;
+    let latestDate: Date | null = null;
+    
+    for (const line of lines) {
+      const parts = line.split('|');
+      if (parts.length < 4) continue;
+      
+      const [hash, dateStr, author, ...messageParts] = parts;
+      const message = messageParts.join('|'); // Rejoin in case message had pipes
+      
+      const date = new Date(dateStr);
+      
+      // Track date range
+      if (!earliestDate || date < earliestDate) earliestDate = date;
+      if (!latestDate || date > latestDate) latestDate = date;
+      
+      const type = determineType(message);
+      const category = determineCategory(message);
+      const description = formatDescription(message);
+      
+      // Update stats
+      const statKey = type === 'feature' ? 'features' : 
+                     type === 'fix' ? 'fixes' : 
+                     type === 'refactor' ? 'refactors' : 
+                     type === 'docs' ? 'docs' : 'other';
+      stats[statKey]++;
+      
+      entries.push({
+        hash: hash.substring(0, 7),
+        date: date.toISOString(),
+        author,
+        message,
+        type,
+        category,
+        description
+      });
+    }
     
     return {
       entries,
       totalCount: entries.length,
       dateRange: {
-        from: dates[dates.length - 1] || '',
-        to: dates[0] || '',
+        from: earliestDate?.toISOString() || new Date().toISOString(),
+        to: latestDate?.toISOString() || new Date().toISOString()
       },
-      stats,
+      stats
     };
     
   } catch (error) {
-    logger?.warn?.('[changelog] Failed to fetch git history:', error);
-    throw new Error('Failed to fetch changelog from git history');
+    console.error('Failed to generate changelog:', error);
+    
+    // Return empty timeline on error
+    return {
+      entries: [],
+      totalCount: 0,
+      dateRange: {
+        from: new Date().toISOString(),
+        to: new Date().toISOString()
+      },
+      stats: {
+        features: 0,
+        fixes: 0,
+        refactors: 0,
+        docs: 0,
+        other: 0
+      }
+    };
   }
-};
+}
 
-export const getChangelogByDateRange = async (params: {
-  days: number;
-  logger?: Pick<Logger, 'debug' | 'warn'>;
-}): Promise<ChangelogTimeline> => {
-  const { days, logger } = params;
-  
-  const toDate = new Date().toISOString().split('T')[0];
-  const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-  
-  return getChangelogTimeline({ fromDate, toDate, limit: 200, logger });
-};
-
-export const getChangelogGroupedByDate = (timeline: ChangelogTimeline): Array<{
+/**
+ * Get changelog grouped by date
+ */
+export function getChangelogGroupedByDate(days: number = 365): Array<{
   date: string;
   entries: ChangelogEntry[];
-}> => {
+}> {
+  const timeline = generateChangelog(days);
+  
   const grouped = new Map<string, ChangelogEntry[]>();
   
   for (const entry of timeline.entries) {
-    const existing = grouped.get(entry.date) || [];
-    existing.push(entry);
-    grouped.set(entry.date, existing);
+    const dateKey = entry.date.split('T')[0]; // YYYY-MM-DD
+    
+    if (!grouped.has(dateKey)) {
+      grouped.set(dateKey, []);
+    }
+    
+    grouped.get(dateKey)!.push(entry);
   }
   
-  // Sort by date descending
+  // Convert to array and sort by date (newest first)
   return Array.from(grouped.entries())
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([date, entries]) => ({ date, entries }));
-};
+    .map(([date, entries]) => ({ date, entries }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+
+/**
+ * Get changelog filtered by type
+ */
+export function getChangelogByType(type: ChangelogEntryType, days: number = 365): ChangelogEntry[] {
+  const timeline = generateChangelog(days);
+  return timeline.entries.filter(entry => entry.type === type);
+}
+
+/**
+ * Get changelog by date range (for API endpoint)
+ */
+export async function getChangelogByDateRange(params: {
+  days: number;
+  logger?: Pick<import('@slack/bolt').Logger, 'debug' | 'warn'>;
+}): Promise<ChangelogTimeline> {
+  const { days, logger } = params;
+  
+  logger?.debug?.('[changelog] Generating timeline', { days });
+  
+  const timeline = generateChangelog(days);
+  
+  logger?.debug?.('[changelog] Generated timeline', { 
+    totalCount: timeline.totalCount,
+    dateRange: timeline.dateRange 
+  });
+  
+  return timeline;
+}
+
+/**
+ * Get changelog timeline (alias for getChangelogByDateRange)
+ */
+export async function getChangelogTimeline(params: {
+  days: number;
+  logger?: Pick<import('@slack/bolt').Logger, 'debug' | 'warn'>;
+}): Promise<ChangelogTimeline> {
+  return getChangelogByDateRange(params);
+}
+
+/**
+ * Get recent changes summary (last 7 days)
+ */
+export function getRecentChangesSummary(): {
+  total: number;
+  features: number;
+  fixes: number;
+  highlights: string[];
+} {
+  const timeline = generateChangelog(7);
+  
+  const features = timeline.entries.filter(e => e.type === 'feature');
+  const fixes = timeline.entries.filter(e => e.type === 'fix');
+  
+  // Get top 3 most significant recent changes
+  const highlights = timeline.entries
+    .slice(0, 5)
+    .map(e => e.description);
+  
+  return {
+    total: timeline.entries.length,
+    features: features.length,
+    fixes: fixes.length,
+    highlights
+  };
+}

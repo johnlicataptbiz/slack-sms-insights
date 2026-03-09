@@ -2889,18 +2889,21 @@ const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origi
         250,
         logger,
       );
-      messages = legacy.map((event) => ({
-        id: event.id,
-        conversation_id: conversationId,
-        event_ts: event.event_ts instanceof Date ? event.event_ts : new Date(event.event_ts),
-        direction: event.direction,
-        body: event.body,
-        sequence: null,
-        line: null,
-        aloware_user: null,
-        slack_channel_id: event.slack_channel_id,
-        slack_message_ts: event.slack_message_ts,
-      })) as InboxMessageRow[];
+      messages = legacy.map((event) => {
+        const eventTs = event.event_ts instanceof Date ? event.event_ts : new Date(event.event_ts);
+        return {
+          id: event.id,
+          conversation_id: conversationId,
+          event_ts: eventTs,
+          direction: event.direction,
+          body: event.body,
+          sequence: null,
+          line: null,
+          aloware_user: null,
+          slack_channel_id: event.slack_channel_id,
+          slack_message_ts: event.slack_message_ts,
+        };
+      });
       messages.sort((a, b) => {
         const aTime = a.event_ts.getTime();
         const bTime = b.event_ts.getTime();

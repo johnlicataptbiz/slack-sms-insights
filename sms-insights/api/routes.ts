@@ -2867,21 +2867,10 @@ const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origi
   const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
   const ownerLabel = toInboxConversationV2(conversation).ownerLabel || null;
 
-  let messages = [] as Array<{
-    id: string;
-    conversation_id: string | null;
-    event_ts: string;
-    direction: 'inbound' | 'outbound' | 'unknown';
-    body: string | null;
-    sequence: string | null;
-    line: string | null;
-    aloware_user: string | null;
-    slack_channel_id: string;
-    slack_message_ts: string;
-  }>;
+  let messages: InboxMessageRow[] = [];
   try {
     const rawMessages = await listMessagesForConversation(conversationId, 250, logger);
-    messages = rawMessages.map(m => toInboxMessageV2(m));
+    messages = rawMessages;
   } catch (error) {
     logger?.warn?.('CRM notes: failed to load v2 message rows; falling back to legacy events', {
       conversationId,
@@ -2903,7 +2892,7 @@ const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origi
       messages = legacy.map((event) => ({
         id: event.id,
         conversation_id: conversationId,
-        event_ts: event.event_ts,
+        event_ts: event.event_ts instanceof Date ? event.event_ts : new Date(event.event_ts),
         direction: event.direction,
         body: event.body,
         sequence: null,
@@ -2911,9 +2900,11 @@ const handlePostInboxCrmNotesV2: RequestHandler = async (req, res, logger, origi
         aloware_user: null,
         slack_channel_id: event.slack_channel_id,
         slack_message_ts: event.slack_message_ts,
-      }));
+      })) as InboxMessageRow[];
       messages.sort((a, b) => {
-        const byTime = a.event_ts.getTime() - b.event_ts.getTime();
+        const aTime = a.event_ts.getTime();
+        const bTime = b.event_ts.getTime();
+        const byTime = aTime - bTime;
         if (!Number.isNaN(byTime) && byTime !== 0) return byTime;
         return a.id.localeCompare(b.id);
       });

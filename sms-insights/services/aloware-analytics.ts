@@ -40,7 +40,7 @@ const DASHBOARD_MESSAGE_REPLY_RATE_LIMIT = 8;
 const NO_SEQUENCE_LABEL = 'No sequence (manual/direct)';
 const EXPLICIT_AB_VERSION_PATTERN = /\b(?:version\s*([AB])|([AB])\s*version)\b/i;
 const TRAILING_SEQUENCE_VERSION_PATTERN = /\s*-\s*20\d{2}\s*v?\d+(?:\.\d+)*\s*$/i;
-const TRAILING_GENERIC_VERSION_PATTERN = /\s*v?\d+(?:\.\d+){1,}\s*$/i;
+const TRAILING_GENERIC_VERSION_PATTERN = /\s*(?:v\d+(?:\.\d+)*|\d+(?:\.\d+)+)\s*$/i;
 const TRAILING_YEAR_PATTERN = /\s*-\s*20\d{2}\s*$/i;
 
 const STOPWORDS = new Set([

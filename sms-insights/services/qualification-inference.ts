@@ -14,13 +14,14 @@ type QualificationSnapshot = {
   coachingInterest: CoachingInterest;
   deliveryModel: DeliveryModel;
   progressStep: number;
+  objectionTags: string[];
 };
 
 export type QualificationInferenceResult = {
   changed: boolean;
   updates: Pick<
     UpdateConversationStateInput,
-    'fullOrPartTime' | 'niche' | 'revenueMix' | 'coachingInterest' | 'deliveryModel' | 'progressStep'
+    'fullOrPartTime' | 'niche' | 'revenueMix' | 'coachingInterest' | 'deliveryModel' | 'progressStep' | 'objectionTags'
   >;
   snapshot: QualificationSnapshot;
   inferred: {
@@ -29,6 +30,7 @@ export type QualificationInferenceResult = {
     revenueMix: RevenueMixCategory | null;
     coachingInterest: CoachingInterest | null;
     deliveryModel: DeliveryModel | null;
+    objectionTags: string[];
   };
 };
 
@@ -376,6 +378,28 @@ const inferNiche = (bodies: string[]): string | null => {
   return null;
 };
 
+// ── Objection inference ───────────────────────────────────────────────────────
+const OBJECTION_MAP: Record<string, RegExp[]> = {
+  'price_cost': [/\btoo expensive\b/i, /\bprice is high\b/i, /\bcant afford\b/i, /\bcost\b.{0,20}\bmuch\b/i, /\binvestment\b.{0,20}\bhigh\b/i],
+  'time_capacity': [/\bno time\b/i, /\btoo busy\b/i, /\boverwhelmed\b/i, /\bnot right now\b/i, /\bwaiting\b/i],
+  'spouse_partner': [/\btalk to (?:my )?(?:spouse|wife|husband|partner)\b/i, /\brun it by (?:my )?(?:spouse|wife|husband|partner)\b/i],
+  'market_saturation': [/\bsaturated\b/i, /\btoo many pt\b/i, /\bcompetition\b/i],
+  'insurance_reliance': [/\bpatients won'?t pay cash\b/i, /\bneed insurance\b/i, /\bonly take insurance\b/i],
+};
+
+const inferObjectionTags = (bodies: string[]): string[] => {
+  const found = new Set<string>();
+  for (const body of bodies) {
+    const normalized = normalizeLower(body);
+    for (const [tag, patterns] of Object.entries(OBJECTION_MAP)) {
+      if (patterns.some(p => p.test(normalized))) {
+        found.add(tag);
+      }
+    }
+  }
+  return [...found];
+};
+
 const resolveQualificationProgressStep = (snapshot: {
   fullOrPartTime: EmploymentStatus;
   niche: string | null;
@@ -408,36 +432,37 @@ export const inferQualificationStateFromMessages = (
     revenueMix: inferRevenueMix(inboundBodies),
     coachingInterest: inferCoachingInterest(inboundBodies),
     deliveryModel: inferDeliveryModel(inboundBodies),
+    objectionTags: inferObjectionTags(inboundBodies),
   };
 
   const snapshot: QualificationSnapshot = {
-    fullOrPartTime: inferred.fullOrPartTime
-      ? allowOverwriteKnown || state.qualification_full_or_part_time === 'unknown'
-        ? inferred.fullOrPartTime
-        : state.qualification_full_or_part_time
-      : state.qualification_full_or_part_time,
-    niche: inferred.niche
-      ? allowOverwriteKnown || isNicheMissing(state.qualification_niche)
-        ? inferred.niche
-        : state.qualification_niche
+    fullOrPartTime: (inferred.fullOrPartTime && (allowOverwriteKnown || state.qualification_full_or_part_time === 'unknown'))
+      ? inferred.fullOrPartTime
+      : (state.qualification_full_or_part_time as EmploymentStatus),
+    niche: (inferred.niche && (allowOverwriteKnown || isNicheMissing(state.qualification_niche)))
+      ? inferred.niche
       : state.qualification_niche,
-    revenueMix: inferred.revenueMix
-      ? allowOverwriteKnown || state.qualification_revenue_mix === 'unknown'
-        ? inferred.revenueMix
-        : state.qualification_revenue_mix
-      : state.qualification_revenue_mix,
-    coachingInterest: inferred.coachingInterest
-      ? allowOverwriteKnown || state.qualification_coaching_interest === 'unknown'
-        ? inferred.coachingInterest
-        : state.qualification_coaching_interest
-      : state.qualification_coaching_interest,
-    deliveryModel: inferred.deliveryModel
-      ? allowOverwriteKnown || state.qualification_delivery_model === 'unknown'
-        ? inferred.deliveryModel
-        : state.qualification_delivery_model
-      : state.qualification_delivery_model,
+    revenueMix: (inferred.revenueMix && (allowOverwriteKnown || state.qualification_revenue_mix === 'unknown'))
+      ? inferred.revenueMix
+      : (state.qualification_revenue_mix as RevenueMixCategory),
+    coachingInterest: (inferred.coachingInterest && (allowOverwriteKnown || state.qualification_coaching_interest === 'unknown'))
+      ? inferred.coachingInterest
+      : (state.qualification_coaching_interest as CoachingInterest),
+    deliveryModel: (inferred.deliveryModel && (allowOverwriteKnown || state.qualification_delivery_model === 'unknown'))
+      ? inferred.deliveryModel
+      : ((state.qualification_delivery_model || 'unknown') as DeliveryModel),
     progressStep: 0,
+    objectionTags: (state.objection_tags || []) as string[],
   };
+
+  // Merge objection tags (don't overwrite, just append new ones)
+  if (inferred.objectionTags.length > 0) {
+    const nextTags = [...new Set([...snapshot.objectionTags, ...inferred.objectionTags])];
+    if (nextTags.length !== snapshot.objectionTags.length) {
+      snapshot.objectionTags = nextTags;
+    }
+  }
+
   snapshot.progressStep = resolveQualificationProgressStep(snapshot);
 
   const updates: QualificationInferenceResult['updates'] = {};
@@ -453,11 +478,14 @@ export const inferQualificationStateFromMessages = (
   if (snapshot.coachingInterest !== state.qualification_coaching_interest) {
     updates.coachingInterest = snapshot.coachingInterest;
   }
-  if (snapshot.deliveryModel !== state.qualification_delivery_model) {
+  if (snapshot.deliveryModel !== (state.qualification_delivery_model || 'unknown')) {
     updates.deliveryModel = snapshot.deliveryModel;
   }
-  if (snapshot.progressStep !== state.qualification_progress_step) {
+  if (snapshot.progressStep !== (state.qualification_progress_step || 0)) {
     updates.progressStep = snapshot.progressStep;
+  }
+  if (JSON.stringify(snapshot.objectionTags) !== JSON.stringify(state.objection_tags || [])) {
+    updates.objectionTags = snapshot.objectionTags;
   }
 
   const changed = Object.keys(updates).length > 0;

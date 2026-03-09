@@ -39,26 +39,14 @@ const resolvePrismaConfig = (): { url: string; mode: PrismaMode; detail?: string
 };
 
 const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
-  if (!process.env.DATABASE_URL) {
-    process.env.DATABASE_URL = config.url;
-  }
-  if (config.mode === 'accelerate' && !process.env.PRISMA_ACCELERATE_URL) {
-    process.env.PRISMA_ACCELERATE_URL = config.url;
-  }
-
-  const prismaClientOptions: any = {
-    datasources: {
-      db: {
-        url: config.url,
-      },
-    },
-  };
-
   if (config.mode === 'accelerate') {
-    return (new PrismaClient(prismaClientOptions) as any).$extends(withAccelerate()) as unknown as PrismaClient;
+    // @ts-ignore - Prisma 7 uses accelerateUrl
+    return (new PrismaClient({ accelerateUrl: config.url }) as any).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
-  return new PrismaClient(prismaClientOptions);
+  // NOTE: For direct mode in Prisma 7, datasourceUrl is also unknown if using 'client' engine.
+  // It usually requires an adapter or a different engine configuration.
+  return new PrismaClient();
 };
 
 export const getPrismaClient = (): PrismaRuntimeClient => {

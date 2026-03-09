@@ -57,7 +57,7 @@ const compareVersionParts = (a: number[] | null, b: number[] | null): number => 
 };
 
 const extractVersionDisplay = (label: string): string => {
-  const match = label.match(/(?:v)?(\d+(?:\.\d+)+)/i);
+  const match = label.match(/(?:v\d+(?:\.\d+)*|\b\d+(?:\.\d+)+)\b/i);
   return match?.[0] ?? '';
 };
 

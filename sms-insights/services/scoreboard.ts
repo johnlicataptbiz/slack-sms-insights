@@ -1,5 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallsSummary } from './booked-calls.js';
+import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallsSummary, getBookedCallSequenceFromSmsEvents } from './booked-calls.js';
 import { getPrismaClient } from './prisma.js';
 import { getSalesMetricsSummary } from './sales-metrics.js';
 
@@ -140,7 +140,7 @@ export type ScoreboardV2 = {
 
 const EXPLICIT_AB_VERSION_PATTERN = /\b(?:version\s*([AB])|([AB])\s*version)\b/i;
 const TRAILING_YEAR_VERSION_PATTERN = /\s*-\s*20\d{2}\s*v?\d+(?:\.\d+)*\s*$/i;
-const TRAILING_GENERIC_VERSION_PATTERN = /\s*v?\d+(?:\.\d+){1,}\s*$/i;
+const TRAILING_GENERIC_VERSION_PATTERN = /\s*(?:v\d+(?:\.\d+)*|\d+(?:\.\d+)+)\s*$/i;
 const TRAILING_YEAR_PATTERN = /\s*-\s*20\d{2}\s*$/i;
 const V2_PATTERN = /\bv2\b/i;
 const LEGACY_PATTERN = /\blegacy\b/i;
@@ -690,9 +690,11 @@ export const getScoreboardData = async (
   ]);
 
   // SMS reply links for attribution
-  const [weeklySmsReplyLinks, monthlySmsReplyLinks] = await Promise.all([
+  const [weeklySmsReplyLinks, monthlySmsReplyLinks, weeklySmsSequenceLookup, monthlySmsSequenceLookup] = await Promise.all([
     getBookedCallSmsReplyLinks(weeklyAttributionSources, logger),
     getBookedCallSmsReplyLinks(monthlyAttributionSources, logger),
+    getBookedCallSequenceFromSmsEvents(weeklyAttributionSources, logger),
+    getBookedCallSequenceFromSmsEvents(monthlyAttributionSources, logger),
   ]);
 
   // Build canonical slices (merges SMS heuristics with Slack booked-calls)
@@ -704,11 +706,13 @@ export const getScoreboardData = async (
     weeklyCanonical.topSequences,
     weeklyAttributionSources,
     weeklySmsReplyLinks,
+    weeklySmsSequenceLookup,
   );
   const monthlySeqAttribution = attributeSlackBookedCallsToSequences(
     monthlyCanonical.topSequences,
     monthlyAttributionSources,
     monthlySmsReplyLinks,
+    monthlySmsSequenceLookup,
   );
 
   // Build all metric sections

@@ -38,7 +38,7 @@ const normalizeSequenceLabel = (label: string): string => label.trim().replace(/
 
 const EXPLICIT_AB_VERSION_PATTERN = /\b(?:version\s*([AB])|([AB])\s*version)\b/i;
 const TRAILING_YEAR_VERSION_PATTERN = /\s*-\s*20\d{2}\s*v?\d+(?:\.\d+)*\s*$/i;
-const TRAILING_GENERIC_VERSION_PATTERN = /\s*v?\d+(?:\.\d+){1,}\s*$/i;
+const TRAILING_GENERIC_VERSION_PATTERN = /\s*(?:v\d+(?:\.\d+)*|\d+(?:\.\d+)+)\s*$/i;
 const TRAILING_YEAR_PATTERN = /\s*-\s*20\d{2}\s*$/i;
 const V2_PATTERN = /\bv2\b/i;
 const LEGACY_PATTERN = /\blegacy\b/i;

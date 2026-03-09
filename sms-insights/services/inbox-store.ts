@@ -295,6 +295,7 @@ export type UpdateConversationStateInput = {
   deliveryModel?: DeliveryModel;
   coachingInterest?: CoachingInterest;
   progressStep?: number;
+  objectionTags?: string[];
   escalationLevel?: 1 | 2 | 3 | 4;
   escalationReason?: string | null;
   escalationOverridden?: boolean;
@@ -320,6 +321,7 @@ export const updateConversationState = async (
     if (input.deliveryModel !== undefined) updateData.qualification_delivery_model = input.deliveryModel;
     if (input.coachingInterest !== undefined) updateData.qualification_coaching_interest = input.coachingInterest;
     if (input.progressStep !== undefined) updateData.qualification_progress_step = input.progressStep;
+    if (input.objectionTags !== undefined) updateData.objection_tags = input.objectionTags;
     if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
     if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
     if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;

@@ -121,37 +121,47 @@
   - [x] 19.2 Add mobile styles for tab navigation
   - [x] 19.3 Ensure touch targets are adequate
 
+## Phase 5: UI Improvements Phase 3 (Advanced Table Features)
+
+- [x] 20. Column Visibility Functionality
+  - [x] 20.1 Wire up column visibility toggle to actually hide/show columns
+  - [x] 20.2 Update table header to reflect visible columns only
+  - [x] 20.3 Persist column visibility to localStorage
+
+- [ ] 21. Advanced Filtering
+  - [ ] 21.1 Add date range filter for sequence first seen
+  - [ ] 21.2 Add metric threshold filters (min reply rate, min bookings)
+  - [ ] 21.3 Add lead magnet filter dropdown
+  - [ ] 21.4 Add "show only champions" filter
+
+- [ ] 22. Table Pagination
+  - [ ] 22.1 Add pagination for large sequence families (>10 versions)
+  - [ ] 22.2 Add items per page selector (10, 25, 50, 100)
+  - [ ] 22.3 Add pagination info display
+
+- [ ] 23. Performance Optimizations
+  - [ ] 23.1 Virtualize long lists for better scroll performance
+  - [ ] 23.2 Debounce search input
+  - [ ] 23.3 Memoize expensive calculations
+
 ## Current Status
 
-**Phase**: UI IMPROVEMENTS - Phase 1 Complete (Hero + Tabs)  
+**Phase**: UI IMPROVEMENTS - Phase 2 Complete (Table Controls)  
 **Last Updated**: 2025-01-24  
-**Next Action**: Test TypeScript compilation and verify build
+**Next Action**: Start Phase 3 - Advanced Table Features
 
 ### Completed
-- ✅ **Database Migration**: Already complete - current DB is PTBIZSMS
-  - Verified: Contains all ptbizsms-specific tables (lead_outcomes, lead_attribution, etc.)
-  - Verified: 621 conversations with qualification data (49.2% coverage)
-  - Verified: All critical tables present with substantial data
-- ✅ Database migration verification script created
-- ✅ Database connection migration script created  
-- ✅ ReplyTimingPanel component with CSS
-- ✅ SequenceQualificationBreakdown component with CSS
-- ✅ SequencesV2 page updated with new components
-- ✅ All CSS styles added
-- ✅ **UI Improvements Phase 1**:
-  - ✅ V2HeroSummary component with gradient styling
-  - ✅ V2TabNav component with sticky positioning
-  - ✅ Content reorganized into 4 logical tabs
-  - ✅ Per-section loading states implemented
-  - ✅ Mobile responsive styles added
-  - ✅ Export utility created
+- ✅ **Phase 1**: Hero Summary + Tabbed Navigation (commit 683eb4e)
+- ✅ **Phase 2**: Table Improvements - sorting, filtering, export (commit 535ef73)
+  - ✅ TableControls component with search, sort, column visibility UI
+  - ✅ CSV export functionality
+  - ✅ Results count indicator
+  - ✅ Mobile responsive table controls
 
-### Completed
-- ✅ TypeScript compilation successful
-- ✅ Build successful (4.45s)
+### In Progress
+- ⏳ Phase 3: Advanced Table Features
 
-### Ready for Testing
-- ⏳ Test hero summary renders correctly
-- ⏳ Test tab navigation switches content
-- ⏳ Test mobile responsive layout
-- ⏳ Deploy to production
+### Ready for Development
+- ⏳ Wire up column visibility to actually hide columns
+- ⏳ Add advanced filtering (date ranges, metric thresholds)
+- ⏳ Add pagination for large datasets

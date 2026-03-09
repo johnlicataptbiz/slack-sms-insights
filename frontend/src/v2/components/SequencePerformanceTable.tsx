@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import type { UnattributedAuditRow } from '../../api/v2-types';
 import { V2Panel, V2State, V2Skeleton } from './V2Primitives';
 import { exportToCSV, formatDateForFilename } from '../../utils/export';
@@ -282,12 +282,12 @@ function SequenceFamilyGroup({
       <table className="V2Table" style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--v2-text-dim)', textAlign: 'left', borderBottom: '1px solid var(--v2-border)' }}>
-            <th style={{ padding: '0.75rem 1.25rem' }}>Version / Status</th>
-            <th>Volume</th>
-            <th>Reply Rate</th>
-            <th>Booking Rate</th>
-            <th>Opt-Outs</th>
-            <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>Gaps</th>
+            {columnVisibility.version && <th style={{ padding: '0.75rem 1.25rem' }}>Version / Status</th>}
+            {columnVisibility.volume && <th>Volume</th>}
+            {columnVisibility.replyRate && <th>Reply Rate</th>}
+            {columnVisibility.bookingRate && <th>Booking Rate</th>}
+            {columnVisibility.optOuts && <th>Opt-Outs</th>}
+            {columnVisibility.gaps && <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>Gaps</th>}
           </tr>
         </thead>
         <tbody>
@@ -302,64 +302,76 @@ function SequenceFamilyGroup({
 
             return (
               <tr key={row.label} style={{ borderBottom: idx < sortedVersions.length -1 ? '1px solid var(--v2-border)' : 'none' }}>
-                <td style={{ padding: '1rem 1.25rem' }}>
-                  <div className="V2ExperimentMeta">
-                    <span className="V2ExperimentMeta__version">{versionLabel}</span>
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {isChampion && <span className="V2Badge V2Badge--champion">Champion</span>}
-                      {isExperimental && <span className="V2Badge V2Badge--experimental">Latest</span>}
-                      {row.uniqueContacted > 0 && row.uniqueContacted < 50 && <span className="V2Badge V2Badge--confidenceLow">Low Sample</span>}
+                {columnVisibility.version && (
+                  <td style={{ padding: '1rem 1.25rem' }}>
+                    <div className="V2ExperimentMeta">
+                      <span className="V2ExperimentMeta__version">{versionLabel}</span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {isChampion && <span className="V2Badge V2Badge--champion">Champion</span>}
+                        {isExperimental && <span className="V2Badge V2Badge--experimental">Latest</span>}
+                        {row.uniqueContacted > 0 && row.uniqueContacted < 50 && <span className="V2Badge V2Badge--confidenceLow">Low Sample</span>}
+                      </div>
                     </div>
-                  </div>
-                </td>
-                <td>
-                  <div style={{ fontWeight: 500 }}>{fmtInt(row.uniqueContacted)} <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.75rem' }}>leads</span></div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{fmtInt(row.messagesSent)} msgs</div>
-                </td>
-                <td>
-                  <div className="V2StatComparison">
-                    <span className="V2Table__cell--main-metric" style={{ color: row.replyRatePct >= 10 ? 'var(--v2-positive)' : 'inherit' }}>
-                      {fmtPct(row.replyRatePct)}
-                    </span>
-                    <StatDelta current={row.replyRatePct} previous={prevVersion?.replyRatePct ?? 0} />
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{fmtInt(row.repliesReceived)} interactions</div>
-                </td>
-                <td>
-                  <div className="V2StatComparison">
-                    <span className="V2Table__cell--main-metric" style={{ color: row.bookingRatePct >= 2 ? 'var(--v2-positive)' : 'inherit' }}>
-                      {fmtPct(row.bookingRatePct)}
-                    </span>
-                    <StatDelta current={row.bookingRatePct} previous={prevVersion?.bookingRatePct ?? 0} />
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', display: 'flex', gap: '8px' }}>
-                    <span>{fmtInt(row.canonicalBookedCalls)} calls</span>
-                    {(row.canonicalBookedJack > 0 || row.canonicalBookedBrandon > 0 || row.canonicalBookedSelf > 0) && (
-                      <span style={{ color: 'var(--v2-text-dim)', opacity: 0.8 }}>
-                        ({[
-                          row.canonicalBookedJack > 0 && `J:${row.canonicalBookedJack}`,
-                          row.canonicalBookedBrandon > 0 && `B:${row.canonicalBookedBrandon}`,
-                          row.canonicalBookedSelf > 0 && `S:${row.canonicalBookedSelf}`
-                        ].filter(Boolean).join(' ')})
+                  </td>
+                )}
+                {columnVisibility.volume && (
+                  <td>
+                    <div style={{ fontWeight: 500 }}>{fmtInt(row.uniqueContacted)} <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.75rem' }}>leads</span></div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{fmtInt(row.messagesSent)} msgs</div>
+                  </td>
+                )}
+                {columnVisibility.replyRate && (
+                  <td>
+                    <div className="V2StatComparison">
+                      <span className="V2Table__cell--main-metric" style={{ color: row.replyRatePct >= 10 ? 'var(--v2-positive)' : 'inherit' }}>
+                        {fmtPct(row.replyRatePct)}
                       </span>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <div style={{ color: row.optOutRatePct >= 6 ? 'var(--v2-warning)' : 'inherit' }}>
-                    {fmtPct(row.optOutRatePct)}
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{row.optOuts} total</div>
-                </td>
-                <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
-                  {gaps.length > 0 ? (
-                    <div className="V2Table__cell--gap-warning" title={`${gaps.length} booked calls almost matched this version but were below the fuzzy threshold.`}>
-                      ⚠️ {gaps.length} Gaps
+                      <StatDelta current={row.replyRatePct} previous={prevVersion?.replyRatePct ?? 0} />
                     </div>
-                  ) : (
-                    <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.8rem' }}>—</span>
-                  )}
-                </td>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{fmtInt(row.repliesReceived)} interactions</div>
+                  </td>
+                )}
+                {columnVisibility.bookingRate && (
+                  <td>
+                    <div className="V2StatComparison">
+                      <span className="V2Table__cell--main-metric" style={{ color: row.bookingRatePct >= 2 ? 'var(--v2-positive)' : 'inherit' }}>
+                        {fmtPct(row.bookingRatePct)}
+                      </span>
+                      <StatDelta current={row.bookingRatePct} previous={prevVersion?.bookingRatePct ?? 0} />
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', display: 'flex', gap: '8px' }}>
+                      <span>{fmtInt(row.canonicalBookedCalls)} calls</span>
+                      {(row.canonicalBookedJack > 0 || row.canonicalBookedBrandon > 0 || row.canonicalBookedSelf > 0) && (
+                        <span style={{ color: 'var(--v2-text-dim)', opacity: 0.8 }}>
+                          ({[
+                            row.canonicalBookedJack > 0 && `J:${row.canonicalBookedJack}`,
+                            row.canonicalBookedBrandon > 0 && `B:${row.canonicalBookedBrandon}`,
+                            row.canonicalBookedSelf > 0 && `S:${row.canonicalBookedSelf}`
+                          ].filter(Boolean).join(' ')})
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                )}
+                {columnVisibility.optOuts && (
+                  <td>
+                    <div style={{ color: row.optOutRatePct >= 6 ? 'var(--v2-warning)' : 'inherit' }}>
+                      {fmtPct(row.optOutRatePct)}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{row.optOuts} total</div>
+                  </td>
+                )}
+                {columnVisibility.gaps && (
+                  <td style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                    {gaps.length > 0 ? (
+                      <div className="V2Table__cell--gap-warning" title={`${gaps.length} booked calls almost matched this version but were below the fuzzy threshold.`}>
+                        ⚠️ {gaps.length} Gaps
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.8rem' }}>—</span>
+                    )}
+                  </td>
+                )}
               </tr>
             );
           })}
@@ -369,6 +381,8 @@ function SequenceFamilyGroup({
   );
 }
 
+const columnVisibilityStorageKey = 'v2_sequences_column_visibility_v1';
+
 export function SequencePerformanceTable({ 
   mergedRows, 
   modeLabel, 
@@ -376,17 +390,55 @@ export function SequencePerformanceTable({
   mode = '7d',
 }: SequencePerformanceTableProps) {
   // State for table controls
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('canonicalBookedCalls');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>({
-    version: true,
-    volume: true,
-    replyRate: true,
-    bookingRate: true,
-    optOuts: true,
-    gaps: true,
+  
+  // Load column visibility from localStorage
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
+    if (typeof window === 'undefined') {
+      return {
+        version: true,
+        volume: true,
+        replyRate: true,
+        bookingRate: true,
+        optOuts: true,
+        gaps: true,
+      };
+    }
+    try {
+      const saved = localStorage.getItem(columnVisibilityStorageKey);
+      if (saved) {
+        return { ...JSON.parse(saved) };
+      }
+    } catch {
+      // Ignore parse errors
+    }
+    return {
+      version: true,
+      volume: true,
+      replyRate: true,
+      bookingRate: true,
+      optOuts: true,
+      gaps: true,
+    };
   });
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Persist column visibility to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(columnVisibilityStorageKey, JSON.stringify(columnVisibility));
+    }
+  }, [columnVisibility]);
 
   // Filter and sort rows
   const processedRows = useMemo(() => {
@@ -469,8 +521,8 @@ export function SequencePerformanceTable({
       caption={`Iterative tracking across ${uniqueFamilyCount} sequence families · ${modeLabel} · Booked = Slack-verified`}
     >
       <TableControls
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchQuery={searchInput}
+        onSearchChange={setSearchInput}
         sortBy={sortBy}
         sortOrder={sortOrder}
         onSortChange={setSortBy}

@@ -10,6 +10,7 @@ const getPrisma = () => getPrismaClient();
 export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors: string[] }> => {
   const prisma = getPrisma();
   const errors: string[] = [];
+  const syncedConversationIds = new Set<string>();
 
   // Get distribution of current workload by rep
   const workloadRows = await prisma.$queryRawUnsafe<{ rep_id: string; count: bigint }[]>(`
@@ -61,10 +62,29 @@ export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors:
     }
 
     try {
-      await prisma.work_items.update({
-        where: { id: row.id },
-        data: { rep_id: repId },
+      await prisma.$transaction(async (tx) => {
+        await tx.work_items.update({
+          where: { id: row.id },
+          data: { rep_id: repId },
+        });
+
+        if (!syncedConversationIds.has(row.conversation_id)) {
+          // Keep conversation-level assignment in sync so backlog KPIs do not stay "unassigned"
+          // after work items have already been auto-assigned.
+          await tx.$executeRawUnsafe(
+            `
+            UPDATE conversations
+            SET current_rep_id = $2
+            WHERE id = $1::uuid
+              AND (current_rep_id IS NULL OR BTRIM(current_rep_id) = '')
+            `,
+            row.conversation_id,
+            repId,
+          );
+          syncedConversationIds.add(row.conversation_id);
+        }
       });
+
       workload[repId] = (workload[repId] || 0) + 1;
       assigned++;
     } catch (err) {

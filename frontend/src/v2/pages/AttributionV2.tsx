@@ -1,26 +1,16 @@
-import { useMemo } from 'react';
-
 import { useV2SalesMetrics } from '../../api/v2Queries';
-import { resolveCurrentBusinessDay, shiftIsoDay } from '../../utils/runDay';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
 import { v2Copy } from '../copy';
 import { UnattributedAuditTable } from '../components/UnattributedAuditTable';
 
-const BUSINESS_TZ = 'America/Chicago';
-
 export default function AttributionV2() {
-  const business = useMemo(() => resolveCurrentBusinessDay({ timeZone: BUSINESS_TZ, startHour: 4 }), []);
-  const day = useMemo(() => (business ? shiftIsoDay(business.day, -1) : null), [business]);
-
-  const { data, isLoading, isError, error } = useV2SalesMetrics(day ? { day, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ });
+  const { data, isLoading, isError, error } = useV2SalesMetrics({ range: 'today', tz: 'America/Chicago' });
   const payload = data?.data;
 
   if (isLoading) return <V2State kind="loading">Loading attribution deep dive…</V2State>;
   if (isError || !payload) {
     return <V2State kind="error">Failed to load attribution: {String((error as Error)?.message || error)}</V2State>;
   }
-
-  const diagnosticSignals = payload.sequences.reduce((sum, row) => sum + row.diagnosticSmsBookingSignals, 0);
 
   return (
     <div className="V2Page">
@@ -31,7 +21,6 @@ export default function AttributionV2() {
 
       <section className="V2MetricsGrid">
         <V2MetricCard label={<V2Term term="callsBookedSlack" />} value={payload.bookedCredit.total.toLocaleString()} tone="positive" />
-        <V2MetricCard label={<V2Term term="smsBookingHintsDiagnostic" />} value={diagnosticSignals.toLocaleString()} tone="accent" />
         <V2MetricCard label="Overall Reply Rate (People)" value={`${payload.totals.replyRatePct.toFixed(1)}%`} />
         <V2MetricCard label={<V2Term term="manualReplyRate" />} value={`${payload.totals.manualReplyRatePct.toFixed(1)}%`} />
         <V2MetricCard label={<V2Term term="sequenceReplyRate" />} value={`${payload.totals.sequenceReplyRatePct.toFixed(1)}%`} />
@@ -46,11 +35,11 @@ export default function AttributionV2() {
           </ul>
         </V2Panel>
 
-        <V2Panel title="SMS Hint Signals (Support View)" caption="Useful for QA and early signal checks, not booked-call KPI totals.">
+        <V2Panel title="How Booking Credit Works" caption="Clear rule set for how setter credit is assigned.">
           <ul className="V2BulletList">
-            <li>Source: SMS body heuristics.</li>
-            <li>Used to coach messaging quality and catch conversion signals early.</li>
-            <li>Not included in booked-call totals in v2.</li>
+            <li>If Jack reacts, credit goes to Jack.</li>
+            <li>If Brandon reacts, credit goes to Brandon.</li>
+            <li>If no setter reaction exists, it is treated as self-booked.</li>
           </ul>
         </V2Panel>
       </div>

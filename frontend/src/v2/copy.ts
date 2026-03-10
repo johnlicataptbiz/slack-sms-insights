@@ -6,7 +6,7 @@ export const v2Copy = {
     setterJack: "Jack's Stats",
     setterBrandon: "Brandon's Stats",
     sequences: 'Sequences',
-    attribution: 'Attribution',
+    attribution: 'Booking Audit',
   },
   actions: {
     kpiDefinitions: 'KPI Definitions',
@@ -43,8 +43,8 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
     definition: 'Calls this setter booked, credited from Slack booking records.',
   },
   smsBookingHintsDiagnostic: {
-    label: 'Booking Signals',
-    definition: 'Conversations our system flagged as likely bookings — for reference only, not added to your booked total.',
+    label: 'Internal Booking Signal',
+    definition: 'Internal QA signal only. This is not used for booked-call credit.',
   },
   peopleContacted: {
     label: 'Leads Reached',
@@ -56,7 +56,7 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
   },
   outboundConversations: {
     label: 'Conversations Started',
-    definition: 'Unique leads we started a conversation with.',
+    definition: 'Unique leads the team started texting.',
   },
   optOuts: {
     label: 'Opt-Outs',
@@ -72,15 +72,15 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
   },
   sequenceReplyRate: {
     label: 'Sequence Reply Rate',
-    definition: 'Reply rate from automated sequence follow-ups.',
+    definition: 'Reply rate from automated follow-up sequences.',
   },
   selfBooked: {
     label: 'Self-Booked',
     definition: 'Discovery calls booked without setter help.',
   },
   sequenceMatchCoverage: {
-    label: 'Sequence-Attributed Bookings',
-    definition: 'Booked calls where a sequence started the first conversation.',
+    label: 'Bookings Tied to a Sequence',
+    definition: 'Booked calls where we can confidently tie the lead back to a sequence.',
   },
 };
 
@@ -90,7 +90,6 @@ export const V2_TERM_GROUPS: Array<{ title: string; keys: V2TermKey[] }> = [
     keys: [
       'callsBookedSlack',
       'callsBookedCreditSlack',
-      'smsBookingHintsDiagnostic',
       'peopleContacted',
       'replyRatePeople',
       'outboundConversations',

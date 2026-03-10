@@ -54,7 +54,7 @@ export function InsightsV2() {
     <div className="V2Page">
       <V2PageHeader
         title="Performance"
-        subtitle="Team and rep KPIs, funnel conversion, risk watchlist, and Monday health."
+        subtitle="Team and setter results, conversion flow, what needs attention, and Monday sync status."
         right={
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {(Object.keys(RANGE_LABELS) as Range[]).map((value) => (
@@ -89,7 +89,7 @@ export function InsightsV2() {
       </div>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Setter Comparison" caption="Embedded Jack/Brandon scorecards.">
+        <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range.">
           <div className="V2TableWrap">
             <table className="V2Table">
               <thead>
@@ -127,7 +127,7 @@ export function InsightsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Funnel" caption="Contacted -> replied -> booked conversion and dropoff.">
+        <V2Panel title="Lead Flow" caption="How leads move from contacted to replied to booked.">
           <div className="V2SplitStat">
             <div>
               <span>Contacted</span>
@@ -144,11 +144,11 @@ export function InsightsV2() {
           </div>
           <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
             <div>
-              <span>Contact -&gt; Reply Dropoff</span>
+              <span>Contacted to Replied Dropoff</span>
               <strong>{fmtPct(data.funnel.replyDropoffPct)}</strong>
             </div>
             <div>
-              <span>Reply -&gt; Booking Dropoff</span>
+              <span>Replied to Booked Dropoff</span>
               <strong>{fmtPct(data.funnel.bookingDropoffPct)}</strong>
             </div>
           </div>
@@ -156,9 +156,9 @@ export function InsightsV2() {
       </div>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Risk Watchlist" caption="Auto-flagged issues from KPI thresholds.">
+        <V2Panel title="Watch List" caption="Items that need attention based on this range.">
           {data.risks.length === 0 ? (
-            <V2State kind="empty">No active risk flags for this window.</V2State>
+            <V2State kind="empty">No issues flagged for this date range.</V2State>
           ) : (
             <div className="V2RiskFlags">
               {data.risks.map((risk) => (
@@ -171,14 +171,14 @@ export function InsightsV2() {
           )}
         </V2Panel>
 
-        <V2Panel title="Monday Health" caption="Compact sync and coverage health.">
+        <V2Panel title="Monday Sync Status" caption="Is Monday data current and complete?">
           <div className="V2SplitStat">
             <div>
               <span>Boards</span>
               <strong>{fmtInt(data.mondayHealth.boards)}</strong>
             </div>
             <div>
-              <span>Stale</span>
+              <span>Needs Sync</span>
               <strong>{fmtInt(data.mondayHealth.staleBoards)}</strong>
             </div>
             <div>
@@ -188,11 +188,11 @@ export function InsightsV2() {
           </div>
           <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
             <div>
-              <span>Source Coverage</span>
+              <span>Source Filled In</span>
               <strong>{fmtPct(data.mondayHealth.avgSourceCoveragePct)}</strong>
             </div>
             <div>
-              <span>Campaign Coverage</span>
+              <span>Campaign Filled In</span>
               <strong>{fmtPct(data.mondayHealth.avgCampaignCoveragePct)}</strong>
             </div>
           </div>

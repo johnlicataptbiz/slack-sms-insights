@@ -47,7 +47,7 @@ export default function SequencesV2() {
     <div className="V2Page">
       <V2PageHeader
         title="Sequences"
-        subtitle="Deep SMS diagnostics: canonical KPIs, attribution breakdown, qualification quality, and Monday outcomes health."
+        subtitle="How each sequence is performing: volume, replies, bookings, and lead quality."
         right={
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
@@ -72,10 +72,10 @@ export default function SequencesV2() {
       />
 
       {query.isLoading ? (
-        <V2State kind="loading">Loading deep sequence analytics…</V2State>
+        <V2State kind="loading">Loading sequence performance…</V2State>
       ) : query.isError || !data || !totals ? (
         <V2State kind="error" onRetry={() => void query.refetch()}>
-          Failed to load deep sequence analytics.
+          Failed to load sequence performance.
         </V2State>
       ) : (
         <>
@@ -99,13 +99,13 @@ export default function SequencesV2() {
               value={fmtPct(totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0)}
             />
             <V2MetricCard label="Opt-outs" value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
-            <V2MetricCard label="Monday stale boards" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
+            <V2MetricCard label="Monday needs sync" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
           </div>
 
           <div ref={tableRef}>
             <V2Panel
-              title="Canonical Sequence Table"
-              caption="Registry-backed sequence analytics and quality diagnostics."
+              title="Sequence Performance Table"
+              caption="At-a-glance sequence performance for this date range."
             >
               <div className="V2TableWrap V2TableWrap--sequences">
                 <table className="V2Table V2Table--sequences">
@@ -155,14 +155,14 @@ export default function SequencesV2() {
           </div>
 
           <div className="V2Grid V2Grid--3">
-            <V2Panel title="Monday Outcomes Health" caption="Operational quality signals from Monday pipelines.">
+            <V2Panel title="Monday Sync Status" caption="Quick read on Monday data freshness.">
               <div className="V2SplitStat">
                 <div>
                   <span>Boards</span>
                   <strong>{fmtInt(data.monday.boards)}</strong>
                 </div>
                 <div>
-                  <span>Stale</span>
+                  <span>Needs Sync</span>
                   <strong>{fmtInt(data.monday.staleBoards)}</strong>
                 </div>
                 <div>
@@ -172,22 +172,22 @@ export default function SequencesV2() {
               </div>
             </V2Panel>
 
-            <V2Panel title="Monday Coverage" caption="Coverage quality should trend toward 100%.">
+            <V2Panel title="Monday Data Coverage" caption="How complete key Monday fields are.">
               <div className="V2DeltaList">
                 <div>
-                  <span>Source Coverage</span>
+                  <span>Source Filled In</span>
                   <strong>{fmtPct(data.monday.avgSourceCoveragePct)}</strong>
                 </div>
                 <div>
-                  <span>Campaign Coverage</span>
+                  <span>Campaign Filled In</span>
                   <strong>{fmtPct(data.monday.avgCampaignCoveragePct)}</strong>
                 </div>
                 <div>
-                  <span>Set By Coverage</span>
+                  <span>Set By Filled In</span>
                   <strong>{fmtPct(data.monday.avgSetByCoveragePct)}</strong>
                 </div>
                 <div>
-                  <span>Touchpoints Coverage</span>
+                  <span>Touchpoints Filled In</span>
                   <strong>{fmtPct(data.monday.avgTouchpointsCoveragePct)}</strong>
                 </div>
               </div>

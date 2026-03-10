@@ -39,7 +39,6 @@ export default function RepV2({ rep }: { rep: RepKey }) {
         outbound: 0,
         optOuts: 0,
         optOutRate: 0,
-        hints: 0,
       };
     }
 
@@ -49,15 +48,12 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     const outbound = repRow?.outboundConversations ?? 0;
     const optOuts = repRow?.optOuts ?? 0;
     const optOutRate = outbound > 0 ? (optOuts / outbound) * 100 : 0;
-    const hints = repRow?.diagnosticSmsBookingSignals ?? 0;
-
     return {
       booked,
       replyRate,
       outbound,
       optOuts,
       optOutRate,
-      hints,
     };
   }, [payload, rep]);
 
@@ -70,15 +66,12 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     const outbound = repRow?.outboundConversations ?? 0;
     const optOuts = repRow?.optOuts ?? 0;
     const optOutRate = outbound > 0 ? (optOuts / outbound) * 100 : 0;
-    const hints = repRow?.diagnosticSmsBookingSignals ?? 0;
-
     return {
       booked,
       replyRate,
       outbound,
       optOuts,
       optOutRate,
-      hints,
     };
   }, [prevPayload, rep]);
 
@@ -90,7 +83,6 @@ export default function RepV2({ rep }: { rep: RepKey }) {
       replyRate: metrics.replyRate - prevMetrics.replyRate,
       optOuts: metrics.optOuts - prevMetrics.optOuts,
       optOutRate: metrics.optOutRate - prevMetrics.optOutRate,
-      hints: metrics.hints - prevMetrics.hints,
     };
   }, [metrics, prevMetrics]);
 
@@ -108,14 +100,14 @@ export default function RepV2({ rep }: { rep: RepKey }) {
       flags.push({
         level: 'warning',
         title: 'High outbound volume with zero calls booked',
-        detail: `${fmtInt(metrics.outbound)} outbound conversations with no booked-call credit.`,
+        detail: `${fmtInt(metrics.outbound)} outbound conversations with no booked calls credited yet.`,
       });
     }
     if (metrics.replyRate > 0 && metrics.replyRate < 5 && metrics.outbound >= 20) {
       flags.push({
         level: 'warning',
         title: 'Low reply rate on high volume',
-        detail: `Reply rate is ${fmtPct(metrics.replyRate)} on ${fmtInt(metrics.outbound)} outbound conversations.`,
+        detail: `Reply rate is ${fmtPct(metrics.replyRate)} across ${fmtInt(metrics.outbound)} outbound conversations.`,
       });
     }
     if (deltas && deltas.optOuts > 0) {
@@ -140,7 +132,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     <div className="V2Page">
       <V2PageHeader
         title={`${name} Scorecard`}
-        subtitle={`Daily activity summary for business day ${day || 'current'} (${BUSINESS_TZ}). Changes vs. ${prevDay || 'prior day'}.`}
+        subtitle={`Daily summary for ${day || 'today'} (${BUSINESS_TZ}) with day-over-day change vs ${prevDay || 'yesterday'}.`}
       />
 
       <section className="V2MetricsGrid">
@@ -174,11 +166,6 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           tone={metrics.optOutRate >= 3 ? 'critical' : 'default'}
         />
         <V2MetricCard
-          label={<V2Term term="smsBookingHintsDiagnostic" />}
-          value={fmtInt(metrics.hints)}
-          meta={deltas ? `${fmtDeltaInt(deltas.hints)} vs prior day` : 'No prior-day data yet'}
-        />
-        <V2MetricCard
           label="Booking Rate"
           value={metrics.outbound > 0 ? `${((metrics.booked / metrics.outbound) * 100).toFixed(1)}%` : 'n/a'}
           meta={`${fmtInt(metrics.booked)} booked / ${fmtInt(metrics.outbound)} outbound`}
@@ -187,7 +174,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
       </section>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Day by Day" caption="Changes from yesterday to today.">
+        <V2Panel title="Day-over-Day" caption="How today compares with yesterday.">
           {deltas ? (
             <div className="V2DeltaList">
               <div>
@@ -212,7 +199,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           )}
         </V2Panel>
 
-        <V2Panel title="Watch List" caption="Things to keep an eye on.">
+        <V2Panel title="Watch List" caption="Items that may need coaching or follow-up.">
           {riskFlags.length ? (
             <div className="V2RiskFlags">
               {riskFlags.map((flag) => (
@@ -223,7 +210,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
               ))}
             </div>
           ) : (
-            <V2State kind="empty">No issues flagged for today.</V2State>
+            <V2State kind="empty">No issues flagged today.</V2State>
           )}
         </V2Panel>
       </div>
@@ -246,11 +233,10 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           </div>
         </V2Panel>
 
-        <V2Panel title="How to Read This Page" caption="This page is a daily summary, not a ranking.">
+        <V2Panel title="How to Read This Page" caption="This is a coaching snapshot, not a leaderboard.">
           <ul className="V2BulletList">
-            <li>Calls Booked comes from Slack booking records.</li>
-            <li>Booking Signals are for reference only — they don't count toward booked-call totals.</li>
-            <li>Use the Sequences and Performance pages to dig into root cause.</li>
+            <li>Booked Calls come from Slack booking records and reactions.</li>
+            <li>Use Sequences and Performance pages to find root causes quickly.</li>
           </ul>
         </V2Panel>
       </div>

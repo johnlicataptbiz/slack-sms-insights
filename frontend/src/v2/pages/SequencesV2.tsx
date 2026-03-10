@@ -15,6 +15,7 @@ const MODE_LABELS: Record<Mode, string> = {
 
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+const fmtSplit = (jack: number, brandon: number, selfBooked: number) => `${fmtInt(jack)} / ${fmtInt(brandon)} / ${fmtInt(selfBooked)}`;
 
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('30d');
@@ -118,10 +119,8 @@ export default function SequencesV2() {
                       <th className="is-right">Booked</th>
                       <th className="is-right">Book %</th>
                       <th className="is-right">Opt-outs</th>
-                      <th className="is-right">Opt-out %</th>
-                      <th className="is-right">Jack</th>
-                      <th className="is-right">Brandon</th>
-                      <th className="is-right">Self</th>
+                      <th className="is-right">Opt %</th>
+                      <th className="is-right" title="Booked split as Jack / Brandon / Self">J / B / Self</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -137,9 +136,7 @@ export default function SequencesV2() {
                         <td className="is-right">{fmtPct(row.bookingRatePct)}</td>
                         <td className="is-right">{fmtInt(row.optOuts)}</td>
                         <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
-                        <td className="is-right">{fmtInt(row.bookedBreakdown.jack)}</td>
-                        <td className="is-right">{fmtInt(row.bookedBreakdown.brandon)}</td>
-                        <td className="is-right">{fmtInt(row.bookedBreakdown.selfBooked)}</td>
+                        <td className="is-right">{fmtSplit(row.bookedBreakdown.jack, row.bookedBreakdown.brandon, row.bookedBreakdown.selfBooked)}</td>
                       </tr>
                     ))}
                   </tbody>

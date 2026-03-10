@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { parseUiMode, type UiMode } from './uiMode';
+import { Analytics } from '@vercel/analytics/react';
 
 const V2App = lazy(() => import('./v2/V2App'));
 
@@ -47,7 +48,12 @@ export default function App() {
     );
   }
 
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      <Analytics />
+    </>
+  );
 }
 
 export const detectUiMode = resolveUiMode;

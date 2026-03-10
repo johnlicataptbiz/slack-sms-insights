@@ -1,5 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
+import { resolveSequenceId } from './sequence-registry.js';
 
 const getPrisma = () => getPrismaClient();
 
@@ -36,6 +37,7 @@ export type SmsEventRow = {
   body: string | null;
   line: string | null;
   sequence: string | null;
+  sequence_id?: string | null;
   conversation_id: string | null;
   raw: unknown | null;
   created_at: Date;
@@ -50,6 +52,7 @@ export const insertSmsEvent = async (
   const prisma = getPrisma();
 
   try {
+    const sequenceId = await resolveSequenceId(event.sequence, prisma);
     const data = {
       slack_team_id: event.slackTeamId,
       slack_channel_id: event.slackChannelId,
@@ -63,6 +66,7 @@ export const insertSmsEvent = async (
       body: event.body ?? null,
       line: event.line ?? null,
       sequence: event.sequence ?? null,
+      sequence_id: sequenceId,
       conversation_id: event.conversationId ?? null,
       raw: (event.raw as any) ?? null,
     };
@@ -83,6 +87,7 @@ export const insertSmsEvent = async (
         body: data.body,
         line: data.line,
         sequence: data.sequence,
+        sequence_id: data.sequence_id,
         conversation_id: data.conversation_id,
         raw: data.raw,
       },

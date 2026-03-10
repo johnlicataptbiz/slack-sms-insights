@@ -16,10 +16,13 @@ import {
   assertMondayLeadInsightsV2Envelope,
   assertSalesMetricsBatchV2Envelope,
   assertSalesMetricsV2Envelope,
+  assertInsightsSummaryV2Envelope,
   assertSequenceVersionHistoryV2Envelope,
   assertScoreboardV2Envelope,
+  assertSequenceDeepV2Envelope,
   assertSendMessageResultEnvelope,
   assertWeeklySummaryV2Envelope,
+  assertSequenceKpisV2Envelope,
 } from './v2Guards';
 import type {
   AlowareSequenceSyncV2,
@@ -33,6 +36,7 @@ import type {
   InboxSendConfigV2,
   InboxConversationDetailV2,
   InboxConversationListV2,
+  InsightsSummaryV2,
   MondayLeadInsightsV2,
   MondayScorecardsV2,
   ObjectionFrequencyRowV2,
@@ -43,6 +47,8 @@ import type {
   SalesMetricsBatchV2,
   SalesMetricsV2,
   SequenceVersionHistoryV2,
+  SequenceDeepV2,
+  SequenceKpisV2,
   ScoreboardV2,
   SendMessageResultV2,
   StageConversionRowV2,
@@ -308,6 +314,74 @@ export const useV2WeeklySummary = (params: { weekStart?: string; tz?: string }) 
     gcTime: 30 * 60 * 1000,        // 30 minutes
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2InsightsSummary = (params: {
+  from?: string;
+  to?: string;
+  day?: string;
+  range?: 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
+  tz?: string;
+  rep?: 'jack' | 'brandon' | null;
+}) => {
+  const searchParams = new URLSearchParams();
+  if (params.from && params.to) {
+    searchParams.set('from', params.from);
+    searchParams.set('to', params.to);
+  } else if (params.day) {
+    searchParams.set('day', params.day);
+  } else {
+    searchParams.set('range', params.range || '7d');
+  }
+  if (params.tz) searchParams.set('tz', params.tz);
+  if (params.rep) searchParams.set('rep', params.rep);
+
+  return useQuery({
+    queryKey: ['v2', 'insights', 'summary', params],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/insights/summary?${searchParams.toString()}`);
+      assertInsightsSummaryV2Envelope(response);
+      return response as ApiEnvelope<InsightsSummaryV2>;
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2SequencesDeep = (params: {
+  from?: string;
+  to?: string;
+  day?: string;
+  range?: 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
+  tz?: string;
+  status?: 'active' | 'inactive';
+}) => {
+  const searchParams = new URLSearchParams();
+  if (params.from && params.to) {
+    searchParams.set('from', params.from);
+    searchParams.set('to', params.to);
+  } else if (params.day) {
+    searchParams.set('day', params.day);
+  } else {
+    searchParams.set('range', params.range || '30d');
+  }
+  if (params.tz) searchParams.set('tz', params.tz);
+  if (params.status) searchParams.set('status', params.status);
+
+  return useQuery({
+    queryKey: ['v2', 'sequences', 'deep', params],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/sequences/deep?${searchParams.toString()}`);
+      assertSequenceDeepV2Envelope(response);
+      return response as ApiEnvelope<SequenceDeepV2>;
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 2,
     refetchOnWindowFocus: false,
   });
 };
@@ -1471,6 +1545,24 @@ export const useV2SequenceQualification = (params: { range: '7d' | '30d' | '90d'
         `/api/v2/sequences/qualification?${searchParams.toString()}`
       );
       return response as ApiEnvelope<SequenceQualificationBreakdown>;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 15 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2SequenceKpis = (params: { range: '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+
+  return useQuery({
+    queryKey: ['v2', 'sequences', 'kpis', params],
+    queryFn: async () => {
+      const response = await client.get<unknown>(`/api/v2/sequences/kpis?${searchParams.toString()}`);
+      assertSequenceKpisV2Envelope(response);
+      return response as ApiEnvelope<SequenceKpisV2>;
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,

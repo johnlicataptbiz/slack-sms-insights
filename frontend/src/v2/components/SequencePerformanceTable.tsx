@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import type { UnattributedAuditRow } from '../../api/v2-types';
-import { V2Panel, V2State, V2Skeleton } from './V2Primitives';
+import { V2Panel, V2State } from './V2Primitives';
 import { exportToCSV, formatDateForFilename } from '../../utils/export';
 
 // Formatting utilities
@@ -338,15 +338,11 @@ function SequenceFamilyGroup({
   familyRows, 
   unattributedAuditRows = [],
   columnVisibility,
-  sortBy,
-  sortOrder,
 }: { 
   family: string; 
   familyRows: MergedSeqRow[];
   unattributedAuditRows?: UnattributedAuditRow[];
   columnVisibility: ColumnVisibility;
-  sortBy: SortKey;
-  sortOrder: SortOrder;
 }) {
   const {
     sortedVersions,
@@ -637,8 +633,7 @@ export function SequencePerformanceTable({
     familyEntries, 
     activeSequenceCount, 
     uniqueFamilyCount,
-    totalPages,
-    paginatedFamilies 
+    totalPages
   } = useMemo(() => {
     const grouped = processedRows.reduce((acc, row) => {
       const family = row.leadMagnet || 'Not Captured Yet';
@@ -661,7 +656,6 @@ export function SequencePerformanceTable({
       activeSequenceCount: processedRows.length,
       uniqueFamilyCount: totalFamilies,
       totalPages,
-      paginatedFamilies,
     };
   }, [processedRows, pagination]);
 
@@ -727,8 +721,6 @@ export function SequencePerformanceTable({
             familyRows={familyRows} 
             unattributedAuditRows={unattributedAuditRows}
             columnVisibility={columnVisibility}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
           />
         ))}
       </div>

@@ -694,6 +694,117 @@ export type ScoreboardV2 = {
   };
 };
 
+export type SequenceKpiRowV2 = {
+  label: string;
+  leadMagnet: string;
+  version: string;
+  messagesSent: number;
+  uniqueContacted: number;
+  repliesReceived: number;
+  replyRatePct: number;
+  bookedCalls: number;
+  bookingRatePct: number;
+  optOuts: number;
+  optOutRatePct: number;
+  firstSeenAt?: string | null;
+  bookedBreakdown?: {
+    jack: number;
+    brandon: number;
+    selfBooked: number;
+    bookedAfterSmsReply: number;
+    diagnosticSmsBookingSignals: number;
+  };
+};
+
+export type SequenceKpisV2 = {
+  items: SequenceKpiRowV2[];
+  window: { from: string; to: string; timeZone: string };
+};
+
+export type InsightsSummaryV2 = {
+  window: { from: string; to: string; timeZone: string };
+  kpis: {
+    messagesSent: number;
+    uniqueContacted: number;
+    repliesReceived: number;
+    replyRatePct: number;
+    bookedCalls: number;
+    bookingRatePct: number;
+    optOuts: number;
+    optOutRatePct: number;
+  };
+  reps: Array<{
+    repId: string;
+    messagesSent: number;
+    uniqueContacted: number;
+    repliesReceived: number;
+    replyRatePct: number;
+    bookedCalls: number;
+    bookingRatePct: number;
+    optOuts: number;
+    optOutRatePct: number;
+  }>;
+  funnel: {
+    contacted: number;
+    replied: number;
+    booked: number;
+    replyDropoffPct: number;
+    bookingDropoffPct: number;
+  };
+  risks: Array<{ key: string; severity: 'critical' | 'warning' | 'info'; message: string }>;
+  mondayHealth: {
+    boards: number;
+    staleBoards: number;
+    erroredBoards: number;
+    avgSourceCoveragePct: number;
+    avgCampaignCoveragePct: number;
+  };
+};
+
+export type SequenceDeepV2 = {
+  window: { from: string; to: string; timeZone: string };
+  sequences: Array<{
+    sequenceId: string;
+    label: string;
+    leadMagnet: string;
+    versionTag: string;
+    status: 'active' | 'inactive';
+    ownerRep: string | null;
+    isManualBucket: boolean;
+    messagesSent: number;
+    uniqueContacted: number;
+    repliesReceived: number;
+    replyRatePct: number;
+    bookedCalls: number;
+    bookingRatePct: number;
+    optOuts: number;
+    optOutRatePct: number;
+    bookedBreakdown: {
+      jack: number;
+      brandon: number;
+      selfBooked: number;
+      bookedAfterSmsReply: number;
+      diagnosticSignals: number;
+    };
+    leadQuality: {
+      leadsCount: number;
+      highInterestPct: number;
+      fullTimePct: number;
+      mostlyCashPct: number;
+      progressedToStep3Or4Pct: number;
+    };
+  }>;
+  monday: {
+    boards: number;
+    staleBoards: number;
+    erroredBoards: number;
+    avgSourceCoveragePct: number;
+    avgCampaignCoveragePct: number;
+    avgSetByCoveragePct: number;
+    avgTouchpointsCoveragePct: number;
+  };
+};
+
 export type SequenceVersionHistoryRowV2 = {
   label: string;
   leadMagnet: string;

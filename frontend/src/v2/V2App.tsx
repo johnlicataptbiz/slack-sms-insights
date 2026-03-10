@@ -7,7 +7,6 @@ import { V2Panel, V2State } from './components/V2Primitives';
 import V2Shell from './layout/V2Shell';
 import InboxV2 from './pages/InboxV2';
 import InsightsV2 from './pages/InsightsV2';
-import RepV2 from './pages/RepV2';
 import RunsV2 from './pages/RunsV2';
 import SequencesV2 from './pages/SequencesV2';
 import { easing } from './utils/motion';
@@ -110,22 +109,8 @@ function AnimatedRoutes() {
               </ErrorBoundary>
             }
           />
-          <Route
-            path="rep/jack"
-            element={
-              <ErrorBoundary fallback={<PageErrorFallback />}>
-                <RepV2 rep="jack" />
-              </ErrorBoundary>
-            }
-          />
-          <Route
-            path="rep/brandon"
-            element={
-              <ErrorBoundary fallback={<PageErrorFallback />}>
-                <RepV2 rep="brandon" />
-              </ErrorBoundary>
-            }
-          />
+          <Route path="rep/jack" element={<Navigate to="/v2/insights?rep=jack" replace />} />
+          <Route path="rep/brandon" element={<Navigate to="/v2/insights?rep=brandon" replace />} />
           <Route
             path="sequences"
             element={

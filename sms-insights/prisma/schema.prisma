@@ -7,20 +7,91 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SmsDirection {
+  inbound
+  outbound
+  unknown
+}
+
+enum ConversationStatus {
+  open
+  closed
+  dnc
+}
+
+enum CadenceStatus {
+  idle
+  podcast_sent
+  call_offered
+  nurture_pool
+}
+
+enum DailyRunStatus {
+  success
+  error
+  pending
+}
+
+enum MondaySyncStatus {
+  idle
+  running
+  success
+  error
+}
+
+enum MondayBookedCallPushStatus {
+  pending
+  synced
+  error
+  skipped
+}
+
+enum SendAttemptStatus {
+  blocked
+  queued
+  sent
+  failed
+  duplicate
+}
+
+enum SequenceVersionStatus {
+  active
+  testing
+  rewrite
+  archived
+}
+
+enum WorkItemSeverity {
+  low
+  med
+  high
+}
+
+enum WorkItemType {
+  needs_reply
+  follow_up
+  hot_lead
+}
+
+enum SequenceRegistryStatus {
+  active
+  inactive
+}
+
 model Conversation {
   id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   contactKey              String                   @unique @map("contact_key")
   contact_id              String?
   contact_phone           String?
   current_rep_id          String?
-  status                  String                   @default("open")
+  status                  ConversationStatus       @default(open)
   last_inbound_at         DateTime?                @db.Timestamptz(6)
   last_outbound_at        DateTime?                @db.Timestamptz(6)
   last_touch_at           DateTime?                @db.Timestamptz(6)
   unreplied_inbound_count Int                      @default(0)
   nextFollowupAt          DateTime?                @map("next_followup_due_at") @db.Timestamptz(6)
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt               DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
+  updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
   conversation_notes      conversation_notes[]
   conversation_state      conversation_state?
   draft_suggestions       draft_suggestions[]
@@ -44,7 +115,7 @@ model actor_directory {
   active         Boolean  @default(true)
   notes          String?
   created_at     DateTime @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([role, active], map: "idx_actor_directory_role_active")
 }
@@ -82,7 +153,7 @@ model booked_call_attribution {
   lead_score_source          String?
   mapper_version             String   @default("v1.0")
   created_at                 DateTime @default(now()) @db.Timestamptz(6)
-  updated_at                 DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([conversation_id], map: "idx_booked_call_attribution_conversation_id")
   @@index([booked_event_ts(sort: Desc)], map: "idx_booked_call_attribution_event_ts")
@@ -94,7 +165,7 @@ model booked_call_reactions {
   reaction_name  String
   reaction_count Int          @default(0)
   users          Json?
-  updated_at     DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime     @updatedAt @db.Timestamptz(6)
   booked_calls   booked_calls @relation(fields: [booked_call_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([booked_call_id, reaction_name])
@@ -141,9 +212,9 @@ model conversation_state {
   escalation_overridden           Boolean      @default(false)
   last_podcast_sent_at            DateTime?    @db.Timestamptz(6)
   next_followup_due_at            DateTime?    @db.Timestamptz(6)
-  cadence_status                  String       @default("idle")
+  cadence_status                  CadenceStatus @default(idle)
   created_at                      DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at                      DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at                      DateTime     @updatedAt @db.Timestamptz(6)
   objection_tags                  String[]     @default([])
   guardrail_override_count        Int          @default(0)
   call_outcome                    String?
@@ -181,7 +252,7 @@ model daily_runs {
   channel_id    String
   channel_name  String?
   report_type   String
-  status        String
+  status        DailyRunStatus
   error_message String?
   summary_text  String?
   full_report   String?
@@ -208,7 +279,7 @@ model draft_suggestions {
   send_linked_event_id   String?      @db.Uuid
   raw                    Json?
   created_at             DateTime     @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime     @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime     @updatedAt @db.Timestamptz(6)
   rejection_reason       String?
   rejection_feedback     String?
   rejected_at            DateTime?    @db.Timestamptz(6)
@@ -225,7 +296,7 @@ model goals {
   unit       String    @db.VarChar(50)
   period     String    @db.VarChar(20)
   created_at DateTime? @default(now()) @db.Timestamptz(6)
-  updated_at DateTime? @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt @db.Timestamptz(6)
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -245,7 +316,7 @@ model inbox_contact_profiles {
   dnc                   Boolean       @default(false)
   raw                   Json?
   created_at            DateTime      @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime      @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime      @updatedAt @db.Timestamptz(6)
   lead_source           String?
   sequence_id           String?
   disposition_status_id String?
@@ -343,7 +414,7 @@ model monday_board_registry {
   owner_team        String?
   notes             String?
   created_at        DateTime @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([active, board_class], map: "idx_monday_board_registry_active_class")
 }
@@ -355,11 +426,11 @@ model monday_booked_call_pushes {
   slack_message_ts String
   setter_bucket    String
   monday_item_id   String?
-  status           String
+  status           MondayBookedCallPushStatus
   error            String?
   payload_json     Json?
   pushed_at        DateTime? @db.Timestamptz(6)
-  updated_at       DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime  @updatedAt @db.Timestamptz(6)
 
   @@id([board_id, slack_channel_id, slack_message_ts])
   @@index([status, updated_at(sort: Desc)], map: "idx_monday_booked_call_pushes_status_updated")
@@ -420,7 +491,7 @@ model monday_call_snapshots {
 model monday_column_mappings {
   board_id     String   @id
   mapping_json Json
-  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @updatedAt @db.Timestamptz(6)
 }
 
 model monday_metric_facts {
@@ -447,9 +518,9 @@ model monday_sync_state {
   board_id     String    @id
   cursor       String?
   last_sync_at DateTime? @db.Timestamptz(6)
-  status       String?
+  status       MondaySyncStatus?
   error        String?
-  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @updatedAt @db.Timestamptz(6)
 
   @@index([updated_at(sort: Desc)], map: "idx_monday_sync_state_updated_at")
 }
@@ -475,7 +546,7 @@ model send_attempts {
   allowlist_decision Boolean      @default(false)
   dnc_decision       Boolean      @default(false)
   idempotency_key    String?
-  status             String
+  status             SendAttemptStatus
   retry_count        Int          @default(0)
   request_payload    Json?
   response_payload   Json?
@@ -490,11 +561,141 @@ model send_attempts {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model sequence_version_decisions {
   sequence_label String   @id
-  status         String
+  status         SequenceVersionStatus
   updated_by     String?
-  updated_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([status, updated_at(sort: Desc)], map: "idx_sequence_version_decisions_status_updated")
+}
+
+model sequence_registry {
+  id               String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label            String
+  normalized_label String                 @unique
+  status           SequenceRegistryStatus @default(active)
+  lead_magnet      String?
+  version_tag      String?
+  owner_rep        String?
+  is_manual_bucket Boolean                @default(false)
+  created_at       DateTime               @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime               @updatedAt @db.Timestamptz(6)
+  aliases          sequence_aliases[]
+  facts_booking    fact_booking_daily[]
+  facts_lead       fact_lead_quality_daily[]
+  facts_sms        fact_sms_daily[]
+  sms_events       sms_events[]
+
+  @@index([status], map: "idx_sequence_registry_status")
+  @@index([is_manual_bucket], map: "idx_sequence_registry_manual_bucket")
+}
+
+model sequence_aliases {
+  raw_label        String            @id
+  normalized_label String
+  sequence_id      String            @db.Uuid
+  created_at       DateTime          @default(now()) @db.Timestamptz(6)
+  sequence         sequence_registry @relation(fields: [sequence_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sequence_id], map: "idx_sequence_aliases_sequence_id")
+  @@index([normalized_label], map: "idx_sequence_aliases_normalized_label")
+}
+
+model fact_sms_daily {
+  day                   DateTime          @db.Date
+  sequence_id           String            @db.Uuid
+  rep_id                String
+  messages_sent         Int               @default(0)
+  unique_contacted      Int               @default(0)
+  replies_received      Int               @default(0)
+  opt_outs              Int               @default(0)
+  reply_rate_pct        Float             @default(0)
+  opt_out_rate_pct      Float             @default(0)
+  booking_signals_sms   Int               @default(0)
+  created_at            DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime          @updatedAt @db.Timestamptz(6)
+  sequence_registry     sequence_registry @relation(fields: [sequence_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([day, sequence_id, rep_id])
+  @@index([day], map: "idx_fact_sms_daily_day")
+  @@index([sequence_id, day], map: "idx_fact_sms_daily_sequence_day")
+  @@index([rep_id, day], map: "idx_fact_sms_daily_rep_day")
+}
+
+model fact_booking_daily {
+  day                        DateTime          @db.Date
+  sequence_id                String            @db.Uuid
+  rep_id                     String
+  booked_total               Int               @default(0)
+  booked_jack                Int               @default(0)
+  booked_brandon             Int               @default(0)
+  booked_self                Int               @default(0)
+  booked_after_sms_reply     Int               @default(0)
+  booking_rate_pct           Float             @default(0)
+  diagnostic_booking_signals Int               @default(0)
+  created_at                 DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime          @updatedAt @db.Timestamptz(6)
+  sequence_registry          sequence_registry @relation(fields: [sequence_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([day, sequence_id, rep_id])
+  @@index([day], map: "idx_fact_booking_daily_day")
+  @@index([sequence_id, day], map: "idx_fact_booking_daily_sequence_day")
+  @@index([rep_id, day], map: "idx_fact_booking_daily_rep_day")
+}
+
+model fact_lead_quality_daily {
+  day                       DateTime          @db.Date
+  sequence_id               String            @db.Uuid
+  rep_id                    String
+  leads_count               Int               @default(0)
+  progress_step_0_count     Int               @default(0)
+  progress_step_1_count     Int               @default(0)
+  progress_step_2_count     Int               @default(0)
+  progress_step_3_count     Int               @default(0)
+  progress_step_4_count     Int               @default(0)
+  revenue_mix_mostly_cash   Int               @default(0)
+  revenue_mix_mostly_ins    Int               @default(0)
+  revenue_mix_balanced      Int               @default(0)
+  revenue_mix_unknown       Int               @default(0)
+  employment_full_time      Int               @default(0)
+  employment_part_time      Int               @default(0)
+  employment_unknown        Int               @default(0)
+  coaching_interest_high    Int               @default(0)
+  coaching_interest_medium  Int               @default(0)
+  coaching_interest_low     Int               @default(0)
+  coaching_interest_unknown Int               @default(0)
+  avg_lead_score            Float?
+  source_bucket_unknown     Int               @default(0)
+  source_bucket_known       Int               @default(0)
+  created_at                DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime          @updatedAt @db.Timestamptz(6)
+  sequence_registry         sequence_registry @relation(fields: [sequence_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([day, sequence_id, rep_id])
+  @@index([day], map: "idx_fact_lead_quality_daily_day")
+  @@index([sequence_id, day], map: "idx_fact_lead_quality_daily_sequence_day")
+  @@index([rep_id, day], map: "idx_fact_lead_quality_daily_rep_day")
+}
+
+model fact_monday_health_daily {
+  day                     DateTime @db.Date
+  board_id                String
+  board_class             String
+  sync_status             String?
+  is_stale                Boolean  @default(false)
+  source_coverage_pct     Float    @default(0)
+  campaign_coverage_pct   Float    @default(0)
+  set_by_coverage_pct     Float    @default(0)
+  touchpoints_coverage_pct Float   @default(0)
+  snapshot_count          Int      @default(0)
+  lead_attribution_count  Int      @default(0)
+  metric_fact_count       Int      @default(0)
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @updatedAt @db.Timestamptz(6)
+
+  @@id([day, board_id])
+  @@index([day], map: "idx_fact_monday_health_daily_day")
+  @@index([board_class, day], map: "idx_fact_monday_health_daily_class_day")
+  @@index([sync_status, day], map: "idx_fact_monday_health_daily_status_day")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -540,7 +741,7 @@ model sms_events {
   slack_channel_id    String
   slack_message_ts    String
   event_ts            DateTime             @db.Timestamptz(6)
-  direction           String
+  direction           SmsDirection
   contact_id          String?
   contact_phone       String?
   contact_name        String?
@@ -548,18 +749,22 @@ model sms_events {
   body                String?
   line                String?
   sequence            String?
+  sequence_id         String?              @db.Uuid
   raw                 Json?
   created_at          DateTime             @default(now()) @db.Timestamptz(6)
   conversation_id     String?              @db.Uuid
   conversion_examples conversion_examples?
   draft_suggestions   draft_suggestions[]
   conversations       Conversation?        @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_sms_events_conversation")
+  sequence_registry   sequence_registry?   @relation(fields: [sequence_id], references: [id], onUpdate: NoAction)
   work_items          work_items[]
 
   @@unique([slack_channel_id, slack_message_ts])
   @@index([contact_id, event_ts(sort: Desc)], map: "idx_sms_events_contact_id_event_ts")
   @@index([contact_phone, event_ts(sort: Desc)], map: "idx_sms_events_contact_phone_event_ts")
   @@index([conversation_id, event_ts(sort: Desc)], map: "idx_sms_events_conversation_event_ts")
+  @@index([sequence, event_ts(sort: Desc)], map: "idx_sms_events_sequence_event_ts")
+  @@index([sequence_id, event_ts(sort: Desc)], map: "idx_sms_events_sequence_id_event_ts")
   @@index([event_ts(sort: Desc)], map: "idx_sms_events_event_ts")
 }
 
@@ -583,7 +788,7 @@ model user_send_preferences {
   default_line_id     Int?
   default_from_number String?
   created_at          DateTime @default(now()) @db.Timestamptz(6)
-  updated_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @updatedAt @db.Timestamptz(6)
 
   @@index([updated_at(sort: Desc)], map: "idx_user_send_preferences_updated")
 }
@@ -591,10 +796,10 @@ model user_send_preferences {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model work_items {
   id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  type            String
-  conversation_id String       @unique(map: "uniq_open_needs_reply_per_conversation", where: raw("((type = 'needs_reply'::text) AND (resolved_at IS NULL))")) @db.Uuid
+  type            WorkItemType
+  conversation_id String       @unique(map: "uniq_open_needs_reply_per_conversation", where: raw("((type = 'needs_reply'::\"WorkItemType\") AND (resolved_at IS NULL))")) @db.Uuid
   rep_id          String?
-  severity        String       @default("med")
+  severity        WorkItemSeverity @default(med)
   created_at      DateTime     @default(now()) @db.Timestamptz(6)
   due_at          DateTime     @db.Timestamptz(6)
   resolved_at     DateTime?    @db.Timestamptz(6)

@@ -44,9 +44,7 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
     return (new PrismaClient({ accelerateUrl: config.url }) as any).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
-  // NOTE: For direct mode in Prisma 7, datasourceUrl is also unknown if using 'client' engine.
-  // It usually requires an adapter or a different engine configuration.
-  return new PrismaClient();
+  throw new Error('Direct postgres URLs are not supported by this runtime. Set PRISMA_ACCELERATE_URL (prisma+postgres://).');
 };
 
 export const getPrismaClient = (): PrismaRuntimeClient => {

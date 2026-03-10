@@ -53,5 +53,5 @@ export function exportToCSV(data: MergedSeqRow[], filename: string): void {
  * Format date for filename
  */
 export function formatDateForFilename(date: Date = new Date()): string {
-  return date.toISOString().split('T')[0];
+  return date.toISOString().split('T')[0] ?? 'unknown-date';
 }

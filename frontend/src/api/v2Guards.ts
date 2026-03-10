@@ -13,10 +13,13 @@ import type {
   SalesMetricsBatchV2,
   SalesMetricsV2,
   SequenceVersionHistoryV2,
+  SequenceKpisV2,
   ScoreboardV2,
   SendMessageResultV2,
   MondayLeadInsightsV2,
+  InsightsSummaryV2,
   WeeklyManagerSummaryV2,
+  SequenceDeepV2,
 } from './v2-types';
 
 const isObject = (value: unknown): value is Record<string, unknown> => {
@@ -355,6 +358,40 @@ export function assertScoreboardV2Envelope(value: unknown): asserts value is Api
   if (data.provenance.attributionModel !== 'sequence_initiated_conversation') {
     throw new Error('Invalid scoreboard response: provenance.attributionModel');
   }
+}
+
+export function assertSequenceKpisV2Envelope(value: unknown): asserts value is ApiEnvelope<SequenceKpisV2> {
+  if (!isObject(value)) throw new Error('Invalid sequence KPIs response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid sequence KPIs response: data must be object');
+  if (!Array.isArray(value.data.items)) {
+    throw new Error('Invalid sequence KPIs response: items must be array');
+  }
+  if (!isObject(value.data.window)) {
+    throw new Error('Invalid sequence KPIs response: window missing');
+  }
+  if (!isString(value.data.window.from)) throw new Error('Invalid sequence KPIs response: window.from');
+  if (!isString(value.data.window.to)) throw new Error('Invalid sequence KPIs response: window.to');
+  if (!isString(value.data.window.timeZone)) throw new Error('Invalid sequence KPIs response: window.timeZone');
+}
+
+export function assertInsightsSummaryV2Envelope(value: unknown): asserts value is ApiEnvelope<InsightsSummaryV2> {
+  if (!isObject(value)) throw new Error('Invalid v2 insights summary response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid v2 insights summary response: data must be object');
+  if (!isObject(value.data.kpis)) throw new Error('Invalid v2 insights summary response: kpis missing');
+  if (!Array.isArray(value.data.reps)) throw new Error('Invalid v2 insights summary response: reps missing');
+  if (!isObject(value.data.funnel)) throw new Error('Invalid v2 insights summary response: funnel missing');
+  if (!Array.isArray(value.data.risks)) throw new Error('Invalid v2 insights summary response: risks missing');
+  if (!isObject(value.data.mondayHealth)) throw new Error('Invalid v2 insights summary response: mondayHealth missing');
+}
+
+export function assertSequenceDeepV2Envelope(value: unknown): asserts value is ApiEnvelope<SequenceDeepV2> {
+  if (!isObject(value)) throw new Error('Invalid v2 sequences deep response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid v2 sequences deep response: data must be object');
+  if (!Array.isArray(value.data.sequences)) throw new Error('Invalid v2 sequences deep response: sequences missing');
+  if (!isObject(value.data.monday)) throw new Error('Invalid v2 sequences deep response: monday missing');
 }
 
 export function assertSequenceVersionHistoryV2Envelope(

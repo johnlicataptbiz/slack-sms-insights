@@ -93,6 +93,10 @@ import { getSlackAuthRuntimeStatus } from '../services/runtime-status.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
 import { getScoreboardData } from '../services/scoreboard.js';
+import { getSequenceKpis } from '../services/sequence-kpis.js';
+import { refreshKpiFacts } from '../services/kpi-facts.js';
+import { getInsightsSummary } from '../services/insights-summary.js';
+import { getSequencesDeep } from '../services/sequences-deep.js';
 import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../services/security-headers.js';
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
@@ -1177,6 +1181,163 @@ const handleGetSequenceQualificationV2: RequestHandler = async (req, res, logger
       500,
       {
         error: 'Failed to fetch sequence qualification data',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
+const handleGetSequenceKpisV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '7d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  try {
+    const payload = await getSequenceKpis(
+      {
+        from: resolved.from,
+        to: resolved.to,
+        timeZone: resolved.timeZone,
+      },
+      logger,
+    );
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: payload,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch sequence KPIs:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch sequence KPIs', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const shouldRefreshFactsOnRead = (): boolean => {
+  const raw = (process.env.KPI_FACT_REFRESH_ON_READ || 'true').trim().toLowerCase();
+  return raw !== 'false' && raw !== '0' && raw !== 'off';
+};
+
+const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '7d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  const repRaw = (url.searchParams.get('rep') || '').trim().toLowerCase();
+  const rep = repRaw === 'jack' || repRaw === 'brandon' ? repRaw : null;
+
+  try {
+    if (shouldRefreshFactsOnRead()) {
+      await refreshKpiFacts(
+        {
+          from: resolved.from,
+          to: resolved.to,
+          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        },
+        logger,
+      );
+    }
+
+    const data = await getInsightsSummary(
+      {
+        from: resolved.from,
+        to: resolved.to,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        rep,
+      },
+      logger,
+    );
+
+    sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
+  } catch (error) {
+    logger?.error('Failed to fetch insights summary:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch insights summary', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  const statusRaw = (url.searchParams.get('status') || '').trim().toLowerCase();
+  const status = statusRaw === 'active' || statusRaw === 'inactive' ? statusRaw : null;
+
+  try {
+    if (shouldRefreshFactsOnRead()) {
+      await refreshKpiFacts(
+        {
+          from: resolved.from,
+          to: resolved.to,
+          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        },
+        logger,
+      );
+    }
+
+    const data = await getSequencesDeep(
+      {
+        from: resolved.from,
+        to: resolved.to,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        status,
+      },
+      logger,
+    );
+
+    sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
+  } catch (error) {
+    logger?.error('Failed to fetch sequences deep analytics:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to fetch sequences deep analytics',
         details: error instanceof Error ? error.message : String(error),
       },
       origin,
@@ -4261,7 +4422,10 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/runs/:id', handler: handleGetRunByIdV2 },
   { method: 'GET', path: '/api/v2/channels', handler: handleGetChannelsV2 },
   { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
+  { method: 'GET', path: '/api/v2/insights/summary', handler: handleGetInsightsSummaryV2 },
   { method: 'GET', path: '/api/v2/scoreboard', handler: handleGetScoreboardV2 },
+  { method: 'GET', path: '/api/v2/sequences/kpis', handler: handleGetSequenceKpisV2 },
+  { method: 'GET', path: '/api/v2/sequences/deep', handler: handleGetSequencesDeepV2 },
   { method: 'GET', path: '/api/v2/sequences/qualification', handler: handleGetSequenceQualificationV2 },
   { method: 'GET', path: '/api/v2/sequences/version-history', handler: handleGetSequenceVersionHistoryV2 },
   { method: 'POST', path: '/api/v2/sequences/version-decisions', handler: handlePostSequenceVersionDecisionV2 },

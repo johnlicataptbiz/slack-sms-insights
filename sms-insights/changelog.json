@@ -1,8 +1,80 @@
 {
-  "generatedAt": "2026-03-09T22:56:00.856Z",
+  "generatedAt": "2026-03-10T06:58:33.103Z",
   "daysIncluded": 365,
-  "totalCount": 315,
+  "totalCount": 323,
   "entries": [
+    {
+      "hash": "0a5ccb9",
+      "date": "2026-03-09T23:44:11-05:00",
+      "message": "fix: restore dashboard auth gate",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Restore dashboard auth gate"
+    },
+    {
+      "hash": "730b1e9",
+      "date": "2026-03-09T22:27:47-05:00",
+      "message": "fix: update Railway deploy command",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Update Railway deploy command"
+    },
+    {
+      "hash": "9c74781",
+      "date": "2026-03-09T22:26:39-05:00",
+      "message": "chore: avoid gitleaks false positive in storage key",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Avoid gitleaks false positive in storage key"
+    },
+    {
+      "hash": "a222b77",
+      "date": "2026-03-09T22:25:36-05:00",
+      "message": "chore: remove secret-like strings from repo",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Remove secret-like strings from repo"
+    },
+    {
+      "hash": "4e6568a",
+      "date": "2026-03-09T22:23:37-05:00",
+      "message": "fix: restore ptbizsms deploys and clean CI",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Restore ptbizsms deploys and clean CI"
+    },
+    {
+      "hash": "3e9a732",
+      "date": "2026-03-09T18:07:37-05:00",
+      "message": "ci: Skip local build in GitHub Actions - let Railway handle it",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "AI & ML",
+      "description": "Skip local build in GitHub Actions - let Railway handle it"
+    },
+    {
+      "hash": "4b01929",
+      "date": "2026-03-09T17:56:39-05:00",
+      "message": "docs: Update implementation plan with current status",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Update implementation plan with current status"
+    },
+    {
+      "hash": "88f9232",
+      "date": "2026-03-09T17:56:10-05:00",
+      "message": "feat(changelog): Add build-time changelog generation for production",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add build-time changelog generation for production"
+    },
     {
       "hash": "dd5ef85",
       "date": "2026-03-09T17:52:24-05:00",

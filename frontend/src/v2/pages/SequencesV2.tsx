@@ -1,98 +1,9 @@
-import { type ReactNode, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import {
-  useV2SalesMetrics,
-  useV2Scoreboard,
-  useV2SequenceQualification,
-} from '../../api/v2Queries';
-import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
-import { ReplyTimingPanel } from '../components/ReplyTimingPanel';
-import { SkeletonDashboard } from '../components/Skeleton';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2AnimatedList, V2Sparkline, V2HeroSummary, V2TabNav } from '../components/V2Primitives';
-import { SequencePerformanceTable, type MergedSeqRow } from '../components/SequencePerformanceTable';
-import { CompliancePanel } from '../components/CompliancePanel';
-import { TimingPanel } from '../components/TimingPanel';
-import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
-import { ChangelogPanel } from '../components/ChangelogPanel';
-
-type TabKey = 'overview' | 'sequences' | 'qualification' | 'attribution';
-
-const BUSINESS_TZ = 'America/Chicago';
-const MANUAL_LABEL = 'No sequence (manual/direct)';
-const NOT_CAPTURED_LABEL = 'Not Captured Yet';
-const executiveSectionsStorageKey = 'v2_sequences_exec_sections';
-type ExecutiveSectionKey = 'leadMagnet' | 'attribution' | 'compliance' | 'timing';
-type ExecutiveSectionState = Record<ExecutiveSectionKey, boolean>;
-const defaultExecutiveSectionState: ExecutiveSectionState = {
-  leadMagnet: false,
-  attribution: false,
-  compliance: false,
-  timing: false,
-};
+import { useV2SequencesDeep } from '../../api/v2Queries';
+import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 
 type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
-// ─── Formatters ──────────────────────────────────────────────────────────────
-
-const fmtPct = (n: number) => `${n.toFixed(1)}%`;
-const fmtInt = (n: number) => n.toLocaleString();
-
-
-
-const normalizeSequenceLabel = (label: string): string => label.trim().replace(/\s+/g, ' ').toLowerCase();
-
-const EXPLICIT_AB_VERSION_PATTERN = /\b(?:version\s*([AB])|([AB])\s*version)\b/i;
-const TRAILING_YEAR_VERSION_PATTERN = /\s*-\s*20\d{2}\s*v?\d+(?:\.\d+)*\s*$/i;
-const TRAILING_GENERIC_VERSION_PATTERN = /\s*(?:v\d+(?:\.\d+)*|\d+(?:\.\d+)+)\s*$/i;
-const TRAILING_YEAR_PATTERN = /\s*-\s*20\d{2}\s*$/i;
-const V2_PATTERN = /\bv2\b/i;
-const LEGACY_PATTERN = /\blegacy\b/i;
-
-const parseLeadMagnetAndVersionFallback = (label: string): { leadMagnet: string; version: string } => {
-  const normalized = label.trim().replace(/\s+/g, ' ');
-  const normalizedLower = normalized.toLowerCase();
-
-  if (!normalized) {
-    return { leadMagnet: NOT_CAPTURED_LABEL, version: '' };
-  }
-
-  const isManualSequence =
-    normalizedLower === MANUAL_LABEL.toLowerCase() ||
-    normalizedLower === 'manual' ||
-    normalizedLower === 'manual/direct' ||
-    normalizedLower.startsWith('no sequence');
-
-  if (isManualSequence) {
-    return { leadMagnet: MANUAL_LABEL, version: '' };
-  }
-
-  const abMatch = normalized.match(EXPLICIT_AB_VERSION_PATTERN);
-  const abVersion = (abMatch?.[1] || abMatch?.[2] || '').toUpperCase();
-
-  let base = normalized
-    .replace(EXPLICIT_AB_VERSION_PATTERN, '')
-    .replace(TRAILING_YEAR_VERSION_PATTERN, '')
-    .replace(TRAILING_GENERIC_VERSION_PATTERN, '')
-    .replace(TRAILING_YEAR_PATTERN, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!base) base = normalized;
-
-  let version = '';
-  if (abVersion) {
-    version = `Version ${abVersion}`;
-  } else if (LEGACY_PATTERN.test(normalized)) {
-    version = 'Legacy';
-    base = base.replace(LEGACY_PATTERN, '').replace(/\s+/g, ' ').trim();
-  } else if (V2_PATTERN.test(normalized)) {
-    version = 'V2';
-    base = base.replace(V2_PATTERN, '').replace(/\s+/g, ' ').trim();
-  } else if (TRAILING_YEAR_PATTERN.test(normalized) || TRAILING_YEAR_VERSION_PATTERN.test(normalized)) {
-    version = 'Legacy';
-  }
-
-  return { leadMagnet: base || NOT_CAPTURED_LABEL, version };
-};
 
 const MODE_LABELS: Record<Mode, string> = {
   '7d': 'Last 7 days',
@@ -102,501 +13,175 @@ const MODE_LABELS: Record<Mode, string> = {
   '365d': 'Last 365 days',
 };
 
-// ─── JSX Helpers ─────────────────────────────────────────────────────────────
-
-function ExecutiveSection({
-  id,
-  title,
-  meta,
-  children,
-  isOpen,
-  onToggle,
-}: {
-  id: ExecutiveSectionKey;
-  title: string;
-  meta: string;
-  children: ReactNode;
-  isOpen: boolean;
-  onToggle: (id: ExecutiveSectionKey, open: boolean) => void;
-}) {
-  return (
-    <details
-      className="V2ExecutiveSection"
-      open={isOpen}
-      onToggle={(event) => onToggle(id, event.currentTarget.open)}
-    >
-      <summary className="V2ExecutiveSection__summary">
-        <div className="V2ExecutiveSection__titleWrap">
-          <p className="V2ExecutiveSection__title">{title}</p>
-          <p className="V2ExecutiveSection__meta">{meta}</p>
-        </div>
-        <span className="V2ExecutiveSection__chevron" aria-hidden="true">
-          ▾
-        </span>
-      </summary>
-      <div className="V2ExecutiveSection__body">{children}</div>
-    </details>
-  );
-}
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-
-// ─── Component ───────────────────────────────────────────────────────────────
+const fmtInt = (n: number) => n.toLocaleString();
+const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 
 export default function SequencesV2() {
-  const [mode, setMode] = useState<Mode>('7d');
-  const [activeTab, setActiveTab] = useState<TabKey>('overview');
-  const [executiveSections, setExecutiveSections] = useState<ExecutiveSectionState>(() => {
-    if (typeof window === 'undefined') return defaultExecutiveSectionState;
-    try {
-      const raw = localStorage.getItem(executiveSectionsStorageKey);
-      if (!raw) return defaultExecutiveSectionState;
-      const parsed = JSON.parse(raw) as Partial<ExecutiveSectionState>;
-      return {
-        ...defaultExecutiveSectionState,
-        ...parsed,
-      };
-    } catch {
-      return defaultExecutiveSectionState;
-    }
+  const [mode, setMode] = useState<Mode>('30d');
+  const [status, setStatus] = useState<'active' | 'inactive' | ''>('active');
+
+  const query = useV2SequencesDeep({
+    range: mode,
+    tz: 'America/Chicago',
+    ...(status ? { status } : {}),
   });
+  const data = query.data?.data;
 
-  const salesMetricsQuery = useV2SalesMetrics({ range: mode, tz: BUSINESS_TZ });
-  const scoreboardQuery = useV2Scoreboard({ tz: BUSINESS_TZ });
-  const sequenceQualQuery = useV2SequenceQualification({ range: mode, tz: BUSINESS_TZ });
-
-  const updateExecutiveSections = (next: ExecutiveSectionState) => {
-    setExecutiveSections(next);
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(executiveSectionsStorageKey, JSON.stringify(next));
-    } catch {
-      // noop
-    }
-  };
-
-  const setExecutiveSectionOpen = (key: ExecutiveSectionKey, open: boolean) => {
-    updateExecutiveSections({
-      ...executiveSections,
-      [key]: open,
-    });
-  };
-
-  const setAllExecutiveSections = (open: boolean) => {
-    updateExecutiveSections({
-      leadMagnet: open,
-      attribution: open,
-      compliance: open,
-      timing: open,
-    });
-  };
-
-  // sequenceQualQuery is intentionally excluded from the main loading gate — it is a secondary
-  // enrichment query that can be slow. The page renders with core data while qual loads separately.
-  const isLoading = salesMetricsQuery.isLoading || scoreboardQuery.isLoading;
-  const isError = salesMetricsQuery.isError || scoreboardQuery.isError;
-
-  const salesMetrics = salesMetricsQuery.data?.data;
-  const scoreboard = scoreboardQuery.data?.data;
-  const trendByDay = salesMetrics?.trendByDay ?? [];
-
-  // Build scoreboard lookup by label for metadata fields (leadMagnet/version).
-  const scoreboardByLabel = useMemo(() => {
-    const exact = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
-    const normalized = new Map<string, NonNullable<typeof scoreboard>['sequences'][0]>();
-
-    for (const seq of scoreboard?.sequences ?? []) {
-      exact.set(seq.label, seq);
-      normalized.set(normalizeSequenceLabel(seq.label), seq);
-    }
-
-    return { exact, normalized };
-  }, [scoreboard?.sequences]);
-
-  // Merge: numeric fields from sales-metrics (time-range consistent).
-  // Scoreboard is used for window-independent metadata (lead magnet/version labels),
-  // with local parsing fallback to avoid false "Not Captured Yet" buckets.
-  const mergedRows = useMemo((): MergedSeqRow[] => {
-    const smSeqs = salesMetrics?.sequences ?? [];
-    return smSeqs.map((seq) => {
-      const sb =
-        scoreboardByLabel.exact.get(seq.label) ||
-        scoreboardByLabel.normalized.get(normalizeSequenceLabel(seq.label));
-
-      const fallback = parseLeadMagnetAndVersionFallback(seq.label);
-      const resolvedLeadMagnet = sb?.leadMagnet?.trim() || fallback.leadMagnet || NOT_CAPTURED_LABEL;
-      const resolvedVersion = sb?.version?.trim() || fallback.version || '';
-
-      return {
-        label: seq.label,
-        leadMagnet: resolvedLeadMagnet,
-        version: resolvedVersion,
-        firstSeenAt: seq.firstSeenAt,
-        messagesSent: seq.messagesSent,
-        uniqueContacted: seq.uniqueContacted,
-        repliesReceived: seq.repliesReceived,
-        replyRatePct: seq.replyRatePct,
-        canonicalBookedCalls: seq.canonicalBookedCalls,
-        bookingRatePct: seq.bookingRatePct,
-        canonicalBookedAfterSmsReply: seq.canonicalBookedAfterSmsReply,
-        canonicalBookedJack: seq.canonicalBookedJack,
-        canonicalBookedBrandon: seq.canonicalBookedBrandon,
-        canonicalBookedSelf: seq.canonicalBookedSelf,
-        optOuts: seq.optOuts,
-        optOutRatePct: seq.optOutRatePct,
-        bookedAuditRows: seq.bookedAuditRows,
-        diagnosticSmsBookingSignals: seq.diagnosticSmsBookingSignals,
-        isManual: seq.label === MANUAL_LABEL,
-        uniqueReplied: sb?.uniqueReplied ?? 0,
-        smsReplyPct:
-          seq.canonicalBookedCalls > 0
-            ? (seq.canonicalBookedAfterSmsReply / seq.canonicalBookedCalls) * 100
-            : null,
-      };
-    });
-  }, [salesMetrics?.sequences, scoreboardByLabel]);
-
-  // KPI totals
-  const kpis = useMemo(() => {
-    const activeRows = mergedRows.filter((r) => !r.isManual && r.messagesSent > 0);
-    const totalMessages = mergedRows.reduce((s, r) => s + r.messagesSent, 0);
-    const totalReplied = mergedRows.reduce((s, r) => s + r.repliesReceived, 0);
-    const totalBooked = mergedRows.reduce((s, r) => s + r.canonicalBookedCalls, 0);
-    const totalBookedAfterSmsReply = mergedRows.reduce((s, r) => s + r.canonicalBookedAfterSmsReply, 0);
-    const totalUniqueContacted = mergedRows.reduce((s, r) => s + r.uniqueContacted, 0);
-    const avgReplyRate = totalMessages > 0 ? (totalReplied / totalMessages) * 100 : 0;
-    const smsReplyBookingPct = totalBooked > 0 ? (totalBookedAfterSmsReply / totalBooked) * 100 : 0;
-    return {
-      activeSequences: activeRows.length,
-      totalMessages,
-      totalBooked,
-      totalUniqueContacted,
-      avgReplyRate,
-      smsReplyBookingPct,
-      // Channel split KPIs - use totals from salesMetrics to avoid double-counting
-      sequenceMessagesSent: salesMetrics?.totals?.sequenceMessagesSent ?? 0,
-      manualMessagesSent: salesMetrics?.totals?.manualMessagesSent ?? 0,
-      sequenceReplyRatePct: salesMetrics?.totals?.sequenceReplyRatePct ?? 0,
-      manualReplyRatePct: salesMetrics?.totals?.manualReplyRatePct ?? 0,
-    };
-  }, [mergedRows, salesMetrics]);
-
-  const monthlyBookings = scoreboard?.monthly.bookings;
-  const compliance = scoreboard?.compliance;
-  const timing = scoreboard?.timing;
-
-  if (isLoading) {
-    return (
-      <div className="V2Page">
-        <SkeletonDashboard />
-      </div>
+  const totals = useMemo(() => {
+    if (!data) return null;
+    return data.sequences.reduce(
+      (acc, row) => {
+        acc.messagesSent += row.messagesSent;
+        acc.uniqueContacted += row.uniqueContacted;
+        acc.repliesReceived += row.repliesReceived;
+        acc.bookedCalls += row.bookedCalls;
+        acc.optOuts += row.optOuts;
+        return acc;
+      },
+      { messagesSent: 0, uniqueContacted: 0, repliesReceived: 0, bookedCalls: 0, optOuts: 0 },
     );
-  }
-
-  if (isError) {
-    return (
-      <div className="V2Page">
-        <V2State kind="error" onRetry={() => void salesMetricsQuery.refetch()}>
-          Failed to load sequence data. Check your connection and try again.
-        </V2State>
-      </div>
-    );
-  }
+  }, [data]);
 
   return (
     <div className="V2Page">
-      {/* ── Header ── */}
       <V2PageHeader
         title="Sequences"
-        subtitle={`Performance across all active sequences · ${MODE_LABELS[mode]}`}
+        subtitle="Deep SMS diagnostics: canonical KPIs, attribution breakdown, qualification quality, and Monday outcomes health."
         right={
-          <div className="V2ControlsRow">
-            <ChangelogPanel />
-            <div className="V2ExecToggles">
-              <button
-                type="button"
-                className="V2ExecToggles__btn"
-                onClick={() => setAllExecutiveSections(true)}
-              >
-                Expand all
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
+              <button key={m} className={`V2Chip ${mode === m ? 'is-active' : ''}`} onClick={() => setMode(m)}>
+                {MODE_LABELS[m]}
               </button>
-              <button
-                type="button"
-                className="V2ExecToggles__btn"
-                onClick={() => setAllExecutiveSections(false)}
-              >
-                Collapse all
-              </button>
-            </div>
-            <div className="V2ModeToggle">
-              <button
-                type="button"
-                className={`V2ModeToggle__btn${mode === '7d' ? ' is-active' : ''}`}
-                onClick={() => setMode('7d')}
-              >
-                7d
-              </button>
-              <button
-                type="button"
-                className={`V2ModeToggle__btn${mode === '30d' ? ' is-active' : ''}`}
-                onClick={() => setMode('30d')}
-              >
-                30d
-              </button>
-              <button
-                type="button"
-                className={`V2ModeToggle__btn${mode === '90d' ? ' is-active' : ''}`}
-                onClick={() => setMode('90d')}
-              >
-                90d
-              </button>
-              <button
-                type="button"
-                className={`V2ModeToggle__btn${mode === '180d' ? ' is-active' : ''}`}
-                onClick={() => setMode('180d')}
-              >
-                180d
-              </button>
-              <button
-                type="button"
-                className={`V2ModeToggle__btn${mode === '365d' ? ' is-active' : ''}`}
-                onClick={() => setMode('365d')}
-              >
-                365d
-              </button>
-            </div>
+            ))}
+            <select value={status} onChange={(event) => setStatus(event.target.value as 'active' | 'inactive' | '')}>
+              <option value="">All statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
           </div>
         }
       />
 
-      {/* ── Hero Summary ── */}
-      <V2HeroSummary
-        primaryValue={String(kpis.totalBooked)}
-        primaryLabel="Booked Calls"
-        primaryChange={{ value: 12.5, isPositive: true }} // Mock change - can be calculated from trend data
-        secondaryMetrics={[
-          { value: `${kpis.avgReplyRate.toFixed(1)}%`, label: 'Reply Rate', meta: `${mode} avg` },
-          { value: String(kpis.activeSequences), label: 'Active Sequences', meta: 'sending messages' },
-        ]}
-      />
-
-      {/* ── Tab Navigation ── */}
-      <V2TabNav
-        tabs={[
-          { key: 'overview', label: 'Overview', count: undefined },
-          { key: 'sequences', label: 'Sequences', count: mergedRows.length },
-          { key: 'qualification', label: 'Qualification', count: sequenceQualQuery.data?.data?.items?.length },
-          { key: 'attribution', label: 'Attribution', count: undefined },
-        ]}
-        activeTab={activeTab}
-        onChange={(key) => setActiveTab(key as TabKey)}
-      />
-
-      {/* ── Tab Content: Overview ── */}
-      {activeTab === 'overview' && (
+      {query.isLoading ? (
+        <V2State kind="loading">Loading deep sequence analytics…</V2State>
+      ) : query.isError || !data || !totals ? (
+        <V2State kind="error" onRetry={() => void query.refetch()}>
+          Failed to load deep sequence analytics.
+        </V2State>
+      ) : (
         <>
-          {/* ── KPI Summary ── */}
-          <V2AnimatedList className="V2MetricsGrid">
+          <div className="V2MetricGrid">
+            <V2MetricCard label="Messages sent" value={fmtInt(totals.messagesSent)} />
+            <V2MetricCard label="Unique contacted" value={fmtInt(totals.uniqueContacted)} />
+            <V2MetricCard label="Replies" value={fmtInt(totals.repliesReceived)} />
             <V2MetricCard
-              label="Active Sequences"
-              value={String(kpis.activeSequences)}
-              meta={`${mode} window`}
+              label="Reply rate"
+              value={fmtPct(totals.uniqueContacted > 0 ? (totals.repliesReceived / totals.uniqueContacted) * 100 : 0)}
             />
+            <V2MetricCard label="Booked calls" value={fmtInt(totals.bookedCalls)} tone="positive" />
             <V2MetricCard
-              label="Messages Sent"
-              value={fmtInt(kpis.totalMessages)}
-              meta="all sequences"
+              label="Booking rate"
+              value={fmtPct(totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0)}
             />
-            <V2MetricCard
-              label="Unique Contacts"
-              value={fmtInt(kpis.totalUniqueContacted)}
-              meta={`${mode} window`}
-            />
-            <V2MetricCard
-              label="Booked Calls"
-              value={fmtInt(kpis.totalBooked)}
-              tone={kpis.totalBooked > 0 ? 'positive' : 'default'}
-              meta="Slack-verified bookings"
-            />
-            <V2MetricCard
-              label="Avg Reply Rate"
-              value={fmtPct(kpis.avgReplyRate)}
-              tone={kpis.avgReplyRate >= 10 ? 'positive' : 'default'}
-              meta="based on messages sent"
-            />
-            <V2MetricCard
-              label="Booked via SMS Reply %"
-              value={fmtPct(kpis.smsReplyBookingPct)}
-              tone={kpis.smsReplyBookingPct >= 50 ? 'positive' : 'default'}
-              meta="of bookings had a prior SMS reply"
-            />
-          </V2AnimatedList>
+            <V2MetricCard label="Opt-outs" value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
+            <V2MetricCard label="Monday stale boards" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
+          </div>
 
-          {/* ── Channel Split KPIs ── */}
-          {(kpis.sequenceMessagesSent > 0 || kpis.manualMessagesSent > 0) && (
-            <V2AnimatedList className="V2MetricsGrid">
-              <V2MetricCard
-                label="Sequence Messages"
-                value={fmtInt(kpis.sequenceMessagesSent)}
-                meta={`${mode} window`}
-              />
-              <V2MetricCard
-                label="Sequence Reply Rate"
-                value={fmtPct(kpis.sequenceReplyRatePct)}
-                tone={kpis.sequenceReplyRatePct >= 10 ? 'positive' : 'default'}
-                meta="replies ÷ messages"
-              />
-              <V2MetricCard
-                label="Manual Messages"
-                value={fmtInt(kpis.manualMessagesSent)}
-                meta={`${mode} window`}
-              />
-              <V2MetricCard
-                label="Manual Reply Rate"
-                value={fmtPct(kpis.manualReplyRatePct)}
-                tone={kpis.manualReplyRatePct >= 10 ? 'positive' : 'default'}
-                meta="replies ÷ messages"
-              />
-            </V2AnimatedList>
-          )}
+          <V2Panel title="Canonical Sequence Table" caption="Registry-backed sequence analytics and quality diagnostics.">
+            <div className="V2TableWrap V2TableWrap--sequences">
+              <table className="V2Table V2Table--sequences">
+                <thead>
+                  <tr>
+                    <th>Sequence</th>
+                    <th>Lead Magnet</th>
+                    <th>Status</th>
+                    <th className="is-right">Sent</th>
+                    <th className="is-right">Contacted</th>
+                    <th className="is-right">Replies</th>
+                    <th className="is-right">Reply %</th>
+                    <th className="is-right">Booked</th>
+                    <th className="is-right">Book %</th>
+                    <th className="is-right">Opt-outs</th>
+                    <th className="is-right">Opt-out %</th>
+                    <th className="is-right">Jack</th>
+                    <th className="is-right">Brandon</th>
+                    <th className="is-right">Self</th>
+                    <th className="is-right">After Reply</th>
+                    <th className="is-right">Hi Interest %</th>
+                    <th className="is-right">Full-time %</th>
+                    <th className="is-right">Mostly Cash %</th>
+                    <th className="is-right">Step 3/4 %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.sequences.map((row) => (
+                    <tr key={row.sequenceId} className={row.isManualBucket ? 'V2Table__row--manual' : ''}>
+                      <td>{row.label}</td>
+                      <td>{row.leadMagnet}</td>
+                      <td>{row.status}</td>
+                      <td className="is-right">{fmtInt(row.messagesSent)}</td>
+                      <td className="is-right">{fmtInt(row.uniqueContacted)}</td>
+                      <td className="is-right">{fmtInt(row.repliesReceived)}</td>
+                      <td className="is-right">{fmtPct(row.replyRatePct)}</td>
+                      <td className="is-right">{fmtInt(row.bookedCalls)}</td>
+                      <td className="is-right">{fmtPct(row.bookingRatePct)}</td>
+                      <td className="is-right">{fmtInt(row.optOuts)}</td>
+                      <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
+                      <td className="is-right">{fmtInt(row.bookedBreakdown.jack)}</td>
+                      <td className="is-right">{fmtInt(row.bookedBreakdown.brandon)}</td>
+                      <td className="is-right">{fmtInt(row.bookedBreakdown.selfBooked)}</td>
+                      <td className="is-right">{fmtInt(row.bookedBreakdown.bookedAfterSmsReply)}</td>
+                      <td className="is-right">{fmtPct(row.leadQuality.highInterestPct)}</td>
+                      <td className="is-right">{fmtPct(row.leadQuality.fullTimePct)}</td>
+                      <td className="is-right">{fmtPct(row.leadQuality.mostlyCashPct)}</td>
+                      <td className="is-right">{fmtPct(row.leadQuality.progressedToStep3Or4Pct)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </V2Panel>
 
-          {/* ── Trend Sparklines ── */}
-          {trendByDay.length > 0 && (
-            <V2Panel
-              title="Trend Overview"
-              caption={`Day-by-day performance · ${MODE_LABELS[mode]}`}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Messages</span>
-                  <V2Sparkline
-                    data={trendByDay.map((d) => d.messagesSent)}
-                    stroke="var(--v2-accent)"
-                    height={28}
-                  />
-                  <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
-                    {fmtInt(trendByDay.reduce((s, d) => s + d.messagesSent, 0))}
-                  </span>
+          <div className="V2Grid V2Grid--2">
+            <V2Panel title="Monday Outcomes Health" caption="Operational quality signals from Monday pipelines.">
+              <div className="V2SplitStat">
+                <div>
+                  <span>Boards</span>
+                  <strong>{fmtInt(data.monday.boards)}</strong>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Replies</span>
-                  <V2Sparkline
-                    data={trendByDay.map((d) => d.repliesReceived)}
-                    stroke="var(--v2-positive)"
-                    height={28}
-                  />
-                  <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
-                    {fmtInt(trendByDay.reduce((s, d) => s + d.repliesReceived, 0))}
-                  </span>
+                <div>
+                  <span>Stale</span>
+                  <strong>{fmtInt(data.monday.staleBoards)}</strong>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span style={{ width: '100px', fontSize: '0.85rem', color: 'var(--v2-text-dim)' }}>Bookings</span>
-                  <V2Sparkline
-                    data={trendByDay.map((d) => d.canonicalBookedCalls)}
-                    stroke="var(--v2-success)"
-                    height={28}
-                  />
-                  <span style={{ width: '60px', textAlign: 'right', fontWeight: 600, fontSize: '0.85rem' }}>
-                    {fmtInt(trendByDay.reduce((s, d) => s + d.canonicalBookedCalls, 0))}
-                  </span>
+                <div>
+                  <span>Errored</span>
+                  <strong>{fmtInt(data.monday.erroredBoards)}</strong>
                 </div>
               </div>
             </V2Panel>
-          )}
-        </>
-      )}
 
-      {/* ── Tab Content: Sequences ── */}
-      {activeTab === 'sequences' && (
-        <>
-          {/* ── Sequence Performance: Redesigned ── */}
-          <SequencePerformanceTable 
-            mergedRows={mergedRows} 
-            modeLabel={MODE_LABELS[mode]} 
-            unattributedAuditRows={salesMetrics?.provenance.sequenceBookedAttribution?.unattributedAuditRows}
-          />
-        </>
-      )}
-
-      {/* ── Tab Content: Qualification ── */}
-      {activeTab === 'qualification' && (
-        <>
-          {/* ── Reply Timing Insights ── */}
-          <ReplyTimingPanel
-            timing={timing}
-            sequences={mergedRows.map(r => ({
-              label: r.label,
-              medianTimeToFirstReplyMinutes: r.medianTimeToFirstReplyMinutes ?? null,
-              avgTimeToFirstReplyMinutes: r.avgTimeToFirstReplyMinutes ?? null,
-            }))}
-          />
-
-          {/* ── Sequence Qualification Breakdown ── */}
-          <V2Panel
-            title="Lead Qualification by Sequence"
-            caption={`Self-identified lead attributes from qualification inference · ${mode} window`}
-          >
-            {sequenceQualQuery.isLoading ? (
-              <div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span style={{ color: 'var(--v2-muted)' }}>Loading qualification data...</span>
+            <V2Panel title="Monday Coverage" caption="Coverage quality should trend toward 100%.">
+              <div className="V2DeltaList">
+                <div>
+                  <span>Source Coverage</span>
+                  <strong>{fmtPct(data.monday.avgSourceCoveragePct)}</strong>
+                </div>
+                <div>
+                  <span>Campaign Coverage</span>
+                  <strong>{fmtPct(data.monday.avgCampaignCoveragePct)}</strong>
+                </div>
+                <div>
+                  <span>Set By Coverage</span>
+                  <strong>{fmtPct(data.monday.avgSetByCoveragePct)}</strong>
+                </div>
+                <div>
+                  <span>Touchpoints Coverage</span>
+                  <strong>{fmtPct(data.monday.avgTouchpointsCoveragePct)}</strong>
+                </div>
               </div>
-            ) : (
-              <SequenceQualificationBreakdown
-                items={sequenceQualQuery.data?.data?.items ?? []}
-                isLoading={false}
-              />
-            )}
-          </V2Panel>
-        </>
-      )}
-
-      {/* ── Tab Content: Attribution ── */}
-      {activeTab === 'attribution' && (
-        <>
-          {/* ── Booking Attribution ── */}
-          {(salesMetrics?.bookedCredit || monthlyBookings) && (
-            <ExecutiveSection
-              id="attribution"
-              title="Booking Attribution"
-              meta={`Expanded analysis panel · rep split: ${MODE_LABELS[mode]} window`}
-              isOpen={executiveSections.attribution}
-              onToggle={setExecutiveSectionOpen}
-            >
-              <BookingAttributionPanel
-                bookedCredit={salesMetrics?.bookedCredit}
-                attribution={salesMetrics?.provenance.sequenceBookedAttribution}
-                modeLabel={MODE_LABELS[mode]}
-                mode={mode}
-              />
-            </ExecutiveSection>
-          )}
-
-          {/* ── Compliance Panel ── */}
-          {compliance && (
-            <ExecutiveSection
-              id="compliance"
-              title="Opt-Out Health"
-              meta="Expanded analysis panel · weekly window"
-              isOpen={executiveSections.compliance}
-              onToggle={setExecutiveSectionOpen}
-            >
-              <CompliancePanel compliance={compliance} />
-            </ExecutiveSection>
-          )}
-
-          {/* ── Timing Panel ── */}
-          {timing && (
-            <ExecutiveSection
-              id="timing"
-              title="Reply Timing"
-              meta="Expanded analysis panel · weekly window"
-              isOpen={executiveSections.timing}
-              onToggle={setExecutiveSectionOpen}
-            >
-              <TimingPanel timing={timing} />
-            </ExecutiveSection>
-          )}
+            </V2Panel>
+          </div>
         </>
       )}
     </div>

@@ -1136,6 +1136,41 @@
   }
 }
 
+/* ─── Generic Chips & Ghost Buttons ─────────────────────────────────────── */
+.V2Chip {
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--v2-border, #d0d5dd);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-smooth);
+}
+
+.V2Chip.is-active {
+  border-color: var(--v2-primary, #0ea5e9);
+  background: var(--v2-primary-soft, rgba(14, 165, 233, 0.12));
+  color: var(--v2-primary, #0ea5e9);
+  box-shadow: 0 6px 18px rgba(14, 165, 233, 0.16);
+}
+
+.V2GhostButton {
+  border: 1px solid var(--v2-border, #d0d5dd);
+  background: transparent;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s var(--ease-smooth);
+}
+
+.V2GhostButton:hover {
+  border-color: var(--v2-primary, #0ea5e9);
+  color: var(--v2-primary, #0ea5e9);
+  box-shadow: 0 8px 20px rgba(14, 165, 233, 0.12);
+}
+
 /* ─── Reduced Motion ─────────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

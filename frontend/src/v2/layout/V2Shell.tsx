@@ -19,8 +19,6 @@ const navItems: NavItem[] = [
   { to: '/v2/insights', label: v2Copy.nav.insights, shortLabel: 'Insights', icon: '◉' },
   { to: '/v2/inbox', label: v2Copy.nav.inbox, shortLabel: 'Inbox', icon: '✉' },
   { to: '/v2/runs', label: v2Copy.nav.runs, shortLabel: 'Runs', icon: '◌' },
-  { to: '/v2/rep/jack', label: v2Copy.nav.setterJack, shortLabel: 'Jack', icon: 'J' },
-  { to: '/v2/rep/brandon', label: v2Copy.nav.setterBrandon, shortLabel: 'Brandon', icon: 'B' },
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: '⟐' },
 ];
 

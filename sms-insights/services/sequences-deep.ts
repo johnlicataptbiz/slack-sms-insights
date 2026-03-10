@@ -2,6 +2,7 @@ import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
+const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
 
 export type SequenceDeepParams = {
   from: Date;
@@ -69,6 +70,7 @@ export const getSequencesDeep = async (
   logger?: Pick<Logger, 'warn'>,
 ): Promise<SequenceDeepPayload> => {
   const prisma = getPrisma();
+  const salesTeamBoardId = (process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID).trim();
   const fromDay = params.from.toISOString().slice(0, 10);
   const toDay = params.to.toISOString().slice(0, 10);
 
@@ -177,11 +179,13 @@ export const getSequencesDeep = async (
       SELECT COUNT(*)::int AS monday_booked_total
       FROM monday_call_snapshots
       WHERE is_booked = TRUE
+        AND board_id = $3
         AND call_date >= $1::date
         AND call_date <= $2::date
       `,
       fromDay,
       toDay,
+      salesTeamBoardId,
     ),
   ]);
 

@@ -8,6 +8,7 @@ const getPrisma = () => getPrismaClient();
 const MANUAL_LABEL = 'No sequence (manual/direct)';
 const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
 const SOCIAL_MEDIA_BACKFILL_LABEL = 'Social Media (Monday backfill)';
+const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
 const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
@@ -72,6 +73,7 @@ export const refreshKpiFacts = async (
   logger?: Pick<Logger, 'info' | 'warn' | 'error'>,
 ): Promise<KpiFactRefreshResult> => {
   const prisma = getPrisma();
+  const salesTeamBoardId = (process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID).trim();
 
   const manual = await prisma.sequence_registry.upsert({
     where: { normalized_label: 'no sequence manual direct' },
@@ -412,12 +414,14 @@ export const refreshKpiFacts = async (
       AND lo.call_date >= $1::date
       AND lo.call_date <= $2::date
       AND lo.call_date <= (CURRENT_DATE - INTERVAL '2 days')
+      AND lo.board_id = $5
     GROUP BY 1,2,3,4
     `,
     fromDay,
     toDay,
     params.timeZone,
     MANUAL_LABEL,
+    salesTeamBoardId,
   );
 
   // If Slack attribution is incomplete, backfill residual counts from Monday as historical source of truth.

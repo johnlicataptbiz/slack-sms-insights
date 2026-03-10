@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 
-import { useV2SequencesDeep } from '../../api/v2Queries';
+import { useV2SequenceQualification, useV2SequencesDeep } from '../../api/v2Queries';
+import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 
 type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
@@ -27,7 +28,9 @@ export default function SequencesV2() {
     tz: 'America/Chicago',
     ...(status ? { status } : {}),
   });
+  const qualificationQuery = useV2SequenceQualification({ range: mode, tz: 'America/Chicago' });
   const data = query.data?.data;
+  const qualificationItems = qualificationQuery.data?.data.items ?? [];
 
   const totals = useMemo(() => {
     if (!data) return null;
@@ -144,6 +147,19 @@ export default function SequencesV2() {
               </div>
             </V2Panel>
           </div>
+
+          <V2Panel
+            title="Lead Qualification by Sequence"
+            caption="Deeper breakdown as you scroll: employment, revenue model, interest level, and top niches."
+          >
+            {qualificationQuery.isLoading ? (
+              <V2State kind="loading">Loading qualification breakdown...</V2State>
+            ) : qualificationItems.length === 0 ? (
+              <V2State kind="empty">No qualification breakdown available for this date range.</V2State>
+            ) : (
+              <SequenceQualificationBreakdown items={qualificationItems} isLoading={false} />
+            )}
+          </V2Panel>
 
           <div className="V2Grid V2Grid--3">
             <V2Panel title="Monday Board Health" caption="Quick read on Monday freshness.">

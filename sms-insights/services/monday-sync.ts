@@ -20,7 +20,11 @@ import {
   upsertNormalizedMondayLeadRecords,
 } from './monday-store.js';
 
-const parseBool = (value: string | undefined): boolean => value?.trim().toLowerCase() === 'true';
+const parseBool = (value: string | undefined, fallback = false): boolean => {
+  const normalized = (value || '').trim().toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === 'true';
+};
 const parseCsv = (value: string | undefined): string[] =>
   (value || '')
     .split(',')
@@ -32,6 +36,8 @@ export const mondayConfig = {
   writebackEnabled: parseBool(process.env.MONDAY_WRITEBACK_ENABLED),
   personalSyncEnabled: parseBool(process.env.MONDAY_PERSONAL_SYNC_ENABLED),
   outboundEnabled: parseBool(process.env.MONDAY_OUTBOUND_ENABLED),
+  // Safety gate: keep all automatic Monday writes OFF unless explicitly enabled.
+  autoWriteEnabled: parseBool(process.env.MONDAY_AUTO_WRITE_ENABLED, false),
   acqBoardId: (process.env.MONDAY_ACQ_BOARD_ID || '5077164868').trim(),
   salesCallsBoardId: (
     process.env.MONDAY_SALES_CALLS_BOARD_ID ||
@@ -368,7 +374,7 @@ export const runMondayMaintenanceCycle = async (
       }
     }
 
-    if (mondayConfig.outboundEnabled && mondayConfig.writebackEnabled) {
+    if (mondayConfig.autoWriteEnabled && mondayConfig.outboundEnabled && mondayConfig.writebackEnabled) {
       try {
         const weekly = await import('./weekly-manager-summary.js');
         await weekly.syncWeeklySummaryToMonday({}, logger);
@@ -377,7 +383,7 @@ export const runMondayMaintenanceCycle = async (
       }
     }
 
-    if (mondayConfig.outboundEnabled && mondayConfig.personalSyncEnabled) {
+    if (mondayConfig.autoWriteEnabled && mondayConfig.outboundEnabled && mondayConfig.personalSyncEnabled) {
       try {
         const personal = await import('./monday-personal-writeback.js');
         const result = await personal.syncRecentSetterBookedCallsToMonday(logger);
@@ -392,8 +398,10 @@ export const runMondayMaintenanceCycle = async (
 };
 
 export const startMondaySyncJobs = (logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>): (() => void) => {
-  const weeklyWritebackEnabled = mondayConfig.outboundEnabled && mondayConfig.writebackEnabled;
-  const personalWritebackEnabled = mondayConfig.outboundEnabled && mondayConfig.personalSyncEnabled;
+  const weeklyWritebackEnabled =
+    mondayConfig.autoWriteEnabled && mondayConfig.outboundEnabled && mondayConfig.writebackEnabled;
+  const personalWritebackEnabled =
+    mondayConfig.autoWriteEnabled && mondayConfig.outboundEnabled && mondayConfig.personalSyncEnabled;
   if (!mondayConfig.syncEnabled && !weeklyWritebackEnabled && !personalWritebackEnabled) {
     logger?.info?.('Monday jobs disabled');
     return () => {};
@@ -404,6 +412,7 @@ export const startMondaySyncJobs = (logger?: Pick<Logger, 'info' | 'debug' | 'wa
     writebackEnabled: weeklyWritebackEnabled,
     personalSyncEnabled: personalWritebackEnabled,
     outboundEnabled: mondayConfig.outboundEnabled,
+    autoWriteEnabled: mondayConfig.autoWriteEnabled,
     boardIds: resolveSyncBoardIds(),
     personalBoardId: mondayConfig.personalBoardId,
     intervalMs: mondayConfig.pollIntervalMs,

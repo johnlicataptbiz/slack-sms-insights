@@ -345,13 +345,16 @@ export const syncWeeklySummaryToMonday = async (
   } = {},
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{ status: 'skipped' | 'synced'; weekStart: string; itemId: string | null }> => {
-  if (!mondayConfig.outboundEnabled || !mondayConfig.writebackEnabled) {
+  if (!mondayConfig.autoWriteEnabled || !mondayConfig.outboundEnabled || !mondayConfig.writebackEnabled) {
     const summary = await getWeeklyManagerSummary(params, logger);
     return { status: 'skipped', weekStart: summary.window.weekStart, itemId: null };
   }
 
   const summary = await getWeeklyManagerSummary(params, logger);
-  const targetBoardId = mondayConfig.personalBoardId || mondayConfig.myCallsBoardId || mondayConfig.acqBoardId;
+  const targetBoardId = mondayConfig.personalBoardId || mondayConfig.myCallsBoardId;
+  if (!targetBoardId) {
+    return { status: 'skipped', weekStart: summary.window.weekStart, itemId: null };
+  }
   const existing = await getMondayWeeklyReport(summary.window.weekStart, logger);
   const markdown = buildWeeklySummaryMarkdown(summary);
   const title = `PTBizSMS Weekly Summary - ${summary.window.weekStart}`;

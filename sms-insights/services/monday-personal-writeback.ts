@@ -140,6 +140,18 @@ const cleanPhone = (value: string | null): string | null => {
   return `+${digits}`;
 };
 
+const normalizeContactName = (value: string | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // Drop obvious phone-like strings so we do not create numeric-only Monday item names.
+  const digitsOnly = trimmed.replace(/\D/g, '');
+  if (digitsOnly.length >= 7 && digitsOnly.length >= trimmed.replace(/\s+/g, '').length - 2) {
+    return null;
+  }
+  return trimmed;
+};
+
 const slackPermalink = (channelId: string, messageTs: string): string => {
   return `https://slack.com/archives/${channelId}/p${messageTs.replace('.', '')}`;
 };
@@ -211,11 +223,12 @@ const addColumnValue = (
 
 const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
   const setter = formatSetter(source.bucket === 'brandon' ? 'brandon' : 'jack');
+  const contactName = normalizeContactName(source.contactName);
   const lines = [
     `# Slack Booked Call (${setter})`,
     '',
     `Booked at: ${source.eventTs}`,
-    `Contact: ${source.contactName || source.contactPhone || 'Unknown'}`,
+    `Contact: ${contactName || source.contactPhone || 'Unknown'}`,
     `Phone: ${source.contactPhone || 'n/a'}`,
     `Line: ${source.line || 'n/a'}`,
     `Rep: ${source.rep || setter}`,
@@ -229,7 +242,8 @@ const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
 
 const buildItemName = (source: BookedCallAttributionSource): string => {
   const callDate = resolveCallDate(source.eventTs);
-  const who = source.contactName || source.contactPhone || 'Booked Call';
+  const contactName = normalizeContactName(source.contactName);
+  const who = contactName || 'Booked Call';
   return `${who} - ${callDate}`;
 };
 
@@ -265,7 +279,7 @@ const toColumnValues = (
   const link = slackPermalink(source.slackChannelId, source.slackMessageTs);
 
   addColumnValue(values, columnsById, mapping.callDateColumnId, callDate, { isDate: true });
-  addColumnValue(values, columnsById, mapping.contactNameColumnId, source.contactName);
+  addColumnValue(values, columnsById, mapping.contactNameColumnId, normalizeContactName(source.contactName));
   addColumnValue(values, columnsById, mapping.phoneColumnId, source.contactPhone, { isPhone: true });
   addColumnValue(values, columnsById, mapping.setterColumnId, source.rep || setter, { isSetter: true });
   addColumnValue(values, columnsById, mapping.stageColumnId, 'Booked');
@@ -399,7 +413,7 @@ const loadRelevantSources = async (params: {
 export const syncRecentSetterBookedCallsToMonday = async (
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{ status: 'skipped' | 'success'; pushed: number; checked: number }> => {
-  if (!mondayConfig.outboundEnabled || !mondayConfig.personalSyncEnabled) {
+  if (!mondayConfig.autoWriteEnabled || !mondayConfig.outboundEnabled || !mondayConfig.personalSyncEnabled) {
     return { status: 'skipped', pushed: 0, checked: 0 };
   }
 
@@ -432,6 +446,9 @@ export const syncBookedCallToPersonalBoardFromSlackMessage = async (
   },
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{ status: 'skipped' | 'synced' | 'error'; reason?: string }> => {
+  if (!mondayConfig.autoWriteEnabled) {
+    return { status: 'skipped', reason: 'MONDAY_AUTO_WRITE_ENABLED is false' };
+  }
   if (!mondayConfig.outboundEnabled) {
     return { status: 'skipped', reason: 'MONDAY_OUTBOUND_ENABLED is false' };
   }

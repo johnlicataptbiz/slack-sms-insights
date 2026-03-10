@@ -309,7 +309,30 @@ export const upsertBookedCallItem = async (
     }
 
     if (!itemId) throw new Error('Failed to create monday booked call item');
-  } else if (hasColumnValues) {
+  } else {
+    const renameMutation = `
+      mutation RenameBookedCallItem($itemId: ID!, $itemName: String!) {
+        change_simple_column_value(item_id: $itemId, column_id: "name", value: $itemName) {
+          id
+        }
+      }
+    `;
+    try {
+      await requestGraphQl(
+        renameMutation,
+        {
+          itemId,
+          itemName: payload.itemName,
+        },
+        logger,
+      );
+      action = 'updated';
+    } catch (error) {
+      logger?.warn?.('Booked call item rename failed; continuing with update body/columns', error);
+    }
+  }
+
+  if (itemId && hasColumnValues) {
     const patchColumnsMutation = `
       mutation PatchBookedCallColumns($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
         change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $columnValues) {

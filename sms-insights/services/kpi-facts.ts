@@ -331,9 +331,13 @@ export const refreshKpiFacts = async (
     }
   }
   for (const missing of sequenceAttribution.unattributedAuditRows) {
+    const fallbackSequenceLabel =
+      missing.bucket === 'jack' || missing.bucket === 'brandon'
+        ? SOCIAL_MEDIA_BACKFILL_LABEL
+        : MANUAL_LABEL;
     bumpBookingRow({
       eventTs: missing.eventTs,
-      sequenceLabel: MANUAL_LABEL,
+      sequenceLabel: fallbackSequenceLabel,
       bucket: missing.bucket,
       strictSmsReplyLinked: false,
     });

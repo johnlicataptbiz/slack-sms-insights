@@ -95,7 +95,6 @@ import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contr
 import { getScoreboardData } from '../services/scoreboard.js';
 import { getSequenceKpis } from '../services/sequence-kpis.js';
 import { refreshKpiFacts } from '../services/kpi-facts.js';
-import { getAttributionLagStatus } from '../services/attribution-health.js';
 import { getInsightsSummary } from '../services/insights-summary.js';
 import { getSequencesDeep } from '../services/sequences-deep.js';
 import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../services/security-headers.js';
@@ -1258,14 +1257,8 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
   const rep = repRaw === 'jack' || repRaw === 'brandon' ? repRaw : null;
 
   try {
-    let refreshInfo:
-      | {
-          fallbackBookingRows: number;
-          fallbackBookedTotal: number;
-        }
-      | null = null;
     if (shouldRefreshFactsOnRead()) {
-      refreshInfo = await refreshKpiFacts(
+      await refreshKpiFacts(
         {
           from: resolved.from,
           to: resolved.to,
@@ -1275,33 +1268,15 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
       );
     }
 
-    const [data, lagStatus] = await Promise.all([
-      getInsightsSummary(
-        {
-          from: resolved.from,
-          to: resolved.to,
-          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
-          rep,
-        },
-        logger,
-      ),
-      getAttributionLagStatus(24),
-    ]);
-
-    const warnings: string[] = [];
-    if (refreshInfo && refreshInfo.fallbackBookingRows > 0) {
-      warnings.push(
-        `Historical Monday backfill applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
-      );
-    }
-    if (lagStatus.isLagging) {
-      warnings.push(
-        `Booked-call attribution lag is ${lagStatus.lagHours}h behind booked_calls (max attribution ${lagStatus.maxAttributionTs}).`,
-      );
-    }
-    if (warnings.length > 0) {
-      data.warnings = warnings;
-    }
+    const data = await getInsightsSummary(
+      {
+        from: resolved.from,
+        to: resolved.to,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        rep,
+      },
+      logger,
+    );
 
     sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
   } catch (error) {
@@ -1334,14 +1309,8 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
   const status = statusRaw === 'active' || statusRaw === 'inactive' ? statusRaw : null;
 
   try {
-    let refreshInfo:
-      | {
-          fallbackBookingRows: number;
-          fallbackBookedTotal: number;
-        }
-      | null = null;
     if (shouldRefreshFactsOnRead()) {
-      refreshInfo = await refreshKpiFacts(
+      await refreshKpiFacts(
         {
           from: resolved.from,
           to: resolved.to,
@@ -1351,52 +1320,15 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
       );
     }
 
-    const [data, lagStatus] = await Promise.all([
-      getSequencesDeep(
-        {
-          from: resolved.from,
-          to: resolved.to,
-          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
-          status,
-        },
-        logger,
-      ),
-      getAttributionLagStatus(24),
-    ]);
-
-    const warnings: string[] = [];
-    if (refreshInfo && refreshInfo.fallbackBookingRows > 0) {
-      warnings.push(
-        `Historical Monday backfill applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
-      );
-    }
-    if (lagStatus.isLagging) {
-      warnings.push(
-        `Booked-call attribution lag is ${lagStatus.lagHours}h behind booked_calls (max attribution ${lagStatus.maxAttributionTs}).`,
-      );
-    }
-    const verification = data.verification;
-    const mondayDeltaAbs = Math.abs(verification.deltaBookedVsMonday);
-    const mondayDeltaPct =
-      verification.mondayBookedTotal > 0 ? (mondayDeltaAbs / verification.mondayBookedTotal) * 100 : 0;
-    if (verification.mondayBookedTotal > 0 && mondayDeltaPct >= 15) {
-      warnings.push(
-        `Slack-vs-Monday booked delta is ${verification.deltaBookedVsMonday} (${mondayDeltaPct.toFixed(1)}% of Monday booked).`,
-      );
-    }
-    if (verification.manualDirectSharePct >= 35) {
-      warnings.push(
-        `Manual/direct booked share is high (${verification.manualDirectSharePct.toFixed(1)}%). Sequence attribution likely still under-mapped.`,
-      );
-    }
-    if (verification.attributionConversationMappedPct < 40) {
-      warnings.push(
-        `Conversation linkage on booked_call_attribution is low (${verification.attributionConversationMappedPct.toFixed(1)}%).`,
-      );
-    }
-    if (warnings.length > 0) {
-      data.warnings = warnings;
-    }
+    const data = await getSequencesDeep(
+      {
+        from: resolved.from,
+        to: resolved.to,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        status,
+      },
+      logger,
+    );
 
     sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
   } catch (error) {

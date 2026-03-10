@@ -3,6 +3,8 @@ import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
 const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
+const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
+const SOCIAL_MEDIA_BACKFILL_LABEL = 'Social Media (Monday backfill)';
 
 export type SequenceDeepParams = {
   from: Date;
@@ -189,6 +191,15 @@ export const getSequencesDeep = async (
     ),
   ]);
 
+  const manualSequenceId = sequenceRows.find((row) => row.is_manual_bucket)?.id || null;
+  const backfillSequenceIds = new Set(
+    sequenceRows
+      .filter((row) => row.label === MONDAY_BACKFILL_LABEL || row.label === SOCIAL_MEDIA_BACKFILL_LABEL)
+      .map((row) => row.id),
+  );
+  const resolveSequenceId = (sequenceId: string): string =>
+    manualSequenceId && backfillSequenceIds.has(sequenceId) ? manualSequenceId : sequenceId;
+
   const summary = new Map<string, {
     messagesSent: number;
     uniqueContacted: number;
@@ -233,7 +244,7 @@ export const getSequencesDeep = async (
   };
 
   for (const row of smsRows) {
-    const stat = ensure(row.sequence_id);
+    const stat = ensure(resolveSequenceId(row.sequence_id));
     stat.messagesSent += row.messages_sent;
     stat.uniqueContacted += row.unique_contacted;
     stat.repliesReceived += row.replies_received;
@@ -242,7 +253,7 @@ export const getSequencesDeep = async (
   }
 
   for (const row of bookingRows) {
-    const stat = ensure(row.sequence_id);
+    const stat = ensure(resolveSequenceId(row.sequence_id));
     stat.bookedCalls += row.booked_total;
     stat.bookedJack += row.booked_jack;
     stat.bookedBrandon += row.booked_brandon;
@@ -252,7 +263,7 @@ export const getSequencesDeep = async (
   }
 
   for (const row of leadRows) {
-    const stat = ensure(row.sequence_id);
+    const stat = ensure(resolveSequenceId(row.sequence_id));
     stat.qualityLeads += row.leads_count;
     stat.qualityHighInterest += row.coaching_interest_high;
     stat.qualityFullTime += row.employment_full_time;
@@ -261,6 +272,7 @@ export const getSequencesDeep = async (
   }
 
   const sequences = sequenceRows
+    .filter((row) => !backfillSequenceIds.has(row.id))
     .map((row) => {
       const stat = summary.get(row.id);
       const messagesSent = stat?.messagesSent || 0;

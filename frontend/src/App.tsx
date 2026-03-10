@@ -1,6 +1,8 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { parseUiMode, type UiMode } from './uiMode';
+import { client, setUnauthorizedHandler } from './api/client';
+import { PasswordGate } from './components/PasswordGate';
 
 const V2App = lazy(() => import('./v2/V2App'));
 
@@ -35,8 +37,28 @@ export default function App() {
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Password gate removed - always authenticated
-    setIsAuthed(true);
+    let active = true;
+
+    const handleUnauthorized = () => {
+      if (active) setIsAuthed(false);
+    };
+    setUnauthorizedHandler(handleUnauthorized);
+
+    const verifySession = async () => {
+      try {
+        await client.get('/api/auth/verify');
+        if (active) setIsAuthed(true);
+      } catch {
+        if (active) setIsAuthed(false);
+      }
+    };
+
+    verifySession();
+
+    return () => {
+      active = false;
+      setUnauthorizedHandler(() => {});
+    };
   }, []);
 
   if (isAuthed === null) {
@@ -44,6 +66,21 @@ export default function App() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: 'var(--muted-foreground, #888)' }}>
         Loading…
       </div>
+    );
+  }
+
+  if (isAuthed === false) {
+    return (
+      <PasswordGate
+        onUnlock={async () => {
+          try {
+            await client.get('/api/auth/verify');
+            setIsAuthed(true);
+          } catch {
+            setIsAuthed(false);
+          }
+        }}
+      />
     );
   }
 

@@ -29,6 +29,14 @@ export function InsightsV2() {
   const data = query.data?.data;
 
   const reps = useMemo(() => data?.reps ?? [], [data?.reps]);
+  const setterRows = useMemo(
+    () =>
+      reps.filter((rep) => {
+        const id = (rep.repId || '').toLowerCase();
+        return id === 'jack' || id === 'brandon';
+      }),
+    [reps],
+  );
 
   if (query.isLoading) {
     return (
@@ -106,7 +114,7 @@ export function InsightsV2() {
                 </tr>
               </thead>
               <tbody>
-                {reps.map((rep) => {
+                {setterRows.map((rep) => {
                   const isSelected = selectedRep && rep.repId === selectedRep;
                   return (
                     <tr key={rep.repId} className={isSelected ? 'V2Table__row--highlight' : ''}>

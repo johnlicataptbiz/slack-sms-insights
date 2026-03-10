@@ -138,7 +138,8 @@ export const startDailyReportCron = async (app: App): Promise<void> => {
           logger: app.logger,
           channelId: DAILY_REPORT_CHANNEL_ID,
           channelName: DAILY_REPORT_CHANNEL_NAME,
-          prompt: 'daily report',
+          // Keep cron reports pinned to prior-day results even if a retry happens later.
+          prompt: 'daily report yesterday',
           reportType: 'daily',
         });
 

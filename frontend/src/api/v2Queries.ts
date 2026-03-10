@@ -23,6 +23,8 @@ import {
   assertSendMessageResultEnvelope,
   assertWeeklySummaryV2Envelope,
   assertSequenceKpisV2Envelope,
+  assertAttributionHealthV2Envelope,
+  assertManualMondayEnvelope,
 } from './v2Guards';
 import type {
   AlowareSequenceSyncV2,
@@ -49,10 +51,12 @@ import type {
   SequenceVersionHistoryV2,
   SequenceDeepV2,
   SequenceKpisV2,
+  AttributionHealthV2,
   ScoreboardV2,
   SendMessageResultV2,
   StageConversionRowV2,
   WeeklyManagerSummaryV2,
+  SequenceQualificationBreakdown,
 } from './v2-types';
 
 export type SalesMetricsQueryParams =
@@ -129,6 +133,12 @@ export const fetchV2SalesMetrics = async (params: SalesMetricsQueryParams) => {
   return response as ApiEnvelope<SalesMetricsV2>;
 };
 
+const fetchV2AttributionHealth = async () => {
+  const response = await client.get<unknown>('/api/v2/attribution/health');
+  assertAttributionHealthV2Envelope(response);
+  return response as ApiEnvelope<AttributionHealthV2>;
+};
+
 const fetchV2SalesMetricsBatch = async (params: { days: string[]; tz?: string }) => {
   const searchParams = new URLSearchParams();
   searchParams.set('days', params.days.join(','));
@@ -147,6 +157,20 @@ export const useV2SalesMetrics = (params: SalesMetricsQueryParams, options?: { e
     gcTime: 5 * 60 * 1000,     // 5 minutes (cacheTime in v5)
     retry: 3,                  // Retry 3 times on failure
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2AttributionHealth = () => {
+  return useQuery({
+    queryKey: ['v2', 'attribution', 'health'],
+    queryFn: async () => {
+      const envelope = await fetchV2AttributionHealth();
+      return envelope.data;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 3,
     refetchOnWindowFocus: false,
   });
 };
@@ -1551,6 +1575,32 @@ export const useV2SequenceQualification = (params: { range: '7d' | '30d' | '90d'
     refetchOnWindowFocus: false,
   });
 };
+
+type ManualMondayPayload = {
+  contactName: string;
+  contactPhone?: string | null;
+  eventTs?: string;
+  line?: string | null;
+  notes?: string | null;
+  setter?: 'jack' | 'brandon';
+};
+
+const createManualMondayBookedCall = async (payload: ManualMondayPayload) => {
+  const response = await client.post<unknown>('/api/v2/monday/manual-booked-call', payload);
+  assertManualMondayEnvelope(response);
+  return response as ApiEnvelope<{ status: 'synced'; itemId: string }>;
+};
+
+export const useManualMondayBookedCall = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createManualMondayBookedCall,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+    },
+  });
+};
+
 
 export const useV2SequenceKpis = (params: { range: '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string }) => {
   const searchParams = new URLSearchParams();

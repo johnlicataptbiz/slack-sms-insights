@@ -20,6 +20,7 @@ import type {
   InsightsSummaryV2,
   WeeklyManagerSummaryV2,
   SequenceDeepV2,
+  AttributionHealthV2,
 } from './v2-types';
 
 const isObject = (value: unknown): value is Record<string, unknown> => {
@@ -36,6 +37,16 @@ function assertEnvelopeMeta(value: unknown): asserts value is ApiEnvelope<unknow
   if (value.schemaVersion !== '2026.1') throw new Error('Invalid v2 envelope meta: unsupported schemaVersion');
   if (!isString(value.generatedAt)) throw new Error('Invalid v2 envelope meta: generatedAt must be string');
   if (!isString(value.timeZone)) throw new Error('Invalid v2 envelope meta: timeZone must be string');
+}
+
+export function assertManualMondayEnvelope(
+  value: unknown,
+): asserts value is ApiEnvelope<{ status: 'synced'; itemId: string }> {
+  if (!isObject(value)) throw new Error('Invalid manual Monday response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid manual Monday response: data must be object');
+  if (value.data.status !== 'synced') throw new Error('Invalid manual Monday response: status');
+  if (!isString(value.data.itemId)) throw new Error('Invalid manual Monday response: itemId');
 }
 
 function assertRun(value: unknown): void {
@@ -373,6 +384,15 @@ export function assertSequenceKpisV2Envelope(value: unknown): asserts value is A
   if (!isString(value.data.window.from)) throw new Error('Invalid sequence KPIs response: window.from');
   if (!isString(value.data.window.to)) throw new Error('Invalid sequence KPIs response: window.to');
   if (!isString(value.data.window.timeZone)) throw new Error('Invalid sequence KPIs response: window.timeZone');
+  if (!isObject(value.data.verification)) throw new Error('Invalid sequence KPIs response: verification missing');
+  const verification = value.data.verification;
+  if (!isNumber(verification.slackBookedTotal)) throw new Error('Invalid sequence KPIs response: verification.slackBookedTotal must be number');
+  if (!isNumber(verification.matchedCalls)) throw new Error('Invalid sequence KPIs response: verification.matchedCalls must be number');
+  if (!isNumber(verification.unattributedCalls)) throw new Error('Invalid sequence KPIs response: verification.unattributedCalls must be number');
+  if (!isNumber(verification.manualDirectBooked)) throw new Error('Invalid sequence KPIs response: verification.manualDirectBooked must be number');
+  if (!isNumber(verification.manualDirectSharePct)) throw new Error('Invalid sequence KPIs response: verification.manualDirectSharePct must be number');
+  if (!isNumber(verification.smsPhoneMatchedCalls)) throw new Error('Invalid sequence KPIs response: verification.smsPhoneMatchedCalls must be number');
+  if (!isNumber(verification.fuzzyTextMatchedCalls)) throw new Error('Invalid sequence KPIs response: verification.fuzzyTextMatchedCalls must be number');
 }
 
 export function assertInsightsSummaryV2Envelope(value: unknown): asserts value is ApiEnvelope<InsightsSummaryV2> {
@@ -384,6 +404,25 @@ export function assertInsightsSummaryV2Envelope(value: unknown): asserts value i
   if (!isObject(value.data.funnel)) throw new Error('Invalid v2 insights summary response: funnel missing');
   if (!Array.isArray(value.data.risks)) throw new Error('Invalid v2 insights summary response: risks missing');
   if (!isObject(value.data.mondayHealth)) throw new Error('Invalid v2 insights summary response: mondayHealth missing');
+  if (!isNumber(value.data.mondayHealth.avgSetByCoveragePct)) {
+    throw new Error('Invalid v2 insights summary response: mondayHealth.avgSetByCoveragePct must be number');
+  }
+  if (!isNumber(value.data.mondayHealth.avgTouchpointsCoveragePct)) {
+    throw new Error('Invalid v2 insights summary response: mondayHealth.avgTouchpointsCoveragePct must be number');
+  }
+}
+
+export function assertAttributionHealthV2Envelope(value: unknown): asserts value is ApiEnvelope<AttributionHealthV2> {
+  if (!isObject(value)) throw new Error('Invalid attribution health response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!isObject(value.data)) throw new Error('Invalid attribution health response: data missing');
+  const data = value.data as AttributionHealthV2;
+  if (!isNullableString(data.maxBookedCallsTs)) throw new Error('Invalid attribution health response: maxBookedCallsTs must be string or null');
+  if (!isNullableString(data.maxAttributionTs)) throw new Error('Invalid attribution health response: maxAttributionTs must be string or null');
+  if (data.lagHours != null && !isNumber(data.lagHours)) {
+    throw new Error('Invalid attribution health response: lagHours must be number or null');
+  }
+  if (!isBoolean(data.isLagging)) throw new Error('Invalid attribution health response: isLagging must be boolean');
 }
 
 export function assertSequenceDeepV2Envelope(value: unknown): asserts value is ApiEnvelope<SequenceDeepV2> {

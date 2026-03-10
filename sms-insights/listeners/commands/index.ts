@@ -9,6 +9,7 @@ import {
   ALOWARE_CHANNEL_NAME,
   generateAndPostScoreboard,
 } from '../../services/scoreboard-poster.js';
+import { createManualMondayBookedCall } from '../../services/monday-personal-writeback.js';
 
 const SLACK_TEXT_CHUNK_LIMIT = 3000;
 
@@ -254,6 +255,52 @@ const register = (app: App) => {
           })
           .catch(() => {});
       }
+    }
+  });
+
+  app.command('/manual-monday', async ({ ack, command, logger, respond }) => {
+    try {
+      await ack();
+    } catch (error) {
+      logger.error(error);
+      return;
+    }
+
+    if (!isChannelAllowed(command.channel_id)) {
+      await respond('⛔ This command is only available in selected channels.');
+      return;
+    }
+
+    const parts = (command.text || "")
+      .split("|")
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0);
+
+    const contactName = parts[0];
+    if (!contactName) {
+      await respond(
+        'Usage: `/manual-monday <Contact Name> | [Phone] | [Setter jack/brandon] | [Line] | [Notes]`',
+      );
+      return;
+    }
+
+    const payload = {
+      contactName,
+      contactPhone: parts[1] || undefined,
+      setter:
+        parts[2] && parts[2].toLowerCase() === "brandon" ? "brandon" : "jack",
+      line: parts[3] || undefined,
+      notes: parts[4] || undefined,
+    };
+
+    try {
+      await createManualMondayBookedCall(payload);
+      await respond(`✅ Manual Monday booked call created for *${contactName}*.`);
+    } catch (error) {
+      logger.error('[/manual-monday] Manual call failed:', error);
+      await respond(
+        `❌ Manual Monday push failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   });
 };

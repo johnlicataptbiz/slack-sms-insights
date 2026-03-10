@@ -98,6 +98,7 @@ import { getSequenceKpis } from '../services/sequence-kpis.js';
 import { refreshKpiFacts } from '../services/kpi-facts.js';
 import { getInsightsSummary } from '../services/insights-summary.js';
 import { getSequencesDeep } from '../services/sequences-deep.js';
+import { getAttributionLagStatus } from '../services/attribution-health.js';
 import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../services/security-headers.js';
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
@@ -1229,6 +1230,30 @@ const handleGetSequenceKpisV2: RequestHandler = async (req, res, logger, origin)
       res,
       500,
       { error: 'Failed to fetch sequence KPIs', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetAttributionHealthV2: RequestHandler = async (req, res, logger, origin) => {
+  try {
+    const status = await getAttributionLagStatus();
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data: status,
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: 'snapshot',
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch attribution health:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch attribution health', details: error instanceof Error ? error.message : String(error) },
       origin,
     );
   }
@@ -4483,6 +4508,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/channels', handler: handleGetChannelsV2 },
   { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
   { method: 'GET', path: '/api/v2/insights/summary', handler: handleGetInsightsSummaryV2 },
+  { method: 'GET', path: '/api/v2/attribution/health', handler: handleGetAttributionHealthV2 },
   { method: 'GET', path: '/api/v2/scoreboard', handler: handleGetScoreboardV2 },
   { method: 'GET', path: '/api/v2/sequences/kpis', handler: handleGetSequenceKpisV2 },
   { method: 'GET', path: '/api/v2/sequences/deep', handler: handleGetSequencesDeepV2 },

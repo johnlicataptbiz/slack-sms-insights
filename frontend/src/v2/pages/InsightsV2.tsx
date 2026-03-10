@@ -1,14 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import { useV2InsightsSummary } from '../../api/v2Queries';
+import { useV2InsightsSummary, useV2SalesMetrics } from '../../api/v2Queries';
+import type { BookedCredit } from '../../api/v2-types';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
+import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
+import { AttributionHealthPanel } from '../components/AttributionHealthPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
 
 type Range = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
 
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+const fmtSignedInt = (n: number) => `${n >= 0 ? '+' : ''}${Math.abs(n).toLocaleString()}`;
 
 const RANGE_LABELS: Record<Range, string> = {
   today: 'Today',
@@ -37,6 +41,56 @@ export function InsightsV2() {
       }),
     [reps],
   );
+
+  const salesMetricsQuery = useV2SalesMetrics({ range, tz: 'America/Chicago' });
+  const salesMetrics = salesMetricsQuery.data?.data;
+  const bookedCredit = salesMetrics?.bookedCredit;
+  const manualSharePct = bookedCredit && bookedCredit.total > 0 ? (bookedCredit.selfBooked / bookedCredit.total) * 100 : 0;
+  const manualBookedCalls = bookedCredit?.selfBooked ?? 0;
+  const slackBookedTotal = bookedCredit?.total ?? 0;
+  const slackVsMondayDelta = data ? slackBookedTotal - data.kpis.bookedCalls : 0;
+  const bookingAttributionMeta = salesMetrics?.provenance.sequenceBookedAttribution;
+  const mondayHealth = data?.mondayHealth;
+  const mondayCoverageCards = mondayHealth
+    ? [
+        { label: 'Monday coverage · source', value: mondayHealth.avgSourceCoveragePct },
+        { label: 'Monday coverage · campaign', value: mondayHealth.avgCampaignCoveragePct },
+        { label: 'Monday coverage · set by', value: mondayHealth.avgSetByCoveragePct },
+        { label: 'Monday coverage · touchpoints', value: mondayHealth.avgTouchpointsCoveragePct },
+      ]
+    : [];
+
+  const renderBookingAttributionSection = () => {
+    if (salesMetricsQuery.isLoading) {
+      return (
+        <V2Panel title="Booking attribution" caption="Slack booked calls matched to sequences.">
+          <V2State kind="loading">Loading booking attribution…</V2State>
+        </V2Panel>
+      );
+    }
+    if (salesMetricsQuery.isError) {
+      return (
+        <V2Panel title="Booking attribution" caption="Slack booked calls matched to sequences.">
+          <V2State kind="error">Failed to load booking attribution.</V2State>
+        </V2Panel>
+      );
+    }
+    if (!bookedCredit) {
+      return (
+        <V2Panel title="Booking attribution" caption="Slack booked calls matched to sequences.">
+          <V2State kind="empty">No booking data available yet.</V2State>
+        </V2Panel>
+      );
+    }
+    return (
+      <BookingAttributionPanel
+        bookedCredit={bookedCredit}
+        attribution={bookingAttributionMeta}
+        modeLabel={RANGE_LABELS[range]}
+        mode={range}
+      />
+    );
+  };
 
   if (query.isLoading) {
     return (
@@ -85,16 +139,36 @@ export function InsightsV2() {
         </div>
       ) : null}
 
-      <div className="V2MetricsGrid V2MetricsGrid--compact">
+      <section className="V2MetricsGrid V2MetricsGrid--compact">
         <V2MetricCard label="Messages sent" value={fmtInt(data.kpis.messagesSent)} />
         <V2MetricCard label="People reached" value={fmtInt(data.kpis.uniqueContacted)} />
         <V2MetricCard label="Replies" value={fmtInt(data.kpis.repliesReceived)} />
-        <V2MetricCard label="Reply rate" value={fmtPct(data.kpis.replyRatePct)} tone={data.kpis.replyRatePct >= 10 ? 'positive' : 'default'} />
+        <V2MetricCard
+          label="Reply rate"
+          value={fmtPct(data.kpis.replyRatePct)}
+          tone={data.kpis.replyRatePct >= 10 ? 'positive' : 'default'}
+        />
         <V2MetricCard label="Booked calls" value={fmtInt(data.kpis.bookedCalls)} tone="positive" />
-        <V2MetricCard label="Booking rate" value={fmtPct(data.kpis.bookingRatePct)} tone={data.kpis.bookingRatePct >= 2 ? 'positive' : 'default'} />
-        <V2MetricCard label="Opt-outs" value={fmtInt(data.kpis.optOuts)} tone={data.kpis.optOuts > 0 ? 'critical' : 'default'} />
-        <V2MetricCard label="Opt-out rate" value={fmtPct(data.kpis.optOutRatePct)} tone={data.kpis.optOutRatePct >= 3 ? 'critical' : 'default'} />
-      </div>
+        <V2MetricCard
+          label="Booking rate"
+          value={fmtPct(data.kpis.bookingRatePct)}
+          tone={data.kpis.bookingRatePct >= 2 ? 'positive' : data.kpis.bookingRatePct <= 1 ? 'critical' : 'default'}
+        />
+        <V2MetricCard label="Manual share (Slack)" value={fmtPct(manualSharePct)} />
+        {mondayCoverageCards.map((card) => (
+          <V2MetricCard key={card.label} label={card.label} value={fmtPct(card.value)} />
+        ))}
+        <V2MetricCard
+          label="Opt-outs"
+          value={fmtInt(data.kpis.optOuts)}
+          tone={data.kpis.optOuts > 0 ? 'critical' : 'default'}
+        />
+        <V2MetricCard
+          label="Opt-out rate"
+          value={fmtPct(data.kpis.optOutRatePct)}
+          tone={data.kpis.optOutRatePct >= 3 ? 'critical' : 'default'}
+        />
+      </section>
 
       <div className="V2Grid V2Grid--2">
         <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range.">
@@ -135,6 +209,13 @@ export function InsightsV2() {
           </div>
         </V2Panel>
 
+        <div className="V2PanelStack">
+          {renderBookingAttributionSection()}
+          <AttributionHealthPanel />
+        </div>
+      </div>
+
+      <div className="V2Grid V2Grid--2">
         <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked.">
           <div className="V2SplitStat">
             <div>
@@ -161,9 +242,67 @@ export function InsightsV2() {
             </div>
           </div>
         </V2Panel>
+
+        <div className="V2PanelStack">
+          <V2Panel title="Monday board health" caption="Is Monday data up to date and complete?">
+            <div className="V2SplitStat">
+              <div>
+                <span>Boards</span>
+                <strong>{fmtInt(mondayHealth?.boards ?? 0)}</strong>
+              </div>
+              <div>
+                <span>Behind</span>
+                <strong>{fmtInt(mondayHealth?.staleBoards ?? 0)}</strong>
+              </div>
+              <div>
+                <span>Errors</span>
+                <strong>{fmtInt(mondayHealth?.erroredBoards ?? 0)}</strong>
+              </div>
+            </div>
+            <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
+              {mondayCoverageCards.map((stat) => (
+                <div key={stat.label}>
+                  <span>{stat.label}</span>
+                  <strong>{fmtPct(stat.value)}</strong>
+                </div>
+              ))}
+            </div>
+          </V2Panel>
+
+          <V2Panel title="Booking rate" caption="Manual + sequence bookings for this window.">
+            <div className="V2SplitStat">
+              <div>
+                <span>Booking rate</span>
+                <strong>{fmtPct(data.kpis.bookingRatePct)}</strong>
+              </div>
+              <div>
+                <span>Manual share (Slack)</span>
+                <strong>{fmtPct(manualSharePct)}</strong>
+              </div>
+              <div>
+                <span>Slack vs. Monday delta</span>
+                <strong>{fmtSignedInt(slackVsMondayDelta)}</strong>
+              </div>
+            </div>
+            <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
+              <div>
+                <span>Manual booked calls</span>
+                <strong>{fmtInt(manualBookedCalls)}</strong>
+              </div>
+              <div>
+                <span>Fallback SMS matches</span>
+                <strong>{fmtInt(bookingAttributionMeta?.smsPhoneMatchedCalls ?? 0)}</strong>
+              </div>
+              <div>
+                <span>Strict SMS reply matches</span>
+                <strong>{fmtInt(bookingAttributionMeta?.strictSmsReplyLinkedCalls ?? 0)}</strong>
+              </div>
+            </div>
+          </V2Panel>
+        </div>
       </div>
 
-      <div className="V2Grid V2Grid--2">
+      <div style={{ marginTop: '1rem' }}>
         <V2Panel title="Watch List" caption="Items that need attention based on this range.">
           {data.risks.length === 0 ? (
             <V2State kind="empty">No issues flagged for this date range.</V2State>
@@ -177,33 +316,6 @@ export function InsightsV2() {
               ))}
             </div>
           )}
-        </V2Panel>
-
-        <V2Panel title="Monday Board Health" caption="Is Monday data up to date and complete?">
-          <div className="V2SplitStat">
-            <div>
-              <span>Boards</span>
-              <strong>{fmtInt(data.mondayHealth.boards)}</strong>
-            </div>
-            <div>
-              <span>Behind</span>
-              <strong>{fmtInt(data.mondayHealth.staleBoards)}</strong>
-            </div>
-            <div>
-              <span>With errors</span>
-              <strong>{fmtInt(data.mondayHealth.erroredBoards)}</strong>
-            </div>
-          </div>
-          <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
-            <div>
-              <span>Source filled</span>
-              <strong>{fmtPct(data.mondayHealth.avgSourceCoveragePct)}</strong>
-            </div>
-            <div>
-              <span>Campaign filled</span>
-              <strong>{fmtPct(data.mondayHealth.avgCampaignCoveragePct)}</strong>
-            </div>
-          </div>
         </V2Panel>
       </div>
     </div>

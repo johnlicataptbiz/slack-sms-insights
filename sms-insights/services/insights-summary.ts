@@ -48,6 +48,8 @@ export type InsightsSummary = {
     erroredBoards: number;
     avgSourceCoveragePct: number;
     avgCampaignCoveragePct: number;
+    avgSetByCoveragePct: number;
+    avgTouchpointsCoveragePct: number;
   };
 };
 
@@ -103,6 +105,8 @@ export const getInsightsSummary = async (
       sync_status: true,
       source_coverage_pct: true,
       campaign_coverage_pct: true,
+      set_by_coverage_pct: true,
+      touchpoints_coverage_pct: true,
     },
   });
 
@@ -185,6 +189,10 @@ export const getInsightsSummary = async (
     mondayRows.length > 0 ? mondayRows.reduce((sum, row) => sum + row.source_coverage_pct, 0) / mondayRows.length : 0;
   const avgCampaignCoveragePct =
     mondayRows.length > 0 ? mondayRows.reduce((sum, row) => sum + row.campaign_coverage_pct, 0) / mondayRows.length : 0;
+  const avgSetByCoveragePct =
+    mondayRows.length > 0 ? mondayRows.reduce((sum, row) => sum + row.set_by_coverage_pct, 0) / mondayRows.length : 0;
+  const avgTouchpointsCoveragePct =
+    mondayRows.length > 0 ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length : 0;
 
   if (mondayRows.length === 0) {
     logger?.warn?.('insights-summary: no monday health rows in requested window');
@@ -217,6 +225,8 @@ export const getInsightsSummary = async (
       erroredBoards,
       avgSourceCoveragePct,
       avgCampaignCoveragePct,
+      avgSetByCoveragePct,
+      avgTouchpointsCoveragePct,
     },
   };
 };

@@ -147,6 +147,26 @@ export const getSequenceKpis = async (
     }
   }
 
+  const aggregatedTotals = {
+    messagesSent: 0,
+    uniqueContacted: 0,
+    repliesReceived: 0,
+    optOuts: 0,
+    bookingSignals: 0,
+    bookedCalls: 0,
+  };
+  for (const stat of summary.values()) {
+    aggregatedTotals.messagesSent += stat.messagesSent;
+    aggregatedTotals.uniqueContacted += stat.uniqueContacted;
+    aggregatedTotals.repliesReceived += stat.repliesReceived;
+    aggregatedTotals.optOuts += stat.optOuts;
+    aggregatedTotals.bookingSignals += stat.bookingSignals;
+    aggregatedTotals.bookedCalls += stat.bookedCalls;
+  }
+
+  const manualDirectBooked = sequenceBookedAttribution.totals.manualCalls;
+  const slackBookedTotal = aggregatedTotals.bookedCalls;
+
   const items: SequenceKpiRow[] = Array.from(aggregated.values()).map((row) => {
     const booked = bookedByCanonical.get(row.label);
     const uniqueContacted = peopleBySeq.get(row.label) ?? row.messagesSent;
@@ -180,8 +200,19 @@ export const getSequenceKpis = async (
     };
   });
 
+  const verification = {
+    slackBookedTotal,
+    matchedCalls: sequenceBookedAttribution.totals.matchedCalls,
+    unattributedCalls: sequenceBookedAttribution.totals.unattributedCalls,
+    manualDirectBooked,
+    manualDirectSharePct: slackBookedTotal > 0 ? (manualDirectBooked / slackBookedTotal) * 100 : 0,
+    smsPhoneMatchedCalls: sequenceBookedAttribution.totals.smsPhoneMatchedCalls,
+    fuzzyTextMatchedCalls: sequenceBookedAttribution.totals.fuzzyTextMatchedCalls,
+  };
+
   return {
     items,
     window: { from: fromIso, to: toIso, timeZone: tz },
+    verification,
   };
 };

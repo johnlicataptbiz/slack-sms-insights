@@ -1,8 +1,188 @@
 {
-  "generatedAt": "2026-03-10T06:58:33.103Z",
+  "generatedAt": "2026-03-10T20:39:56.603Z",
   "daysIncluded": 365,
-  "totalCount": 323,
+  "totalCount": 343,
   "entries": [
+    {
+      "hash": "28bfc31",
+      "date": "2026-03-10T14:42:49-05:00",
+      "message": "Add manual monday booked-call endpoint",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add manual monday booked-call endpoint"
+    },
+    {
+      "hash": "0252d27",
+      "date": "2026-03-10T13:29:47-05:00",
+      "message": "Disable auto Monday writes by default and restrict writeback targets",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Disable auto Monday writes by default and restrict writeback targets"
+    },
+    {
+      "hash": "3141036",
+      "date": "2026-03-10T11:37:45-05:00",
+      "message": "Add qualification breakdown section below sequences table",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add qualification breakdown section below sequences table"
+    },
+    {
+      "hash": "bc2c8c5",
+      "date": "2026-03-10T10:39:11-05:00",
+      "message": "Fix inbox send crash on missing contact key and JSON profile upserts",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix inbox send crash on missing contact key and JSON profile upserts"
+    },
+    {
+      "hash": "1051c0d",
+      "date": "2026-03-10T10:35:05-05:00",
+      "message": "Make sequences table fit viewport with compact split column",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Database",
+      "description": "Make sequences table fit viewport with compact split column"
+    },
+    {
+      "hash": "c6752d2",
+      "date": "2026-03-10T10:28:59-05:00",
+      "message": "Lock setter comparison and pin cron daily report to yesterday",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Lock setter comparison and pin cron daily report to yesterday"
+    },
+    {
+      "hash": "ee44605",
+      "date": "2026-03-10T09:22:26-05:00",
+      "message": "Plain-language pass across V2 pages and trust-focused labels",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Plain-language pass across V2 pages and trust-focused labels"
+    },
+    {
+      "hash": "753d085",
+      "date": "2026-03-10T09:15:07-05:00",
+      "message": "Simplify V2 language and remove possible-bookings UI wording",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Simplify V2 language and remove possible-bookings UI wording"
+    },
+    {
+      "hash": "817694b",
+      "date": "2026-03-10T09:10:04-05:00",
+      "message": "Make social Monday backfill deterministic by source",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Make social Monday backfill deterministic by source"
+    },
+    {
+      "hash": "5228e3f",
+      "date": "2026-03-10T09:04:43-05:00",
+      "message": "Keep sequences UI clean while preserving attribution backfill",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Keep sequences UI clean while preserving attribution backfill"
+    },
+    {
+      "hash": "30be5a7",
+      "date": "2026-03-10T08:59:50-05:00",
+      "message": "Scope Monday backfill to Sales Team Calls board",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Scope Monday backfill to Sales Team Calls board"
+    },
+    {
+      "hash": "ad91595",
+      "date": "2026-03-10T08:55:07-05:00",
+      "message": "Backfill social-source bookings from Monday attribution",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Backfill social-source bookings from Monday attribution"
+    },
+    {
+      "hash": "c4171ae",
+      "date": "2026-03-10T08:48:28-05:00",
+      "message": "Use Monday historical data to backfill unattributed booked calls",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Use Monday historical data to backfill unattributed booked calls"
+    },
+    {
+      "hash": "d1c8dbc",
+      "date": "2026-03-10T08:39:26-05:00",
+      "message": "Add Monday verification signals to sequences attribution",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add Monday verification signals to sequences attribution"
+    },
+    {
+      "hash": "6cc7e56",
+      "date": "2026-03-10T08:34:00-05:00",
+      "message": "Improve sequence attribution and remove fallback manual inflation",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Improve sequence attribution and remove fallback manual inflation"
+    },
+    {
+      "hash": "08b47e0",
+      "date": "2026-03-10T08:17:00-05:00",
+      "message": "Sync conversation assignee during inbox auto-assign",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Sync conversation assignee during inbox auto-assign"
+    },
+    {
+      "hash": "4e8d887",
+      "date": "2026-03-10T08:14:21-05:00",
+      "message": "Harden booked-call attribution with SMS sequence fallback",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Harden booked-call attribution with SMS sequence fallback"
+    },
+    {
+      "hash": "5d017af",
+      "date": "2026-03-10T08:09:21-05:00",
+      "message": "Fix sequence booking attribution and tighten sequences table layout",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fix sequence booking attribution and tighten sequences table layout"
+    },
+    {
+      "hash": "149f38a",
+      "date": "2026-03-10T07:54:53-05:00",
+      "message": "Add attribution writer, lag alerts, fallback warnings, and full Monday pagination",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add attribution writer, lag alerts, fallback warnings, and full Monday pagination"
+    },
+    {
+      "hash": "f8ffa48",
+      "date": "2026-03-10T02:00:13-05:00",
+      "message": "Refactor v2 IA and add Prisma-backed KPI fact analytics",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Refactor v2 IA and add Prisma-backed KPI fact analytics"
+    },
     {
       "hash": "0a5ccb9",
       "date": "2026-03-09T23:44:11-05:00",

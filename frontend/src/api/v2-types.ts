@@ -32,6 +32,13 @@ export type BookedCredit = {
   selfBooked: number;
 };
 
+export type AttributionHealthV2 = {
+  maxBookedCallsTs: string | null;
+  maxAttributionTs: string | null;
+  lagHours: number | null;
+  isLagging: boolean;
+};
+
 export type SalesMetricsV2 = {
   processing: {
     model: 'live_rolling_metrics';
@@ -719,6 +726,15 @@ export type SequenceKpiRowV2 = {
 export type SequenceKpisV2 = {
   items: SequenceKpiRowV2[];
   window: { from: string; to: string; timeZone: string };
+  verification: {
+    slackBookedTotal: number;
+    matchedCalls: number;
+    unattributedCalls: number;
+    manualDirectBooked: number;
+    manualDirectSharePct: number;
+    smsPhoneMatchedCalls: number;
+    fuzzyTextMatchedCalls: number;
+  };
 };
 
 export type InsightsSummaryV2 = {
@@ -759,6 +775,8 @@ export type InsightsSummaryV2 = {
     erroredBoards: number;
     avgSourceCoveragePct: number;
     avgCampaignCoveragePct: number;
+    avgSetByCoveragePct: number;
+    avgTouchpointsCoveragePct: number;
   };
 };
 

@@ -31,6 +31,40 @@ export default function SequencesV2() {
   const qualificationQuery = useV2SequenceQualification({ range: mode, tz: 'America/Chicago' });
   const data = query.data?.data;
   const qualificationItems = qualificationQuery.data?.data.items ?? [];
+  const qualificationSummary = useMemo(() => {
+    const total = qualificationItems.reduce((sum, item) => sum + item.totalConversations, 0);
+    const sumFullTime = qualificationItems.reduce((sum, item) => sum + item.fullTime.count, 0);
+    const sumPartTime = qualificationItems.reduce((sum, item) => sum + item.partTime.count, 0);
+    const sumCash = qualificationItems.reduce((sum, item) => sum + item.mostlyCash.count, 0);
+    const sumInsurance = qualificationItems.reduce((sum, item) => sum + item.mostlyInsurance.count, 0);
+    const sumBalanced = qualificationItems.reduce((sum, item) => sum + item.balancedMix.count, 0);
+    const sumHighInterest = qualificationItems.reduce((sum, item) => sum + item.highInterest.count, 0);
+    const sumMediumInterest = qualificationItems.reduce((sum, item) => sum + item.mediumInterest.count, 0);
+    const sumLowInterest = qualificationItems.reduce((sum, item) => sum + item.lowInterest.count, 0);
+    const nicheMap = new Map<string, number>();
+    for (const item of qualificationItems) {
+      for (const niche of item.topNiches) {
+        nicheMap.set(niche.niche, (nicheMap.get(niche.niche) || 0) + niche.count);
+      }
+    }
+    const topNiches = [...nicheMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([niche, count]) => ({ niche, count }));
+    const pct = (value: number) => (total > 0 ? (value / total) * 100 : 0);
+    return {
+      total,
+      fullTimePct: pct(sumFullTime),
+      partTimePct: pct(sumPartTime),
+      cashPct: pct(sumCash),
+      insurancePct: pct(sumInsurance),
+      balancedPct: pct(sumBalanced),
+      highInterestPct: pct(sumHighInterest),
+      mediumInterestPct: pct(sumMediumInterest),
+      lowInterestPct: pct(sumLowInterest),
+      topNiches,
+    };
+  }, [qualificationItems]);
 
   const totals = useMemo(() => {
     if (!data) return null;
@@ -46,6 +80,25 @@ export default function SequencesV2() {
       { messagesSent: 0, uniqueContacted: 0, repliesReceived: 0, bookedCalls: 0, optOuts: 0 },
     );
   }, [data]);
+
+  const bookingRatePct = totals && totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0;
+  const coverageStats = data
+    ? [
+        { label: 'Source coverage', value: data.monday.avgSourceCoveragePct },
+        { label: 'Campaign coverage', value: data.monday.avgCampaignCoveragePct },
+        { label: 'Set-by coverage', value: data.monday.avgSetByCoveragePct },
+        { label: 'Touchpoints coverage', value: data.monday.avgTouchpointsCoveragePct },
+      ]
+    : [];
+  const verification = data?.verification ?? {
+    slackBookedTotal: 0,
+    mondayBookedTotal: 0,
+    deltaBookedVsMonday: 0,
+    manualDirectSharePct: 0,
+    manualDirectBooked: 0,
+    attributionConversationMapped: 0,
+    smsPhoneMatchedCalls: 0,
+  };
 
   return (
     <div className="V2Page">
@@ -106,6 +159,96 @@ export default function SequencesV2() {
             <V2MetricCard label="Monday boards behind" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
           </div>
 
+          <div className="V2Grid V2Grid--2">
+            <V2Panel title="Monday coverage" caption="Freshness and completeness for each coverage field.">
+              <div className="V2SplitStat">
+                <div>
+                  <span>Boards</span>
+                  <strong>{fmtInt(data.monday.boards)}</strong>
+                </div>
+                <div>
+                  <span>Behind</span>
+                  <strong>{fmtInt(data.monday.staleBoards)}</strong>
+                </div>
+                <div>
+                  <span>Errors</span>
+                  <strong>{fmtInt(data.monday.erroredBoards)}</strong>
+                </div>
+              </div>
+              <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
+                {coverageStats.map((stat) => (
+                  <div key={stat.label}>
+                    <span>{stat.label}</span>
+                    <strong>{fmtPct(stat.value)}</strong>
+                  </div>
+                ))}
+              </div>
+            </V2Panel>
+
+            <V2Panel title="Booking rate" caption="Booking efficiency plus manual contributions.">
+              <div className="V2SplitStat">
+                <div>
+                  <span>Booking rate</span>
+                  <strong>{fmtPct(bookingRatePct)}</strong>
+                </div>
+                <div>
+                  <span>Manual / direct share</span>
+                  <strong>{fmtPct(verification.manualDirectSharePct ?? 0)}</strong>
+                </div>
+                <div>
+                  <span>Slack vs Monday delta</span>
+                  <strong>{fmtInt(verification.deltaBookedVsMonday ?? 0)}</strong>
+                </div>
+              </div>
+              <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
+                <div>
+                  <span>Manual booked calls</span>
+                  <strong>{fmtInt(verification.manualDirectBooked ?? 0)}</strong>
+                </div>
+                <div>
+                  <span>SMS conversations mapped</span>
+                  <strong>{fmtInt(verification.attributionConversationMapped ?? 0)}</strong>
+                </div>
+              </div>
+            </V2Panel>
+          </div>
+
+          <V2Panel title="Verification snapshot" caption="Slack totals, Monday totals, and fallback cues.">
+            <div className="V2SplitStat">
+              <div>
+                <span>Slack booked</span>
+                <strong>{fmtInt(verification.slackBookedTotal ?? 0)}</strong>
+              </div>
+              <div>
+                <span>Monday booked</span>
+                <strong>{fmtInt(verification.mondayBookedTotal ?? 0)}</strong>
+              </div>
+              <div>
+                <span>Delta</span>
+                <strong>{fmtInt(verification.deltaBookedVsMonday ?? 0)}</strong>
+              </div>
+            </div>
+            <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
+              <div>
+                <span>Manual booked calls</span>
+                <strong>{fmtInt(verification.manualDirectBooked ?? 0)}</strong>
+              </div>
+              <div>
+                <span>SMS conversations mapped</span>
+                <strong>{fmtInt(verification.attributionConversationMapped ?? 0)}</strong>
+              </div>
+              <div>
+                <span>Fallback SMS matches</span>
+                <strong>{fmtInt(verification.smsPhoneMatchedCalls ?? 0)}</strong>
+              </div>
+            </div>
+            {(verification.smsPhoneMatchedCalls ?? 0) > 0 && (
+              <div className="V2InlineWarning" style={{ marginTop: '1rem' }}>
+                Fallback SMS matches are being used for attribution; consider the Slack reaction data the source of truth until the refresh finishes.
+              </div>
+            )}
+          </V2Panel>
+
           <div ref={tableRef}>
             <V2Panel
               title="Sequence Results"
@@ -146,6 +289,40 @@ export default function SequencesV2() {
                 </table>
               </div>
             </V2Panel>
+
+          <div className="V2QualSummary">
+            <article className="V2QualSummary__cell">
+              <strong>{fmtPct(qualificationSummary.fullTimePct)}</strong>
+              <span>Full-time</span>
+              <small>{fmtPct(qualificationSummary.partTimePct)} part-time</small>
+            </article>
+            <article className="V2QualSummary__cell">
+              <strong>{fmtPct(qualificationSummary.cashPct)}</strong>
+              <span>Revenue mix</span>
+              <small>
+                {fmtPct(qualificationSummary.insurancePct)} insurance · {fmtPct(qualificationSummary.balancedPct)} balanced
+              </small>
+            </article>
+            <article className="V2QualSummary__cell">
+              <strong>{fmtPct(qualificationSummary.highInterestPct)}</strong>
+              <span>Coaching interest</span>
+              <small>
+                {fmtPct(qualificationSummary.mediumInterestPct)} medium · {fmtPct(qualificationSummary.lowInterestPct)} low
+              </small>
+            </article>
+            <article className="V2QualSummary__cell">
+              <strong>Top niches</strong>
+              <span>Incoming interests</span>
+              <div className="V2QualSummary__niches">
+                {qualificationSummary.topNiches.map((niche) => (
+                  <span key={niche.niche} className="V2QualSummary__niche">
+                    {niche.niche}
+                    <strong>{fmtInt(niche.count)}</strong>
+                  </span>
+                ))}
+              </div>
+            </article>
+          </div>
           </div>
 
           <V2Panel
@@ -161,63 +338,6 @@ export default function SequencesV2() {
             )}
           </V2Panel>
 
-          <div className="V2Grid V2Grid--3">
-            <V2Panel title="Monday Board Health" caption="Quick read on Monday freshness.">
-              <div className="V2SplitStat">
-                <div>
-                  <span>Boards</span>
-                  <strong>{fmtInt(data.monday.boards)}</strong>
-                </div>
-                <div>
-                  <span>Behind</span>
-                  <strong>{fmtInt(data.monday.staleBoards)}</strong>
-                </div>
-                <div>
-                  <span>With errors</span>
-                  <strong>{fmtInt(data.monday.erroredBoards)}</strong>
-                </div>
-              </div>
-            </V2Panel>
-
-            <V2Panel title="Monday Data Completeness" caption="How complete key Monday fields are.">
-              <div className="V2DeltaList">
-                <div>
-                  <span>Source filled</span>
-                  <strong>{fmtPct(data.monday.avgSourceCoveragePct)}</strong>
-                </div>
-                <div>
-                  <span>Campaign filled</span>
-                  <strong>{fmtPct(data.monday.avgCampaignCoveragePct)}</strong>
-                </div>
-                <div>
-                  <span>Setter filled</span>
-                  <strong>{fmtPct(data.monday.avgSetByCoveragePct)}</strong>
-                </div>
-                <div>
-                  <span>Touchpoints filled</span>
-                  <strong>{fmtPct(data.monday.avgTouchpointsCoveragePct)}</strong>
-                </div>
-              </div>
-            </V2Panel>
-
-            <V2Panel title="Booking Rate" caption="Overall booking efficiency for the selected window.">
-              <div className="V2SplitStat">
-                <div>
-                  <span>Booking rate</span>
-                  <strong>{fmtPct(totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0)}</strong>
-                </div>
-                <div>
-                  <span>Booked calls</span>
-                  <strong>{fmtInt(totals.bookedCalls)}</strong>
-                </div>
-                <div>
-                  <span>Replies</span>
-                  <strong>{fmtInt(totals.repliesReceived)}</strong>
-                </div>
-              </div>
-            </V2Panel>
-
-          </div>
         </>
       )}
     </div>

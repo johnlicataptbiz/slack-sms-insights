@@ -55,6 +55,7 @@ import {
   useV2UpdateConversationStatus,
   useV2UpdateObjectionTags,
   useV2UpdateQualification,
+  useManualMondayBookedCall,
 } from "../../api/v2Queries";
 import { CALL_OUTCOME_LABELS } from "../../api/v2-types";
 import type {
@@ -514,6 +515,12 @@ export default function InboxV2() {
   const [sequenceIdInput, setSequenceIdInput] = useState("");
   const [lastSequenceSync, setLastSequenceSync] =
     useState<AlowareSequenceSyncV2 | null>(null);
+  const [manualPanelOpen, setManualPanelOpen] = useState(false);
+  const [manualLine, setManualLine] = useState("");
+  const [manualNotes, setManualNotes] = useState("");
+  const [manualSetter, setManualSetter] = useState<"jack" | "brandon">("jack");
+  const [manualContactNameInput, setManualContactNameInput] = useState("");
+  const [manualContactPhoneInput, setManualContactPhoneInput] = useState("");
   const assignForm = useForm<AssignFormValues>({
     resolver: zodResolver(assignSchema),
     defaultValues: { ownerLabel: "" },
@@ -530,6 +537,7 @@ export default function InboxV2() {
     resolver: zodResolver(templateSchema),
     defaultValues: { name: "", body: "" },
   });
+  const manualMutation = useManualMondayBookedCall();
 
   // Phase 3 state
   const [objectionTagInput, setObjectionTagInput] = useState("");
@@ -828,6 +836,22 @@ export default function InboxV2() {
   const incrementGuardrailOverrideMutation = useV2IncrementGuardrailOverride();
 
   const detail = detailQuery.data?.data || null;
+  const manualContactNameFromDetail =
+    detail?.contactCard.name ||
+    detail?.conversation.profile_name ||
+    detail?.conversation.contact_name ||
+    "";
+  const manualContactPhoneFromDetail =
+    detail?.contactCard.phone ||
+    detail?.conversation.profile_phone ||
+    detail?.conversation.contact_phone ||
+    "";
+  useEffect(() => {
+    setManualContactNameInput(manualContactNameFromDetail);
+  }, [manualContactNameFromDetail]);
+  useEffect(() => {
+    setManualContactPhoneInput(manualContactPhoneFromDetail);
+  }, [manualContactPhoneFromDetail]);
   const detailConversation = detail?.conversation || null;
   const detailContactCard = detail?.contactCard || null;
   const detailMessages = Array.isArray(detail?.messages) ? detail.messages : [];
@@ -1685,6 +1709,35 @@ export default function InboxV2() {
     } catch (error) {
       setFlashMessage(
         `Template delete failed: ${String((error as Error)?.message || error)}`,
+      );
+    }
+  };
+
+  const onSubmitManualMonday = async () => {
+    if (!manualContactNameInput.trim()) {
+      setFlashMessage("Contact name is required for manual Monday pushes.");
+      return;
+    }
+    if (!detail) {
+      setFlashMessage("Select a conversation first.");
+      return;
+    }
+    try {
+      await manualMutation.mutateAsync({
+        contactName: manualContactNameInput.trim(),
+        contactPhone: manualContactPhoneInput || undefined,
+        eventTs: detail.conversation.last_touch_at || detail.conversation.last_inbound_at || undefined,
+        line: manualLine.trim() || undefined,
+        notes: manualNotes.trim() || undefined,
+        setter: manualSetter,
+      });
+      setFlashMessage("Manual Monday booked call created.");
+      setManualPanelOpen(false);
+      setManualLine("");
+      setManualNotes("");
+    } catch (error) {
+      setFlashMessage(
+        `Manual Monday push failed: ${String((error as Error)?.message || error)}`,
       );
     }
   };
@@ -3617,6 +3670,96 @@ export default function InboxV2() {
                                 ? "Disenrolling…"
                                 : "Disenroll"}
                             </button>
+                          </div>
+
+                          <div className="V2Inbox__manualMonday">
+                            <div className="V2Inbox__manualHeader">
+                              <p className="V2Inbox__manualTitle">Manual Monday push</p>
+                              <button
+                                type="button"
+                                className="V2Inbox__manualToggle"
+                                onClick={() => setManualPanelOpen((prev) => !prev)}
+                              >
+                                {manualPanelOpen ? "Close" : "Open form"}
+                              </button>
+                            </div>
+                            {manualPanelOpen && (
+                              <form
+                                className="V2Inbox__manualForm"
+                                onSubmit={(event) => {
+                                  event.preventDefault();
+                                  void onSubmitManualMonday();
+                                }}
+                              >
+                                <label className="V2Control V2Inbox__manualControl">
+                                  <span>Contact Name</span>
+                                  <input
+                                    type="text"
+                                    value={manualContactNameInput}
+                                    onChange={(event) =>
+                                      setManualContactNameInput(event.target.value)
+                                    }
+                                    placeholder="First and last name"
+                                    required
+                                  />
+                                </label>
+                                <label className="V2Control V2Inbox__manualControl">
+                                  <span>Phone</span>
+                                  <input
+                                    type="text"
+                                    value={manualContactPhoneInput}
+                                    onChange={(event) =>
+                                      setManualContactPhoneInput(event.target.value)
+                                    }
+                                    placeholder="(optional)"
+                                  />
+                                </label>
+                                <label className="V2Control V2Inbox__manualControl">
+                                  <span>Line</span>
+                                  <input
+                                    type="text"
+                                    value={manualLine}
+                                    onChange={(event) => setManualLine(event.target.value)}
+                                    placeholder="Slack line or fallback"
+                                  />
+                                </label>
+                                <label className="V2Control V2Inbox__manualControl">
+                                  <span>Notes</span>
+                                  <textarea
+                                    rows={2}
+                                    value={manualNotes}
+                                    onChange={(event) => setManualNotes(event.target.value)}
+                                    placeholder="Add context for Monday…"
+                                  />
+                                </label>
+                                <label className="V2Control V2Inbox__manualControl">
+                                  <span>Setter</span>
+                                  <select
+                                    value={manualSetter}
+                                    onChange={(event) =>
+                                      setManualSetter(
+                                        event.target.value === "brandon" ? "brandon" : "jack",
+                                      )
+                                    }
+                                  >
+                                    <option value="jack">Jack</option>
+                                    <option value="brandon">Brandon</option>
+                                  </select>
+                                </label>
+                                <button
+                                  type="submit"
+                                  className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                                  disabled={
+                                    manualMutation.isPending ||
+                                    !manualContactNameInput.trim()
+                                  }
+                                >
+                                  {manualMutation.isPending
+                                    ? "Pushing…"
+                                    : "Send to Monday"}
+                                </button>
+                              </form>
+                            )}
                           </div>
 
                           <div

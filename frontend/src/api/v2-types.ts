@@ -723,6 +723,7 @@ export type SequenceKpisV2 = {
 
 export type InsightsSummaryV2 = {
   window: { from: string; to: string; timeZone: string };
+  warnings?: string[];
   kpis: {
     messagesSent: number;
     uniqueContacted: number;
@@ -763,6 +764,7 @@ export type InsightsSummaryV2 = {
 
 export type SequenceDeepV2 = {
   window: { from: string; to: string; timeZone: string };
+  warnings?: string[];
   sequences: Array<{
     sequenceId: string;
     label: string;

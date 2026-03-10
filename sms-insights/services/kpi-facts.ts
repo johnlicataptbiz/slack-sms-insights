@@ -54,10 +54,19 @@ type FactRefreshParams = {
   timeZone: string;
 };
 
+export type KpiFactRefreshResult = {
+  fromDay: string;
+  toDay: string;
+  smsRows: number;
+  bookingRows: number;
+  fallbackBookingRows: number;
+  fallbackBookedTotal: number;
+};
+
 export const refreshKpiFacts = async (
   params: FactRefreshParams,
   logger?: Pick<Logger, 'info' | 'warn' | 'error'>,
-): Promise<void> => {
+): Promise<KpiFactRefreshResult> => {
   const prisma = getPrisma();
 
   const manual = await prisma.sequence_registry.upsert({
@@ -239,6 +248,45 @@ export const refreshKpiFacts = async (
     params.timeZone,
     MANUAL_LABEL,
   );
+
+  const rawBookedFallbackRows = await prisma.$queryRawUnsafe<Array<{
+    day_key: string;
+    booked_total: number;
+  }>>(
+    `SELECT
+       to_char(date_trunc('day', event_ts AT TIME ZONE $3), 'YYYY-MM-DD') AS day_key,
+       COUNT(*)::int AS booked_total
+     FROM booked_calls
+     WHERE event_ts >= $1::timestamptz
+       AND event_ts <= $2::timestamptz
+     GROUP BY 1`,
+    rangeFrom.toISOString(),
+    rangeTo.toISOString(),
+    params.timeZone,
+  );
+
+  // If attribution view is stale/incomplete, preserve booking continuity using raw booked_calls.
+  const fallbackDayTotals = new Map(rawBookedFallbackRows.map((row) => [row.day_key, row.booked_total]));
+  for (const row of bookingRows) {
+    fallbackDayTotals.set(row.day_key, Math.max(0, (fallbackDayTotals.get(row.day_key) || 0) - row.booked_total));
+  }
+
+  let fallbackBookingRows = 0;
+  let fallbackBookedTotal = 0;
+  for (const [dayKey, residualBooked] of fallbackDayTotals.entries()) {
+    if (residualBooked <= 0) continue;
+    bookingRows.push({
+      day_key: dayKey,
+      sequence_key: MANUAL_LABEL,
+      setter: 'unknown',
+      booked_total: residualBooked,
+      booked_jack: 0,
+      booked_brandon: 0,
+      booked_self: residualBooked,
+    });
+    fallbackBookingRows += 1;
+    fallbackBookedTotal += residualBooked;
+  }
 
   const bookingAliases = Array.from(new Set(bookingRows.map((row) => row.sequence_key).filter(Boolean)));
   const aliasRows =
@@ -459,5 +507,21 @@ export const refreshKpiFacts = async (
 
   await prisma.$transaction(writes);
 
-  logger?.info?.('kpi-facts: refreshed daily facts', { fromDay, toDay, smsRows: smsRows.length });
+  logger?.info?.('kpi-facts: refreshed daily facts', {
+    fromDay,
+    toDay,
+    smsRows: smsRows.length,
+    bookingRows: bookingFactRows.length,
+    fallbackBookingRows,
+    fallbackBookedTotal,
+  });
+
+  return {
+    fromDay,
+    toDay,
+    smsRows: smsRows.length,
+    bookingRows: bookingFactRows.length,
+    fallbackBookingRows,
+    fallbackBookedTotal,
+  };
 };

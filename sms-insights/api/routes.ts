@@ -95,6 +95,7 @@ import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contr
 import { getScoreboardData } from '../services/scoreboard.js';
 import { getSequenceKpis } from '../services/sequence-kpis.js';
 import { refreshKpiFacts } from '../services/kpi-facts.js';
+import { getAttributionLagStatus } from '../services/attribution-health.js';
 import { getInsightsSummary } from '../services/insights-summary.js';
 import { getSequencesDeep } from '../services/sequences-deep.js';
 import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../services/security-headers.js';
@@ -1257,8 +1258,14 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
   const rep = repRaw === 'jack' || repRaw === 'brandon' ? repRaw : null;
 
   try {
+    let refreshInfo:
+      | {
+          fallbackBookingRows: number;
+          fallbackBookedTotal: number;
+        }
+      | null = null;
     if (shouldRefreshFactsOnRead()) {
-      await refreshKpiFacts(
+      refreshInfo = await refreshKpiFacts(
         {
           from: resolved.from,
           to: resolved.to,
@@ -1268,15 +1275,33 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
       );
     }
 
-    const data = await getInsightsSummary(
-      {
-        from: resolved.from,
-        to: resolved.to,
-        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
-        rep,
-      },
-      logger,
-    );
+    const [data, lagStatus] = await Promise.all([
+      getInsightsSummary(
+        {
+          from: resolved.from,
+          to: resolved.to,
+          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+          rep,
+        },
+        logger,
+      ),
+      getAttributionLagStatus(24),
+    ]);
+
+    const warnings: string[] = [];
+    if (refreshInfo && refreshInfo.fallbackBookingRows > 0) {
+      warnings.push(
+        `Fallback booking attribution applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
+      );
+    }
+    if (lagStatus.isLagging) {
+      warnings.push(
+        `Booked-call attribution lag is ${lagStatus.lagHours}h behind booked_calls (max attribution ${lagStatus.maxAttributionTs}).`,
+      );
+    }
+    if (warnings.length > 0) {
+      data.warnings = warnings;
+    }
 
     sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
   } catch (error) {
@@ -1309,8 +1334,14 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
   const status = statusRaw === 'active' || statusRaw === 'inactive' ? statusRaw : null;
 
   try {
+    let refreshInfo:
+      | {
+          fallbackBookingRows: number;
+          fallbackBookedTotal: number;
+        }
+      | null = null;
     if (shouldRefreshFactsOnRead()) {
-      await refreshKpiFacts(
+      refreshInfo = await refreshKpiFacts(
         {
           from: resolved.from,
           to: resolved.to,
@@ -1320,15 +1351,33 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
       );
     }
 
-    const data = await getSequencesDeep(
-      {
-        from: resolved.from,
-        to: resolved.to,
-        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
-        status,
-      },
-      logger,
-    );
+    const [data, lagStatus] = await Promise.all([
+      getSequencesDeep(
+        {
+          from: resolved.from,
+          to: resolved.to,
+          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+          status,
+        },
+        logger,
+      ),
+      getAttributionLagStatus(24),
+    ]);
+
+    const warnings: string[] = [];
+    if (refreshInfo && refreshInfo.fallbackBookingRows > 0) {
+      warnings.push(
+        `Fallback booking attribution applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
+      );
+    }
+    if (lagStatus.isLagging) {
+      warnings.push(
+        `Booked-call attribution lag is ${lagStatus.lagHours}h behind booked_calls (max attribution ${lagStatus.maxAttributionTs}).`,
+      );
+    }
+    if (warnings.length > 0) {
+      data.warnings = warnings;
+    }
 
     sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
   } catch (error) {

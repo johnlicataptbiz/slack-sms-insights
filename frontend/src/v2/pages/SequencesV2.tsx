@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { useV2SequencesDeep } from '../../api/v2Queries';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
@@ -19,6 +19,7 @@ const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('30d');
   const [status, setStatus] = useState<'active' | 'inactive' | ''>('active');
+  const tableRef = useRef<HTMLDivElement | null>(null);
 
   const query = useV2SequencesDeep({
     range: mode,
@@ -59,6 +60,13 @@ export default function SequencesV2() {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+            <button
+              type="button"
+              className="V2GhostButton"
+              onClick={() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            >
+              Jump to table
+            </button>
           </div>
         }
       />
@@ -71,7 +79,13 @@ export default function SequencesV2() {
         </V2State>
       ) : (
         <>
-          <div className="V2MetricGrid">
+          {data.warnings && data.warnings.length > 0 ? (
+            <div className="V2InlineWarning">
+              {data.warnings.join(' ')}
+            </div>
+          ) : null}
+
+          <div className="V2MetricsGrid V2MetricsGrid--compact">
             <V2MetricCard label="Messages sent" value={fmtInt(totals.messagesSent)} />
             <V2MetricCard label="Unique contacted" value={fmtInt(totals.uniqueContacted)} />
             <V2MetricCard label="Replies" value={fmtInt(totals.repliesReceived)} />
@@ -88,62 +102,67 @@ export default function SequencesV2() {
             <V2MetricCard label="Monday stale boards" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
           </div>
 
-          <V2Panel title="Canonical Sequence Table" caption="Registry-backed sequence analytics and quality diagnostics.">
-            <div className="V2TableWrap V2TableWrap--sequences">
-              <table className="V2Table V2Table--sequences">
-                <thead>
-                  <tr>
-                    <th>Sequence</th>
-                    <th>Lead Magnet</th>
-                    <th>Status</th>
-                    <th className="is-right">Sent</th>
-                    <th className="is-right">Contacted</th>
-                    <th className="is-right">Replies</th>
-                    <th className="is-right">Reply %</th>
-                    <th className="is-right">Booked</th>
-                    <th className="is-right">Book %</th>
-                    <th className="is-right">Opt-outs</th>
-                    <th className="is-right">Opt-out %</th>
-                    <th className="is-right">Jack</th>
-                    <th className="is-right">Brandon</th>
-                    <th className="is-right">Self</th>
-                    <th className="is-right">After Reply</th>
-                    <th className="is-right">Hi Interest %</th>
-                    <th className="is-right">Full-time %</th>
-                    <th className="is-right">Mostly Cash %</th>
-                    <th className="is-right">Step 3/4 %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.sequences.map((row) => (
-                    <tr key={row.sequenceId} className={row.isManualBucket ? 'V2Table__row--manual' : ''}>
-                      <td>{row.label}</td>
-                      <td>{row.leadMagnet}</td>
-                      <td>{row.status}</td>
-                      <td className="is-right">{fmtInt(row.messagesSent)}</td>
-                      <td className="is-right">{fmtInt(row.uniqueContacted)}</td>
-                      <td className="is-right">{fmtInt(row.repliesReceived)}</td>
-                      <td className="is-right">{fmtPct(row.replyRatePct)}</td>
-                      <td className="is-right">{fmtInt(row.bookedCalls)}</td>
-                      <td className="is-right">{fmtPct(row.bookingRatePct)}</td>
-                      <td className="is-right">{fmtInt(row.optOuts)}</td>
-                      <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
-                      <td className="is-right">{fmtInt(row.bookedBreakdown.jack)}</td>
-                      <td className="is-right">{fmtInt(row.bookedBreakdown.brandon)}</td>
-                      <td className="is-right">{fmtInt(row.bookedBreakdown.selfBooked)}</td>
-                      <td className="is-right">{fmtInt(row.bookedBreakdown.bookedAfterSmsReply)}</td>
-                      <td className="is-right">{fmtPct(row.leadQuality.highInterestPct)}</td>
-                      <td className="is-right">{fmtPct(row.leadQuality.fullTimePct)}</td>
-                      <td className="is-right">{fmtPct(row.leadQuality.mostlyCashPct)}</td>
-                      <td className="is-right">{fmtPct(row.leadQuality.progressedToStep3Or4Pct)}</td>
+          <div ref={tableRef}>
+            <V2Panel
+              title="Canonical Sequence Table"
+              caption="Registry-backed sequence analytics and quality diagnostics."
+            >
+              <div className="V2TableWrap V2TableWrap--sequences">
+                <table className="V2Table V2Table--sequences">
+                  <thead>
+                    <tr>
+                      <th>Sequence</th>
+                      <th>Lead Magnet</th>
+                      <th>Status</th>
+                      <th className="is-right">Sent</th>
+                      <th className="is-right">Contacted</th>
+                      <th className="is-right">Replies</th>
+                      <th className="is-right">Reply %</th>
+                      <th className="is-right">Booked</th>
+                      <th className="is-right">Book %</th>
+                      <th className="is-right">Opt-outs</th>
+                      <th className="is-right">Opt-out %</th>
+                      <th className="is-right">Jack</th>
+                      <th className="is-right">Brandon</th>
+                      <th className="is-right">Self</th>
+                      <th className="is-right">After Reply</th>
+                      <th className="is-right">Hi Interest %</th>
+                      <th className="is-right">Full-time %</th>
+                      <th className="is-right">Mostly Cash %</th>
+                      <th className="is-right">Step 3/4 %</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </V2Panel>
+                  </thead>
+                  <tbody>
+                    {data.sequences.map((row) => (
+                      <tr key={row.sequenceId} className={row.isManualBucket ? 'V2Table__row--manual' : ''}>
+                        <td>{row.label}</td>
+                        <td>{row.leadMagnet}</td>
+                        <td>{row.status}</td>
+                        <td className="is-right">{fmtInt(row.messagesSent)}</td>
+                        <td className="is-right">{fmtInt(row.uniqueContacted)}</td>
+                        <td className="is-right">{fmtInt(row.repliesReceived)}</td>
+                        <td className="is-right">{fmtPct(row.replyRatePct)}</td>
+                        <td className="is-right">{fmtInt(row.bookedCalls)}</td>
+                        <td className="is-right">{fmtPct(row.bookingRatePct)}</td>
+                        <td className="is-right">{fmtInt(row.optOuts)}</td>
+                        <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
+                        <td className="is-right">{fmtInt(row.bookedBreakdown.jack)}</td>
+                        <td className="is-right">{fmtInt(row.bookedBreakdown.brandon)}</td>
+                        <td className="is-right">{fmtInt(row.bookedBreakdown.selfBooked)}</td>
+                        <td className="is-right">{fmtInt(row.bookedBreakdown.bookedAfterSmsReply)}</td>
+                        <td className="is-right">{fmtPct(row.leadQuality.highInterestPct)}</td>
+                        <td className="is-right">{fmtPct(row.leadQuality.fullTimePct)}</td>
+                        <td className="is-right">{fmtPct(row.leadQuality.mostlyCashPct)}</td>
+                        <td className="is-right">{fmtPct(row.leadQuality.progressedToStep3Or4Pct)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </V2Panel>
+          </div>
 
-          <div className="V2Grid V2Grid--2">
+          <div className="V2Grid V2Grid--3">
             <V2Panel title="Monday Outcomes Health" caption="Operational quality signals from Monday pipelines.">
               <div className="V2SplitStat">
                 <div>
@@ -178,6 +197,23 @@ export default function SequencesV2() {
                 <div>
                   <span>Touchpoints Coverage</span>
                   <strong>{fmtPct(data.monday.avgTouchpointsCoveragePct)}</strong>
+                </div>
+              </div>
+            </V2Panel>
+
+            <V2Panel title="Booking Rate" caption="Overall booking efficiency for the selected window.">
+              <div className="V2SplitStat">
+                <div>
+                  <span>Booking rate</span>
+                  <strong>{fmtPct(totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0)}</strong>
+                </div>
+                <div>
+                  <span>Booked calls</span>
+                  <strong>{fmtInt(totals.bookedCalls)}</strong>
+                </div>
+                <div>
+                  <span>Replies</span>
+                  <strong>{fmtInt(totals.repliesReceived)}</strong>
                 </div>
               </div>
             </V2Panel>

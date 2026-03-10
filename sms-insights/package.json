@@ -19,6 +19,7 @@
     "check:monday:lead-normalization": "node --import tsx ./scripts/check-monday-lead-normalization.ts",
     "rebuild:monday:governed": "node --import tsx ./scripts/rebuild-monday-governed-analytics.ts",
     "sync:monday": "node --import tsx ./scripts/sync-monday.ts",
+    "refresh:booked-attribution": "node --import tsx ./scripts/refresh-booked-call-attribution.ts",
     "regenerate:runs": "node --import tsx ./scripts/regenerate-daily-runs.ts",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "dev": "node --import tsx app.ts",

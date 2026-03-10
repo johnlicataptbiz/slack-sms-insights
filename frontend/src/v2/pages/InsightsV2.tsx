@@ -71,7 +71,13 @@ export function InsightsV2() {
         }
       />
 
-      <div className="V2MetricGrid">
+      {data.warnings && data.warnings.length > 0 ? (
+        <div className="V2InlineWarning">
+          {data.warnings.join(' ')}
+        </div>
+      ) : null}
+
+      <div className="V2MetricsGrid V2MetricsGrid--compact">
         <V2MetricCard label="Messages sent" value={fmtInt(data.kpis.messagesSent)} />
         <V2MetricCard label="Unique contacted" value={fmtInt(data.kpis.uniqueContacted)} />
         <V2MetricCard label="Replies" value={fmtInt(data.kpis.repliesReceived)} />

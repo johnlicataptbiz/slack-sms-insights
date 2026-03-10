@@ -12,6 +12,7 @@ export type SequenceDeepParams = {
 
 export type SequenceDeepPayload = {
   window: { from: string; to: string; timeZone: string };
+  warnings?: string[];
   sequences: Array<{
     sequenceId: string;
     label: string;

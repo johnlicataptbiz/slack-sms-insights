@@ -12,6 +12,7 @@ type InsightsSummaryParams = {
 
 export type InsightsSummary = {
   window: { from: string; to: string; timeZone: string };
+  warnings?: string[];
   kpis: {
     messagesSent: number;
     uniqueContacted: number;

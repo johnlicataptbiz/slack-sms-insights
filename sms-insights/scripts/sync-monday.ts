@@ -56,6 +56,59 @@ const parseArgs = (argv: string[]): CliOptions => {
   return options;
 };
 
+const syncBoardFully = async (
+  boardId: string,
+  force: boolean,
+): Promise<{
+  status: 'success' | 'error';
+  boardId: string;
+  fetchedItems: number;
+  upsertedItems: number;
+  pages: number;
+  nextCursor: string | null;
+  error?: string;
+}> => {
+  let fetchedItems = 0;
+  let upsertedItems = 0;
+  let pages = 0;
+  let nextCursor: string | null = null;
+
+  while (true) {
+    const result = await syncMondayBoard(boardId, console, { force });
+    pages += 1;
+    fetchedItems += result.fetchedItems;
+    upsertedItems += result.upsertedItems;
+    nextCursor = result.nextCursor;
+
+    if (result.status !== 'success') {
+      return {
+        status: 'error',
+        boardId,
+        fetchedItems,
+        upsertedItems,
+        pages,
+        nextCursor,
+        error: result.error || 'sync failed',
+      };
+    }
+
+    if (!nextCursor) {
+      return {
+        status: 'success',
+        boardId,
+        fetchedItems,
+        upsertedItems,
+        pages,
+        nextCursor: null,
+      };
+    }
+
+    console.log(
+      `Board ${boardId}: continuing pagination (page ${pages}, fetched so far ${fetchedItems}, next cursor present)`,
+    );
+  }
+};
+
 const main = async (): Promise<void> => {
   const options = parseArgs(process.argv.slice(2));
   await initDatabase(console);
@@ -65,12 +118,12 @@ const main = async (): Promise<void> => {
     const boardIds = listMondaySyncBoardIds();
     console.log(`Starting monday sync for ${boardIds.length} board(s): ${boardIds.join(', ')}`);
     for (const boardId of boardIds) {
-      const result = await syncMondayBoard(boardId, console, { force: options.force });
+      const result = await syncBoardFully(boardId, options.force);
       console.log(`Sync result (${boardId}):`, JSON.stringify(result, null, 2));
     }
   } else {
     console.log(`Starting monday sync for board ${options.boardId}...`);
-    const result = await syncMondayBoard(options.boardId, console, { force: options.force });
+    const result = await syncBoardFully(options.boardId, options.force);
     console.log('Sync result:', JSON.stringify(result, null, 2));
   }
 

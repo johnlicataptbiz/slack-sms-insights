@@ -341,18 +341,8 @@ export const refreshKpiFacts = async (
 
   let fallbackBookingRows = 0;
   let fallbackBookedTotal = 0;
-  for (const [dayKey, residualBooked] of fallbackDayTotals.entries()) {
+  for (const [, residualBooked] of fallbackDayTotals.entries()) {
     if (residualBooked <= 0) continue;
-    bookingRows.push({
-      day_key: dayKey,
-      sequence_key: MANUAL_LABEL,
-      setter: 'unknown',
-      booked_total: residualBooked,
-      booked_jack: 0,
-      booked_brandon: 0,
-      booked_self: residualBooked,
-      booked_after_sms_reply: 0,
-    });
     fallbackBookingRows += 1;
     fallbackBookedTotal += residualBooked;
   }

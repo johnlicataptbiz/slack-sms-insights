@@ -289,7 +289,7 @@ export const attributeSlackBookedCallsToSequences = (
     let isManual = false;
     let attributionSource: 'sms_phone_match' | 'fuzzy_text_match' = 'fuzzy_text_match';
 
-    if (fuzzyResolved.label) {
+    if (fuzzyResolved.label && !(fuzzyResolved.manual && smsLookup)) {
       // Fuzzy match succeeded — credit the lead magnet (firstConversion).
       resolvedLabel = fuzzyResolved.label;
       isManual = fuzzyResolved.manual;

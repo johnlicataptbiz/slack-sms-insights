@@ -145,11 +145,18 @@ const parseContactNameFromFallback = (fallback: string): string | null => {
 };
 
 const parseContactPhoneFromFallback = (fallback: string): string | null => {
-  return (
+  const explicit =
     parseFallbackField(fallback, 'Phone') ||
     parseFallbackField(fallback, 'Phone Number') ||
-    parseFallbackField(fallback, 'Mobile Phone')
-  );
+    parseFallbackField(fallback, 'Mobile Phone') ||
+    parseFallbackField(fallback, 'Mobile') ||
+    parseFallbackField(fallback, 'Cell') ||
+    parseFallbackField(fallback, 'SMS Number');
+  if (explicit) return explicit;
+
+  // Fallback: some Slack payload variants do not label phone, but include a US number inline.
+  const inlineMatch = fallback.match(/(?:\+?1[\s\-().]*)?(?:\d[\s\-().]*){10}/);
+  return inlineMatch?.[0] || null;
 };
 
 export const resolveBookedCallSmsReplyLink = (
@@ -285,11 +292,6 @@ export const getBookedCallAttributionSources = async (params: {
     const isBrandon = hasReaction(reactions, 'me', brandonId);
     const hasAttribution = isJack || isBrandon;
 
-    const isValid = hasAttribution
-      ? looksLikeBookedCall(c.text) || looksLikeManualOneOff(c.text)
-      : looksLikeBookedCall(c.text);
-    if (!isValid) continue;
-
     const fallback = fallbackFromRaw(c.raw);
     const firstConversion = parseFallbackField(fallback, 'First Conversion');
     const rep = parseFallbackField(fallback, 'Rep') || parseFallbackField(fallback, 'Contact owner');
@@ -298,6 +300,12 @@ export const getBookedCallAttributionSources = async (params: {
     const contactPhone = parseContactPhoneFromFallback(fallback);
     // parseFallbackField strips <mailto:email|email> → plain email address
     const contactEmail = parseFallbackField(fallback, 'Email')?.toLowerCase().trim() || null;
+    const hasStructuredBookingFields = Boolean(firstConversion || contactEmail || contactName);
+
+    const isValid = hasAttribution
+      ? looksLikeBookedCall(c.text) || looksLikeManualOneOff(c.text) || hasStructuredBookingFields
+      : looksLikeBookedCall(c.text) || hasStructuredBookingFields;
+    if (!isValid) continue;
 
     if (!hasAttribution) {
       const eventMs = new Date(c.event_ts).getTime();
@@ -387,8 +395,9 @@ export const getBookedCallSequenceFromSmsEvents = async (
       phoneKeyToEntries.set(phoneKey, list);
     }
 
-    // Name match only when neither email nor phone is available.
-    if (!call.contactEmail && !phoneKey) {
+    // Name lookup is a useful fallback whenever phone is absent, even if email exists.
+    // (email -> profile lookup is incomplete in production data)
+    if (!phoneKey) {
       const nameKey = normalizeContactNameKey(call.contactName);
       if (nameKey) {
         const list = nameKeyToEntries.get(nameKey) || [];

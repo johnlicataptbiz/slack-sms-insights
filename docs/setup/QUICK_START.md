@@ -34,7 +34,7 @@ cp .env.example .env
 
 # 2. Edit .env with minimum required values:
 # - DATABASE_URL (or use Railway)
-# - SLACK_BOT_TOKEN (or use xoxb-dummy for testing)
+# - SLACK_BOT_TOKEN (or use <slack-bot-token> for testing)
 # - VITE_API_URL=http://localhost:3000
 # - DASHBOARD_AUTH_REDIRECT_URI=http://localhost:3000/api/oauth/callback
 # - DASHBOARD_AUTH_SUCCESS_URL=http://localhost:5173
@@ -43,7 +43,7 @@ cp .env.example .env
 # 3. Quick edit for dummy mode:
 cat > .env << 'EOF'
 NODE_ENV=development
-SLACK_BOT_TOKEN=xoxb-dummy
+SLACK_BOT_TOKEN=<slack-bot-token>
 SLACK_SIGNING_SECRET=dummy-secret
 DATABASE_URL=postgresql://$(whoami)@localhost:5432/sms_insights
 VITE_API_URL=http://localhost:3000

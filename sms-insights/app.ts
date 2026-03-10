@@ -85,12 +85,12 @@ const getContentType = (ext: string): string => {
 };
 
 /** Initialization */
-const isDummyToken = process.env.SLACK_BOT_TOKEN === 'xoxb-dummy';
+const isDummyToken = process.env.SLACK_BOT_TOKEN === 'dummy-token';
 const app = new App({
   token: isDummyToken ? undefined : process.env.SLACK_BOT_TOKEN,
   authorize: isDummyToken
     ? async () => ({
-        botToken: 'xoxb-dummy',
+        botToken: 'dummy-token',
         botId: 'B_DUMMY',
         teamId: 'T_DUMMY',
       })
@@ -211,8 +211,8 @@ app.error(async (error) => {
 
     // Start Bolt App
     let slackStarted = false;
-    if (process.env.SLACK_BOT_TOKEN === 'xoxb-dummy') {
-      setSlackAuthRuntimeStatus('disabled', 'Slack bot runtime disabled: xoxb-dummy token in use');
+    if (process.env.SLACK_BOT_TOKEN === 'dummy-token') {
+      setSlackAuthRuntimeStatus('disabled', 'Slack bot runtime disabled: dummy-token token in use');
       logger.app.info('⚡️ Bolt app skipped (dummy token detected)');
     } else {
       const missingSlackEnv: string[] = [];

@@ -8,7 +8,7 @@ Use this checklist weekly (or before any production release) to keep GitHub, Ver
 - Main CI is green (frontend build, backend test, secret scan).
 
 ## 2) Vercel
-- Project name is `ptbizsms-dashboard`.
+- Project name is `sms-insights-dashboard`.
 - Production domain is `ptbizsms.com` (and `www.ptbizsms.com` if used).
 - Required env vars are present in Production and Preview:
   - `RAILWAY_API_BASE_URL`

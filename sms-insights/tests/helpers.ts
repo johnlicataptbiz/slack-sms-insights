@@ -22,5 +22,5 @@ export const fakeLogger = {
 };
 
 export const fakeAck = mock.fn<AckFn<void>>();
-export const fakeClient = new WebClient('xoxb-example');
+export const fakeClient = new WebClient('xoxb_example');
 export const fakeSay = mock.fn<SayFn>();

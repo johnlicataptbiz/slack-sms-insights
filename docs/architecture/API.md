@@ -47,7 +47,7 @@ Handles OAuth callback from Slack.
 ```json
 {
   "ok": true,
-  "token": "xoxp-...",
+  "token": "<slack-user-token>",
   "user": {
     "id": "U123456",
     "name": "John Doe",

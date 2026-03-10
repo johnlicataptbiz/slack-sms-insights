@@ -7,13 +7,13 @@ import { getAnalytics, isSupported } from 'firebase/analytics';
 // - Enable "Restrict key usage" in Google Cloud Console for this API key
 // - Recommended allowed domains: ptbizsms.com, www.ptbizsms.com, localhost (for dev)
 const firebaseConfig = {
-  apiKey: 'AIzaSyBLaIFv578OpjGkNXcssrqqk1_M_TtFFBo',
-  authDomain: 'aloware-sms-updates.firebaseapp.com',
-  projectId: 'aloware-sms-updates',
-  storageBucket: 'aloware-sms-updates.firebasestorage.app',
-  messagingSenderId: '295905998690',
-  appId: '1:295905998690:web:99bfcc5deb26625d071e3b',
-  measurementId: 'G-5KG64GBL70',
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || '',
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || '',
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || '',
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || '',
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || '',
 };
 
 export const firebaseApp = initializeApp(firebaseConfig);

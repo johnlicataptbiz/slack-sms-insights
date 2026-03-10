@@ -16,7 +16,9 @@ import 'dotenv/config';
 import { writeFileSync } from 'fs';
 
 // Target database connection string (new ptbizsms DB) - Prisma Accelerate URL
-const TARGET_DB_URL = 'prisma+postgres://accelerate.prisma-data.net/?api_key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqd3RfaWQiOjEsInNlY3VyZV9rZXkiOiJza19UZU91SFc2YXhWY2prdktCSnIwM2EiLCJhcGlfa2V5IjoiMDFLSlIwNEFCUDU2QVJTUEI5NjRONDVUWUMiLCJ0ZW5hbnRfaWQiOiIwN2I0YzI2N2Y1OTUxMzI5MmVjZWE3ZjA5MjE3ZjkxMzA1M2RkZDk5NzJjM2YyMWVlYzU2YmY2NWU5YmRlMGEzIiwiaW50ZXJuYWxfc2VjcmV0IjoiNmRmZmU2OTktM2Y0ZS00NjI5LTlkNjQtZTNkMjkwMWVkZjRjIn0.EKV8VtER27iSUZtBoQhp2rxj7G5rz_5tQMOOGwn9GkM';
+const TARGET_DB_URL =
+  process.env.TARGET_PRISMA_ACCELERATE_URL ||
+  'prisma+postgres://accelerate.prisma-data.net/?api_key=REPLACE_ME';
 
 // Source database connection string (current/old DB) - from environment
 const SOURCE_DB_URL = process.env.PRISMA_ACCELERATE_URL || process.env.DATABASE_URL;

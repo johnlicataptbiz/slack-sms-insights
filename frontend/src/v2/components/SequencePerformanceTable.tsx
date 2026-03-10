@@ -516,7 +516,7 @@ function SequenceFamilyGroup({
   );
 }
 
-const columnVisibilityStorageKey = 'v2_sequences_column_visibility_v1';
+const columnVisibilityStorageKey = 'v2_sequences_column_visibility';
 
 export function SequencePerformanceTable({ 
   mergedRows, 

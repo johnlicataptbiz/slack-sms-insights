@@ -209,6 +209,31 @@ export default function SequencesV2() {
                 </div>
               </div>
             </V2Panel>
+
+            <V2Panel title="Attribution Verification" caption="Final cross-check against Monday outcomes.">
+              <div className="V2DeltaList">
+                <div>
+                  <span>Slack booked (window)</span>
+                  <strong>{fmtInt(data.verification.slackBookedTotal)}</strong>
+                </div>
+                <div>
+                  <span>Monday booked (window)</span>
+                  <strong>{fmtInt(data.verification.mondayBookedTotal)}</strong>
+                </div>
+                <div>
+                  <span>Delta (Slack - Monday)</span>
+                  <strong>{fmtInt(data.verification.deltaBookedVsMonday)}</strong>
+                </div>
+                <div>
+                  <span>Manual/direct share</span>
+                  <strong>{fmtPct(data.verification.manualDirectSharePct)}</strong>
+                </div>
+                <div>
+                  <span>Attribution conv mapped</span>
+                  <strong>{fmtPct(data.verification.attributionConversationMappedPct)}</strong>
+                </div>
+              </div>
+            </V2Panel>
           </div>
         </>
       )}

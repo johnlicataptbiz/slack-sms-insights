@@ -805,6 +805,15 @@ export type SequenceDeepV2 = {
     avgSetByCoveragePct: number;
     avgTouchpointsCoveragePct: number;
   };
+  verification: {
+    slackBookedTotal: number;
+    mondayBookedTotal: number;
+    deltaBookedVsMonday: number;
+    manualDirectBooked: number;
+    manualDirectSharePct: number;
+    attributionConversationMapped: number;
+    attributionConversationMappedPct: number;
+  };
 };
 
 export type SequenceVersionHistoryRowV2 = {

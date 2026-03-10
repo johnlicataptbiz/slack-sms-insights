@@ -1375,6 +1375,25 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
         `Booked-call attribution lag is ${lagStatus.lagHours}h behind booked_calls (max attribution ${lagStatus.maxAttributionTs}).`,
       );
     }
+    const verification = data.verification;
+    const mondayDeltaAbs = Math.abs(verification.deltaBookedVsMonday);
+    const mondayDeltaPct =
+      verification.mondayBookedTotal > 0 ? (mondayDeltaAbs / verification.mondayBookedTotal) * 100 : 0;
+    if (verification.mondayBookedTotal > 0 && mondayDeltaPct >= 15) {
+      warnings.push(
+        `Slack-vs-Monday booked delta is ${verification.deltaBookedVsMonday} (${mondayDeltaPct.toFixed(1)}% of Monday booked).`,
+      );
+    }
+    if (verification.manualDirectSharePct >= 35) {
+      warnings.push(
+        `Manual/direct booked share is high (${verification.manualDirectSharePct.toFixed(1)}%). Sequence attribution likely still under-mapped.`,
+      );
+    }
+    if (verification.attributionConversationMappedPct < 40) {
+      warnings.push(
+        `Conversation linkage on booked_call_attribution is low (${verification.attributionConversationMappedPct.toFixed(1)}%).`,
+      );
+    }
     if (warnings.length > 0) {
       data.warnings = warnings;
     }

@@ -53,6 +53,15 @@ export type SequenceDeepPayload = {
     avgSetByCoveragePct: number;
     avgTouchpointsCoveragePct: number;
   };
+  verification: {
+    slackBookedTotal: number;
+    mondayBookedTotal: number;
+    deltaBookedVsMonday: number;
+    manualDirectBooked: number;
+    manualDirectSharePct: number;
+    attributionConversationMapped: number;
+    attributionConversationMappedPct: number;
+  };
 };
 
 export const getSequencesDeep = async (
@@ -63,7 +72,7 @@ export const getSequencesDeep = async (
   const fromDay = params.from.toISOString().slice(0, 10);
   const toDay = params.to.toISOString().slice(0, 10);
 
-  const [smsRows, bookingRows, leadRows, sequenceRows, mondayRows] = await Promise.all([
+  const [smsRows, bookingRows, leadRows, sequenceRows, mondayRows, manualBucketRows, attributionStats, mondayBookedTotalRows] = await Promise.all([
     prisma.fact_sms_daily.findMany({
       where: {
         day: {
@@ -147,6 +156,33 @@ export const getSequencesDeep = async (
         touchpoints_coverage_pct: true,
       },
     }),
+    prisma.sequence_registry.findMany({
+      where: { is_manual_bucket: true },
+      select: { id: true },
+    }),
+    prisma.$queryRawUnsafe<Array<{ total: number; mapped_conversation: number }>>(
+      `
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE conversation_id IS NOT NULL)::int AS mapped_conversation
+      FROM booked_call_attribution
+      WHERE booked_event_ts >= $1::timestamptz
+        AND booked_event_ts <= $2::timestamptz
+      `,
+      params.from.toISOString(),
+      params.to.toISOString(),
+    ),
+    prisma.$queryRawUnsafe<Array<{ monday_booked_total: number }>>(
+      `
+      SELECT COUNT(*)::int AS monday_booked_total
+      FROM monday_call_snapshots
+      WHERE is_booked = TRUE
+        AND call_date >= $1::date
+        AND call_date <= $2::date
+      `,
+      fromDay,
+      toDay,
+    ),
   ]);
 
   const summary = new Map<string, {
@@ -268,6 +304,14 @@ export const getSequencesDeep = async (
   const boards = new Set(mondayRows.map((row) => row.board_id)).size;
   const staleBoards = mondayRows.filter((row) => row.is_stale).length;
   const erroredBoards = mondayRows.filter((row) => row.sync_status === 'error').length;
+  const manualBucketIds = new Set(manualBucketRows.map((row) => row.id));
+  const slackBookedTotal = bookingRows.reduce((sum, row) => sum + row.booked_total, 0);
+  const manualDirectBooked = bookingRows
+    .filter((row) => manualBucketIds.has(row.sequence_id))
+    .reduce((sum, row) => sum + row.booked_total, 0);
+  const mondayBookedTotal = mondayBookedTotalRows[0]?.monday_booked_total || 0;
+  const attributionTotal = attributionStats[0]?.total || 0;
+  const attributionMappedConversation = attributionStats[0]?.mapped_conversation || 0;
 
   if (mondayRows.length === 0) {
     logger?.warn?.('sequences-deep: no monday health rows in requested window');
@@ -290,6 +334,16 @@ export const getSequencesDeep = async (
         mondayRows.length > 0
           ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length
           : 0,
+    },
+    verification: {
+      slackBookedTotal,
+      mondayBookedTotal,
+      deltaBookedVsMonday: slackBookedTotal - mondayBookedTotal,
+      manualDirectBooked,
+      manualDirectSharePct: slackBookedTotal > 0 ? (manualDirectBooked / slackBookedTotal) * 100 : 0,
+      attributionConversationMapped: attributionMappedConversation,
+      attributionConversationMappedPct:
+        attributionTotal > 0 ? (attributionMappedConversation / attributionTotal) * 100 : 0,
     },
   };
 };

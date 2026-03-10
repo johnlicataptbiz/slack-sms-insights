@@ -8,6 +8,11 @@ const getPrisma = () => getPrismaClient();
 const MANUAL_LABEL = 'No sequence (manual/direct)';
 const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
 const SOCIAL_MEDIA_BACKFILL_LABEL = 'Social Media (Monday backfill)';
+const SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL = 'Social Media - Instagram (Monday backfill)';
+const SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL = 'Social Media - Facebook Ads (Monday backfill)';
+const SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL = 'Social Media - Facebook Group (Monday backfill)';
+const SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL = 'Social Media - LinkedIn (Monday backfill)';
+const SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL = 'Social Media - Organic (Monday backfill)';
 const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
@@ -52,6 +57,16 @@ const isBookingSignal = (direction: string, body: string): boolean => {
 };
 
 const isOptOutSignal = (direction: string, body: string): boolean => direction === 'inbound' && CANCELLATION_PATTERN.test(body);
+const resolveSocialMondayBackfillLabel = (source: string | null | undefined): string => {
+  const normalized = (source || '').trim().toLowerCase();
+  if (!normalized) return SOCIAL_MEDIA_BACKFILL_LABEL;
+  if (normalized.includes('instagram')) return SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL;
+  if (normalized.includes('facebook group')) return SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL;
+  if (normalized.includes('facebook ads') || normalized === 'facebook') return SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL;
+  if (normalized.includes('linkedin')) return SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL;
+  if (normalized.includes('organic social')) return SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL;
+  return SOCIAL_MEDIA_BACKFILL_LABEL;
+};
 
 type FactRefreshParams = {
   from: Date;
@@ -105,6 +120,59 @@ export const refreshKpiFacts = async (
     },
     select: { id: true },
   });
+  const [socialInstagramBackfill, socialFacebookAdsBackfill, socialFacebookGroupBackfill, socialLinkedInBackfill, socialOrganicBackfill] =
+    await Promise.all([
+      prisma.sequence_registry.upsert({
+        where: { normalized_label: 'social media instagram monday backfill' },
+        update: { is_manual_bucket: false },
+        create: {
+          label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
+          normalized_label: 'social media instagram monday backfill',
+          is_manual_bucket: false,
+        },
+        select: { id: true },
+      }),
+      prisma.sequence_registry.upsert({
+        where: { normalized_label: 'social media facebook ads monday backfill' },
+        update: { is_manual_bucket: false },
+        create: {
+          label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
+          normalized_label: 'social media facebook ads monday backfill',
+          is_manual_bucket: false,
+        },
+        select: { id: true },
+      }),
+      prisma.sequence_registry.upsert({
+        where: { normalized_label: 'social media facebook group monday backfill' },
+        update: { is_manual_bucket: false },
+        create: {
+          label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
+          normalized_label: 'social media facebook group monday backfill',
+          is_manual_bucket: false,
+        },
+        select: { id: true },
+      }),
+      prisma.sequence_registry.upsert({
+        where: { normalized_label: 'social media linkedin monday backfill' },
+        update: { is_manual_bucket: false },
+        create: {
+          label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
+          normalized_label: 'social media linkedin monday backfill',
+          is_manual_bucket: false,
+        },
+        select: { id: true },
+      }),
+      prisma.sequence_registry.upsert({
+        where: { normalized_label: 'social media organic monday backfill' },
+        update: { is_manual_bucket: false },
+        create: {
+          label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
+          normalized_label: 'social media organic monday backfill',
+          is_manual_bucket: false,
+        },
+        select: { id: true },
+      }),
+    ]);
 
   const rangeFrom = new Date(params.from);
   const rangeTo = new Date(params.to);
@@ -470,7 +538,7 @@ export const refreshKpiFacts = async (
       const isSocialSource = /social|instagram|facebook|linkedin/i.test(candidate.source_key || '');
       const mondayResolvedSequenceKey =
         candidate.sequence_key === MANUAL_LABEL
-          ? (isSocialSource ? SOCIAL_MEDIA_BACKFILL_LABEL : MONDAY_BACKFILL_LABEL)
+          ? (isSocialSource ? resolveSocialMondayBackfillLabel(candidate.source_key) : MONDAY_BACKFILL_LABEL)
           : candidate.sequence_key;
       bookingRows.push({
         day_key: dayKey,
@@ -540,6 +608,11 @@ export const refreshKpiFacts = async (
   const aliasByRawLabel = new Map(aliasRows.map((row) => [row.raw_label, row.sequence_id]));
   aliasByRawLabel.set(MONDAY_BACKFILL_LABEL, mondayBackfill.id);
   aliasByRawLabel.set(SOCIAL_MEDIA_BACKFILL_LABEL, socialMediaBackfill.id);
+  aliasByRawLabel.set(SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL, socialInstagramBackfill.id);
+  aliasByRawLabel.set(SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL, socialFacebookAdsBackfill.id);
+  aliasByRawLabel.set(SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL, socialFacebookGroupBackfill.id);
+  aliasByRawLabel.set(SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL, socialLinkedInBackfill.id);
+  aliasByRawLabel.set(SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL, socialOrganicBackfill.id);
   const smsBaseMap = new Map(
     smsRows.map((row) => [
       `${row.day}|${row.sequenceId}|${row.repId}`,

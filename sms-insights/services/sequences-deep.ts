@@ -3,8 +3,7 @@ import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
 const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
-const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
-const SOCIAL_MEDIA_BACKFILL_LABEL = 'Social Media (Monday backfill)';
+const isMondayBackfillLabel = (label: string): boolean => label.toLowerCase().includes('monday backfill');
 
 export type SequenceDeepParams = {
   from: Date;
@@ -194,7 +193,7 @@ export const getSequencesDeep = async (
   const manualSequenceId = sequenceRows.find((row) => row.is_manual_bucket)?.id || null;
   const backfillSequenceIds = new Set(
     sequenceRows
-      .filter((row) => row.label === MONDAY_BACKFILL_LABEL || row.label === SOCIAL_MEDIA_BACKFILL_LABEL)
+      .filter((row) => isMondayBackfillLabel(row.label))
       .map((row) => row.id),
   );
   const resolveSequenceId = (sequenceId: string): string =>

@@ -334,6 +334,7 @@ export const getBookedCallAttributionSources = async (params: {
 export type BookedCallSmsSequenceLookup = {
   sequenceLabel: string;
   latestOutboundAt: string;
+  conversationId: string | null;
 };
 
 const SMS_SEQUENCE_LOOKBACK_DAYS = 30;
@@ -414,20 +415,22 @@ export const getBookedCallSequenceFromSmsEvents = async (
 
   // Helper: find the most recent outbound sequence within lookback window before bookingTs
   const resolveBest = (
-    outbounds: Array<{ sequence: string; ts: number }>,
+    outbounds: Array<{ sequence: string; ts: number; conversationId: string | null }>,
     bookingTs: number,
-  ): { sequence: string; ts: number } | null => {
+  ): { sequence: string; ts: number; conversationId: string | null } | null => {
     let bestSequence: string | null = null;
     let bestTs = -1;
+    let bestConversationId: string | null = null;
     for (const outbound of outbounds) {
       if (outbound.ts > bookingTs) continue;
       if (bookingTs - outbound.ts > lookbackMs) continue;
       if (outbound.ts > bestTs) {
         bestTs = outbound.ts;
         bestSequence = outbound.sequence;
+        bestConversationId = outbound.conversationId;
       }
     }
-    return bestSequence ? { sequence: bestSequence, ts: bestTs } : null;
+    return bestSequence ? { sequence: bestSequence, ts: bestTs, conversationId: bestConversationId } : null;
   };
 
   try {
@@ -459,12 +462,13 @@ export const getBookedCallSequenceFromSmsEvents = async (
       const emailDerivedPhoneKeys = [...new Set([...emailToPhoneKey.values()])];
       if (emailDerivedPhoneKeys.length > 0) {
         // Step 2: phone → sms_events outbound sequence
-        const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date }[]>(
+        const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]>(
           `
           SELECT
             RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
             TRIM(sequence) AS sequence,
-            event_ts
+            event_ts,
+            conversation_id
           FROM sms_events
           WHERE direction = 'outbound'
             AND contact_phone IS NOT NULL
@@ -476,12 +480,12 @@ export const getBookedCallSequenceFromSmsEvents = async (
           `,
           emailDerivedPhoneKeys, fromIso, toIso,
         );
-        const outboundByEmailPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
+        const outboundByEmailPhone = new Map<string, Array<{ sequence: string; ts: number; conversationId: string | null }>>();
         for (const row of rows) {
           const ts = new Date(row.event_ts).getTime();
           if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
           const list = outboundByEmailPhone.get(row.phone_key) || [];
-          list.push({ sequence: row.sequence, ts });
+          list.push({ sequence: row.sequence, ts, conversationId: row.conversation_id });
           outboundByEmailPhone.set(row.phone_key, list);
         }
         for (const [emailKey, entries] of emailKeyToEntries) {
@@ -495,6 +499,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
               results.set(bookedCallId, {
                 sequenceLabel: best.sequence,
                 latestOutboundAt: new Date(best.ts).toISOString(),
+                conversationId: best.conversationId,
               });
             }
           }
@@ -504,15 +509,16 @@ export const getBookedCallSequenceFromSmsEvents = async (
 
     // --- Phone-based lookup (FALLBACK — direct contactPhone → sms_events) ---
     // Runs second; skips calls already resolved by email lookup above.
-    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number }>>();
+    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number; conversationId: string | null }>>();
     if (phoneKeyToEntries.size > 0) {
       const phoneKeys = [...phoneKeyToEntries.keys()];
-      const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date }[]>(
+      const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]>(
         `
         SELECT
           RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
           TRIM(sequence) AS sequence,
-          event_ts
+          event_ts,
+          conversation_id
         FROM sms_events
         WHERE direction = 'outbound'
           AND contact_phone IS NOT NULL
@@ -528,7 +534,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
         const ts = new Date(row.event_ts).getTime();
         if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
         const list = outboundByPhone.get(row.phone_key) || [];
-        list.push({ sequence: row.sequence, ts });
+        list.push({ sequence: row.sequence, ts, conversationId: row.conversation_id });
         outboundByPhone.set(row.phone_key, list);
       }
       for (const [phoneKey, entries] of phoneKeyToEntries) {
@@ -541,6 +547,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
             results.set(bookedCallId, {
               sequenceLabel: best.sequence,
               latestOutboundAt: new Date(best.ts).toISOString(),
+              conversationId: best.conversationId,
             });
           }
         }
@@ -548,15 +555,16 @@ export const getBookedCallSequenceFromSmsEvents = async (
     }
 
     // --- Name-based lookup (last resort for calls without phone or email) ---
-    const outboundByName = new Map<string, Array<{ sequence: string; ts: number }>>();
+    const outboundByName = new Map<string, Array<{ sequence: string; ts: number; conversationId: string | null }>>();
     if (nameKeyToEntries.size > 0) {
       const nameKeys = [...nameKeyToEntries.keys()];
-      const rows = await prisma.$queryRawUnsafe<{ contact_name_key: string; sequence: string; event_ts: Date }[]>(
+      const rows = await prisma.$queryRawUnsafe<{ contact_name_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]>(
         `
         SELECT
           LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) AS contact_name_key,
           TRIM(sequence) AS sequence,
-          event_ts
+          event_ts,
+          conversation_id
         FROM sms_events
         WHERE direction = 'outbound'
           AND contact_name IS NOT NULL
@@ -572,7 +580,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
         const ts = new Date(row.event_ts).getTime();
         if (!row.contact_name_key || !row.sequence || !Number.isFinite(ts)) continue;
         const list = outboundByName.get(row.contact_name_key) || [];
-        list.push({ sequence: row.sequence, ts });
+        list.push({ sequence: row.sequence, ts, conversationId: row.conversation_id });
         outboundByName.set(row.contact_name_key, list);
       }
       for (const [nameKey, entries] of nameKeyToEntries) {
@@ -585,6 +593,7 @@ export const getBookedCallSequenceFromSmsEvents = async (
             results.set(bookedCallId, {
               sequenceLabel: best.sequence,
               latestOutboundAt: new Date(best.ts).toISOString(),
+              conversationId: best.conversationId,
             });
           }
         }

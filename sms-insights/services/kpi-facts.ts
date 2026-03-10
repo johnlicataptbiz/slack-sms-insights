@@ -357,7 +357,32 @@ export const refreshKpiFacts = async (
     fallbackBookedTotal += residualBooked;
   }
 
-  const bookingAliases = Array.from(new Set(bookingRows.map((row) => row.sequence_key).filter(Boolean)));
+  const mergedBookingRowsMap = new Map<string, {
+    day_key: string;
+    sequence_key: string;
+    setter: string;
+    booked_total: number;
+    booked_jack: number;
+    booked_brandon: number;
+    booked_self: number;
+    booked_after_sms_reply: number;
+  }>();
+  for (const row of bookingRows) {
+    const mergeKey = `${row.day_key}|${row.sequence_key}|${row.setter}`;
+    const existing = mergedBookingRowsMap.get(mergeKey);
+    if (!existing) {
+      mergedBookingRowsMap.set(mergeKey, { ...row });
+      continue;
+    }
+    existing.booked_total += row.booked_total;
+    existing.booked_jack += row.booked_jack;
+    existing.booked_brandon += row.booked_brandon;
+    existing.booked_self += row.booked_self;
+    existing.booked_after_sms_reply += row.booked_after_sms_reply;
+  }
+  const mergedBookingRows = Array.from(mergedBookingRowsMap.values());
+
+  const bookingAliases = Array.from(new Set(mergedBookingRows.map((row) => row.sequence_key).filter(Boolean)));
   const aliasRows =
     bookingAliases.length > 0
       ? await prisma.sequence_aliases.findMany({
@@ -373,7 +398,7 @@ export const refreshKpiFacts = async (
     ]),
   );
 
-  const bookingFactRows = bookingRows.map((row) => {
+  const bookingFactRows = mergedBookingRows.map((row) => {
     const sequenceId = aliasByRawLabel.get(row.sequence_key) || manual.id;
     const repId = normalizeRep(row.setter);
     const smsBase = smsBaseMap.get(`${row.day_key}|${sequenceId}|${repId}`);

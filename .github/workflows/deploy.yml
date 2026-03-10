@@ -20,4 +20,4 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          railway up --service sms-insights --no-build
+          railway up --service sms-insights

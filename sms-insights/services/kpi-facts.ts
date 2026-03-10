@@ -1,5 +1,7 @@
 import type { Logger } from '@slack/bolt';
+import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallSequenceFromSmsEvents } from './booked-calls.js';
 import { getPrismaClient } from './prisma.js';
+import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
 
 const getPrisma = () => getPrismaClient();
 
@@ -222,7 +224,41 @@ export const refreshKpiFacts = async (
   const fromDay = dayKey(rangeFrom, params.timeZone);
   const toDay = dayKey(rangeTo, params.timeZone);
 
-  const bookingRows = await prisma.$queryRawUnsafe<Array<{
+  const sequenceRows = await prisma.sequence_registry.findMany({
+    select: { id: true, label: true },
+  });
+  const messagesSentBySequenceId = new Map<string, number>();
+  for (const row of smsRows) {
+    messagesSentBySequenceId.set(row.sequenceId, (messagesSentBySequenceId.get(row.sequenceId) || 0) + row.messagesSent);
+  }
+
+  const sequenceRowsForAttribution = sequenceRows.map((row) => ({
+    label: row.label,
+    messagesSent: messagesSentBySequenceId.get(row.id) || 0,
+    repliesReceived: 0,
+    replyRatePct: 0,
+    bookingSignalsSms: 0,
+    booked: 0,
+    optOuts: 0,
+  }));
+
+  const bookedCallSources = await getBookedCallAttributionSources({
+    from: rangeFrom,
+    to: rangeTo,
+  });
+  const attributionLogger = logger ? { ...logger, debug: logger.info } : undefined;
+  const [smsReplyLinks, smsSequenceLookup] = await Promise.all([
+    getBookedCallSmsReplyLinks(bookedCallSources, attributionLogger),
+    getBookedCallSequenceFromSmsEvents(bookedCallSources, attributionLogger),
+  ]);
+  const sequenceAttribution = attributeSlackBookedCallsToSequences(
+    sequenceRowsForAttribution,
+    bookedCallSources,
+    smsReplyLinks,
+    smsSequenceLookup,
+  );
+
+  const bookingRowsMap = new Map<string, {
     day_key: string;
     sequence_key: string;
     setter: string;
@@ -230,24 +266,56 @@ export const refreshKpiFacts = async (
     booked_jack: number;
     booked_brandon: number;
     booked_self: number;
-  }>>(
-    `SELECT
-       to_char(date_trunc('day', booked_event_ts AT TIME ZONE $3), 'YYYY-MM-DD') AS day_key,
-       COALESCE(NULLIF(TRIM(sms_sequence_key), ''), $4) AS sequence_key,
-       COALESCE(NULLIF(TRIM(setter), ''), 'unknown') AS setter,
-       COUNT(*)::int AS booked_total,
-       COUNT(*) FILTER (WHERE lower(setter) LIKE '%jack%')::int AS booked_jack,
-       COUNT(*) FILTER (WHERE lower(setter) LIKE '%brandon%')::int AS booked_brandon,
-       COUNT(*) FILTER (WHERE lower(setter) LIKE '%self%' OR lower(setter) = 'unknown')::int AS booked_self
-     FROM analytics_booked_call_attribution_v
-     WHERE booked_event_ts >= $1::timestamptz
-       AND booked_event_ts <= $2::timestamptz
-     GROUP BY 1,2,3`,
-    rangeFrom.toISOString(),
-    rangeTo.toISOString(),
-    params.timeZone,
-    MANUAL_LABEL,
-  );
+    booked_after_sms_reply: number;
+  }>();
+
+  const bumpBookingRow = (input: {
+    eventTs: string;
+    sequenceLabel: string;
+    bucket: 'jack' | 'brandon' | 'selfBooked';
+    strictSmsReplyLinked: boolean;
+  }) => {
+    const dayKeyValue = dayKey(new Date(input.eventTs), params.timeZone);
+    const setter = input.bucket === 'jack' ? 'jack' : input.bucket === 'brandon' ? 'brandon' : 'unknown';
+    const key = `${dayKeyValue}|${input.sequenceLabel}|${setter}`;
+    const row = bookingRowsMap.get(key) || {
+      day_key: dayKeyValue,
+      sequence_key: input.sequenceLabel,
+      setter,
+      booked_total: 0,
+      booked_jack: 0,
+      booked_brandon: 0,
+      booked_self: 0,
+      booked_after_sms_reply: 0,
+    };
+    row.booked_total += 1;
+    if (input.bucket === 'jack') row.booked_jack += 1;
+    else if (input.bucket === 'brandon') row.booked_brandon += 1;
+    else row.booked_self += 1;
+    if (input.strictSmsReplyLinked) row.booked_after_sms_reply += 1;
+    bookingRowsMap.set(key, row);
+  };
+
+  for (const [sequenceLabel, breakdown] of sequenceAttribution.byLabel.entries()) {
+    for (const auditRow of breakdown.auditRows) {
+      bumpBookingRow({
+        eventTs: auditRow.eventTs,
+        sequenceLabel,
+        bucket: auditRow.bucket,
+        strictSmsReplyLinked: auditRow.strictSmsReplyLinked,
+      });
+    }
+  }
+  for (const missing of sequenceAttribution.unattributedAuditRows) {
+    bumpBookingRow({
+      eventTs: missing.eventTs,
+      sequenceLabel: MANUAL_LABEL,
+      bucket: missing.bucket,
+      strictSmsReplyLinked: false,
+    });
+  }
+
+  const bookingRows = Array.from(bookingRowsMap.values());
 
   const rawBookedFallbackRows = await prisma.$queryRawUnsafe<Array<{
     day_key: string;
@@ -283,6 +351,7 @@ export const refreshKpiFacts = async (
       booked_jack: 0,
       booked_brandon: 0,
       booked_self: residualBooked,
+      booked_after_sms_reply: 0,
     });
     fallbackBookingRows += 1;
     fallbackBookedTotal += residualBooked;
@@ -317,7 +386,7 @@ export const refreshKpiFacts = async (
       booked_jack: row.booked_jack,
       booked_brandon: row.booked_brandon,
       booked_self: row.booked_self,
-      booked_after_sms_reply: row.booked_total,
+      booked_after_sms_reply: row.booked_after_sms_reply,
       booking_rate_pct: uniqueContacted > 0 ? (row.booked_total / uniqueContacted) * 100 : 0,
       diagnostic_booking_signals: smsBase?.bookingSignalsSms || 0,
     };

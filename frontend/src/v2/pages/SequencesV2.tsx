@@ -112,10 +112,8 @@ export default function SequencesV2() {
                   <thead>
                     <tr>
                       <th>Sequence</th>
-                      <th>Lead Magnet</th>
                       <th>Status</th>
                       <th className="is-right">Sent</th>
-                      <th className="is-right">Contacted</th>
                       <th className="is-right">Replies</th>
                       <th className="is-right">Reply %</th>
                       <th className="is-right">Booked</th>
@@ -127,19 +125,16 @@ export default function SequencesV2() {
                       <th className="is-right">Self</th>
                       <th className="is-right">After Reply</th>
                       <th className="is-right">Hi Interest %</th>
-                      <th className="is-right">Full-time %</th>
-                      <th className="is-right">Mostly Cash %</th>
-                      <th className="is-right">Step 3/4 %</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.sequences.map((row) => (
                       <tr key={row.sequenceId} className={row.isManualBucket ? 'V2Table__row--manual' : ''}>
-                        <td>{row.label}</td>
-                        <td>{row.leadMagnet}</td>
+                        <td title={`${row.label}${row.leadMagnet ? ` • ${row.leadMagnet}` : ''}`}>
+                          <span className="V2Table__seqName">{row.label}</span>
+                        </td>
                         <td>{row.status}</td>
                         <td className="is-right">{fmtInt(row.messagesSent)}</td>
-                        <td className="is-right">{fmtInt(row.uniqueContacted)}</td>
                         <td className="is-right">{fmtInt(row.repliesReceived)}</td>
                         <td className="is-right">{fmtPct(row.replyRatePct)}</td>
                         <td className="is-right">{fmtInt(row.bookedCalls)}</td>
@@ -151,9 +146,6 @@ export default function SequencesV2() {
                         <td className="is-right">{fmtInt(row.bookedBreakdown.selfBooked)}</td>
                         <td className="is-right">{fmtInt(row.bookedBreakdown.bookedAfterSmsReply)}</td>
                         <td className="is-right">{fmtPct(row.leadQuality.highInterestPct)}</td>
-                        <td className="is-right">{fmtPct(row.leadQuality.fullTimePct)}</td>
-                        <td className="is-right">{fmtPct(row.leadQuality.mostlyCashPct)}</td>
-                        <td className="is-right">{fmtPct(row.leadQuality.progressedToStep3Or4Pct)}</td>
                       </tr>
                     ))}
                   </tbody>

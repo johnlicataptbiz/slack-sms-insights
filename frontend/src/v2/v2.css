@@ -5670,9 +5670,14 @@ display: inline-block;
 .V2TableWrap--sequences {
   overflow-x: auto;
   overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
   border: 1px solid rgba(7, 19, 36, 0.1);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.75);
+}
+
+.V2TableWrap--sequences .V2Table--sequences {
+  min-width: 1320px;
 }
 
 .V2TableWrap--sequences .V2Table th,
@@ -5845,7 +5850,7 @@ display: inline-block;
 /* Tighter cell padding for the sequences table to prevent horizontal scroll */
 .V2Table--sequences th,
 .V2Table--sequences td {
-  padding: 0.36rem 0.46rem;
+  padding: 0.32rem 0.44rem;
   font-size: 0.82rem;
 }
 
@@ -5895,7 +5900,7 @@ display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 260px;
+  max-width: 320px;
 }
 
 .V2Table__leadMagnetText {

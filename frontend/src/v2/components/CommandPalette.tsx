@@ -60,9 +60,9 @@ export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }
 
   const commands: CommandItem[] = [
     // Navigation
-    { id: 'nav-insights', label: 'Insights', icon: '◉', group: 'Navigate', action: () => go('/v2/insights'), keywords: ['dashboard', 'overview'] },
+    { id: 'nav-insights', label: 'Performance', icon: '◉', group: 'Navigate', action: () => go('/v2/insights'), keywords: ['dashboard', 'overview'] },
     { id: 'nav-inbox', label: 'Inbox', icon: '✉', group: 'Navigate', action: () => go('/v2/inbox'), keywords: ['messages', 'conversations', 'sms'] },
-    { id: 'nav-runs', label: 'Daily Runs', icon: '◌', group: 'Navigate', action: () => go('/v2/runs'), keywords: ['reports', 'daily'] },
+    { id: 'nav-runs', label: 'Daily Activity', icon: '◌', group: 'Navigate', action: () => go('/v2/runs'), keywords: ['reports', 'daily'] },
     {
       id: 'nav-jack',
       label: 'Insights: Jack',
@@ -80,7 +80,7 @@ export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }
       keywords: ['brandon', 'rep', 'scorecard'],
     },
     { id: 'nav-sequences', label: 'Sequences', icon: '⟐', group: 'Navigate', action: () => go('/v2/sequences'), keywords: ['sequences', 'qualification', 'campaigns'] },
-    { id: 'nav-attribution', label: 'Attribution', icon: '⊕', group: 'Navigate', action: () => go('/v2/attribution'), keywords: ['attribution', 'source'] },
+    { id: 'nav-attribution', label: 'Booking Audit', icon: '⊕', group: 'Navigate', action: () => go('/v2/attribution'), keywords: ['booking', 'source', 'attribution'] },
     // Actions
     { id: 'action-signout', label: 'Sign Out', icon: '→', group: 'Actions', action: () => { setOpen(false); onSignOut(); }, keywords: ['logout', 'sign out'] },
   ];

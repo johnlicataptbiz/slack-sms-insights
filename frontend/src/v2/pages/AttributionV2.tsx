@@ -7,9 +7,9 @@ export default function AttributionV2() {
   const { data, isLoading, isError, error } = useV2SalesMetrics({ range: 'today', tz: 'America/Chicago' });
   const payload = data?.data;
 
-  if (isLoading) return <V2State kind="loading">Loading attribution deep dive…</V2State>;
+  if (isLoading) return <V2State kind="loading">Loading booking source details…</V2State>;
   if (isError || !payload) {
-    return <V2State kind="error">Failed to load attribution: {String((error as Error)?.message || error)}</V2State>;
+    return <V2State kind="error">Could not load booking source details: {String((error as Error)?.message || error)}</V2State>;
   }
 
   return (
@@ -21,17 +21,17 @@ export default function AttributionV2() {
 
       <section className="V2MetricsGrid">
         <V2MetricCard label={<V2Term term="callsBookedSlack" />} value={payload.bookedCredit.total.toLocaleString()} tone="positive" />
-        <V2MetricCard label="Overall Reply Rate (People)" value={`${payload.totals.replyRatePct.toFixed(1)}%`} />
+        <V2MetricCard label="Overall reply rate" value={`${payload.totals.replyRatePct.toFixed(1)}%`} />
         <V2MetricCard label={<V2Term term="manualReplyRate" />} value={`${payload.totals.manualReplyRatePct.toFixed(1)}%`} />
         <V2MetricCard label={<V2Term term="sequenceReplyRate" />} value={`${payload.totals.sequenceReplyRatePct.toFixed(1)}%`} />
       </section>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Booked Calls Source (Slack)" caption="This is the booked-call KPI and setter credit source.">
+        <V2Panel title="Booked Calls Source (Slack)" caption="This is the main booked-call number and credit source.">
           <ul className="V2BulletList">
-            <li>Source: Slack booked-call channel + reaction-based credit routing.</li>
-            <li>This is the KPI used in scorecards and weekly reviews.</li>
-            <li>Day-by-day trend uses this same canonical booked-call count.</li>
+            <li>Source: Slack booked-call channel plus reaction-based credit routing.</li>
+            <li>This is the booked-call number used in scorecards and weekly reviews.</li>
+            <li>Day-by-day trend uses this same booked-call count.</li>
           </ul>
         </V2Panel>
 
@@ -44,14 +44,14 @@ export default function AttributionV2() {
         </V2Panel>
       </div>
 
-      <V2Panel title="Coverage" caption='How many booked calls matched a sequence label vs "No sequence (manual/direct)".'>
+      <V2Panel title="Sequence Match Summary" caption='How many booked calls matched a sequence name vs "No sequence (manual/direct)".'>
         <div className="V2SplitStat">
           <div>
             <span>Total Calls Booked</span>
             <strong>{payload.provenance.sequenceBookedAttribution?.totalCalls ?? 0}</strong>
           </div>
           <div>
-            <span>Matched</span>
+            <span>Matched to sequence</span>
             <strong>{payload.provenance.sequenceBookedAttribution?.matchedCalls ?? 0}</strong>
           </div>
           <div>
@@ -59,7 +59,7 @@ export default function AttributionV2() {
             <strong>{payload.provenance.sequenceBookedAttribution?.manualCalls ?? 0}</strong>
           </div>
           <div>
-            <span>Unattributed</span>
+            <span>Not linked yet</span>
             <strong>{payload.provenance.sequenceBookedAttribution?.unattributedCalls ?? 0}</strong>
           </div>
         </div>

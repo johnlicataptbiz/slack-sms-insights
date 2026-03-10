@@ -657,11 +657,11 @@ export default function RunsV2() {
     <div className="V2Page">
       <V2PageHeader
         title={v2Copy.nav.runs}
-        subtitle="A look back at each day's activity."
+        subtitle="Daily activity and report history."
         right={
           <div className="V2ControlsRow">
             <label className="V2Control">
-              <span>Show last (days)</span>
+              <span>Date range (days)</span>
               <V2Select
                 value={String(daysBack)}
                 onValueChange={(value) =>
@@ -727,7 +727,7 @@ export default function RunsV2() {
 
       <section className="V2MetricsGrid">
         <V2MetricCard
-          label="Daily Reports"
+          label="Reports"
           value={String(aggregateStats.totalRuns)}
           meta={`Last ${daysBack} day${daysBack === 1 ? '' : 's'}`}
         />
@@ -789,7 +789,7 @@ export default function RunsV2() {
                       <div className="V2RunList__kpis">
                         <span>Sent {formatCount(runView.messagesSent)}</span>
                         <span>Replies {formatCount(runView.repliesReceived)}</span>
-                        <span>Booked (report) {formatCount(runView.booked)}</span>
+                        <span>Booked (SMS report) {formatCount(runView.booked)}</span>
                         <span>Opt-outs {formatCount(runView.optOuts)}</span>
                       </div>
                       <p className="V2RunList__summary">{runView.summaryPreview || 'No summary available for this report.'}</p>
@@ -800,7 +800,7 @@ export default function RunsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Report Details" caption="The summary and raw output." className="V2RunsLayout__detail">
+        <V2Panel title="Report Details" caption="Summary and full report text." className="V2RunsLayout__detail">
           {selected && selectedView ? (
             <div className="V2RunDetail">
               {isRunDetailFocused ? (
@@ -813,7 +813,7 @@ export default function RunsV2() {
 
               <header className="V2RunDetail__hero">
                 <div>
-                  <p className="V2RunDetail__eyebrow">{selected.reportType === 'daily' ? 'Automated Daily Report' : 'Manual / On-Demand Report'}</p>
+                  <p className="V2RunDetail__eyebrow">{selected.reportType === 'daily' ? 'Automated Daily Report' : 'Manual Report'}</p>
                   <h3>{selectedView.title}</h3>
                   <p>{selectedView.subtitle}</p>
                 </div>
@@ -839,7 +839,7 @@ export default function RunsV2() {
                   tone="accent"
                 />
                 <V2MetricCard
-                  label="Booked Calls (Canonical)"
+                  label="Booked Calls (Slack)"
                   value={
                     selectedBookedMetricsQuery.isLoading
                       ? 'Loading…'
@@ -851,10 +851,10 @@ export default function RunsV2() {
                   tone={(selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'}
                 />
                 <V2MetricCard
-                  label="Booked (from report text)"
+                  label="Booked Calls (SMS report)"
                   value={formatCount(selectedView.booked)}
                   tone={(selectedView.booked ?? 0) > 0 ? 'positive' : 'default'}
-                  meta="Extracted from SMS report - may be inaccurate"
+                  meta="Pulled from SMS report text. Can differ from Slack."
                 />
                 <V2MetricCard
                   label="Setter Split"
@@ -961,12 +961,12 @@ export default function RunsV2() {
                         <tr>
                           <th>Setter</th>
                           <th className="is-right">Conversations</th>
-                          <th
-                            className="is-right"
-                            title="Bookings as reported by the Aloware SMS system — not Slack-verified. See 'Booked (Slack-verified)' above for the canonical count."
-                          >
-                            Bookings (from report)
-                          </th>
+                              <th
+                                className="is-right"
+                                title="Bookings as reported by Aloware SMS text. This can differ from Slack booked calls above."
+                              >
+                                Bookings (from report)
+                              </th>
                           <th className="is-right">Opt-Outs</th>
                           <th>Top Sequence</th>
                         </tr>
@@ -978,7 +978,7 @@ export default function RunsV2() {
                             <td className="is-right">{row.outboundConversations.toLocaleString()}</td>
                             <td
                               className="is-right"
-                              title="Aloware-reported bookings — may differ from Slack-verified count above"
+                              title="Aloware-reported bookings may differ from Slack booked calls above"
                             >
                               {row.booked.toLocaleString()}
                             </td>
@@ -993,12 +993,12 @@ export default function RunsV2() {
                   <p className="V2RunDetail__muted">No setter data found for this report.</p>
                 )}
                 <p className="V2RunDetail__muted" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                  ⓘ <strong>Important:</strong> "Bookings (from report)" are pulled from the Aloware SMS report text and may not match the Slack-verified count above. Always use <em>Booked Calls (Canonical)</em> as the official figure for reporting.
+                  ⓘ <strong>Important:</strong> "Bookings (from report)" come from Aloware SMS report text and may not match Slack. Use <em>Booked Calls (Slack)</em> as the official number.
                 </p>
               </section>
 
               <details className="V2RunDetail__raw">
-                <summary>Show full report text</summary>
+                <summary>Show full report</summary>
                 <pre>{selectedRunQuery.isLoading ? 'Loading report text…' : selected.fullReport || 'No report text available'}</pre>
               </details>
             </div>

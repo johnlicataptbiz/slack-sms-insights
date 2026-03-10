@@ -33,7 +33,7 @@ export function InsightsV2() {
   if (query.isLoading) {
     return (
       <div className="V2Page">
-        <V2PageHeader title="Performance" subtitle="High-level team and setter performance in one place." />
+        <V2PageHeader title="Performance" subtitle="Team results in one place." />
         <SkeletonDashboard />
       </div>
     );
@@ -42,7 +42,7 @@ export function InsightsV2() {
   if (query.isError || !data) {
     return (
       <div className="V2Page">
-        <V2PageHeader title="Performance" subtitle="High-level team and setter performance in one place." />
+        <V2PageHeader title="Performance" subtitle="Team results in one place." />
         <V2State kind="error" onRetry={() => void query.refetch()}>
           Failed to load performance summary.
         </V2State>
@@ -54,7 +54,7 @@ export function InsightsV2() {
     <div className="V2Page">
       <V2PageHeader
         title="Performance"
-        subtitle="Team and setter results, conversion flow, what needs attention, and Monday sync status."
+        subtitle="Team and setter results, what needs attention, and Monday board health."
         right={
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {(Object.keys(RANGE_LABELS) as Range[]).map((value) => (
@@ -79,7 +79,7 @@ export function InsightsV2() {
 
       <div className="V2MetricsGrid V2MetricsGrid--compact">
         <V2MetricCard label="Messages sent" value={fmtInt(data.kpis.messagesSent)} />
-        <V2MetricCard label="Unique contacted" value={fmtInt(data.kpis.uniqueContacted)} />
+        <V2MetricCard label="People reached" value={fmtInt(data.kpis.uniqueContacted)} />
         <V2MetricCard label="Replies" value={fmtInt(data.kpis.repliesReceived)} />
         <V2MetricCard label="Reply rate" value={fmtPct(data.kpis.replyRatePct)} tone={data.kpis.replyRatePct >= 10 ? 'positive' : 'default'} />
         <V2MetricCard label="Booked calls" value={fmtInt(data.kpis.bookedCalls)} tone="positive" />
@@ -127,7 +127,7 @@ export function InsightsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Lead Flow" caption="How leads move from contacted to replied to booked.">
+        <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked.">
           <div className="V2SplitStat">
             <div>
               <span>Contacted</span>
@@ -144,11 +144,11 @@ export function InsightsV2() {
           </div>
           <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
             <div>
-              <span>Contacted to Replied Dropoff</span>
+              <span>Reached but no reply yet</span>
               <strong>{fmtPct(data.funnel.replyDropoffPct)}</strong>
             </div>
             <div>
-              <span>Replied to Booked Dropoff</span>
+              <span>Replied but not booked yet</span>
               <strong>{fmtPct(data.funnel.bookingDropoffPct)}</strong>
             </div>
           </div>
@@ -171,28 +171,28 @@ export function InsightsV2() {
           )}
         </V2Panel>
 
-        <V2Panel title="Monday Sync Status" caption="Is Monday data current and complete?">
+        <V2Panel title="Monday Board Health" caption="Is Monday data up to date and complete?">
           <div className="V2SplitStat">
             <div>
               <span>Boards</span>
               <strong>{fmtInt(data.mondayHealth.boards)}</strong>
             </div>
             <div>
-              <span>Needs Sync</span>
+              <span>Behind</span>
               <strong>{fmtInt(data.mondayHealth.staleBoards)}</strong>
             </div>
             <div>
-              <span>Errored</span>
+              <span>With errors</span>
               <strong>{fmtInt(data.mondayHealth.erroredBoards)}</strong>
             </div>
           </div>
           <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
             <div>
-              <span>Source Filled In</span>
+              <span>Source filled</span>
               <strong>{fmtPct(data.mondayHealth.avgSourceCoveragePct)}</strong>
             </div>
             <div>
-              <span>Campaign Filled In</span>
+              <span>Campaign filled</span>
               <strong>{fmtPct(data.mondayHealth.avgCampaignCoveragePct)}</strong>
             </div>
           </div>

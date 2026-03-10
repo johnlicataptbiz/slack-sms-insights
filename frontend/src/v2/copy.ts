@@ -9,7 +9,7 @@ export const v2Copy = {
     attribution: 'Booking Audit',
   },
   actions: {
-    kpiDefinitions: 'KPI Definitions',
+    kpiDefinitions: 'Metric Definitions',
     close: 'Close',
   },
 } as const;
@@ -47,7 +47,7 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
     definition: 'Internal QA signal only. This is not used for booked-call credit.',
   },
   peopleContacted: {
-    label: 'Leads Reached',
+    label: 'People Reached',
     definition: 'Unique people we messaged this week.',
   },
   replyRatePeople: {
@@ -80,7 +80,7 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
   },
   sequenceMatchCoverage: {
     label: 'Bookings Tied to a Sequence',
-    definition: 'Booked calls where we can confidently tie the lead back to a sequence.',
+    definition: 'Booked calls we can tie back to a sequence name.',
   },
 };
 

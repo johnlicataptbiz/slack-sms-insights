@@ -47,7 +47,7 @@ export default function SequencesV2() {
     <div className="V2Page">
       <V2PageHeader
         title="Sequences"
-        subtitle="How each sequence is performing: volume, replies, bookings, and lead quality."
+        subtitle="How each sequence is performing: volume, replies, and booked calls."
         right={
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
@@ -87,7 +87,7 @@ export default function SequencesV2() {
 
           <div className="V2MetricsGrid V2MetricsGrid--compact">
             <V2MetricCard label="Messages sent" value={fmtInt(totals.messagesSent)} />
-            <V2MetricCard label="Unique contacted" value={fmtInt(totals.uniqueContacted)} />
+            <V2MetricCard label="People reached" value={fmtInt(totals.uniqueContacted)} />
             <V2MetricCard label="Replies" value={fmtInt(totals.repliesReceived)} />
             <V2MetricCard
               label="Reply rate"
@@ -99,20 +99,19 @@ export default function SequencesV2() {
               value={fmtPct(totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0)}
             />
             <V2MetricCard label="Opt-outs" value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
-            <V2MetricCard label="Monday needs sync" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
+            <V2MetricCard label="Monday boards behind" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
           </div>
 
           <div ref={tableRef}>
             <V2Panel
-              title="Sequence Performance Table"
-              caption="At-a-glance sequence performance for this date range."
+              title="Sequence Results"
+              caption="At-a-glance sequence performance for this date range. Tip: swipe left/right if needed."
             >
               <div className="V2TableWrap V2TableWrap--sequences">
                 <table className="V2Table V2Table--sequences">
                   <thead>
                     <tr>
                       <th>Sequence</th>
-                      <th>Status</th>
                       <th className="is-right">Sent</th>
                       <th className="is-right">Replies</th>
                       <th className="is-right">Reply %</th>
@@ -123,8 +122,6 @@ export default function SequencesV2() {
                       <th className="is-right">Jack</th>
                       <th className="is-right">Brandon</th>
                       <th className="is-right">Self</th>
-                      <th className="is-right">After Reply</th>
-                      <th className="is-right">Hi Interest %</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -133,7 +130,6 @@ export default function SequencesV2() {
                         <td title={`${row.label}${row.leadMagnet ? ` • ${row.leadMagnet}` : ''}`}>
                           <span className="V2Table__seqName">{row.label}</span>
                         </td>
-                        <td>{row.status}</td>
                         <td className="is-right">{fmtInt(row.messagesSent)}</td>
                         <td className="is-right">{fmtInt(row.repliesReceived)}</td>
                         <td className="is-right">{fmtPct(row.replyRatePct)}</td>
@@ -144,8 +140,6 @@ export default function SequencesV2() {
                         <td className="is-right">{fmtInt(row.bookedBreakdown.jack)}</td>
                         <td className="is-right">{fmtInt(row.bookedBreakdown.brandon)}</td>
                         <td className="is-right">{fmtInt(row.bookedBreakdown.selfBooked)}</td>
-                        <td className="is-right">{fmtInt(row.bookedBreakdown.bookedAfterSmsReply)}</td>
-                        <td className="is-right">{fmtPct(row.leadQuality.highInterestPct)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -155,39 +149,39 @@ export default function SequencesV2() {
           </div>
 
           <div className="V2Grid V2Grid--3">
-            <V2Panel title="Monday Sync Status" caption="Quick read on Monday data freshness.">
+            <V2Panel title="Monday Board Health" caption="Quick read on Monday freshness.">
               <div className="V2SplitStat">
                 <div>
                   <span>Boards</span>
                   <strong>{fmtInt(data.monday.boards)}</strong>
                 </div>
                 <div>
-                  <span>Needs Sync</span>
+                  <span>Behind</span>
                   <strong>{fmtInt(data.monday.staleBoards)}</strong>
                 </div>
                 <div>
-                  <span>Errored</span>
+                  <span>With errors</span>
                   <strong>{fmtInt(data.monday.erroredBoards)}</strong>
                 </div>
               </div>
             </V2Panel>
 
-            <V2Panel title="Monday Data Coverage" caption="How complete key Monday fields are.">
+            <V2Panel title="Monday Data Completeness" caption="How complete key Monday fields are.">
               <div className="V2DeltaList">
                 <div>
-                  <span>Source Filled In</span>
+                  <span>Source filled</span>
                   <strong>{fmtPct(data.monday.avgSourceCoveragePct)}</strong>
                 </div>
                 <div>
-                  <span>Campaign Filled In</span>
+                  <span>Campaign filled</span>
                   <strong>{fmtPct(data.monday.avgCampaignCoveragePct)}</strong>
                 </div>
                 <div>
-                  <span>Set By Filled In</span>
+                  <span>Setter filled</span>
                   <strong>{fmtPct(data.monday.avgSetByCoveragePct)}</strong>
                 </div>
                 <div>
-                  <span>Touchpoints Filled In</span>
+                  <span>Touchpoints filled</span>
                   <strong>{fmtPct(data.monday.avgTouchpointsCoveragePct)}</strong>
                 </div>
               </div>

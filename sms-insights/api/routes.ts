@@ -1291,7 +1291,7 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
     const warnings: string[] = [];
     if (refreshInfo && refreshInfo.fallbackBookingRows > 0) {
       warnings.push(
-        `Fallback booking attribution applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
+        `Historical Monday backfill applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
       );
     }
     if (lagStatus.isLagging) {
@@ -1367,7 +1367,7 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
     const warnings: string[] = [];
     if (refreshInfo && refreshInfo.fallbackBookingRows > 0) {
       warnings.push(
-        `Fallback booking attribution applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
+        `Historical Monday backfill applied for ${refreshInfo.fallbackBookingRows} day(s), ${refreshInfo.fallbackBookedTotal} booking(s).`,
       );
     }
     if (lagStatus.isLagging) {

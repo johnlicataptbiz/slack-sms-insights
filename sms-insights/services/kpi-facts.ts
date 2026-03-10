@@ -6,6 +6,7 @@ import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribut
 const getPrisma = () => getPrismaClient();
 
 const MANUAL_LABEL = 'No sequence (manual/direct)';
+const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
 const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
@@ -78,6 +79,16 @@ export const refreshKpiFacts = async (
       label: MANUAL_LABEL,
       normalized_label: 'no sequence manual direct',
       is_manual_bucket: true,
+    },
+    select: { id: true },
+  });
+  const mondayBackfill = await prisma.sequence_registry.upsert({
+    where: { normalized_label: 'monday backfill sequence unresolved' },
+    update: { is_manual_bucket: false },
+    create: {
+      label: MONDAY_BACKFILL_LABEL,
+      normalized_label: 'monday backfill sequence unresolved',
+      is_manual_bucket: false,
     },
     select: { id: true },
   });
@@ -333,18 +344,133 @@ export const refreshKpiFacts = async (
     params.timeZone,
   );
 
-  // If attribution view is stale/incomplete, preserve booking continuity using raw booked_calls.
+  const mondayFallbackRows = await prisma.$queryRawUnsafe<Array<{
+    day_key: string;
+    sequence_key: string;
+    setter: string | null;
+    booked_total: number;
+  }>>(
+    `
+    SELECT
+      to_char(date_trunc('day', lo.call_date::timestamp AT TIME ZONE $3), 'YYYY-MM-DD') AS day_key,
+      COALESCE(
+        NULLIF(BTRIM(la.sequence), ''),
+        NULLIF(BTRIM(la.campaign), ''),
+        NULLIF(BTRIM(sms_seq.sequence_key), ''),
+        $4
+      ) AS sequence_key,
+      COALESCE(
+        NULLIF(BTRIM(lo.set_by), ''),
+        NULLIF(BTRIM(lo.setter), ''),
+        NULLIF(BTRIM(la.set_by), ''),
+        NULLIF(BTRIM(la.setter), '')
+      ) AS setter,
+      COUNT(*)::int AS booked_total
+    FROM lead_outcomes lo
+    LEFT JOIN lead_attribution la
+      ON la.board_id = lo.board_id
+     AND la.item_id = lo.item_id
+    LEFT JOIN LATERAL (
+      SELECT COALESCE(NULLIF(BTRIM(se.sequence), ''), $4) AS sequence_key
+      FROM sms_events se
+      WHERE se.direction = 'outbound'
+        AND se.event_ts <= (lo.call_date::timestamp + INTERVAL '1 day')
+        AND se.event_ts >= (lo.call_date::timestamp - INTERVAL '14 days')
+        AND (
+          (
+            lo.contact_key LIKE 'phone:%'
+            AND RIGHT(regexp_replace(COALESCE(se.contact_phone, ''), '\\D', '', 'g'), 10) =
+                RIGHT(regexp_replace(replace(lo.contact_key, 'phone:', ''), '\\D', '', 'g'), 10)
+          )
+          OR (
+            lo.contact_key LIKE 'name:%'
+            AND LOWER(regexp_replace(BTRIM(COALESCE(se.contact_name, '')), '\\s+', ' ', 'g')) =
+                LOWER(regexp_replace(BTRIM(replace(lo.contact_key, 'name:', '')), '\\s+', ' ', 'g'))
+          )
+        )
+      ORDER BY se.event_ts DESC
+      LIMIT 1
+    ) sms_seq ON TRUE
+    WHERE lo.is_booked = TRUE
+      AND lo.call_date IS NOT NULL
+      AND lo.call_date >= $1::date
+      AND lo.call_date <= $2::date
+      AND lo.call_date <= (CURRENT_DATE - INTERVAL '2 days')
+    GROUP BY 1,2,3
+    `,
+    fromDay,
+    toDay,
+    params.timeZone,
+    MANUAL_LABEL,
+  );
+
+  // If Slack attribution is incomplete, backfill residual counts from Monday as historical source of truth.
   const fallbackDayTotals = new Map(rawBookedFallbackRows.map((row) => [row.day_key, row.booked_total]));
   for (const row of bookingRows) {
     fallbackDayTotals.set(row.day_key, Math.max(0, (fallbackDayTotals.get(row.day_key) || 0) - row.booked_total));
   }
+  const mondayRowsByDay = new Map<string, Array<{
+    sequence_key: string;
+    setter: string;
+    remaining: number;
+  }>>();
+  for (const row of mondayFallbackRows) {
+    const list = mondayRowsByDay.get(row.day_key) || [];
+    list.push({
+      sequence_key: row.sequence_key || MANUAL_LABEL,
+      setter: normalizeRep(row.setter || 'unknown'),
+      remaining: Math.max(0, row.booked_total || 0),
+    });
+    mondayRowsByDay.set(row.day_key, list);
+  }
+  for (const rows of mondayRowsByDay.values()) {
+    rows.sort((a, b) => b.remaining - a.remaining);
+  }
 
   let fallbackBookingRows = 0;
   let fallbackBookedTotal = 0;
-  for (const [, residualBooked] of fallbackDayTotals.entries()) {
-    if (residualBooked <= 0) continue;
-    fallbackBookingRows += 1;
-    fallbackBookedTotal += residualBooked;
+  for (const [dayKey, residualStart] of fallbackDayTotals.entries()) {
+    if (residualStart <= 0) continue;
+    let residualBooked = residualStart;
+
+    const mondayCandidates = mondayRowsByDay.get(dayKey) || [];
+    for (const candidate of mondayCandidates) {
+      if (residualBooked <= 0) break;
+      if (candidate.remaining <= 0) continue;
+      const take = Math.min(residualBooked, candidate.remaining);
+      if (take <= 0) continue;
+
+      const setter = candidate.setter;
+      bookingRows.push({
+        day_key: dayKey,
+        sequence_key: candidate.sequence_key === MANUAL_LABEL ? MONDAY_BACKFILL_LABEL : candidate.sequence_key,
+        setter,
+        booked_total: take,
+        booked_jack: setter === 'jack' ? take : 0,
+        booked_brandon: setter === 'brandon' ? take : 0,
+        booked_self: setter === 'jack' || setter === 'brandon' ? 0 : take,
+        booked_after_sms_reply: 0,
+      });
+      candidate.remaining -= take;
+      residualBooked -= take;
+      fallbackBookingRows += 1;
+      fallbackBookedTotal += take;
+    }
+
+    if (residualBooked > 0) {
+      bookingRows.push({
+        day_key: dayKey,
+        sequence_key: MANUAL_LABEL,
+        setter: 'unknown',
+        booked_total: residualBooked,
+        booked_jack: 0,
+        booked_brandon: 0,
+        booked_self: residualBooked,
+        booked_after_sms_reply: 0,
+      });
+      fallbackBookingRows += 1;
+      fallbackBookedTotal += residualBooked;
+    }
   }
 
   const mergedBookingRowsMap = new Map<string, {
@@ -381,6 +507,7 @@ export const refreshKpiFacts = async (
         })
       : [];
   const aliasByRawLabel = new Map(aliasRows.map((row) => [row.raw_label, row.sequence_id]));
+  aliasByRawLabel.set(MONDAY_BACKFILL_LABEL, mondayBackfill.id);
   const smsBaseMap = new Map(
     smsRows.map((row) => [
       `${row.day}|${row.sequenceId}|${row.repId}`,

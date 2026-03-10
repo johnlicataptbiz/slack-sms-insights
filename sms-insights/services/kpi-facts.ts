@@ -7,6 +7,7 @@ const getPrisma = () => getPrismaClient();
 
 const MANUAL_LABEL = 'No sequence (manual/direct)';
 const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
+const SOCIAL_MEDIA_BACKFILL_LABEL = 'Social Media (Monday backfill)';
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
 const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
@@ -88,6 +89,16 @@ export const refreshKpiFacts = async (
     create: {
       label: MONDAY_BACKFILL_LABEL,
       normalized_label: 'monday backfill sequence unresolved',
+      is_manual_bucket: false,
+    },
+    select: { id: true },
+  });
+  const socialMediaBackfill = await prisma.sequence_registry.upsert({
+    where: { normalized_label: 'social media monday backfill' },
+    update: { is_manual_bucket: false },
+    create: {
+      label: SOCIAL_MEDIA_BACKFILL_LABEL,
+      normalized_label: 'social media monday backfill',
       is_manual_bucket: false,
     },
     select: { id: true },
@@ -347,6 +358,7 @@ export const refreshKpiFacts = async (
   const mondayFallbackRows = await prisma.$queryRawUnsafe<Array<{
     day_key: string;
     sequence_key: string;
+    source_key: string | null;
     setter: string | null;
     booked_total: number;
   }>>(
@@ -359,6 +371,10 @@ export const refreshKpiFacts = async (
         NULLIF(BTRIM(sms_seq.sequence_key), ''),
         $4
       ) AS sequence_key,
+      COALESCE(
+        NULLIF(BTRIM(lo.source), ''),
+        NULLIF(BTRIM(la.source), '')
+      ) AS source_key,
       COALESCE(
         NULLIF(BTRIM(lo.set_by), ''),
         NULLIF(BTRIM(lo.setter), ''),
@@ -396,7 +412,7 @@ export const refreshKpiFacts = async (
       AND lo.call_date >= $1::date
       AND lo.call_date <= $2::date
       AND lo.call_date <= (CURRENT_DATE - INTERVAL '2 days')
-    GROUP BY 1,2,3
+    GROUP BY 1,2,3,4
     `,
     fromDay,
     toDay,
@@ -411,6 +427,7 @@ export const refreshKpiFacts = async (
   }
   const mondayRowsByDay = new Map<string, Array<{
     sequence_key: string;
+    source_key: string | null;
     setter: string;
     remaining: number;
   }>>();
@@ -418,6 +435,7 @@ export const refreshKpiFacts = async (
     const list = mondayRowsByDay.get(row.day_key) || [];
     list.push({
       sequence_key: row.sequence_key || MANUAL_LABEL,
+      source_key: row.source_key || null,
       setter: normalizeRep(row.setter || 'unknown'),
       remaining: Math.max(0, row.booked_total || 0),
     });
@@ -441,9 +459,14 @@ export const refreshKpiFacts = async (
       if (take <= 0) continue;
 
       const setter = candidate.setter;
+      const isSocialSource = /social|instagram|facebook|linkedin/i.test(candidate.source_key || '');
+      const mondayResolvedSequenceKey =
+        candidate.sequence_key === MANUAL_LABEL
+          ? (isSocialSource ? SOCIAL_MEDIA_BACKFILL_LABEL : MONDAY_BACKFILL_LABEL)
+          : candidate.sequence_key;
       bookingRows.push({
         day_key: dayKey,
-        sequence_key: candidate.sequence_key === MANUAL_LABEL ? MONDAY_BACKFILL_LABEL : candidate.sequence_key,
+        sequence_key: mondayResolvedSequenceKey,
         setter,
         booked_total: take,
         booked_jack: setter === 'jack' ? take : 0,
@@ -508,6 +531,7 @@ export const refreshKpiFacts = async (
       : [];
   const aliasByRawLabel = new Map(aliasRows.map((row) => [row.raw_label, row.sequence_id]));
   aliasByRawLabel.set(MONDAY_BACKFILL_LABEL, mondayBackfill.id);
+  aliasByRawLabel.set(SOCIAL_MEDIA_BACKFILL_LABEL, socialMediaBackfill.id);
   const smsBaseMap = new Map(
     smsRows.map((row) => [
       `${row.day}|${row.sequenceId}|${row.repId}`,

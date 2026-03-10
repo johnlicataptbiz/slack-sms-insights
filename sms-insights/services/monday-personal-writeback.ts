@@ -12,6 +12,15 @@ import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
 
 type PersonalSetterBucket = 'jack' | 'brandon';
 
+type ManualSyncParams = {
+  contactName: string;
+  contactPhone?: string | null;
+  eventTs?: string;
+  line?: string | null;
+  notes?: string | null;
+  setter?: PersonalSetterBucket;
+};
+
 type PersonalBoardColumnMapping = {
   callDateColumnId: string | null;
   contactNameColumnId: string | null;
@@ -150,6 +159,27 @@ const normalizeContactName = (value: string | null): string | null => {
     return null;
   }
   return trimmed;
+};
+
+const buildManualItemName = (contactName: string, eventTs: string): string => {
+  const cleaned = normalizeContactName(contactName) || 'Manual Call';
+  const callDate = resolveCallDate(eventTs);
+  return `${cleaned} - ${callDate}`;
+};
+
+const buildManualMarkdown = (params: ManualSyncParams): string => {
+  const setter = formatSetter(params.setter || 'jack');
+  const callDate = resolveCallDate(params.eventTs || new Date().toISOString());
+  return [
+    `# Manual Booking (${setter})`,
+    '',
+    `Date: ${callDate}`,
+    `Contact: ${params.contactName}`,
+    `Phone: ${params.contactPhone || 'n/a'}`,
+    `Line: ${params.line || 'manual'}`,
+    '',
+    params.notes || 'Notes: n/a',
+  ].join('\n');
 };
 
 const slackPermalink = (channelId: string, messageTs: string): string => {
@@ -296,6 +326,51 @@ const toColumnValues = (
       .join('\n'),
   );
   return values;
+};
+
+const buildManualSource = (params: ManualSyncParams): BookedCallAttributionSource => {
+  const eventTs = params.eventTs || new Date().toISOString();
+  return {
+    bookedCallId: `manual-${Date.now()}`,
+    eventTs,
+    bucket: params.setter || 'jack',
+    firstConversion: null,
+    rep: formatSetter(params.setter || 'jack'),
+    line: params.line || null,
+    contactName: params.contactName,
+    contactPhone: params.contactPhone ?? null,
+    contactEmail: null,
+    slackChannelId: 'manual',
+    slackMessageTs: `${Date.now()}`,
+    text: params.notes || null,
+  };
+};
+
+export const createManualMondayBookedCall = async (
+  params: ManualSyncParams,
+  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+): Promise<{ itemId: string }> => {
+  if (!mondayConfig.personalBoardId) {
+    throw new Error('Personal board is not configured for manual Monday write');
+  }
+
+  const boardId = mondayConfig.personalBoardId;
+  const source = buildManualSource(params);
+  const { mapping, columnsById } = await loadBoardMapping(boardId, logger);
+  const columnValues = toColumnValues(source, mapping, columnsById);
+  const itemName = buildManualItemName(source.contactName || params.contactName, source.eventTs);
+  const result = await upsertBookedCallItem(
+    boardId,
+    {
+      itemName,
+      updateMarkdown: buildManualMarkdown(params),
+      columnValues,
+      existingItemId: null,
+    },
+    logger,
+  );
+
+  return { itemId: result.itemId };
 };
 
 const pushOne = async (

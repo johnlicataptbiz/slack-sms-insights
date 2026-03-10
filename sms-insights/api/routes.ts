@@ -86,6 +86,7 @@ import {
   parseScope,
 } from '../services/monday-governed-analytics.js';
 import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
+import { createManualMondayBookedCall } from '../services/monday-personal-writeback.js';
 import { getPrismaRuntimeStatus } from '../services/prisma.js';
 import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
@@ -4244,6 +4245,65 @@ const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, o
   }
 };
 
+const handlePostManualBookedCallV2: RequestHandler = async (req, res, logger, origin) => {
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    return sendJson(res, 401, { error: 'Unauthorized' }, origin);
+  }
+
+  let body: {
+    contactName?: string;
+    contactPhone?: string;
+    eventTs?: string;
+    line?: string;
+    notes?: string;
+    setter?: 'jack' | 'brandon';
+  } = {};
+  try {
+    body = (await parseJsonBody(req)) as typeof body;
+  } catch (error) {
+    sendBodyParseError(res, origin, error);
+    return;
+  }
+
+  const contactName = body.contactName?.trim();
+  if (!contactName) {
+    return sendJson(res, 400, { error: 'contactName is required' }, origin);
+  }
+
+  try {
+    const result = await createManualMondayBookedCall(
+      {
+        contactName,
+        contactPhone: body.contactPhone ?? null,
+        eventTs: body.eventTs,
+        line: body.line ?? null,
+        notes: body.notes ?? null,
+        setter: body.setter || 'jack',
+      },
+      logger,
+    );
+
+    sendJson(
+      res,
+      200,
+      toEnvelope({ data: { status: 'synced', itemId: result.itemId }, timeZone: DEFAULT_BUSINESS_TIMEZONE }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error?.('Manual Monday booked-call sync failed', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Manual Monday create failed',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
 const handleGetMondayBoardCatalogV2: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   const staleThresholdHoursRaw = Number.parseInt(url.searchParams.get('staleThresholdHours') || '24', 10);
@@ -4547,6 +4607,7 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
   { method: 'GET', path: '/api/v2/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
   { method: 'GET', path: '/api/v2/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
+  { method: 'POST', path: '/api/v2/monday/manual-booked-call', handler: handlePostManualBookedCallV2 },
   { method: 'GET', path: '/api/admin/cron-status', handler: handleGetCronStatus },
   { method: 'GET', path: '/api/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
   { method: 'GET', path: '/api/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },

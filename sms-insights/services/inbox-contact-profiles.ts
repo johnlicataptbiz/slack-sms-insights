@@ -85,6 +85,14 @@ export type UpsertInboxContactProfileInput = {
 };
 
 const getPrisma = () => getPrismaClient();
+const toJsonParam = (value: unknown): string | null => {
+  if (value === undefined || value === null) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+};
 
 export const upsertInboxContactProfile = async (
   input: UpsertInboxContactProfileInput,
@@ -197,7 +205,7 @@ export const upsertInboxContactProfile = async (
       input.leadSource ?? null,
       input.sequenceId ?? null,
       input.dispositionStatusId ?? null,
-      input.tags ?? null,
+      toJsonParam(input.tags),
       input.textAuthorized ?? null,
       input.isBlocked ?? null,
       input.cnamCity ?? null,
@@ -219,7 +227,7 @@ export const upsertInboxContactProfile = async (
       employmentStatus,
       coachingInterest,
       input.dnc === true,
-      input.raw ?? null,
+      toJsonParam(input.raw),
     );
 
     const row = results[0];
@@ -237,6 +245,9 @@ export const getInboxContactProfileByKey = async (
   contactKey: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<InboxContactProfileRow | null> => {
+  if (!contactKey || !contactKey.trim()) {
+    return null;
+  }
   const prisma = getPrisma();
   try {
     const result = await prisma.inbox_contact_profiles.findUnique({

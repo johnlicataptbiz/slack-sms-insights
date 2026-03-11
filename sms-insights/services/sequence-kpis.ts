@@ -101,7 +101,7 @@ export const getSequenceKpis = async (
   ]);
 
   const smsLinks = await getBookedCallSmsReplyLinks(attributionSources, logger);
-  const smsSeqLookup = await getBookedCallSequenceFromSmsEvents(attributionSources, logger);
+  const smsSeqLookup = await getBookedCallSequenceFromSmsEvents(attributionSources, logger, smsLinks);
   const seqAttribution = attributeSlackBookedCallsToSequences(summary.topSequences, attributionSources, smsLinks, smsSeqLookup);
   const canonicalMap = await resolveCanonicalSequenceLabels(summary.topSequences.map((row) => row.label));
 

@@ -358,6 +358,7 @@ const SMS_SEQUENCE_LOOKBACK_DAYS = 30;
 export const getBookedCallSequenceFromSmsEvents = async (
   calls: BookedCallAttributionSource[],
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  replyLinks: Map<string, BookedCallSmsReplyLink> = new Map(),
 ): Promise<Map<string, BookedCallSmsSequenceLookup>> => {
   const results = new Map<string, BookedCallSmsSequenceLookup>();
   if (calls.length === 0) return results;
@@ -377,7 +378,13 @@ export const getBookedCallSequenceFromSmsEvents = async (
     const bookingTs = new Date(call.eventTs).getTime();
     if (!Number.isFinite(bookingTs)) continue;
 
-    const entry = { bookedCallId: call.bookedCallId, bookingTs };
+    const sourceKey = bookedCallSourceKey(call);
+    const replyLink = replyLinks.get(sourceKey);
+    const replyTs = replyLink?.latestReplyAt ? new Date(replyLink.latestReplyAt).getTime() : NaN;
+    const targetTs =
+      replyLink?.hasPriorReply && Number.isFinite(replyTs) ? replyTs : bookingTs;
+
+    const entry = { bookedCallId: call.bookedCallId, bookingTs: targetTs };
 
     // Email is primary — always add to email map when available (email → profile → phone is most accurate).
     if (call.contactEmail) {

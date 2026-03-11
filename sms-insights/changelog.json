@@ -1,8 +1,44 @@
 {
-  "generatedAt": "2026-03-11T05:31:42.355Z",
+  "generatedAt": "2026-03-11T15:07:48.234Z",
   "daysIncluded": 365,
-  "totalCount": 344,
+  "totalCount": 348,
   "entries": [
+    {
+      "hash": "5050ca5",
+      "date": "2026-03-11T10:05:49-05:00",
+      "message": "Remove Monday coverage and booking rate panels",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Integrations",
+      "description": "Remove Monday coverage and booking rate panels"
+    },
+    {
+      "hash": "b37cb5c",
+      "date": "2026-03-11T01:11:05-05:00",
+      "message": "Replace react-mentions and clear audit warnings",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Replace react-mentions and clear audit warnings"
+    },
+    {
+      "hash": "eda01f7",
+      "date": "2026-03-11T00:58:34-05:00",
+      "message": "Reduce inbox bundle size and align Node 22",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Reduce inbox bundle size and align Node 22"
+    },
+    {
+      "hash": "f4db81b",
+      "date": "2026-03-11T00:40:02-05:00",
+      "message": "Fix attribution KPIs and deploy readiness",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Fix attribution KPIs and deploy readiness"
+    },
     {
       "hash": "d308238",
       "date": "2026-03-10T15:40:21-05:00",

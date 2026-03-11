@@ -1,11 +1,11 @@
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { V2Panel, V2State } from './components/V2Primitives';
 import V2Shell from './layout/V2Shell';
-import InboxV2 from './pages/InboxV2';
 import InsightsV2 from './pages/InsightsV2';
 import RunsV2 from './pages/RunsV2';
 import SequencesV2 from './pages/SequencesV2';
@@ -97,7 +97,9 @@ function AnimatedRoutes() {
             path="inbox"
             element={
               <ErrorBoundary fallback={<PageErrorFallback />}>
-                <InboxV2 />
+                <Suspense fallback={<V2Panel title="Inbox" caption="Loading messages..."><V2State kind="loading">Loading inbox…</V2State></V2Panel>}>
+                  <InboxV2 />
+                </Suspense>
               </ErrorBoundary>
             }
           />
@@ -161,3 +163,4 @@ export default function V2App() {
     </ErrorBoundary>
   );
 }
+const InboxV2 = lazy(() => import('./pages/InboxV2'));

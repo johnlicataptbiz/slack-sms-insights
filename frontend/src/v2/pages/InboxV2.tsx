@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,7 @@ import {
   parseISO,
 } from "date-fns";
 import { useForm } from "react-hook-form";
-import EmojiPicker, { type EmojiClickData } from "emoji-picker-react";
+import type { EmojiClickData } from "emoji-picker-react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import Linkify from "linkify-react";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -67,6 +67,8 @@ import { V2Select, type V2SelectOption } from "../components/V2Select";
 import { V2State } from "../components/V2Primitives";
 import { SkeletonText } from "../components/Skeleton";
 import { useToast } from "../hooks/useToast";
+
+const LazyEmojiPicker = lazy(async () => ({ default: (await import("emoji-picker-react")).default }));
 
 const parseDateValue = (value: string): Date | null => {
   const parsed = parseISO(value);
@@ -3190,13 +3192,15 @@ export default function InboxV2() {
                             </button>
                             {isEmojiPickerOpen ? (
                               <div className="V2Inbox__emojiPopover">
-                                <EmojiPicker
-                                  width={300}
-                                  height={360}
-                                  lazyLoadEmojis
-                                  searchDisabled={false}
-                                  onEmojiClick={onAppendEmoji}
-                                />
+                                <Suspense fallback={<div className="V2Inbox__emojiLoading">Loading…</div>}>
+                                  <LazyEmojiPicker
+                                    width={300}
+                                    height={360}
+                                    lazyLoadEmojis
+                                    searchDisabled={false}
+                                    onEmojiClick={onAppendEmoji}
+                                  />
+                                </Suspense>
                               </div>
                             ) : null}
                           </div>

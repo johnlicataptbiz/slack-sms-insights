@@ -63,7 +63,6 @@
     "react-dom": "^19.2.4",
     "react-hook-form": "^7.71.2",
     "react-hotkeys-hook": "^5.2.4",
-    "react-mentions": "^4.4.10",
     "react-resizable-panels": "^4.7.0",
     "react-router-dom": "^7.13.0",
     "react-textarea-autosize": "^8.5.9",
@@ -83,9 +82,8 @@
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@types/react-mentions": "^4.4.1",
     "@types/three": "^0.183.1",
-    "@vercel/node": "^5.6.4",
+    "@vercel/node": "^5.6.15",
     "@vitejs/plugin-react": "^5.1.4",
     "autoprefixer": "^10.4.24",
     "jsdom": "^28.1.0",
@@ -95,5 +93,11 @@
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
     "vitest": "^4.0.18"
+  },
+  "overrides": {
+    "minimatch": "10.2.4",
+    "path-to-regexp": "8.3.0",
+    "undici": "7.22.0",
+    "ajv": "8.18.0"
   }
 }

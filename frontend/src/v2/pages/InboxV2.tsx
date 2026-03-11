@@ -17,7 +17,6 @@ import type { EmojiClickData } from "emoji-picker-react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import Linkify from "linkify-react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Mention, MentionsInput } from "react-mentions";
 import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
 import { z } from "zod";
 import {
@@ -360,75 +359,132 @@ const TEMPLATE_VARIABLE_MENTIONS = [
   { id: "{{calendly}}", display: "{{calendly}}" },
 ];
 
-const templateMentionsInputStyle = {
-  control: {
-    minHeight: 64,
-    border: "1px solid rgba(7, 19, 36, 0.14)",
-    borderRadius: 8,
-    background: "rgba(255, 255, 255, 0.95)",
-    fontSize: 13,
-    fontFamily: "inherit",
-  },
-  highlighter: {
-    padding: "0.45rem 0.55rem",
-  },
-  input: {
-    margin: 0,
-    padding: "0.45rem 0.55rem",
-    outline: 0,
-    border: 0,
-    minHeight: 64,
-  },
-  suggestions: {
-    list: {
-      backgroundColor: "#ffffff",
-      border: "1px solid rgba(7, 19, 36, 0.14)",
-      borderRadius: 8,
-      fontSize: 12,
-      boxShadow: "0 12px 24px rgba(7, 19, 36, 0.16)",
-    },
-    item: {
-      padding: "6px 10px",
-      borderBottom: "1px solid rgba(7, 19, 36, 0.08)",
-    },
-  },
-} as const;
+type MentionOption = { id: string; display: string };
+type MentionConfig = { trigger: "@" | "/"; data: MentionOption[] };
 
-const composerMentionsInputStyle = {
-  control: {
-    minHeight: 60,
-    border: "1px solid color-mix(in srgb, var(--v2-accent) 28%, var(--v2-border) 72%)",
-    borderRadius: 12,
-    background: "linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(250, 253, 255, 0.92))",
-    fontSize: 14,
-    fontFamily: "inherit",
-  },
-  highlighter: {
-    padding: "0.65rem 0.8rem",
-  },
-  input: {
-    margin: 0,
-    padding: "0.65rem 0.8rem",
-    outline: 0,
-    border: 0,
-    minHeight: 60,
-    maxHeight: 220,
-  },
-  suggestions: {
-    list: {
-      backgroundColor: "#ffffff",
-      border: "1px solid rgba(7, 19, 36, 0.14)",
-      borderRadius: 8,
-      fontSize: 12,
-      boxShadow: "0 12px 24px rgba(7, 19, 36, 0.16)",
-      zIndex: 42,
-    },
-    item: {
-      padding: "6px 10px",
-      borderBottom: "1px solid rgba(7, 19, 36, 0.08)",
-    },
-  },
-} as const;
+const mentionConfigs: MentionConfig[] = [
+  { trigger: "@", data: TEMPLATE_OWNER_MENTIONS },
+  { trigger: "/", data: TEMPLATE_VARIABLE_MENTIONS },
+];
+
+const matchMention = (value: string, caret: number) => {
+  const upToCaret = value.slice(0, caret);
+  const atIndex = upToCaret.lastIndexOf("@");
+  const slashIndex = upToCaret.lastIndexOf("/");
+  const triggerIndex = Math.max(atIndex, slashIndex);
+  if (triggerIndex === -1) return null;
+
+  const trigger = upToCaret[triggerIndex] as "@" | "/";
+  const query = upToCaret.slice(triggerIndex + 1);
+  if (query.includes(" ") || query.includes("\n")) return null;
+  return { trigger, query, start: triggerIndex, end: caret };
+};
+
+const filterMentions = (config: MentionConfig, query: string) => {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return config.data;
+  return config.data.filter((item) => item.display.toLowerCase().includes(normalized));
+};
+
+type MentionTextareaProps = {
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  className?: string;
+  inputRef?: (element: HTMLTextAreaElement | null) => void;
+};
+
+const MentionTextarea = ({ value, onChange, placeholder, className, inputRef }: MentionTextareaProps) => {
+  const [active, setActive] = useState<null | { trigger: "@" | "/"; query: string; start: number; end: number }>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const suggestions = useMemo(() => {
+    if (!active) return [];
+    const config = mentionConfigs.find((item) => item.trigger === active.trigger);
+    if (!config) return [];
+    return filterMentions(config, active.query).slice(0, 6);
+  }, [active]);
+
+  const updateMentionState = (nextValue: string, caret: number) => {
+    const next = matchMention(nextValue, caret);
+    setActive(next);
+    setActiveIndex(0);
+  };
+
+  const handleChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const nextValue = event.target.value;
+    const caret = event.target.selectionStart ?? nextValue.length;
+    onChange(nextValue);
+    updateMentionState(nextValue, caret);
+  };
+
+  const applyMention = (option: MentionOption) => {
+    if (!active) return;
+    const before = value.slice(0, active.start);
+    const after = value.slice(active.end);
+    const insertion = option.display;
+    const nextValue = `${before}${insertion} ${after}`;
+    onChange(nextValue);
+    setActive(null);
+    setActiveIndex(0);
+    requestAnimationFrame(() => {
+      if (!textareaRef.current) return;
+      const caret = before.length + insertion.length + 1;
+      textareaRef.current.focus();
+      textareaRef.current.setSelectionRange(caret, caret);
+    });
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!active || suggestions.length === 0) return;
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((prev) => (prev + 1) % suggestions.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+    } else if (event.key === "Enter" || event.key === "Tab") {
+      event.preventDefault();
+      applyMention(suggestions[activeIndex]);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setActive(null);
+    }
+  };
+
+  const setRef = (element: HTMLTextAreaElement | null) => {
+    textareaRef.current = element;
+    if (inputRef) inputRef(element);
+  };
+
+  return (
+    <div className="V2Inbox__mentionWrap">
+      <textarea
+        ref={setRef}
+        className={className}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+      />
+      {active && suggestions.length > 0 ? (
+        <div className="V2Inbox__mentionPopover">
+          {suggestions.map((item, index) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`V2Inbox__mentionItem ${index === activeIndex ? "is-active" : ""}`}
+              onClick={() => applyMention(item)}
+            >
+              {item.display}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 const assignSchema = z.object({
   ownerLabel: z.string().trim().max(80, "Owner name is too long"),
@@ -2881,14 +2937,13 @@ export default function InboxV2() {
                         </div>
                       )}
                       <div className="V2Inbox__chatInputRow">
-                        <MentionsInput
-                          inputRef={(element: HTMLTextAreaElement | null) => {
+                        <MentionTextarea
+                          inputRef={(element) => {
                             composerRef.current = element;
                           }}
                           className="V2Inbox__chatInput"
-                          style={composerMentionsInputStyle}
                           value={composerText}
-                          onChange={(_event, nextText) => {
+                          onChange={(nextText) => {
                             setComposerText(nextText);
                             setSendStatus((prev) =>
                               prev === "sent" || prev === "error"
@@ -2909,27 +2964,7 @@ export default function InboxV2() {
                             }
                           }}
                           placeholder="Type your message... use @ for owners, / for variables, Cmd/Ctrl+Enter to send"
-                          allowSuggestionsAboveCursor
-                        >
-                          <Mention
-                            trigger="@"
-                            data={TEMPLATE_OWNER_MENTIONS}
-                            markup="__display__"
-                            displayTransform={(id: string, display: string) =>
-                              display || id
-                            }
-                            appendSpaceOnAdd
-                          />
-                          <Mention
-                            trigger="/"
-                            data={TEMPLATE_VARIABLE_MENTIONS}
-                            markup="__display__"
-                            displayTransform={(id: string, display: string) =>
-                              display || id
-                            }
-                            appendSpaceOnAdd
-                          />
-                        </MentionsInput>
+                        />
                         <div className="V2Inbox__chatActions">
                           <button
                             type="button"
@@ -3122,11 +3157,10 @@ export default function InboxV2() {
                                       }
                                       placeholder="Template name…"
                                     />
-                                    <MentionsInput
+                                    <MentionTextarea
                                       className="V2Inbox__templateBodyInput"
-                                      style={templateMentionsInputStyle}
                                       value={newTemplateBody}
-                                      onChange={(_event, newValue) =>
+                                      onChange={(newValue) =>
                                         templateForm.setValue(
                                           "body",
                                           newValue,
@@ -3134,30 +3168,7 @@ export default function InboxV2() {
                                         )
                                       }
                                       placeholder="Message body... use / for variables and @ for owner tags"
-                                      allowSuggestionsAboveCursor
-                                      forceSuggestionsAboveCursor
-                                    >
-                                      <Mention
-                                        trigger="@"
-                                        data={TEMPLATE_OWNER_MENTIONS}
-                                        markup="__display__"
-                                        displayTransform={(
-                                          id: string,
-                                          display: string,
-                                        ) => display || id}
-                                        appendSpaceOnAdd
-                                      />
-                                      <Mention
-                                        trigger="/"
-                                        data={TEMPLATE_VARIABLE_MENTIONS}
-                                        markup="__display__"
-                                        displayTransform={(
-                                          id: string,
-                                          display: string,
-                                        ) => display || id}
-                                        appendSpaceOnAdd
-                                      />
-                                    </MentionsInput>
+                                    />
                                     <button
                                       type="button"
                                       className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"

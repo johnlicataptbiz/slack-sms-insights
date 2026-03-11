@@ -3528,6 +3528,11 @@
   align-items: flex-start;
 }
 
+.V2Inbox__mentionWrap {
+  position: relative;
+  flex: 1;
+}
+
 .V2Inbox__chatInput {
   flex: 1;
   min-height: 60px;
@@ -3539,6 +3544,40 @@
   padding: 0.65rem 0.8rem;
   resize: none;
   outline: none;
+}
+
+.V2Inbox__mentionPopover {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  width: min(320px, 100%);
+  background: #ffffff;
+  border: 1px solid rgba(7, 19, 36, 0.14);
+  border-radius: 10px;
+  box-shadow: 0 14px 28px rgba(7, 19, 36, 0.18);
+  padding: 0.35rem;
+  gap: 0.2rem;
+  z-index: 45;
+}
+
+.V2Inbox__mentionItem {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  text-align: left;
+  padding: 0.4rem 0.55rem;
+  font: 600 0.78rem/1.2 var(--v2-font-ui);
+  color: var(--v2-text);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.V2Inbox__mentionItem.is-active,
+.V2Inbox__mentionItem:hover {
+  background: rgba(38, 132, 255, 0.12);
+  color: #1d4ed8;
 }
 
 .V2Inbox__chatInput:focus {

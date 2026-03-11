@@ -3,7 +3,7 @@ import type { RunOutlierAnnotation } from '../services/daily-report-summary.js';
 import type { WeeklyManagerSummary } from '../services/weekly-manager-summary.js';
 import type { UnattributedAuditRow } from '../services/sequence-booked-attribution.js';
 
-export type RequestedMode = 'day' | 'range' | 'from-to';
+export type RequestedMode = 'day' | 'range' | 'from-to' | 'snapshot';
 
 export type ApiEnvelopeMeta = {
   schemaVersion: '2026.1';

@@ -32,6 +32,15 @@ export type SequenceKpiRow = {
 export type SequenceKpis = {
   items: SequenceKpiRow[];
   window: { from: string; to: string; timeZone: string };
+  verification: {
+    slackBookedTotal: number;
+    matchedCalls: number;
+    unattributedCalls: number;
+    manualDirectBooked: number;
+    manualDirectSharePct: number;
+    smsPhoneMatchedCalls: number;
+    fuzzyTextMatchedCalls: number;
+  };
 };
 
 const getPrisma = () => getPrismaClient();
@@ -117,9 +126,12 @@ export const getSequenceKpis = async (
     {
       label: string;
       messagesSent: number;
+      uniqueContacted: number;
       repliesReceived: number;
       optOuts: number;
       bookingSignalsSms: number;
+      bookingSignals: number;
+      bookedCalls: number;
       firstSeenAt?: string | null;
     }
   >();
@@ -127,21 +139,28 @@ export const getSequenceKpis = async (
   for (const row of summary.topSequences) {
     const canonical = canonicalMap.get(row.label) ?? row.label;
     const existing = aggregated.get(canonical);
+    const uniqueContacted = row.uniqueContacted ?? 0;
     if (!existing) {
       aggregated.set(canonical, {
         label: canonical,
         messagesSent: row.messagesSent,
+        uniqueContacted,
         repliesReceived: row.repliesReceived,
         optOuts: row.optOuts,
         bookingSignalsSms: row.bookingSignalsSms,
+        bookingSignals: row.bookingSignalsSms,
+        bookedCalls: row.booked ?? 0,
         firstSeenAt: row.firstSeenAt ?? null,
       });
       continue;
     }
     existing.messagesSent += row.messagesSent;
+    existing.uniqueContacted += uniqueContacted;
     existing.repliesReceived += row.repliesReceived;
     existing.optOuts += row.optOuts;
     existing.bookingSignalsSms += row.bookingSignalsSms;
+    existing.bookingSignals += row.bookingSignalsSms;
+    existing.bookedCalls += row.booked ?? 0;
     if (row.firstSeenAt && (!existing.firstSeenAt || row.firstSeenAt < existing.firstSeenAt)) {
       existing.firstSeenAt = row.firstSeenAt;
     }
@@ -155,7 +174,7 @@ export const getSequenceKpis = async (
     bookingSignals: 0,
     bookedCalls: 0,
   };
-  for (const stat of summary.values()) {
+  for (const stat of aggregated.values()) {
     aggregatedTotals.messagesSent += stat.messagesSent;
     aggregatedTotals.uniqueContacted += stat.uniqueContacted;
     aggregatedTotals.repliesReceived += stat.repliesReceived;
@@ -164,7 +183,7 @@ export const getSequenceKpis = async (
     aggregatedTotals.bookedCalls += stat.bookedCalls;
   }
 
-  const manualDirectBooked = sequenceBookedAttribution.totals.manualCalls;
+  const manualDirectBooked = seqAttribution.totals.manualCalls;
   const slackBookedTotal = aggregatedTotals.bookedCalls;
 
   const items: SequenceKpiRow[] = Array.from(aggregated.values()).map((row) => {
@@ -202,12 +221,12 @@ export const getSequenceKpis = async (
 
   const verification = {
     slackBookedTotal,
-    matchedCalls: sequenceBookedAttribution.totals.matchedCalls,
-    unattributedCalls: sequenceBookedAttribution.totals.unattributedCalls,
+    matchedCalls: seqAttribution.totals.matchedCalls,
+    unattributedCalls: seqAttribution.totals.unattributedCalls,
     manualDirectBooked,
     manualDirectSharePct: slackBookedTotal > 0 ? (manualDirectBooked / slackBookedTotal) * 100 : 0,
-    smsPhoneMatchedCalls: sequenceBookedAttribution.totals.smsPhoneMatchedCalls,
-    fuzzyTextMatchedCalls: sequenceBookedAttribution.totals.fuzzyTextMatchedCalls,
+    smsPhoneMatchedCalls: seqAttribution.totals.smsPhoneMatchedCalls,
+    fuzzyTextMatchedCalls: seqAttribution.totals.fuzzyTextMatchedCalls,
   };
 
   return {

@@ -1,4 +1,4 @@
-export type RequestedMode = 'day' | 'range' | 'from-to';
+export type RequestedMode = 'day' | 'range' | 'from-to' | 'snapshot';
 
 export type ApiEnvelopeMeta = {
   schemaVersion: '2026.1';

@@ -284,11 +284,13 @@ const register = (app: App) => {
       return;
     }
 
+    const setterBucket: 'jack' | 'brandon' =
+      parts[2] && parts[2].toLowerCase() === "brandon" ? "brandon" : "jack";
+
     const payload = {
       contactName,
       contactPhone: parts[1] || undefined,
-      setter:
-        parts[2] && parts[2].toLowerCase() === "brandon" ? "brandon" : "jack",
+      setter: setterBucket,
       line: parts[3] || undefined,
       notes: parts[4] || undefined,
     };

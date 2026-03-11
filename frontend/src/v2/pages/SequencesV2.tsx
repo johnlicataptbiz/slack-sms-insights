@@ -82,14 +82,6 @@ export default function SequencesV2() {
   }, [data]);
 
   const bookingRatePct = totals && totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0;
-  const coverageStats = data
-    ? [
-        { label: 'Source coverage', value: data.monday.avgSourceCoveragePct },
-        { label: 'Campaign coverage', value: data.monday.avgCampaignCoveragePct },
-        { label: 'Set-by coverage', value: data.monday.avgSetByCoveragePct },
-        { label: 'Touchpoints coverage', value: data.monday.avgTouchpointsCoveragePct },
-      ]
-    : [];
   const verification = data?.verification ?? {
     slackBookedTotal: 0,
     mondayBookedTotal: 0,
@@ -157,60 +149,6 @@ export default function SequencesV2() {
             />
             <V2MetricCard label="Opt-outs" value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
             <V2MetricCard label="Monday boards behind" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
-          </div>
-
-          <div className="V2Grid V2Grid--2">
-            <V2Panel title="Monday coverage" caption="Freshness and completeness for each coverage field.">
-              <div className="V2SplitStat">
-                <div>
-                  <span>Boards</span>
-                  <strong>{fmtInt(data.monday.boards)}</strong>
-                </div>
-                <div>
-                  <span>Behind</span>
-                  <strong>{fmtInt(data.monday.staleBoards)}</strong>
-                </div>
-                <div>
-                  <span>Errors</span>
-                  <strong>{fmtInt(data.monday.erroredBoards)}</strong>
-                </div>
-              </div>
-              <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
-                {coverageStats.map((stat) => (
-                  <div key={stat.label}>
-                    <span>{stat.label}</span>
-                    <strong>{fmtPct(stat.value)}</strong>
-                  </div>
-                ))}
-              </div>
-            </V2Panel>
-
-            <V2Panel title="Booking rate" caption="Booking efficiency plus manual contributions.">
-              <div className="V2SplitStat">
-                <div>
-                  <span>Booking rate</span>
-                  <strong>{fmtPct(bookingRatePct)}</strong>
-                </div>
-                <div>
-                  <span>Manual / direct share</span>
-                  <strong>{fmtPct(verification.manualDirectSharePct ?? 0)}</strong>
-                </div>
-                <div>
-                  <span>Slack vs Monday delta</span>
-                  <strong>{fmtInt(verification.deltaBookedVsMonday ?? 0)}</strong>
-                </div>
-              </div>
-              <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
-                <div>
-                  <span>Manual booked calls</span>
-                  <strong>{fmtInt(verification.manualDirectBooked ?? 0)}</strong>
-                </div>
-                <div>
-                  <span>SMS conversations mapped</span>
-                  <strong>{fmtInt(verification.attributionConversationMapped ?? 0)}</strong>
-                </div>
-              </div>
-            </V2Panel>
           </div>
 
           <V2Panel title="Verification snapshot" caption="Slack totals, Monday totals, and fallback cues.">

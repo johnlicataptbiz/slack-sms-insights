@@ -8002,3 +8002,68 @@ display: inline-block;
   font-weight: 700;
   color: var(--v2-text);
 }
+
+
+/* =============================================================
+   Brand Asset Utilities - HubSpot CDN assets
+   ============================================================= */
+
+/* Sidebar: flex column so hero banner is pushed to bottom */
+.V2Shell__sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Nav takes remaining space, pushing hero banner down */
+.V2Shell__nav {
+  flex: 1;
+}
+
+/* Sidebar pattern overlay (absolutely positioned, low opacity) */
+.V2Shell__sidebarPattern {
+  position: absolute;
+  inset: 0;
+  background-size: 180px auto;
+  background-repeat: repeat;
+  opacity: 0.07;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Sidebar hero banner strip at bottom */
+.V2Shell__sidebarHeroBanner {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 56px;
+  object-fit: cover;
+  object-position: center;
+  flex-shrink: 0;
+  opacity: 0.82;
+  position: relative;
+  z-index: 1;
+}
+
+/* Page-level hero banner */
+.V2PageHeroBanner {
+  display: block;
+  width: 100%;
+  height: 88px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: var(--v2-radius-lg);
+  margin-bottom: 1.5rem;
+  opacity: 0.92;
+  box-shadow: 0 4px 20px rgba(8, 12, 29, 0.1);
+}
+
+/* Generic brand divider image */
+.V2BrandDivider {
+  display: block;
+  width: 100%;
+  max-height: 44px;
+  object-fit: contain;
+  margin: 1.5rem 0;
+  opacity: 0.7;
+}

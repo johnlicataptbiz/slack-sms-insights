@@ -8,6 +8,8 @@ import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
 import { AttributionHealthPanel } from '../components/AttributionHealthPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
 
+const smsBannerUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/smsbanner1.png';
+
 type Range = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
 
 const fmtInt = (n: number) => n.toLocaleString();
@@ -114,6 +116,7 @@ export function InsightsV2() {
 
   return (
     <div className="V2Page">
+      <img className="V2PageHeroBanner" src={smsBannerUrl} alt="" aria-hidden="true" />
       <V2PageHeader
         title="Performance"
         subtitle="Team and setter results, what needs attention, and Monday board health."

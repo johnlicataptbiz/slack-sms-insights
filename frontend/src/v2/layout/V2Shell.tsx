@@ -22,7 +22,9 @@ const navItems: NavItem[] = [
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: '⟐' },
 ];
 
-const brandLogoUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/smslogofinal.png';
+const brandLogoUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/logo1sms.png';
+const patternUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/patternsms.png';
+const heroBannerUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/herobannersms.png';
 const mobileMediaQuery = '(max-width: 1080px)';
 const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
 
@@ -201,6 +203,13 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
+          {/* Brand pattern overlay */}
+          <div
+            className="V2Shell__sidebarPattern"
+            style={{ backgroundImage: `url(${patternUrl})` }}
+            aria-hidden="true"
+          />
+
           <div className="V2Shell__sidebarBrand">
             <img className="V2Shell__sidebarLogo" src={brandLogoUrl} alt="PT Biz SMS" />
           </div>
@@ -252,6 +261,13 @@ export default function V2Shell({ children }: { children: ReactNode }) {
               })}
             </motion.div>
           </nav>
+          {/* Hero banner strip at bottom of sidebar */}
+          <img
+            className="V2Shell__sidebarHeroBanner"
+            src={heroBannerUrl}
+            alt=""
+            aria-hidden="true"
+          />
         </motion.aside>
 
         <main className="V2Shell__content">{children}</main>

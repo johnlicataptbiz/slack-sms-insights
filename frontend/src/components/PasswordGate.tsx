@@ -6,7 +6,11 @@ import { ApiError, client } from '../api/client';
 import './PasswordGate.css';
 
 const brandLogoUrl =
-  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/smslogofinal.png';
+  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/logo1sms.png';
+const banner2Url =
+  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/banner2.png';
+const divider2Url =
+  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/divider2.png';
 
 // Floating orb component for background ambiance
 function FloatingOrb({ delay, x, y, size, color }: { delay: number; x: string; y: string; size: number; color: string }) {
@@ -82,6 +86,14 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       >
+        {/* Brand banner */}
+        <img
+          className="PasswordGate__banner"
+          src={banner2Url}
+          alt=""
+          aria-hidden="true"
+        />
+
         {/* Logo */}
         <motion.img
           className="PasswordGate__logo"
@@ -195,6 +207,14 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
             </motion.p>
           ) : null}
         </AnimatePresence>
+
+        {/* Brand divider */}
+        <img
+          className="PasswordGate__divider"
+          src={divider2Url}
+          alt=""
+          aria-hidden="true"
+        />
 
         {/* Footer */}
         <motion.p

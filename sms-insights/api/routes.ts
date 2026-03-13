@@ -170,6 +170,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 const DEFAULT_ALLOWED_ORIGINS = [
   'https://ptbizsms.com',
   'https://www.ptbizsms.com',
+  'https://ptbizsms-dashboard.vercel.app',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',

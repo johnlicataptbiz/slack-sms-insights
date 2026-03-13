@@ -1,6 +1,7 @@
 {
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
+  "alias": ["ptbizsms-dashboard.vercel.app"],
   "rewrites": [
     {
       "source": "/api/:path*",

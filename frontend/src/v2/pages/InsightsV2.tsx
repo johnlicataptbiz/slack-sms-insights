@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { MessageSquare, Users, Reply, Percent, Phone, CalendarCheck, UserMinus, TrendingDown, Share2, LayoutGrid } from 'lucide-react';
 
 import { useV2InsightsSummary, useV2SalesMetrics } from '../../api/v2Queries';
 import type { BookedCredit } from '../../api/v2-types';
@@ -7,6 +8,15 @@ import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Pr
 import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
 import { AttributionHealthPanel } from '../components/AttributionHealthPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
+
+function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      {icon}
+      {children}
+    </span>
+  );
+}
 
 const smsBannerUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/smsbanner1.png';
 
@@ -143,31 +153,31 @@ export function InsightsV2() {
       ) : null}
 
       <section className="V2MetricsGrid V2MetricsGrid--compact">
-        <V2MetricCard label="Messages sent" value={fmtInt(data.kpis.messagesSent)} />
-        <V2MetricCard label="People reached" value={fmtInt(data.kpis.uniqueContacted)} />
-        <V2MetricCard label="Replies" value={fmtInt(data.kpis.repliesReceived)} />
+        <V2MetricCard label={<IconLabel icon={<MessageSquare size={11} />}>Messages sent</IconLabel>} value={fmtInt(data.kpis.messagesSent)} />
+        <V2MetricCard label={<IconLabel icon={<Users size={11} />}>People reached</IconLabel>} value={fmtInt(data.kpis.uniqueContacted)} />
+        <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Replies</IconLabel>} value={fmtInt(data.kpis.repliesReceived)} />
         <V2MetricCard
-          label="Reply rate"
+          label={<IconLabel icon={<Percent size={11} />}>Reply rate</IconLabel>}
           value={fmtPct(data.kpis.replyRatePct)}
           tone={data.kpis.replyRatePct >= 10 ? 'positive' : 'default'}
         />
-        <V2MetricCard label="Booked calls" value={fmtInt(data.kpis.bookedCalls)} tone="positive" />
+        <V2MetricCard label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>} value={fmtInt(data.kpis.bookedCalls)} tone="positive" />
         <V2MetricCard
-          label="Booking rate"
+          label={<IconLabel icon={<CalendarCheck size={11} />}>Booking rate</IconLabel>}
           value={fmtPct(data.kpis.bookingRatePct)}
           tone={data.kpis.bookingRatePct >= 2 ? 'positive' : data.kpis.bookingRatePct <= 1 ? 'critical' : 'default'}
         />
-        <V2MetricCard label="Manual share (Slack)" value={fmtPct(manualSharePct)} />
+        <V2MetricCard label={<IconLabel icon={<Share2 size={11} />}>Manual share (Slack)</IconLabel>} value={fmtPct(manualSharePct)} />
         {mondayCoverageCards.map((card) => (
-          <V2MetricCard key={card.label} label={card.label} value={fmtPct(card.value)} />
+          <V2MetricCard key={card.label} label={<IconLabel icon={<LayoutGrid size={11} />}>{card.label}</IconLabel>} value={fmtPct(card.value)} />
         ))}
         <V2MetricCard
-          label="Opt-outs"
+          label={<IconLabel icon={<UserMinus size={11} />}>Opt-outs</IconLabel>}
           value={fmtInt(data.kpis.optOuts)}
           tone={data.kpis.optOuts > 0 ? 'critical' : 'default'}
         />
         <V2MetricCard
-          label="Opt-out rate"
+          label={<IconLabel icon={<TrendingDown size={11} />}>Opt-out rate</IconLabel>}
           value={fmtPct(data.kpis.optOutRatePct)}
           tone={data.kpis.optOutRatePct >= 3 ? 'critical' : 'default'}
         />

@@ -1,7 +1,8 @@
 import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Drawer } from 'vaul';
+import { BarChart2, Inbox, Activity, GitBranch, LogOut, BookOpen, Menu, X } from 'lucide-react';
 
 import { client } from '../../api/client';
 import { V2_TERM_DEFINITIONS, V2_TERM_GROUPS, v2Copy } from '../copy';
@@ -12,14 +13,14 @@ type NavItem = {
   to: string;
   label: string;
   shortLabel: string;
-  icon: string;
+  icon: ReactNode;
 };
 
 const navItems: NavItem[] = [
-  { to: '/v2/insights', label: v2Copy.nav.insights, shortLabel: 'Insights', icon: '◉' },
-  { to: '/v2/inbox', label: v2Copy.nav.inbox, shortLabel: 'Inbox', icon: '✉' },
-  { to: '/v2/runs', label: v2Copy.nav.runs, shortLabel: 'Runs', icon: '◌' },
-  { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: '⟐' },
+  { to: '/v2/insights', label: v2Copy.nav.insights, shortLabel: 'Insights', icon: <BarChart2 size={16} /> },
+  { to: '/v2/inbox', label: v2Copy.nav.inbox, shortLabel: 'Inbox', icon: <Inbox size={16} /> },
+  { to: '/v2/runs', label: v2Copy.nav.runs, shortLabel: 'Runs', icon: <Activity size={16} /> },
+  { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: <GitBranch size={16} /> },
 ];
 
 const brandLogoUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/logo1sms.png';
@@ -121,20 +122,31 @@ export default function V2Shell({ children }: { children: ReactNode }) {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              <motion.span
-                animate={{
-                  rotate: isMenuOpen ? 45 : 0,
-                  y: isMenuOpen ? 8 : 0,
-                }}
-                transition={{ duration: 0.2 }}
-              />
-              <motion.span
-                animate={{
-                  rotate: isMenuOpen ? -45 : 0,
-                  y: isMenuOpen ? -8 : 0,
-                }}
-                transition={{ duration: 0.2 }}
-              />
+              <AnimatePresence mode="wait" initial={false}>
+                {isMenuOpen ? (
+                  <motion.span
+                    key="close"
+                    initial={{ rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    style={{ display: 'flex' }}
+                  >
+                    <X size={18} />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="open"
+                    initial={{ rotate: 90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: -90, opacity: 0 }}
+                    transition={{ duration: 0.15 }}
+                    style={{ display: 'flex' }}
+                  >
+                    <Menu size={18} />
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </motion.button>
           ) : null}
 
@@ -181,6 +193,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             }}
             whileTap={{ scale: 0.95 }}
           >
+            <BookOpen size={13} />
             {v2Copy.actions.kpiDefinitions}
           </motion.button>
           <motion.button
@@ -190,6 +203,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
+            <LogOut size={13} />
             Sign out
           </motion.button>
         </div>
@@ -287,6 +301,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         whileTap={{ scale: 0.9 }}
         transition={springs.bouncy}
       >
+        <BookOpen size={14} />
         {v2Copy.actions.kpiDefinitions}
       </motion.button>
 
@@ -342,7 +357,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                 whileHover={{ scale: 1.1, rotate: 90 }}
                 whileTap={{ scale: 0.9 }}
               >
-                {v2Copy.actions.close}
+                <X size={18} />
               </motion.button>
             </div>
             <Drawer.Description className="V2DefsDrawer__summary">

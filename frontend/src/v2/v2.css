@@ -84,13 +84,16 @@
 }
 
 .V2Shell__menuButton {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 46px;
   height: 40px;
   border: 1px solid rgba(9, 20, 36, 0.14);
   border-radius: var(--v2-radius-sm);
   background: rgba(255, 255, 255, 0.7);
   cursor: pointer;
+  color: var(--v2-text);
 }
 
 .V2Shell__menuButton span {
@@ -178,6 +181,9 @@
 }
 
 .V2Shell__modeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid rgba(8, 12, 29, 0.16);
   border-radius: 999px;
   padding: 0.55rem 1rem;
@@ -195,6 +201,9 @@
 }
 
 .V2Shell__defsButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid rgba(17, 184, 214, 0.4);
   border-radius: 999px;
   padding: 0.55rem 1rem;
@@ -218,6 +227,8 @@
   box-shadow: var(--v2-shadow-1);
   cursor: pointer;
   display: none;
+  align-items: center;
+  gap: 6px;
 }
 
 .V2Shell__body {
@@ -733,6 +744,9 @@
   font-size: 0.67rem;
   font-weight: 800;
   color: var(--v2-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .V2MetricCard__value {
@@ -1418,6 +1432,16 @@
   color: var(--v2-muted);
 }
 
+.V2State__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.V2State__icon svg {
+  display: block;
+}
+
 .V2TableActions {
   margin-bottom: 0.7rem;
   color: var(--v2-muted);
@@ -1926,7 +1950,7 @@
   }
 
   .V2Shell__defsFab {
-    display: inline-block;
+    display: inline-flex;
   }
 
   .V2Shell__defsButton {
@@ -2293,10 +2317,13 @@
 }
 
 .V2ActionList__icon {
+  display: inline-flex;
+  align-items: center;
   color: var(--v2-accent);
   font-weight: 700;
   font-size: 0.9rem;
   line-height: 1.4;
+  flex-shrink: 0;
 }
 
 .V2ActionList__text {

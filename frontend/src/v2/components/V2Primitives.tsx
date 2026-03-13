@@ -1,5 +1,6 @@
 import { useId, type ReactNode, useState } from 'react';
 import { motion, AnimatePresence, type Variants } from 'framer-motion';
+import { Loader2, AlertTriangle, Inbox as InboxIcon, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import {
   FloatingPortal,
   autoUpdate,
@@ -214,7 +215,11 @@ export function V2MetricCard({
   sparkline?: number[] | undefined;
   trend?: 'up' | 'down' | 'flat' | undefined;
 }) {
-  const trendIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : null;
+  const trendIcon = trend === 'up'
+    ? <TrendingUp size={12} />
+    : trend === 'down'
+    ? <TrendingDown size={12} />
+    : null;
   const [isHovered, setIsHovered] = useState(false);
 
   return (
@@ -403,7 +408,7 @@ export function V2State({
         variants={iconVariants}
         animate={kind}
       >
-        {kind === 'loading' ? '◌' : kind === 'error' ? '⚠' : '○'}
+        {kind === 'loading' ? <Loader2 size={24} /> : kind === 'error' ? <AlertTriangle size={24} /> : <InboxIcon size={24} />}
       </motion.span>
       <span className="V2State__text">{children}</span>
       {kind === 'error' && (
@@ -464,7 +469,7 @@ export function V2RiskAlert({
           repeatDelay: 3,
         }}
       >
-        ⚠
+        <AlertTriangle size={20} />
       </motion.div>
       <div className="V2RiskAlert__content">
         <h3 className="V2RiskAlert__title">{title}</h3>
@@ -683,7 +688,7 @@ export function V2ActionList({ actions }: { actions: string[] }) {
             animate={{ x: [0, 3, 0] }}
             transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2 }}
           >
-            →
+            <ArrowRight size={14} />
           </motion.span>
           <span className="V2ActionList__text">{action}</span>
         </motion.li>
@@ -846,8 +851,10 @@ export function V2HeroSummary({
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.4 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
           >
-            {primaryChange.isPositive ? '↑' : '↓'} {Math.abs(primaryChange.value).toFixed(1)}%
+            {primaryChange.isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            {Math.abs(primaryChange.value).toFixed(1)}%
           </motion.span>
         )}
       </div>

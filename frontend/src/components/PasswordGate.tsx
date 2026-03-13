@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { KeyRound } from 'lucide-react';
 
 import { ApiError, client } from '../api/client';
 
@@ -141,7 +142,7 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
               disabled={isSubmitting || isSuccess}
               className={error ? 'is-error' : ''}
             />
-            <span className="PasswordGate__inputIcon">🔑</span>
+            <span className="PasswordGate__inputIcon"><KeyRound size={16} /></span>
           </div>
 
           <motion.button

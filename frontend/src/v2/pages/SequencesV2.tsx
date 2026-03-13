@@ -1,8 +1,18 @@
 import { useMemo, useRef, useState, useCallback } from 'react';
+import { MessageSquare, Users, Reply, Phone, CalendarCheck, UserMinus, AlertCircle, ChevronUp, ChevronDown, ArrowDownToLine, Filter } from 'lucide-react';
 
 import { useV2SequenceQualification, useV2SequencesDeep } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
+
+function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      {icon}
+      {children}
+    </span>
+  );
+}
 
 type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
 type SortKey =
@@ -47,7 +57,9 @@ export default function SequencesV2() {
 
   const sortIndicator = (key: SortKey) => {
     if (sortKey !== key) return null;
-    return <span style={{ marginLeft: '4px', fontSize: '0.7em' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>;
+    return sortDirection === 'asc'
+      ? <ChevronUp size={10} style={{ marginLeft: '3px', display: 'inline' }} />
+      : <ChevronDown size={10} style={{ marginLeft: '3px', display: 'inline' }} />;
   };
 
   const query = useV2SequencesDeep({
@@ -192,23 +204,23 @@ export default function SequencesV2() {
           ) : null}
 
           <div className="V2MetricsGrid V2MetricsGrid--compact">
-            <V2MetricCard label="Messages sent" value={fmtInt(totals.messagesSent)} />
-            <V2MetricCard label="People reached" value={fmtInt(totals.uniqueContacted)} />
-            <V2MetricCard label="Replies" value={fmtInt(totals.repliesReceived)} />
+            <V2MetricCard label={<IconLabel icon={<MessageSquare size={11} />}>Messages sent</IconLabel>} value={fmtInt(totals.messagesSent)} />
+            <V2MetricCard label={<IconLabel icon={<Users size={11} />}>People reached</IconLabel>} value={fmtInt(totals.uniqueContacted)} />
+            <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Replies</IconLabel>} value={fmtInt(totals.repliesReceived)} />
             <V2MetricCard
-              label="Reply rate"
+              label={<IconLabel icon={<ArrowDownToLine size={11} />}>Reply rate</IconLabel>}
               value={fmtPct(totals.uniqueContacted > 0 ? (totals.repliesReceived / totals.uniqueContacted) * 100 : 0)}
             />
-            <V2MetricCard label="Booked calls" value={fmtInt(totals.bookedCalls)} tone="positive" />
+            <V2MetricCard label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>} value={fmtInt(totals.bookedCalls)} tone="positive" />
             <V2MetricCard
-              label="Booking rate"
+              label={<IconLabel icon={<CalendarCheck size={11} />}>Booking rate</IconLabel>}
               value={fmtPct(totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0)}
             />
-            <V2MetricCard label="Opt-outs" value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
-            <V2MetricCard label="Monday boards behind" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
+            <V2MetricCard label={<IconLabel icon={<UserMinus size={11} />}>Opt-outs</IconLabel>} value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
+            <V2MetricCard label={<IconLabel icon={<AlertCircle size={11} />}>Monday boards behind</IconLabel>} value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
             {filteredCount > 0 && (
               <V2MetricCard
-                label="Filtered out (low activity)"
+                label={<IconLabel icon={<Filter size={11} />}>Filtered out (low activity)</IconLabel>}
                 value={fmtInt(filteredCount)}
                 tone="default"
               />

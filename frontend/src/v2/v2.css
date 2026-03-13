@@ -232,6 +232,7 @@
 }
 
 .V2Shell__sidebar {
+  position: relative;
   border-right: 1px solid rgba(8, 12, 29, 0.08);
   background:
     linear-gradient(180deg, rgba(8, 18, 35, 0.96), rgba(9, 18, 31, 0.94)),
@@ -8010,7 +8011,6 @@ display: inline-block;
 
 /* Sidebar: flex column so hero banner is pushed to bottom */
 .V2Shell__sidebar {
-  position: relative;
   display: flex;
   flex-direction: column;
 }

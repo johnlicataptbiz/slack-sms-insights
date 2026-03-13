@@ -97,6 +97,7 @@ export default function SequencesDeepDive() {
   const [includeManual, setIncludeManual] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('messagesSent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [minSendsThreshold, setMinSendsThreshold] = useState<number>(15);
 
   const activeDay = selectedDay || previousDay;
   const canStepForward = mode === 'day' && Boolean(activeDay && today && activeDay < today);
@@ -129,6 +130,7 @@ export default function SequencesDeepDive() {
     const filtered = sourceRows
       .filter((row) => (includeManual ? true : row.label !== MANUAL_LABEL))
       .filter((row) => (searchText ? row.label.toLowerCase().includes(searchText) : true))
+      .filter((row) => row.messagesSent >= minSendsThreshold)
       .map((row) => {
         const slackBookedCalls = row.slackBookedCalls ?? 0;
         const bookedImpactPct = row.messagesSent > 0 ? Math.min((slackBookedCalls / row.messagesSent) * 100, 100) : 0;
@@ -171,7 +173,12 @@ export default function SequencesDeepDive() {
       if (aValue > bValue) return 1 * dir;
       return a.label.localeCompare(b.label);
     });
-  }, [data?.topSequences, includeManual, search, sortDirection, sortKey]);
+  }, [data?.topSequences, includeManual, search, sortDirection, sortKey, minSendsThreshold]);
+
+  const filteredCount = useMemo(() => {
+    const sourceRows = data?.topSequences ?? [];
+    return sourceRows.filter((row) => row.messagesSent < minSendsThreshold).length;
+  }, [data?.topSequences, minSendsThreshold]);
 
   const summary = useMemo(() => {
     const totalSent = rows.reduce((sum, row) => sum + row.messagesSent, 0);
@@ -290,6 +297,18 @@ export default function SequencesDeepDive() {
             <input type="checkbox" checked={includeManual} onChange={(e) => setIncludeManual(e.target.checked)} />
             Include "{MANUAL_LABEL}" row
           </label>
+
+          <label className="SequencesPage__control">
+            <span>Min sends</span>
+            <input
+              type="number"
+              min={0}
+              max={1000}
+              value={minSendsThreshold}
+              onChange={(e) => setMinSendsThreshold(Math.max(0, parseInt(e.target.value, 10) || 0))}
+              style={{ width: '70px' }}
+            />
+          </label>
         </div>
         <p className="DataPanel__caption">
           View: {rangeLabel}. Time zone: {data?.meta?.timeZone ?? BUSINESS_TIME_ZONE}.
@@ -343,6 +362,13 @@ export default function SequencesDeepDive() {
                 <div className="DataCard__label">High-risk sequences (opt-out)</div>
                 <div className="DataCard__value">{summary.highRiskCount}</div>
               </div>
+              {filteredCount > 0 && (
+                <div className="DataCard DataCard--muted">
+                  <div className="DataCard__label">Filtered out (low activity)</div>
+                  <div className="DataCard__value">{filteredCount}</div>
+                  <p className="DataCard__meta">Sequences with < {minSendsThreshold} sends hidden</p>
+                </div>
+              )}
             </div>
           </section>
 

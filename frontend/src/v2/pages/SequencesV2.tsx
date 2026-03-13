@@ -1,10 +1,20 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useCallback } from 'react';
 
 import { useV2SequenceQualification, useV2SequencesDeep } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 
 type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
+type SortKey =
+  | 'label'
+  | 'messagesSent'
+  | 'repliesReceived'
+  | 'replyRatePct'
+  | 'bookedCalls'
+  | 'bookingRatePct'
+  | 'optOuts'
+  | 'optOutRatePct';
+type SortDirection = 'asc' | 'desc';
 
 const MODE_LABELS: Record<Mode, string> = {
   '7d': 'Last 7 days',
@@ -21,7 +31,24 @@ const fmtSplit = (jack: number, brandon: number, selfBooked: number) => `${fmtIn
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('30d');
   const [status, setStatus] = useState<'active' | 'inactive' | ''>('active');
+  const [minSendsThreshold, setMinSendsThreshold] = useState<number>(15);
+  const [sortKey, setSortKey] = useState<SortKey>('messagesSent');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const tableRef = useRef<HTMLDivElement | null>(null);
+
+  const onSort = useCallback((key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDirection(key === 'label' ? 'asc' : 'desc');
+    }
+  }, [sortKey]);
+
+  const sortIndicator = (key: SortKey) => {
+    if (sortKey !== key) return null;
+    return <span style={{ marginLeft: '4px', fontSize: '0.7em' }}>{sortDirection === 'asc' ? '▲' : '▼'}</span>;
+  };
 
   const query = useV2SequencesDeep({
     range: mode,
@@ -81,6 +108,25 @@ export default function SequencesV2() {
     );
   }, [data]);
 
+  const filteredCount = useMemo(() => {
+    if (!data) return 0;
+    return data.sequences.filter((row) => row.messagesSent < minSendsThreshold).length;
+  }, [data, minSendsThreshold]);
+
+  const sortedSequences = useMemo(() => {
+    if (!data) return [];
+    const filtered = data.sequences.filter((row) => row.messagesSent >= minSendsThreshold);
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      if (sortKey === 'label') return a.label.localeCompare(b.label) * dir;
+      const aVal = a[sortKey as keyof typeof a] as number;
+      const bVal = b[sortKey as keyof typeof b] as number;
+      if (aVal < bVal) return -1 * dir;
+      if (aVal > bVal) return 1 * dir;
+      return a.label.localeCompare(b.label);
+    });
+  }, [data, minSendsThreshold, sortKey, sortDirection]);
+
   const bookingRatePct = totals && totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0;
   const verification = data?.verification ?? {
     slackBookedTotal: 0,
@@ -109,6 +155,17 @@ export default function SequencesV2() {
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
+              <span style={{ whiteSpace: 'nowrap' }}>Min sends</span>
+              <input
+                type="number"
+                min={0}
+                max={1000}
+                value={minSendsThreshold}
+                onChange={(e) => setMinSendsThreshold(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                style={{ width: '64px', padding: '4px 6px', borderRadius: '6px', border: '1px solid var(--v2-border, #e2e8f0)', fontSize: '0.85rem' }}
+              />
+            </label>
             <button
               type="button"
               className="V2GhostButton"
@@ -149,6 +206,13 @@ export default function SequencesV2() {
             />
             <V2MetricCard label="Opt-outs" value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
             <V2MetricCard label="Monday boards behind" value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
+            {filteredCount > 0 && (
+              <V2MetricCard
+                label="Filtered out (low activity)"
+                value={fmtInt(filteredCount)}
+                tone="default"
+              />
+            )}
           </div>
 
           <V2Panel title="Verification snapshot" caption="Slack totals, Monday totals, and fallback cues.">
@@ -196,19 +260,57 @@ export default function SequencesV2() {
                 <table className="V2Table V2Table--sequences">
                   <thead>
                     <tr>
-                      <th>Sequence</th>
-                      <th className="is-right">Sent</th>
-                      <th className="is-right">Replies</th>
-                      <th className="is-right">Reply %</th>
-                      <th className="is-right">Booked</th>
-                      <th className="is-right">Book %</th>
-                      <th className="is-right">Opt-outs</th>
-                      <th className="is-right">Opt %</th>
+                      <th>
+                        <button type="button" className="V2SortButton" onClick={() => onSort('label')}>
+                          Sequence{sortIndicator('label')}
+                        </button>
+                      </th>
+                      <th className="is-right">
+                        <button type="button" className="V2SortButton" onClick={() => onSort('messagesSent')}>
+                          Sent{sortIndicator('messagesSent')}
+                        </button>
+                      </th>
+                      <th className="is-right">
+                        <button type="button" className="V2SortButton" onClick={() => onSort('repliesReceived')}>
+                          Replies{sortIndicator('repliesReceived')}
+                        </button>
+                      </th>
+                      <th className="is-right">
+                        <button type="button" className="V2SortButton" onClick={() => onSort('replyRatePct')}>
+                          Reply %{sortIndicator('replyRatePct')}
+                        </button>
+                      </th>
+                      <th className="is-right">
+                        <button type="button" className="V2SortButton" onClick={() => onSort('bookedCalls')}>
+                          Booked{sortIndicator('bookedCalls')}
+                        </button>
+                      </th>
+                      <th className="is-right">
+                        <button type="button" className="V2SortButton" onClick={() => onSort('bookingRatePct')}>
+                          Book %{sortIndicator('bookingRatePct')}
+                        </button>
+                      </th>
+                      <th className="is-right">
+                        <button type="button" className="V2SortButton" onClick={() => onSort('optOuts')}>
+                          Opt-outs{sortIndicator('optOuts')}
+                        </button>
+                      </th>
+                      <th className="is-right">
+                        <button type="button" className="V2SortButton" onClick={() => onSort('optOutRatePct')}>
+                          Opt %{sortIndicator('optOutRatePct')}
+                        </button>
+                      </th>
                       <th className="is-right" title="Booked split as Jack / Brandon / Self">J / B / Self</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.sequences.map((row) => (
+                    {sortedSequences.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '2rem', color: 'var(--v2-muted, #94a3b8)' }}>
+                          No sequences match the current filter.
+                        </td>
+                      </tr>
+                    ) : sortedSequences.map((row) => (
                       <tr key={row.sequenceId} className={row.isManualBucket ? 'V2Table__row--manual' : ''}>
                         <td title={`${row.label}${row.leadMagnet ? ` • ${row.leadMagnet}` : ''}`}>
                           <span className="V2Table__seqName">{row.label}</span>

@@ -23,9 +23,9 @@ const navItems: NavItem[] = [
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: <GitBranch size={16} /> },
 ];
 
-const brandLogoUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/logo1sms.png';
-const patternUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/patternsms.png';
-const heroBannerUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/herobannersms.png';
+const brandLogoUrl = '/assets/sms-kit/logo1sms.png';
+const patternUrl = '/assets/sms-kit/patternsms.png';
+const heroBannerUrl = '/assets/sms-kit/herobannersms.png';
 const mobileMediaQuery = '(max-width: 1080px)';
 const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
 

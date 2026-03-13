@@ -6,12 +6,9 @@ import { ApiError, client } from '../api/client';
 
 import './PasswordGate.css';
 
-const brandLogoUrl =
-  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/logo1sms.png';
-const banner2Url =
-  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/banner2.png';
-const divider2Url =
-  'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/divider2.png';
+const brandLogoUrl = '/assets/sms-kit/logo1sms.png';
+const banner2Url = '/assets/sms-kit/banner2.png';
+const divider2Url = '/assets/sms-kit/divider2.png';
 
 // Floating orb component for background ambiance
 function FloatingOrb({ delay, x, y, size, color }: { delay: number; x: string; y: string; size: number; color: string }) {

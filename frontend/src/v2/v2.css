@@ -8094,3 +8094,115 @@ display: inline-block;
   margin: 1.5rem 0;
   opacity: 0.7;
 }
+
+/* =============================================================
+   SMS Theme - PT Biz SMS Visual Assets
+   ============================================================= */
+
+/* SMS Logo Badge */
+.sms-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.65rem;
+  background: linear-gradient(135deg, rgba(17, 184, 214, 0.12), rgba(19, 185, 129, 0.08));
+  border: 1px solid rgba(17, 184, 214, 0.25);
+  border-radius: 999px;
+}
+
+.sms-logo-badge img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.sms-logo-badge span {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--v2-base-800);
+  letter-spacing: 0.04em;
+}
+
+/* SMS Hero Banner */
+.sms-hero-banner {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: var(--v2-radius-lg);
+  margin-bottom: var(--v2-space-4);
+  box-shadow: var(--v2-shadow-1);
+}
+
+/* SMS Section Divider */
+.sms-divider {
+  display: block;
+  width: 100%;
+  max-height: 48px;
+  object-fit: contain;
+  margin: var(--v2-space-4) 0;
+  opacity: 0.65;
+}
+
+/* SMS Pattern Background */
+.sms-pattern-bg {
+  position: relative;
+}
+
+.sms-pattern-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/assets/sms-kit/patternsms.png');
+  background-size: 280px auto;
+  background-repeat: repeat;
+  opacity: 0.06;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sms-pattern-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* SMS Card Variant */
+.V2MetricCard--sms {
+  border-color: rgba(17, 184, 214, 0.28);
+  background: linear-gradient(160deg, rgba(17, 184, 214, 0.08), rgba(255, 255, 255, 0.92));
+}
+
+.V2Panel--sms {
+  border-color: rgba(17, 184, 214, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 249, 252, 0.88));
+}
+
+/* Sidebar Logo with SMS branding */
+.V2Shell__sidebarLogo--sms {
+  width: 160px;
+  max-width: 100%;
+}
+
+/* Topbar SMS accent */
+.V2Shell__topbar--sms {
+  background: 
+    linear-gradient(90deg, rgba(17, 184, 214, 0.08), rgba(19, 185, 129, 0.04)),
+    linear-gradient(90deg, rgba(245, 251, 255, 0.92), rgba(255, 255, 255, 0.84));
+}
+
+/* Mobile-optimized SMS banner */
+@media (max-width: 760px) {
+  .sms-hero-banner {
+    max-height: 72px;
+    border-radius: var(--v2-radius-md);
+  }
+  
+  .sms-divider {
+    max-height: 32px;
+  }
+  
+  .sms-pattern-bg::before {
+    background-size: 180px auto;
+  }
+}

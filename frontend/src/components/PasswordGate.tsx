@@ -86,13 +86,16 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* Brand banner */}
+        {/* Brand banner — full-width, clipped by card overflow:hidden */}
         <img
           className="PasswordGate__banner"
           src={banner2Url}
           alt=""
           aria-hidden="true"
         />
+
+        {/* Card body — padded content area */}
+        <div className="PasswordGate__cardBody">
 
         {/* Logo */}
         <motion.img
@@ -104,31 +107,12 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
           transition={{ delay: 0.15, duration: 0.45 }}
         />
 
-        {/* Heading */}
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25, duration: 0.4 }}
-        >
-          <h1 className="PasswordGate__title">PT Biz Dashboard</h1>
-          <p className="PasswordGate__subtitle">Enter your password to continue.</p>
-        </motion.div>
-
-        <motion.p
-          className="PasswordGate__notice"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-        >
-          Sign in with your dashboard password.
-        </motion.p>
-
         {/* Form */}
         <motion.form
           onSubmit={handleSubmit}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, duration: 0.4 }}
+          transition={{ delay: 0.25, duration: 0.4 }}
         >
           {/* Hidden username for password managers */}
           <input
@@ -225,6 +209,8 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
         >
           PT Biz Setter Ops · Secure Access
         </motion.p>
+
+        </div>{/* end .PasswordGate__cardBody */}
       </motion.section>
     </main>
   );

@@ -96,6 +96,7 @@ import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contr
 import { getScoreboardData } from '../services/scoreboard.js';
 import { getSequenceKpis } from '../services/sequence-kpis.js';
 import { refreshKpiFacts } from '../services/kpi-facts.js';
+import { computeDailyReport, computeDailyReportRange } from '../services/daily-report-v2.js';
 import { getInsightsSummary } from '../services/insights-summary.js';
 import { getSequencesDeep } from '../services/sequences-deep.js';
 import { getAttributionLagStatus } from '../services/attribution-health.js';
@@ -4472,6 +4473,57 @@ const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, ori
   );
 };
 
+/* ─── Daily Report V2 handlers ─── */
+
+const handleGetDailyReportV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+  const dateParam = url.searchParams.get('date');
+  const compare = url.searchParams.get('compare') as 'prev_day' | 'prev_week' | 'prev_month' | undefined;
+
+  if (!dateParam) {
+    sendJson(res, 400, { error: 'Missing required query param: date (YYYY-MM-DD)' }, origin);
+    return;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    sendJson(res, 400, { error: 'Invalid date format. Expected YYYY-MM-DD' }, origin);
+    return;
+  }
+
+  try {
+    const report = await computeDailyReport(dateParam, compare ? { compare } : undefined);
+    sendJson(res, 200, toEnvelope({ data: report, timeZone: 'America/Chicago' }), origin);
+  } catch (err: any) {
+    logger?.error(`Daily report V2 error: ${err.message}`);
+    sendJson(res, 500, { error: `Failed to compute daily report: ${err.message}` }, origin);
+  }
+};
+
+const handleGetDailyReportRangeV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url ?? '', `http://${req.headers.host}`);
+  const from = url.searchParams.get('from');
+  const to = url.searchParams.get('to');
+
+  if (!from || !to) {
+    sendJson(res, 400, { error: 'Missing required query params: from, to (YYYY-MM-DD)' }, origin);
+    return;
+  }
+
+  const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+  if (!dateRe.test(from) || !dateRe.test(to)) {
+    sendJson(res, 400, { error: 'Invalid date format. Expected YYYY-MM-DD for both from and to' }, origin);
+    return;
+  }
+
+  try {
+    const range = await computeDailyReportRange(from, to);
+    sendJson(res, 200, toEnvelope({ data: range, timeZone: 'America/Chicago' }), origin);
+  } catch (err: any) {
+    logger?.error(`Daily report range V2 error: ${err.message}`);
+    sendJson(res, 500, { error: `Failed to compute daily report range: ${err.message}` }, origin);
+  }
+};
+
 type ApiRoute = {
   method: 'GET' | 'POST' | 'DELETE';
   path: string;
@@ -4626,6 +4678,8 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/analytics/response-time', handler: handleGetResponseTimeV2 },
   { method: 'GET', path: '/api/v2/analytics/line-balance', handler: handleGetLineBalanceV2 },
   { method: 'GET', path: '/api/v2/analytics/sales-metrics', handler: handleGetSalesMetricsDashboardV2 },
+  { method: 'GET', path: '/api/v2/analytics/daily-report', handler: handleGetDailyReportV2 },
+  { method: 'GET', path: '/api/v2/analytics/daily-report/range', handler: handleGetDailyReportRangeV2 },
   { method: 'POST', path: '/api/v2/admin/auto-assign', handler: handlePostAutoAssignV2 },
   { method: 'POST', path: '/api/v2/admin/bulk-infer-qualification', handler: handlePostBulkInferQualificationV2 },
   { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },

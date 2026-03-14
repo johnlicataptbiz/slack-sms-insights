@@ -689,6 +689,91 @@ type SalesMetricsV1Compatible = {
   };
 };
 
+// ─── Daily Report V2 Types ─────────────────────────────────────────────────────
+
+export type DailyReportKpisV2 = {
+  messagesSent: number;
+  uniqueContacted: number;
+  repliesReceived: number;
+  replyRatePct: number;
+  optOuts: number;
+  optOutRatePct: number;
+  bookedTotal: number;
+  bookingRatePct: number;
+  bookingSignalsSms: number;
+  leadsCount: number;
+  avgLeadScore: number | null;
+};
+
+export type DailyReportComparisonV2 = {
+  period: 'prev_day' | 'prev_week' | 'prev_month';
+  kpis: DailyReportKpisV2;
+  deltas: Record<keyof DailyReportKpisV2, number | null>;
+};
+
+export type DailyReportSequenceRowV2 = {
+  sequenceId: string;
+  sequenceName: string;
+  messagesSent: number;
+  repliesReceived: number;
+  replyRatePct: number;
+  bookedTotal: number;
+  bookingRatePct: number;
+  optOuts: number;
+};
+
+export type DailyReportRepRowV2 = {
+  repId: string;
+  repName: string;
+  messagesSent: number;
+  repliesReceived: number;
+  replyRatePct: number;
+  bookedTotal: number;
+};
+
+export type DailyReportLeadQualityV2 = {
+  total: number;
+  progressDistribution: [number, number, number, number, number];
+  revenueMix: { cash: number; insurance: number; balanced: number; unknown: number };
+  coachingInterest: { high: number; medium: number; low: number; unknown: number };
+  avgLeadScore: number | null;
+};
+
+export type DailyReportMondayHealthRowV2 = {
+  boardId: string;
+  boardClass: string;
+  syncStatus: string | null;
+  isStale: boolean;
+  sourceCoveragePct: number;
+  campaignCoveragePct: number;
+};
+
+export type DailyReportAlertV2 = {
+  id: string;
+  type: string;
+  severity: string;
+  message: string;
+  createdAt: string;
+};
+
+export type DailyReportV2 = {
+  date: string;
+  generatedAt: string;
+  kpis: DailyReportKpisV2;
+  comparison?: DailyReportComparisonV2;
+  sequences: DailyReportSequenceRowV2[];
+  reps: DailyReportRepRowV2[];
+  leadQuality: DailyReportLeadQualityV2;
+  mondayHealth: DailyReportMondayHealthRowV2[];
+  alerts: DailyReportAlertV2[];
+};
+
+export type DailyReportRangeV2 = {
+  from: string;
+  to: string;
+  days: DailyReportV2[];
+};
+
 export const toEnvelope = <T>(params: {
   data: T;
   timeZone: string;

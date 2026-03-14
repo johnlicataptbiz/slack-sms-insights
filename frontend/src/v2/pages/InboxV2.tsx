@@ -67,6 +67,9 @@ import { V2State } from "../components/V2Primitives";
 import { SkeletonText } from "../components/Skeleton";
 import { useToast } from "../hooks/useToast";
 
+// Asset URLs (subtle — inbox is dense, keep assets minimal)
+const arrowDividerUrl = '/assets/sms-kit/arrow_strip_divider.webp';
+
 const LazyEmojiPicker = lazy(async () => ({ default: (await import("emoji-picker-react")).default }));
 
 const parseDateValue = (value: string): Date | null => {
@@ -1860,7 +1863,7 @@ export default function InboxV2() {
   };
 
   return (
-    <div className="V2Page V2Inbox V2PageTransition">
+    <div className="V2Page V2Inbox V2PageTransition sms-pattern-bg" style={{ '--sms-pattern-opacity': '0.03' } as React.CSSProperties}>
       {/* Floating Filter Bar */}
       <div className="V2Inbox__filterBar">
         <div className="V2Inbox__filterGroup">
@@ -2004,6 +2007,8 @@ export default function InboxV2() {
           </label>
         </div>
       </div>
+
+      <img className="sms-section-divider" src={arrowDividerUrl} alt="" aria-hidden="true" style={{ opacity: 0.4, maxHeight: '28px' }} />
 
       <section className="V2Inbox__commandDeck" aria-label="Inbox quick actions">
         <button

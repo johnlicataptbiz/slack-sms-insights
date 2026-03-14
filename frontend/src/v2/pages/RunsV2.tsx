@@ -22,6 +22,11 @@ import { v2Copy } from '../copy';
 import { V2Select, type V2SelectOption } from '../components/V2Select';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2StatBar } from '../components/V2Primitives';
 
+// Asset URLs
+const heroBannerUrl = '/assets/sms-kit/banner2.webp';
+const nodeDividerUrl = '/assets/sms-kit/node_bar_divider.webp';
+const divider2Url = '/assets/sms-kit/divider2.webp';
+
 const savedViewsStorageKey = 'ptbizsms-v2-runs-saved-views';
 const BUSINESS_TZ = 'America/Chicago';
 const DAILY_SNAPSHOT_TITLE_PATTERN = /PT BIZ - DAILY SMS SNAPSHOT/i;
@@ -655,6 +660,14 @@ export default function RunsV2() {
 
   return (
     <div className="V2Page V2PageTransition">
+      {/* Hero Banner */}
+      <div className="V2HeroBanner">
+        <img className="V2HeroBanner__img" src={heroBannerUrl} alt="" aria-hidden="true" />
+        <div className="V2HeroBanner__overlay">
+          <span className="V2HeroBanner__title">Run History &amp; Reports</span>
+        </div>
+      </div>
+
       <V2PageHeader
         title={v2Copy.nav.runs}
         subtitle="Daily activity and report history."
@@ -725,7 +738,9 @@ export default function RunsV2() {
         </div>
       )}
 
-      <section className="V2MetricsGrid">
+      <img className="sms-section-divider" src={nodeDividerUrl} alt="" aria-hidden="true" />
+
+      <section className="V2MetricsGrid sms-pattern-bg--network">
         <V2MetricCard
           label="Reports"
           value={String(aggregateStats.totalRuns)}
@@ -750,8 +765,10 @@ export default function RunsV2() {
         />
       </section>
 
+      <img className="sms-section-divider" src={divider2Url} alt="" aria-hidden="true" />
+
       <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
-        <V2Panel title="Report History" caption={`Showing ${runsData.data.items.length} reports`} className="V2RunsLayout__timeline">
+        <V2Panel title="Report History" caption={`Showing ${runsData.data.items.length} reports`} className="V2RunsLayout__timeline sms-pattern-bg--network">
           <div className="V2RunList">
             {sortedItems.map((run, index) => {
                 const runView = viewByRunId.get(run.id) || buildRunViewModel(run);

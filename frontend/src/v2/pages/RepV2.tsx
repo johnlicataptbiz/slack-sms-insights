@@ -5,6 +5,11 @@ import { SkeletonDashboard } from '../components/Skeleton';
 import { resolveCurrentBusinessDay, shiftIsoDay } from '../../utils/runDay';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
 
+// Asset URLs
+const logoBadgeUrl = '/assets/sms-kit/ptbiz_sms_logo_badge.webp';
+const waveDividerUrl = '/assets/sms-kit/wave_sms_divider.webp';
+const divider3Url = '/assets/sms-kit/divider3.webp';
+
 type RepKey = 'jack' | 'brandon';
 
 const BUSINESS_TZ = 'America/Chicago';
@@ -130,12 +135,23 @@ export default function RepV2({ rep }: { rep: RepKey }) {
 
   return (
     <div className="V2Page V2PageTransition">
+      {/* Hero Banner with Logo Badge */}
+      <div className="V2HeroBanner" style={{ background: 'linear-gradient(135deg, #0a1528 0%, #13223c 50%, #0a1528 100%)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1.5rem' }}>
+          <img src={logoBadgeUrl} alt="" aria-hidden="true" style={{ height: '64px', width: 'auto', borderRadius: '8px' }} />
+          <div>
+            <span className="V2HeroBanner__title">{name} Scorecard</span>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>Daily coaching snapshot</p>
+          </div>
+        </div>
+      </div>
+
       <V2PageHeader
         title={`${name} Scorecard`}
         subtitle={`Daily summary for ${day || 'today'} (${BUSINESS_TZ}) with day-over-day change vs ${prevDay || 'yesterday'}.`}
       />
 
-      <section className="V2MetricsGrid">
+      <section className="V2MetricsGrid sms-pattern-bg">
         <V2MetricCard
           label={<V2Term term="callsBookedCreditSlack" />}
           value={fmtInt(metrics.booked)}
@@ -172,6 +188,8 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           tone={metrics.outbound > 0 && (metrics.booked / metrics.outbound) * 100 >= 5 ? 'positive' : 'default'}
         />
       </section>
+
+      <img className="sms-section-divider" src={waveDividerUrl} alt="" aria-hidden="true" />
 
       <div className="V2Grid V2Grid--2">
         <V2Panel title="Day-over-Day" caption="How today compares with yesterday.">
@@ -214,6 +232,8 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           )}
         </V2Panel>
       </div>
+
+      <img className="sms-section-divider" src={divider3Url} alt="" aria-hidden="true" />
 
       <div className="V2Grid V2Grid--2">
         <V2Panel title="Team Totals" caption="How the team performed.">

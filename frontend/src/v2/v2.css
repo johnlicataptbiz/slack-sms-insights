@@ -9202,6 +9202,150 @@ display: inline-block;
     linear-gradient(90deg, rgba(245, 251, 255, 0.92), rgba(255, 255, 255, 0.84));
 }
 
+/* SMS Grid Coach Background */
+.sms-grid-bg {
+  position: relative;
+}
+
+.sms-grid-bg::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/assets/sms-kit/gridcoachbg.webp');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.sms-grid-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* SMS Section Divider - Enhanced */
+.sms-section-divider {
+  display: block;
+  width: 100%;
+  max-height: 40px;
+  object-fit: contain;
+  margin: var(--v2-space-3) 0;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.sms-section-divider:hover {
+  opacity: 0.7;
+}
+
+/* V2 Hero Banner with Overlay Text */
+.V2HeroBanner {
+  position: relative;
+  width: 100%;
+  border-radius: var(--v2-radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--v2-space-4);
+  box-shadow: var(--v2-shadow-1);
+}
+
+.V2HeroBanner__img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 120px;
+  object-fit: cover;
+}
+
+.V2HeroBanner__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--v2-space-5);
+  background: linear-gradient(90deg, rgba(5, 9, 19, 0.55) 0%, rgba(5, 9, 19, 0.15) 60%, transparent 100%);
+}
+
+.V2HeroBanner__title {
+  font-family: var(--v2-font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  letter-spacing: -0.01em;
+}
+
+/* SMS Pattern Background - Network variant */
+.sms-pattern-bg--network {
+  position: relative;
+}
+
+.sms-pattern-bg--network::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/assets/sms-kit/sms_network_pattern.webp');
+  background-size: 360px auto;
+  background-repeat: repeat;
+  opacity: 0.035;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.sms-pattern-bg--network > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* SMS Pattern Background - PTBiz variant */
+.sms-pattern-bg--ptbiz {
+  position: relative;
+}
+
+.sms-pattern-bg--ptbiz::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/assets/sms-kit/ptbiz_sms_pattern.webp');
+  background-size: 300px auto;
+  background-repeat: repeat;
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.sms-pattern-bg--ptbiz > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Dark mode overrides for asset backgrounds */
+[data-theme="dark"] .sms-pattern-bg::before,
+[data-theme="dark"] .sms-pattern-bg--alt::before,
+[data-theme="dark"] .sms-pattern-bg--network::before,
+[data-theme="dark"] .sms-pattern-bg--ptbiz::before {
+  opacity: 0.08;
+  filter: invert(1) brightness(2);
+}
+
+[data-theme="dark"] .sms-grid-bg::before {
+  opacity: 0.06;
+  filter: invert(1) brightness(1.5);
+}
+
+[data-theme="dark"] .V2HeroBanner__overlay {
+  background: linear-gradient(90deg, rgba(5, 9, 19, 0.7) 0%, rgba(5, 9, 19, 0.3) 60%, transparent 100%);
+}
+
+[data-theme="dark"] .sms-section-divider {
+  opacity: 0.35;
+  filter: brightness(0.8);
+}
+
 /* Mobile-optimized SMS banner */
 @media (max-width: 760px) {
   .sms-hero-banner {
@@ -9215,5 +9359,34 @@ display: inline-block;
   
   .sms-pattern-bg::before {
     background-size: 180px auto;
+  }
+
+  .V2HeroBanner__img {
+    max-height: 80px;
+  }
+
+  .V2HeroBanner__title {
+    font-size: 1rem;
+  }
+
+  .sms-section-divider {
+    max-height: 28px;
+  }
+
+  .sms-grid-bg::before {
+    opacity: 0.025;
+  }
+}
+
+/* Reduced motion: hide decorative asset animations */
+@media (prefers-reduced-motion: reduce) {
+  .sms-section-divider {
+    transition: none;
+  }
+  
+  .sms-grid-bg::before,
+  .sms-pattern-bg--network::before,
+  .sms-pattern-bg--ptbiz::before {
+    animation: none;
   }
 }

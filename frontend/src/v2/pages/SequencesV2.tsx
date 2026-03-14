@@ -5,6 +5,11 @@ import { useV2SequenceQualification, useV2SequencesDeep } from '../../api/v2Quer
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 
+// Asset URLs
+const heroBannerUrl = '/assets/sms-kit/banner3.webp';
+const divider3SmsUrl = '/assets/sms-kit/divider%203%20sms.webp';
+const networkDividerUrl = '/assets/sms-kit/network_bar_divider.webp';
+
 function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
@@ -152,6 +157,14 @@ export default function SequencesV2() {
 
   return (
     <div className="V2Page V2PageTransition">
+      {/* Hero Banner */}
+      <div className="V2HeroBanner">
+        <img className="V2HeroBanner__img" src={heroBannerUrl} alt="" aria-hidden="true" />
+        <div className="V2HeroBanner__overlay">
+          <span className="V2HeroBanner__title">Sequence Performance</span>
+        </div>
+      </div>
+
       <V2PageHeader
         title="Sequences"
         subtitle="How each sequence is performing: volume, replies, and booked calls."
@@ -203,7 +216,7 @@ export default function SequencesV2() {
             </div>
           ) : null}
 
-          <div className="V2MetricsGrid V2MetricsGrid--compact">
+          <div className="V2MetricsGrid V2MetricsGrid--compact sms-pattern-bg--ptbiz">
             <V2MetricCard label={<IconLabel icon={<MessageSquare size={11} />}>Messages sent</IconLabel>} value={fmtInt(totals.messagesSent)} />
             <V2MetricCard label={<IconLabel icon={<Users size={11} />}>People reached</IconLabel>} value={fmtInt(totals.uniqueContacted)} />
             <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Replies</IconLabel>} value={fmtInt(totals.repliesReceived)} />
@@ -226,6 +239,8 @@ export default function SequencesV2() {
               />
             )}
           </div>
+
+          <img className="sms-section-divider" src={divider3SmsUrl} alt="" aria-hidden="true" />
 
           <V2Panel title="Verification snapshot" caption="Slack totals, Monday totals, and fallback cues.">
             <div className="V2SplitStat">
@@ -263,10 +278,13 @@ export default function SequencesV2() {
             )}
           </V2Panel>
 
+          <img className="sms-section-divider" src={networkDividerUrl} alt="" aria-hidden="true" />
+
           <div ref={tableRef}>
             <V2Panel
               title="Sequence Results"
               caption="At-a-glance sequence performance for this date range. Tip: swipe left/right if needed."
+              className="sms-pattern-bg--network"
             >
               <div className="V2TableWrap V2TableWrap--sequences">
                 <table className="V2Table V2Table--sequences">

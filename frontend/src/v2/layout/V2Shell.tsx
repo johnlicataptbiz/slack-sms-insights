@@ -23,25 +23,31 @@ const navItems: NavItem[] = [
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: <GitBranch size={16} /> },
 ];
 
-const brandLogoUrl = '/assets/sms-kit/logo1sms.png';
-const patternUrl = '/assets/sms-kit/patternsms.png';
-const heroBannerUrl = '/assets/sms-kit/herobannersms.png';
-const banner3Url = '/assets/sms-kit/banner3.png';
-const dividerUrl = '/assets/sms-kit/divider.png';
-const divider3Url = '/assets/sms-kit/divider3.png';
-const divider3SmsUrl = '/assets/sms-kit/divider%203%20sms.png';
-const smsPattern2Url = '/assets/sms-kit/smspattern2.png';
+const brandLogoUrl = '/assets/sms-kit/logo1sms.webp';
+const patternUrl = '/assets/sms-kit/patternsms.webp';
+const heroBannerUrl = '/assets/sms-kit/herobannersms.webp';
+const banner2Url = '/assets/sms-kit/banner2.webp';
+const banner3Url = '/assets/sms-kit/banner3.webp';
+const smsPattern2Url = '/assets/sms-kit/smspattern2.webp';
+const ptbizPatternUrl = '/assets/sms-kit/ptbiz_sms_pattern.webp';
+const networkPatternUrl = '/assets/sms-kit/sms_network_pattern.webp';
+const smsGrowthHeroUrl = '/assets/sms-kit/sms_growth_hero.webp';
 const mobileMediaQuery = '(max-width: 1080px)';
 
 // Image rotation for visual variety across routes
 const getPatternForRoute = (pathname: string): string => {
   if (pathname.includes('/insights')) return smsPattern2Url;
-  if (pathname.includes('/inbox')) return patternUrl;
+  if (pathname.includes('/inbox')) return networkPatternUrl;
+  if (pathname.includes('/sequences')) return ptbizPatternUrl;
+  if (pathname.includes('/runs')) return networkPatternUrl;
+  if (pathname.includes('/rep')) return patternUrl;
   return patternUrl;
 };
 
 const getHeroBannerForRoute = (pathname: string): string => {
   if (pathname.includes('/sequences')) return banner3Url;
+  if (pathname.includes('/runs')) return banner2Url;
+  if (pathname.includes('/rep')) return smsGrowthHeroUrl;
   return heroBannerUrl;
 };
 const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;

@@ -129,7 +129,7 @@ export default function RepV2({ rep }: { rep: RepKey }) {
   );
 
   return (
-    <div className="V2Page">
+    <div className="V2Page V2PageTransition">
       <V2PageHeader
         title={`${name} Scorecard`}
         subtitle={`Daily summary for ${day || 'today'} (${BUSINESS_TZ}) with day-over-day change vs ${prevDay || 'yesterday'}.`}

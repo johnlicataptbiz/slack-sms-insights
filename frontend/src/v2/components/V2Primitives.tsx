@@ -207,6 +207,7 @@ export function V2MetricCard({
   tone,
   sparkline,
   trend,
+  glow,
 }: {
   label: ReactNode;
   value: ReactNode;
@@ -214,6 +215,7 @@ export function V2MetricCard({
   tone?: 'default' | 'positive' | 'critical' | 'accent';
   sparkline?: number[] | undefined;
   trend?: 'up' | 'down' | 'flat' | undefined;
+  glow?: boolean | 'positive' | 'critical';
 }) {
   const trendIcon = trend === 'up'
     ? <TrendingUp size={12} />
@@ -222,9 +224,17 @@ export function V2MetricCard({
     : null;
   const [isHovered, setIsHovered] = useState(false);
 
+  const glowClass = glow
+    ? glow === 'positive'
+      ? 'V2MetricCard--glow V2MetricCard--glow-positive'
+      : glow === 'critical'
+      ? 'V2MetricCard--glow V2MetricCard--glow-critical'
+      : 'V2MetricCard--glow'
+    : '';
+
   return (
     <motion.article
-      className={`V2MetricCard ${tone ? `V2MetricCard--${tone}` : ''}`}
+      className={`V2MetricCard ${tone ? `V2MetricCard--${tone}` : ''} ${glowClass}`.trim()}
       variants={metricCardVariants}
       initial="hidden"
       animate="visible"

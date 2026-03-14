@@ -654,7 +654,7 @@ export default function RunsV2() {
   );
 
   return (
-    <div className="V2Page">
+    <div className="V2Page V2PageTransition">
       <V2PageHeader
         title={v2Copy.nav.runs}
         subtitle="Daily activity and report history."

@@ -151,7 +151,7 @@ export default function SequencesV2() {
   };
 
   return (
-    <div className="V2Page">
+    <div className="V2Page V2PageTransition">
       <V2PageHeader
         title="Sequences"
         subtitle="How each sequence is performing: volume, replies, and booked calls."

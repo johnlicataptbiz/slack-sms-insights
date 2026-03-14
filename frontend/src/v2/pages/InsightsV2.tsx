@@ -225,12 +225,19 @@ export function InsightsV2() {
           label={<IconLabel icon={<Percent size={11} />}>Reply rate</IconLabel>}
           value={fmtPct(data.kpis.replyRatePct)}
           tone={data.kpis.replyRatePct >= 10 ? 'positive' : 'default'}
+          glow={data.kpis.replyRatePct >= 10 ? 'positive' : 'critical'}
         />
-        <V2MetricCard label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>} value={fmtInt(data.kpis.bookedCalls)} tone="positive" />
+        <V2MetricCard
+          label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>}
+          value={fmtInt(data.kpis.bookedCalls)}
+          tone="positive"
+          glow={true}
+        />
         <V2MetricCard
           label={<IconLabel icon={<CalendarCheck size={11} />}>Booking rate</IconLabel>}
           value={fmtPct(data.kpis.bookingRatePct)}
           tone={data.kpis.bookingRatePct >= 2 ? 'positive' : data.kpis.bookingRatePct <= 1 ? 'critical' : 'default'}
+          glow={data.kpis.bookingRatePct >= 2 ? 'positive' : 'critical'}
         />
         <V2MetricCard label={<IconLabel icon={<Share2 size={11} />}>Manual share (Slack)</IconLabel>} value={fmtPct(manualSharePct)} />
         {mondayCoverageCards.map((card) => (
@@ -245,11 +252,12 @@ export function InsightsV2() {
           label={<IconLabel icon={<TrendingDown size={11} />}>Opt-out rate</IconLabel>}
           value={fmtPct(data.kpis.optOutRatePct)}
           tone={data.kpis.optOutRatePct >= 3 ? 'critical' : 'default'}
+          glow={data.kpis.optOutRatePct >= 3 ? 'critical' : 'positive'}
         />
       </section>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range.">
+        <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range." className="V2Panel--glass">
           <div className="V2TableWrap">
             <table className="V2Table">
               <thead>
@@ -294,7 +302,7 @@ export function InsightsV2() {
       </div>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked.">
+        <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked." className="V2Panel--glass">
           <div className="V2SplitStat">
             <div>
               <span>Contacted</span>
@@ -381,7 +389,7 @@ export function InsightsV2() {
       </div>
 
       <div style={{ marginTop: '1rem' }}>
-        <V2Panel title="Watch List" caption="Items that need attention based on this range.">
+        <V2Panel title="Watch List" caption="Items that need attention based on this range." className="V2Panel--glass">
           {data.risks.length === 0 ? (
             <V2State kind="empty">No issues flagged for this date range.</V2State>
           ) : (

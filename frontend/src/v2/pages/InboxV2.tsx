@@ -1860,7 +1860,7 @@ export default function InboxV2() {
   };
 
   return (
-    <div className="V2Page V2Inbox">
+    <div className="V2Page V2Inbox V2PageTransition">
       {/* Floating Filter Bar */}
       <div className="V2Inbox__filterBar">
         <div className="V2Inbox__filterGroup">

@@ -110,29 +110,50 @@ export const startDailyReportCron = async (app: App): Promise<void> => {
 
   cronIntervalId = setInterval(() => {
     void (async () => {
-      try {
-        const { date, hour, minute } = getCTDateParts();
+      const { date, hour, minute } = getCTDateParts();
 
-        if (shouldRunInboxWatch(date, hour, minute)) {
+      // ── Background maintenance tasks — each isolated so a Prisma Accelerate
+      //    failure does NOT pollute the daily-run log or reset the report
+      //    dedup guard (lastRunDate). ─────────────────────────────────────────
+      if (shouldRunInboxWatch(date, hour, minute)) {
+        try {
           const thresholds = getInboxWatchThresholds();
           const counts = await loadInboxWatchCounts();
           await postInboxWatchAlert(app, counts, thresholds);
           await maybeAutoAssignInboxBacklog(app, counts, thresholds);
+        } catch (error) {
+          app.logger.error('[cron] Inbox watch failed (non-fatal):', error);
         }
+      }
 
+      try {
         await maybeAlertAttributionLag(app, date, hour, minute);
+      } catch (error) {
+        app.logger.error('[cron] Attribution lag check failed (non-fatal):', error);
+      }
+
+      try {
         await maybeRefreshBookedCallAttribution(app, date, hour, minute);
+      } catch (error) {
+        app.logger.error('[cron] Booked call attribution refresh failed (non-fatal):', error);
+      }
+
+      try {
         await maybeRefreshKpiFacts(app, date, hour, minute);
+      } catch (error) {
+        app.logger.error('[cron] KPI facts refresh failed (non-fatal):', error);
+      }
 
-        // Only fire at the exact target minute
-        if (hour !== REPORT_HOUR_CT || minute !== REPORT_MINUTE_CT) return;
+      // ── Daily report — only fires at REPORT_HOUR_CT:REPORT_MINUTE_CT CT ──
+      if (hour !== REPORT_HOUR_CT || minute !== REPORT_MINUTE_CT) return;
 
-        // Deduplicate: only fire once per calendar day (CT)
-        if (lastRunDate === date) return;
+      // Deduplicate: only fire once per calendar day (CT)
+      if (lastRunDate === date) return;
 
-        lastRunDate = date;
-        app.logger.info(`[cron] Triggering daily report for ${date}`);
+      lastRunDate = date;
+      app.logger.info(`[cron] Triggering daily report for ${date}`);
 
+      try {
         await generateAndPostReport({
           client: app.client,
           logger: app.logger,

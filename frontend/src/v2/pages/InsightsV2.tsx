@@ -20,19 +20,32 @@ function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.
   );
 }
 
-const smsBannerUrl = '/assets/sms-kit/smsbanner1.png';
-const analyticsWaveBannerUrl = '/assets/sms-kit/analytics_wave_banner.png';
-const smsGrowthBannerUrl = '/assets/sms-kit/sms_growth_banner.png';
-const smsWaveBannerUrl = '/assets/sms-kit/sms_wave_banner.png';
+const smsBannerUrl = '/assets/sms-kit/smsbanner1.webp';
+const analyticsWaveBannerUrl = '/assets/sms-kit/analytics_wave_banner.webp';
+const smsGrowthBannerUrl = '/assets/sms-kit/sms_growth_banner.webp';
+const smsWaveBannerUrl = '/assets/sms-kit/sms_wave_banner.webp';
+const banner2Url = '/assets/sms-kit/banner2.webp';
+const smsGrowthHeroUrl = '/assets/sms-kit/sms_growth_hero.webp';
+const heroBannerUrl = '/assets/sms-kit/herobannersms.webp';
 
-// Banner rotation based on day of week for visual variety
+// Section divider assets
+const waveDividerUrl = '/assets/sms-kit/wave_sms_divider.webp';
+const arrowDividerUrl = '/assets/sms-kit/arrow_strip_divider.webp';
+const nodeDividerUrl = '/assets/sms-kit/node_bar_divider.webp';
+
+// Banner rotation — full 7-day cycle for visual variety
 const getInsightsBannerForToday = (): string => {
   const day = new Date().getDay();
-  // Rotate through 4 banners: 0,1=smsbanner1, 2,3=analytics_wave, 4,5=sms_growth, 6=sms_wave
-  if (day <= 1) return smsBannerUrl;
-  if (day <= 3) return analyticsWaveBannerUrl;
-  if (day <= 5) return smsGrowthBannerUrl;
-  return smsWaveBannerUrl;
+  const banners = [
+    smsBannerUrl,           // Sunday
+    analyticsWaveBannerUrl, // Monday
+    smsGrowthBannerUrl,     // Tuesday
+    banner2Url,             // Wednesday
+    smsWaveBannerUrl,       // Thursday
+    smsGrowthHeroUrl,       // Friday
+    heroBannerUrl,          // Saturday
+  ];
+  return banners[day] || smsBannerUrl;
 };
 
 type Range = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
@@ -217,7 +230,9 @@ export function InsightsV2() {
         </div>
       ) : null}
 
-      <section className="V2MetricsGrid V2MetricsGrid--compact">
+      <img className="sms-section-divider" src={waveDividerUrl} alt="" aria-hidden="true" />
+
+      <section className="V2MetricsGrid V2MetricsGrid--compact sms-grid-bg">
         <V2MetricCard label={<IconLabel icon={<MessageSquare size={11} />}>Messages sent</IconLabel>} value={fmtInt(data.kpis.messagesSent)} />
         <V2MetricCard label={<IconLabel icon={<Users size={11} />}>People reached</IconLabel>} value={fmtInt(data.kpis.uniqueContacted)} />
         <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Replies</IconLabel>} value={fmtInt(data.kpis.repliesReceived)} />
@@ -256,8 +271,10 @@ export function InsightsV2() {
         />
       </section>
 
+      <img className="sms-section-divider" src={arrowDividerUrl} alt="" aria-hidden="true" />
+
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range." className="V2Panel--glass">
+        <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range." className="V2Panel--glass sms-pattern-bg">
           <div className="V2TableWrap">
             <table className="V2Table">
               <thead>
@@ -301,8 +318,10 @@ export function InsightsV2() {
         </div>
       </div>
 
+      <img className="sms-section-divider" src={nodeDividerUrl} alt="" aria-hidden="true" />
+
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked." className="V2Panel--glass">
+        <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked." className="V2Panel--glass sms-pattern-bg--alt">
           <div className="V2SplitStat">
             <div>
               <span>Contacted</span>

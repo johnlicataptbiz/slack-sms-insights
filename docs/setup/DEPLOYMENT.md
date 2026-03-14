@@ -1,4 +1,4 @@
-s# Deployment Guide: Vercel + Railway
+# Deployment Guide: Vercel + Railway
 
 This project is split across two platforms for optimal scalability:
 - **Vercel**: React frontend dashboard
@@ -23,9 +23,7 @@ railway login
 ### 1.2 Link project and create database
 
 ```bash
-cd /Users/jl/Desktop/SlackCLI
-
-# Create new Railway project (or link existing)
+# From repo root — create new Railway project (or link existing)
 railway init
 
 # Add PostgreSQL database
@@ -98,7 +96,7 @@ railway variables set MONDAY_PERSONAL_COLUMN_MAP_JSON='{"callDateColumnId":"date
 railway up
 
 # Monitor logs
-railway logs –follow
+railway logs --follow
 ```
 
 After deployment, Railway will give you a URL like: `https://your-railway-app.up.railway.app`

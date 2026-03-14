@@ -8,6 +8,8 @@ import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Pr
 import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
 import { AttributionHealthPanel } from '../components/AttributionHealthPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
+import { MetricCarousel } from '../components/MetricCarousel';
+import { V2Loading } from '../components/V2Loading';
 
 function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -18,7 +20,20 @@ function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.
   );
 }
 
-const smsBannerUrl = 'https://22001532.fs1.hubspotusercontent-na1.net/hubfs/22001532/JL/ptbizsms/smsbanner1.png';
+const smsBannerUrl = '/assets/sms-kit/smsbanner1.png';
+const analyticsWaveBannerUrl = '/assets/sms-kit/analytics_wave_banner.png';
+const smsGrowthBannerUrl = '/assets/sms-kit/sms_growth_banner.png';
+const smsWaveBannerUrl = '/assets/sms-kit/sms_wave_banner.png';
+
+// Banner rotation based on day of week for visual variety
+const getInsightsBannerForToday = (): string => {
+  const day = new Date().getDay();
+  // Rotate through 4 banners: 0,1=smsbanner1, 2,3=analytics_wave, 4,5=sms_growth, 6=sms_wave
+  if (day <= 1) return smsBannerUrl;
+  if (day <= 3) return analyticsWaveBannerUrl;
+  if (day <= 5) return smsGrowthBannerUrl;
+  return smsWaveBannerUrl;
+};
 
 type Range = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
 
@@ -124,9 +139,59 @@ export function InsightsV2() {
     );
   }
 
+  // Metric carousel slides based on KPI data
+  const metricSlides = useMemo(() => {
+    if (!data) return [];
+    return [
+      {
+        id: 'reply-rate',
+        title: 'Reply Rate',
+        value: fmtPct(data.kpis.replyRatePct),
+        description: 'SMS response rate for selected period',
+        trend: (data.kpis.replyRatePct >= 10 ? 'up' : 'down') as 'up' | 'down' | 'neutral',
+        trendValue: data.kpis.replyRatePct >= 10 ? '+Strong' : '-Low',
+        color: (data.kpis.replyRatePct >= 10 ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+      {
+        id: 'booking-rate',
+        title: 'Booking Rate',
+        value: fmtPct(data.kpis.bookingRatePct),
+        description: 'Calls booked per message sent',
+        trend: (data.kpis.bookingRatePct >= 2 ? 'up' : 'down') as 'up' | 'down' | 'neutral',
+        trendValue: data.kpis.bookingRatePct >= 2 ? '+Good' : '-Low',
+        color: (data.kpis.bookingRatePct >= 2 ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+      {
+        id: 'booked-calls',
+        title: 'Booked Calls',
+        value: fmtInt(data.kpis.bookedCalls),
+        description: 'Total calls booked',
+        trend: 'neutral' as 'up' | 'down' | 'neutral',
+        color: 'accent' as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+      {
+        id: 'opt-out-rate',
+        title: 'Opt-out Rate',
+        value: fmtPct(data.kpis.optOutRatePct),
+        description: 'Unsubscribe rate',
+        trend: (data.kpis.optOutRatePct >= 3 ? 'down' : 'up') as 'up' | 'down' | 'neutral',
+        trendValue: data.kpis.optOutRatePct >= 3 ? '-High' : '+Good',
+        color: (data.kpis.optOutRatePct >= 3 ? 'critical' : 'positive') as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+    ];
+  }, [data]);
+
   return (
-    <div className="V2Page">
-      <img className="V2PageHeroBanner" src={smsBannerUrl} alt="" aria-hidden="true" />
+    <div className="V2Page V2PageTransition">
+      <div className="V2HeroBannerOverlay">
+        <img className="V2PageHeroBanner" src={getInsightsBannerForToday()} alt="" aria-hidden="true" />
+      </div>
+      
+      {/* Metric Carousel - Type Motion Pattern */}
+      <div style={{ marginBottom: '1.5rem' }}>
+        <MetricCarousel slides={metricSlides} autoPlay={true} autoPlayInterval={6000} />
+      </div>
+
       <V2PageHeader
         title="Performance"
         subtitle="Team and setter results, what needs attention, and Monday board health."

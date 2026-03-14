@@ -4,9 +4,9 @@ Get the dashboard running locally with a test database.
 
 ## Prerequisites
 
-- Node.js 18+
-- PostgreSQL running locally (or use Railway PostgreSQL)
-- Slack app credentials (.env file)
+- Node.js 22+
+- PostgreSQL 15+ running locally (or use Railway PostgreSQL)
+- Slack app credentials (`.env` file — see [ENV_REFERENCE.md](ENV_REFERENCE.md))
 
 ## Option A: Local PostgreSQL
 
@@ -33,8 +33,7 @@ echo "postgresql://$(whoami):@localhost:5432/sms_insights"
 ## Option B: Railway PostgreSQL (Recommended for quick testing)
 
 ```bash
-# Connect to Railway project
-cd /Users/jl/Desktop/SlackCLI
+# Connect to Railway project (run from repo root)
 railway link
 
 # Get the public URL (needed for connections from outside Railway)
@@ -57,13 +56,11 @@ Replace them with the real shell operators (`&&`, `<<`) or the command will fail
 ### 1. Install dependencies
 
 ```bash
-cd /Users/jl/Desktop/SlackCLI/sms-insights
-
-# Install backend deps
+# From repo root
+cd sms-insights
 npm install
 
-# Install frontend deps
-cd frontend
+cd ../frontend
 npm install
 cd ..
 ```
@@ -109,7 +106,7 @@ You should see:
 ### 4. Start frontend dev server (in another terminal)
 
 ```bash
-cd /Users/jl/Desktop/SlackCLI/frontend
+cd frontend
 npm run dev
 ```
 
@@ -121,9 +118,10 @@ http://localhost:5173
 ### 5. Test the integration
 
 1. **Local frontend** → http://localhost:5173
-2. **API directly** (if needed) → http://localhost:3000/api/runs (requires token in header)
-3. **Slack bot** → Mention `@Aloware SMS Insights populate daily report for today` in your test channel
-4. Check the dashboard for new entries
+2. **Health check** → http://localhost:3000/api/health
+3. **API directly** (if needed) → http://localhost:3000/api/runs (requires token in header)
+4. **Slack bot** → Mention `@Aloware SMS Insights populate daily report for today` in your test channel
+5. Check the dashboard for new entries
 
 ## Database Debugging
 
@@ -166,7 +164,7 @@ npm run build
 
 **"Cannot find module '@slack/web-api'"**
 ```bash
-cd /Users/jl/Desktop/SlackCLI/sms-insights
+cd sms-insights
 npm install
 ```
 
@@ -181,8 +179,9 @@ npm install
 - Fix by re-setting it explicitly (see `DEPLOYMENT.md` troubleshooting)
 
 **Running scripts locally (e.g. `investigate-bookings.ts`)**
-- Scripts read `DATABASE_URL` from the environment — pass the public URL:
+- Scripts read `DATABASE_URL` from the environment — pass the public Railway URL:
   ```bash
+  cd sms-insights
   DATABASE_URL="postgresql://postgres:<password>@crossover.proxy.rlwy.net:56263/railway" \
     npx tsx scripts/investigate-bookings.ts
   ```

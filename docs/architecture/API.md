@@ -23,6 +23,106 @@ Obtain a token through the Slack OAuth flow:
 
 ## Endpoints
 
+### Health & Status
+
+#### Health Check
+```http
+GET /api/health
+```
+
+Public health check endpoint that verifies database connectivity and service status.
+
+**Response:**
+```json
+{
+  "ok": true,
+  "status": "ok",
+  "service": "ptbizsms-api",
+  "appName": "ptbizsms",
+  "time": "2024-01-15T10:30:00Z",
+  "checks": {
+    "db": {
+      "status": "ok",
+      "detail": "Prisma query check passed"
+    },
+    "prisma_accelerate": {
+      "status": "ok",
+      "configured": true,
+      "detail": "Using Prisma Accelerate"
+    },
+    "slack_auth": {
+      "status": "ok",
+      "detail": "Slack bot token configured",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    "aloware_ingest": {
+      "status": "ok",
+      "detail": "seen=1234 ingested=1200 skipped=34 skipRate=2.7%"
+    },
+    "stream_token_config": {
+      "status": "ok",
+      "configured": true,
+      "detail": "Stream token secret configured"
+    },
+    "auth_mode": {
+      "status": "ok",
+      "value": "password_only"
+    },
+    "build_sha": {
+      "status": "ok",
+      "value": "abc123def456"
+    }
+  }
+}
+```
+
+**Status Values:**
+- `ok` — All systems operational
+- `degraded` — Some warnings but functional
+- `error` — Critical failure (database down, etc.)
+
+---
+
+#### Runtime Status
+```http
+GET /api/runtime-status
+```
+
+Lightweight runtime configuration status check.
+
+**Response:**
+```json
+{
+  "ok": true,
+  "service": "ptbizsms-api",
+  "appName": "ptbizsms",
+  "time": "2024-01-15T10:30:00Z",
+  "checks": {
+    "slack_auth": {
+      "status": "ok",
+      "detail": "Slack bot token configured",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    "stream_token_config": {
+      "status": "ok",
+      "configured": true,
+      "detail": "Stream token secret configured"
+    },
+    "prisma_accelerate": {
+      "status": "ok",
+      "configured": true,
+      "detail": "Using Prisma Accelerate"
+    },
+    "build_sha": {
+      "status": "ok",
+      "value": "abc123def456"
+    }
+  }
+}
+```
+
+---
+
 ### Authentication
 
 #### Start OAuth Flow

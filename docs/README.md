@@ -1,80 +1,155 @@
 # PT Biz SMS Insights Documentation
 
-Welcome to the documentation hub for PT Biz SMS Insights — a real-time SMS analytics dashboard integrated with Slack, Aloware, and Monday.com.
+Welcome to the PT Biz SMS Insights documentation hub. This directory contains comprehensive guides for setup, development, deployment, and usage of the platform.
 
-## 📂 Documentation Structure
-
-### 🚀 Setup & Deployment
-| Document | Description | Audience |
-|----------|-------------|----------|
-| [QUICK_START.md](setup/QUICK_START.md) | 5-minute setup guide | New developers |
-| [ONBOARDING.md](setup/ONBOARDING.md) | Comprehensive setup and development guide | New team members |
-| [LOCAL_DEV.md](setup/LOCAL_DEV.md) | Detailed local development environment setup | Developers |
-| [DEPLOYMENT.md](setup/DEPLOYMENT.md) | Production deployment to Railway/Vercel | DevOps |
-
-### 🏗️ Architecture & API
-| Document | Description | Audience |
-|----------|-------------|----------|
-| [DASHBOARD_OVERVIEW.md](architecture/DASHBOARD_OVERVIEW.md) | System architecture, data flow, and component overview | All developers |
-| [UNIFIED_ANALYTICS.md](architecture/UNIFIED_ANALYTICS.md) | Governed Monday analytics model, views, APIs, and Metabase structure | Analytics + dashboard developers |
-| [API.md](architecture/API.md) | Complete API endpoint reference with TypeScript types | Frontend/backend developers |
-
-### 🛠️ Development
-| Document | Description | Audience |
-|----------|-------------|----------|
-| [CONTRIBUTING.md](development/CONTRIBUTING.md) | Git workflow, code standards, testing, PR process | All contributors |
-| [CODE_IMPROVEMENTS.md](development/CODE_IMPROVEMENTS.md) | Summary of code quality improvements implemented | Maintainers |
-| [IMPROVEMENTS_SUMMARY.md](development/IMPROVEMENTS_SUMMARY.md) | Detailed analysis of improvements and recommendations | Tech leads |
-
-### 📋 Planning & Roadmap
-| Document | Description | Audience |
-|----------|-------------|----------|
-| [ROADMAP.md](planning/ROADMAP.md) | Product roadmap and strategic vision (4-layer architecture) | Product/Engineering |
-| [implementation_plan.md](planning/implementation_plan.md) | Feature implementation phases and technical specs | Engineers |
-| [TODO.md](planning/TODO.md) | Active task tracking and backlog | Team |
-
-## 🎯 Quick Navigation
-
-**New to the project?** → Start with [QUICK_START.md](setup/QUICK_START.md)  
-**Setting up locally?** → See [LOCAL_DEV.md](setup/LOCAL_DEV.md)  
-**Deploying to production?** → Follow [DEPLOYMENT.md](setup/DEPLOYMENT.md)  
-**Understanding the system?** → Read [DASHBOARD_OVERVIEW.md](architecture/DASHBOARD_OVERVIEW.md)  
-**API integration?** → Reference [API.md](architecture/API.md)  
-**Contributing code?** → Check [CONTRIBUTING.md](development/CONTRIBUTING.md)
-
-## 🏛️ Architecture Overview
-
-The system follows a 4-layer architecture:
+## 📚 Documentation Structure
 
 ```
-┌─────────────────────────────────────────┐
-│  Layer 4: User Interface (React/Vite)   │
-│  - V2 Dashboard, Legacy Dashboard       │
-├─────────────────────────────────────────┤
-│  Layer 3: API Layer (Express/Bolt)    │
-│  - REST API, Slack Bot, WebSocket       │
-├─────────────────────────────────────────┤
-│  Layer 2: Service Layer               │
-│  - Aloware, Monday, Slack, AI clients   │
-├─────────────────────────────────────────┤
-│  Layer 1: Data Layer (PostgreSQL)     │
-│  - daily_runs, conversations, events    │
-└─────────────────────────────────────────┘
+docs/
+├── setup/                    # Getting started guides
+│   ├── ONBOARDING.md        # Complete setup guide
+│   ├── QUICK_START.md       # 5-minute quick start
+│   ├── LOCAL_DEV.md         # Local development details
+│   ├── DEPLOYMENT.md        # Production deployment
+│   ├── ENV_REFERENCE.md     # Environment variables
+│   ├── USAGE_GUIDE.md       # Day-to-day usage
+│   └── PASSWORD_GATE.md     # Password authentication
+│
+├── architecture/             # System design docs
+│   ├── API.md               # API documentation
+│   ├── DASHBOARD_OVERVIEW.md # Dashboard architecture
+│   ├── SEQUENCE_KPI_CONTRACT.md # KPI definitions
+│   └── UNIFIED_ANALYTICS.md # Analytics architecture
+│
+├── development/              # Development guides
+│   ├── CONTRIBUTING.md      # Contribution guidelines
+│   ├── CODE_IMPROVEMENTS.md # Code quality tips
+│   └── IMPROVEMENTS_SUMMARY.md # Known issues
+│
+├── planning/                 # Project planning
+│   ├── ROADMAP.md           # Feature roadmap
+│   ├── TODO.md              # Implementation tasks
+│   └── implementation_plan.md # Current sprint plan
+│
+└── operations/               # Operations guides
+    ├── DRIFT_CHECKLIST.md   # Configuration drift checks
+    └── PRODUCTION_SMOKE_CHECKS.md # Production verification
 ```
 
-## 🔄 Development Workflow
+## 🚀 Start Here
 
-1. **Setup**: Follow [ONBOARDING.md](setup/ONBOARDING.md) for initial setup
-2. **Develop**: Follow [CONTRIBUTING.md](development/CONTRIBUTING.md) for workflow
-3. **Test**: Run type checks and local tests
-4. **Deploy**: Use [DEPLOYMENT.md](setup/DEPLOYMENT.md) for production releases
+### New to the Project?
+1. **[QUICK_START.md](setup/QUICK_START.md)** — Get running in 5 minutes
+2. **[ONBOARDING.md](setup/ONBOARDING.md)** — Complete setup guide
+3. **[USAGE_GUIDE.md](setup/USAGE_GUIDE.md)** — How to use the platform
 
-## 📞 Support
+### Setting Up Development Environment?
+1. **[LOCAL_DEV.md](setup/LOCAL_DEV.md)** — Detailed local setup
+2. **[ENV_REFERENCE.md](setup/ENV_REFERENCE.md)** — All environment variables
+3. **[CONTRIBUTING.md](development/CONTRIBUTING.md)** — Development workflow
 
-- **Technical questions**: Check [LOCAL_DEV.md](setup/LOCAL_DEV.md) troubleshooting section
-- **API questions**: Reference [API.md](architecture/API.md)
-- **Architecture questions**: See [DASHBOARD_OVERVIEW.md](architecture/DASHBOARD_OVERVIEW.md)
+### Deploying to Production?
+1. **[DEPLOYMENT.md](setup/DEPLOYMENT.md)** — Railway + Vercel deployment
+2. **[PRODUCTION_SMOKE_CHECKS.md](operations/PRODUCTION_SMOKE_CHECKS.md)** — Post-deploy verification
+3. **[DRIFT_CHECKLIST.md](operations/DRIFT_CHECKLIST.md)** — Configuration monitoring
+
+### Building Features?
+1. **[API.md](architecture/API.md)** — API endpoints and contracts
+2. **[DASHBOARD_OVERVIEW.md](architecture/DASHBOARD_OVERVIEW.md)** — Dashboard architecture
+3. **[CONTRIBUTING.md](development/CONTRIBUTING.md)** — Code standards and PR process
+
+## 📖 Key Documents by Role
+
+### For Developers
+| Document | Purpose |
+|----------|---------|
+| [ONBOARDING.md](setup/ONBOARDING.md) | Complete development environment setup |
+| [LOCAL_DEV.md](setup/LOCAL_DEV.md) | Local development workflow |
+| [CONTRIBUTING.md](development/CONTRIBUTING.md) | Code standards and PR process |
+| [API.md](architecture/API.md) | API reference |
+| [CODE_IMPROVEMENTS.md](development/CODE_IMPROVEMENTS.md) | Code quality guidelines |
+
+### For DevOps/Operations
+| Document | Purpose |
+|----------|---------|
+| [DEPLOYMENT.md](setup/DEPLOYMENT.md) | Production deployment guide |
+| [ENV_REFERENCE.md](setup/ENV_REFERENCE.md) | Environment configuration |
+| [PRODUCTION_SMOKE_CHECKS.md](operations/PRODUCTION_SMOKE_CHECKS.md) | Post-deploy checks |
+| [DRIFT_CHECKLIST.md](operations/DRIFT_CHECKLIST.md) | Configuration monitoring |
+
+### For Product/Analytics
+| Document | Purpose |
+|----------|---------|
+| [USAGE_GUIDE.md](setup/USAGE_GUIDE.md) | Platform usage guide |
+| [DASHBOARD_OVERVIEW.md](architecture/DASHBOARD_OVERVIEW.md) | Dashboard features |
+| [UNIFIED_ANALYTICS.md](architecture/UNIFIED_ANALYTICS.md) | Analytics architecture |
+| [ROADMAP.md](planning/ROADMAP.md) | Feature roadmap |
+
+### For New Team Members
+| Document | Purpose |
+|----------|---------|
+| [QUICK_START.md](setup/QUICK_START.md) | 5-minute setup |
+| [ONBOARDING.md](setup/ONBOARDING.md) | Complete guide |
+| [USAGE_GUIDE.md](setup/USAGE_GUIDE.md) | How to use the platform |
+| [CONTRIBUTING.md](development/CONTRIBUTING.md) | How to contribute |
+
+## 🔧 Quick Reference
+
+### Common Commands
+
+```bash
+# Start development
+cd sms-insights && npm run dev      # Backend
+cd frontend && npm run dev          # Frontend
+
+# Database
+cd sms-insights && npx prisma studio # Database GUI
+npm run prisma:generate             # Regenerate client
+
+# Code quality
+cd sms-insights && npm run lint     # Lint backend
+cd frontend && npm run typecheck:v2 # Type check frontend
+
+# Deployment
+cd sms-insights && railway up       # Deploy backend
+cd frontend && vercel --prod        # Deploy frontend
+```
+
+### Important URLs
+
+| Environment | URL |
+|-------------|-----|
+| Local Dashboard | http://localhost:5173 |
+| Local API | http://localhost:3000 |
+| Production Dashboard | https://your-project.vercel.app |
+| Production API | https://your-railway-app.up.railway.app |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `sms-insights/.env` | Backend configuration |
+| `frontend/.env` | Frontend configuration |
+| `sms-insights/prisma/schema.prisma` | Database schema |
+| `railway.toml` | Railway deployment config |
+| `vercel.json` | Vercel deployment config |
+
+## 🆘 Getting Help
+
+1. **Check the docs** — Start with the relevant guide above
+2. **Review troubleshooting** — Each setup guide has a troubleshooting section
+3. **Check logs** — `railway logs --follow` for backend, browser console for frontend
+4. **Open an issue** — Include error messages, steps to reproduce, and environment details
+
+## 📝 Documentation Standards
+
+When contributing documentation:
+- Use clear, concise language
+- Include code examples where helpful
+- Add troubleshooting sections for common issues
+- Keep the [QUICK_START.md](setup/QUICK_START.md) updated with any setup changes
+- Update this README when adding new documents
 
 ---
 
-*Last updated: Current session | Maintained by the PT Biz Engineering team*
+**Questions?** Start with [ONBOARDING.md](setup/ONBOARDING.md) or open an issue.

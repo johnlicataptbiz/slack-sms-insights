@@ -2,7 +2,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Drawer } from 'vaul';
-import { BarChart2, Inbox, Activity, GitBranch, LogOut, BookOpen, Menu, X } from 'lucide-react';
+import { BarChart2, Inbox, Activity, GitBranch, LogOut, BookOpen, Menu, X, Sun, Moon } from 'lucide-react';
 
 import { client } from '../../api/client';
 import { V2_TERM_DEFINITIONS, V2_TERM_GROUPS, v2Copy } from '../copy';
@@ -26,7 +26,24 @@ const navItems: NavItem[] = [
 const brandLogoUrl = '/assets/sms-kit/logo1sms.png';
 const patternUrl = '/assets/sms-kit/patternsms.png';
 const heroBannerUrl = '/assets/sms-kit/herobannersms.png';
+const banner3Url = '/assets/sms-kit/banner3.png';
+const dividerUrl = '/assets/sms-kit/divider.png';
+const divider3Url = '/assets/sms-kit/divider3.png';
+const divider3SmsUrl = '/assets/sms-kit/divider%203%20sms.png';
+const smsPattern2Url = '/assets/sms-kit/smspattern2.png';
 const mobileMediaQuery = '(max-width: 1080px)';
+
+// Image rotation for visual variety across routes
+const getPatternForRoute = (pathname: string): string => {
+  if (pathname.includes('/insights')) return smsPattern2Url;
+  if (pathname.includes('/inbox')) return patternUrl;
+  return patternUrl;
+};
+
+const getHeroBannerForRoute = (pathname: string): string => {
+  if (pathname.includes('/sequences')) return banner3Url;
+  return heroBannerUrl;
+};
 const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
 
 const isRouteActive = (pathname: string, to: string) =>
@@ -45,6 +62,24 @@ const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: st
 };
 
 
+// Theme management utilities
+const getStoredTheme = (): 'light' | 'dark' => {
+  if (typeof window === 'undefined') return 'light';
+  const stored = localStorage.getItem('v2-theme') as 'light' | 'dark' | null;
+  if (stored) return stored;
+  // Check system preference
+  if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+  return 'light';
+};
+
+const setStoredTheme = (theme: 'light' | 'dark') => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('v2-theme', theme);
+  document.documentElement.setAttribute('data-theme', theme);
+};
+
 export default function V2Shell({ children }: { children: ReactNode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDefinitionsOpen, setIsDefinitionsOpen] = useState(false);
@@ -52,9 +87,23 @@ export default function V2Shell({ children }: { children: ReactNode }) {
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
     typeof window !== 'undefined' ? window.matchMedia(mobileMediaQuery).matches : false,
   );
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const location = useLocation();
   const navigate = useNavigate();
   const activeNavItem = navItems.find((item) => isRouteActive(location.pathname, item.to));
+
+  // Initialize theme on mount
+  useEffect(() => {
+    const initialTheme = getStoredTheme();
+    setTheme(initialTheme);
+    document.documentElement.setAttribute('data-theme', initialTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    setStoredTheme(newTheme);
+  };
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -181,6 +230,19 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         <div className="V2Shell__topActions">
           {!isMobileViewport ? <CommandPaletteTrigger onClick={() => setIsCmdOpen(true)} /> : null}
 
+          {/* Theme Toggle */}
+          <motion.button
+            className="V2ThemeToggle"
+            type="button"
+            onClick={toggleTheme}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+          >
+            <Sun size={18} className="V2ThemeToggle__icon V2ThemeToggle__icon--sun" />
+            <Moon size={18} className="V2ThemeToggle__icon V2ThemeToggle__icon--moon" />
+          </motion.button>
+
           <motion.button
             className="V2Shell__defsButton"
             type="button"
@@ -213,19 +275,28 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         {/* Sidebar */}
         <motion.aside
           className={`V2Shell__sidebar ${isMenuOpen ? 'is-open' : ''} ${isDesktopCollapsed ? 'is-collapsed' : ''}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Brand pattern overlay */}
+          {/* Brand pattern overlay - rotates based on route */}
           <div
             className="V2Shell__sidebarPattern"
-            style={{ backgroundImage: `url(${patternUrl})` }}
+            style={{ 
+              backgroundImage: `url(${getPatternForRoute(location.pathname)})`,
+              animation: 'v2-pattern-drift 60s linear infinite'
+            }}
             aria-hidden="true"
           />
 
           <div className="V2Shell__sidebarBrand">
-            <img className="V2Shell__sidebarLogo" src={brandLogoUrl} alt="PT Biz SMS" />
+            <motion.img 
+              className="V2Shell__sidebarLogo" 
+              src={brandLogoUrl} 
+              alt="PT Biz SMS"
+              whileHover={{ scale: 1.05 }}
+              transition={{ duration: 0.2 }}
+            />
           </div>
           <nav className="V2Shell__nav" aria-label="V2 primary navigation">
             <motion.div
@@ -245,7 +316,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                   >
                     <NavLink
                       to={item.to}
-                      className={({ isActive }) => `V2Shell__navItem ${isActive ? 'is-active' : ''}`}
+                      className={({ isActive }) => `V2Shell__navItem V2Shell__navItem--enhanced ${isActive ? 'is-active' : ''}`}
                     >
                       <motion.span
                         className="V2Shell__navIcon"
@@ -264,8 +335,8 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                         <motion.div
                           className="V2Shell__activeIndicator"
                           layoutId="activeNav"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
+                          initial={{ opacity: 0, scale: 0 }}
+                          animate={{ opacity: 1, scale: 1 }}
                           transition={springs.soft}
                         />
                       )}
@@ -275,12 +346,15 @@ export default function V2Shell({ children }: { children: ReactNode }) {
               })}
             </motion.div>
           </nav>
-          {/* Hero banner strip at bottom of sidebar */}
-          <img
+          {/* Hero banner strip at bottom of sidebar - rotates based on route */}
+          <motion.img
             className="V2Shell__sidebarHeroBanner"
-            src={heroBannerUrl}
+            src={getHeroBannerForRoute(location.pathname)}
             alt=""
             aria-hidden="true"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 0.82, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
           />
         </motion.aside>
 

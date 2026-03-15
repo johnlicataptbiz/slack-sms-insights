@@ -133,7 +133,7 @@ export default function SequencesV2() {
 
   const sortedSequences = useMemo(() => {
     if (!data) return [];
-    const filtered = data.sequences.filter((row) => row.messagesSent >= minSendsThreshold);
+    const filtered = data.sequences.filter((row) => row.messagesSent >= minSendsThreshold && !row.isManualBucket);
     const dir = sortDirection === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       if (sortKey === 'label') return a.label.localeCompare(b.label) * dir;

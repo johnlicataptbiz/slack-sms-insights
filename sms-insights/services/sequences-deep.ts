@@ -75,7 +75,7 @@ export const getSequencesDeep = async (
   const fromDay = params.from.toISOString().slice(0, 10);
   const toDay = params.to.toISOString().slice(0, 10);
 
-  const [smsRows, bookingRows, leadRows, sequenceRows, mondayRows, manualBucketRows, attributionStats, mondayBookedTotalRows] = await Promise.all([
+  const [smsRows, bookingRows, leadRows, sequenceRows, mondayRows, manualBucketRows, attributionStats, mondayBookedTotalRows, attributedByLabelRows] = await Promise.all([
     prisma.fact_sms_daily.findMany({
       where: {
         day: {
@@ -188,6 +188,29 @@ export const getSequencesDeep = async (
       toDay,
       salesTeamBoardId,
     ),
+    prisma.$queryRawUnsafe<Array<{ sequence_label: string; booked_total: number; booked_jack: number; booked_brandon: number; booked_self: number }>>(
+      `
+      SELECT
+        b.sequence_label,
+        COUNT(*)::int AS booked_total,
+        COUNT(*) FILTER (WHERE LOWER(COALESCE(b.set_by, '')) LIKE '%jack%')::int AS booked_jack,
+        COUNT(*) FILTER (WHERE LOWER(COALESCE(b.set_by, '')) LIKE '%brandon%')::int AS booked_brandon,
+        COUNT(*) FILTER (
+          WHERE NOT (
+            LOWER(COALESCE(b.set_by, '')) LIKE '%jack%'
+            OR LOWER(COALESCE(b.set_by, '')) LIKE '%brandon%'
+          )
+        )::int AS booked_self
+      FROM booked_call_attribution b
+      WHERE b.booked_event_ts >= $1::timestamptz
+        AND b.booked_event_ts <= $2::timestamptz
+        AND b.sequence_label IS NOT NULL
+        AND BTRIM(b.sequence_label) <> ''
+      GROUP BY b.sequence_label
+      `,
+      params.from.toISOString(),
+      params.to.toISOString(),
+    ),
   ]);
 
   const manualSequenceId = sequenceRows.find((row) => row.is_manual_bucket)?.id || null;
@@ -268,6 +291,28 @@ export const getSequencesDeep = async (
     stat.qualityFullTime += row.employment_full_time;
     stat.qualityMostlyCash += row.revenue_mix_mostly_cash;
     stat.qualityStep34 += row.progress_step_3_count + row.progress_step_4_count;
+  }
+
+  const normalizedLabelMap = new Map<string, string>();
+  const normalizeLabel = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, ' ');
+  for (const row of sequenceRows) {
+    normalizedLabelMap.set(normalizeLabel(row.label), row.id);
+  }
+
+  for (const row of attributedByLabelRows) {
+    const rawLabel = (row.sequence_label || '').trim();
+    if (!rawLabel) continue;
+    const matchedSequenceId = normalizedLabelMap.get(normalizeLabel(rawLabel));
+    if (!matchedSequenceId) continue;
+    const stat = ensure(resolveSequenceId(matchedSequenceId));
+
+    // Fallback attribution: only fill gaps where fact_booking_daily is 0 for this sequence in range.
+    if (stat.bookedCalls === 0 && row.booked_total > 0) {
+      stat.bookedCalls = row.booked_total;
+      stat.bookedJack = row.booked_jack;
+      stat.bookedBrandon = row.booked_brandon;
+      stat.bookedSelf = row.booked_self;
+    }
   }
 
   const sequences = sequenceRows

@@ -753,7 +753,7 @@ export type DailyReportAlertV2 = {
   type: string;
   severity: string;
   message: string;
-  createdAt: string;
+  createdAt: string | null;
 };
 
 export type DailyReportV2 = {

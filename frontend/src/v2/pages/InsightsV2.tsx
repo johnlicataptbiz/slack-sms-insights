@@ -3,13 +3,12 @@ import { useSearchParams } from 'react-router-dom';
 import { MessageSquare, Users, Reply, Percent, Phone, CalendarCheck, UserMinus, TrendingDown, Share2, LayoutGrid } from 'lucide-react';
 
 import { useV2InsightsSummary, useV2SalesMetrics } from '../../api/v2Queries';
-import type { BookedCredit } from '../../api/v2-types';
+import { DEFAULT_BUSINESS_TIME_ZONE } from '../../utils/runDay';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
 import { AttributionHealthPanel } from '../components/AttributionHealthPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
 import { MetricCarousel } from '../components/MetricCarousel';
-import { V2Loading } from '../components/V2Loading';
 
 function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -69,7 +68,7 @@ export function InsightsV2() {
   const repParam = (searchParams.get('rep') || '').toLowerCase();
   const selectedRep = repParam === 'jack' || repParam === 'brandon' ? repParam : null;
 
-  const query = useV2InsightsSummary({ range, tz: 'America/Chicago', rep: selectedRep });
+  const query = useV2InsightsSummary({ range, tz: DEFAULT_BUSINESS_TIME_ZONE, rep: selectedRep });
   const data = query.data?.data;
 
   const reps = useMemo(() => data?.reps ?? [], [data?.reps]);
@@ -82,7 +81,7 @@ export function InsightsV2() {
     [reps],
   );
 
-  const salesMetricsQuery = useV2SalesMetrics({ range, tz: 'America/Chicago' });
+  const salesMetricsQuery = useV2SalesMetrics({ range, tz: DEFAULT_BUSINESS_TIME_ZONE });
   const salesMetrics = salesMetricsQuery.data?.data;
   const bookedCredit = salesMetrics?.bookedCredit;
   const manualSharePct = bookedCredit && bookedCredit.total > 0 ? (bookedCredit.selfBooked / bookedCredit.total) * 100 : 0;
@@ -99,6 +98,53 @@ export function InsightsV2() {
         { label: 'Monday coverage · touchpoints', value: mondayHealth.avgTouchpointsCoveragePct },
       ]
     : [];
+
+  // KPI threshold constants — named to avoid magic numbers
+  const REPLY_RATE_GOOD_THRESHOLD = 10;   // % — below this is considered low engagement
+  const BOOKING_RATE_GOOD_THRESHOLD = 2;  // % — below this is considered low conversion
+  const OPT_OUT_RATE_HIGH_THRESHOLD = 3;  // % — at or above this is considered high churn risk
+
+  // Metric carousel slides — must be declared before any early returns (Rules of Hooks)
+  const metricSlides = useMemo(() => {
+    if (!data) return [];
+    return [
+      {
+        id: 'reply-rate',
+        title: 'Reply Rate',
+        value: fmtPct(data.kpis.replyRatePct),
+        description: 'SMS response rate for selected period',
+        trend: (data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'up' : 'down') as 'up' | 'down' | 'neutral',
+        trendValue: data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? '+Strong' : '-Low',
+        color: (data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+      {
+        id: 'booking-rate',
+        title: 'Booking Rate',
+        value: fmtPct(data.kpis.bookingRatePct),
+        description: 'Calls booked per message sent',
+        trend: (data.kpis.bookingRatePct >= BOOKING_RATE_GOOD_THRESHOLD ? 'up' : 'down') as 'up' | 'down' | 'neutral',
+        trendValue: data.kpis.bookingRatePct >= BOOKING_RATE_GOOD_THRESHOLD ? '+Good' : '-Low',
+        color: (data.kpis.bookingRatePct >= BOOKING_RATE_GOOD_THRESHOLD ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+      {
+        id: 'booked-calls',
+        title: 'Booked Calls',
+        value: fmtInt(data.kpis.bookedCalls),
+        description: 'Total calls booked',
+        trend: 'neutral' as 'up' | 'down' | 'neutral',
+        color: 'accent' as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+      {
+        id: 'opt-out-rate',
+        title: 'Opt-out Rate',
+        value: fmtPct(data.kpis.optOutRatePct),
+        description: 'Unsubscribe rate',
+        trend: (data.kpis.optOutRatePct >= OPT_OUT_RATE_HIGH_THRESHOLD ? 'down' : 'up') as 'up' | 'down' | 'neutral',
+        trendValue: data.kpis.optOutRatePct >= OPT_OUT_RATE_HIGH_THRESHOLD ? '-High' : '+Good',
+        color: (data.kpis.optOutRatePct >= OPT_OUT_RATE_HIGH_THRESHOLD ? 'critical' : 'positive') as 'accent' | 'positive' | 'critical' | 'warning',
+      },
+    ];
+  }, [data]);
 
   const renderBookingAttributionSection = () => {
     if (salesMetricsQuery.isLoading) {
@@ -152,48 +198,6 @@ export function InsightsV2() {
     );
   }
 
-  // Metric carousel slides based on KPI data
-  const metricSlides = useMemo(() => {
-    if (!data) return [];
-    return [
-      {
-        id: 'reply-rate',
-        title: 'Reply Rate',
-        value: fmtPct(data.kpis.replyRatePct),
-        description: 'SMS response rate for selected period',
-        trend: (data.kpis.replyRatePct >= 10 ? 'up' : 'down') as 'up' | 'down' | 'neutral',
-        trendValue: data.kpis.replyRatePct >= 10 ? '+Strong' : '-Low',
-        color: (data.kpis.replyRatePct >= 10 ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-      {
-        id: 'booking-rate',
-        title: 'Booking Rate',
-        value: fmtPct(data.kpis.bookingRatePct),
-        description: 'Calls booked per message sent',
-        trend: (data.kpis.bookingRatePct >= 2 ? 'up' : 'down') as 'up' | 'down' | 'neutral',
-        trendValue: data.kpis.bookingRatePct >= 2 ? '+Good' : '-Low',
-        color: (data.kpis.bookingRatePct >= 2 ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-      {
-        id: 'booked-calls',
-        title: 'Booked Calls',
-        value: fmtInt(data.kpis.bookedCalls),
-        description: 'Total calls booked',
-        trend: 'neutral' as 'up' | 'down' | 'neutral',
-        color: 'accent' as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-      {
-        id: 'opt-out-rate',
-        title: 'Opt-out Rate',
-        value: fmtPct(data.kpis.optOutRatePct),
-        description: 'Unsubscribe rate',
-        trend: (data.kpis.optOutRatePct >= 3 ? 'down' : 'up') as 'up' | 'down' | 'neutral',
-        trendValue: data.kpis.optOutRatePct >= 3 ? '-High' : '+Good',
-        color: (data.kpis.optOutRatePct >= 3 ? 'critical' : 'positive') as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-    ];
-  }, [data]);
-
   return (
     <div className="V2Page V2PageTransition">
       <div className="V2HeroBannerOverlay">
@@ -239,8 +243,8 @@ export function InsightsV2() {
         <V2MetricCard
           label={<IconLabel icon={<Percent size={11} />}>Reply rate</IconLabel>}
           value={fmtPct(data.kpis.replyRatePct)}
-          tone={data.kpis.replyRatePct >= 10 ? 'positive' : 'default'}
-          glow={data.kpis.replyRatePct >= 10 ? 'positive' : 'critical'}
+          tone={data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'positive' : 'default'}
+          glow={data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'positive' : 'critical'}
         />
         <V2MetricCard
           label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>}

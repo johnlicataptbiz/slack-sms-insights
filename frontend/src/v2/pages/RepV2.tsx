@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 
 import { useV2SalesMetrics } from '../../api/v2Queries';
 import { SkeletonDashboard } from '../components/Skeleton';
-import { resolveCurrentBusinessDay, shiftIsoDay } from '../../utils/runDay';
+import { DEFAULT_BUSINESS_TIME_ZONE, resolveCurrentBusinessDay, shiftIsoDay } from '../../utils/runDay';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
 
 // Asset URLs
@@ -12,7 +12,6 @@ const divider3Url = '/assets/sms-kit/divider3.webp';
 
 type RepKey = 'jack' | 'brandon';
 
-const BUSINESS_TZ = 'America/Chicago';
 
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
@@ -21,16 +20,16 @@ const fmtDeltaPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}pp`;
 
 export default function RepV2({ rep }: { rep: RepKey }) {
   const currentBusinessDay = useMemo(
-    () => resolveCurrentBusinessDay({ timeZone: BUSINESS_TZ, startHour: 4 }),
+    () => resolveCurrentBusinessDay({ timeZone: DEFAULT_BUSINESS_TIME_ZONE, startHour: 4 }),
     [],
   );
   const day = useMemo(() => (currentBusinessDay ? shiftIsoDay(currentBusinessDay.day, -1) : null), [currentBusinessDay]);
   const prevDay = useMemo(() => (day ? shiftIsoDay(day, -1) : null), [day]);
 
   const { data, isLoading, isError, refetch } = useV2SalesMetrics(
-    day ? { day, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ },
+    day ? { day, tz: DEFAULT_BUSINESS_TIME_ZONE } : { range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE },
   );
-  const { data: prevData } = useV2SalesMetrics(prevDay ? { day: prevDay, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ });
+  const { data: prevData } = useV2SalesMetrics(prevDay ? { day: prevDay, tz: DEFAULT_BUSINESS_TIME_ZONE } : { range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE });
 
   const payload = data?.data;
   const prevPayload = prevData?.data;
@@ -136,19 +135,19 @@ export default function RepV2({ rep }: { rep: RepKey }) {
   return (
     <div className="V2Page V2PageTransition">
       {/* Hero Banner with Logo Badge */}
-      <div className="V2HeroBanner" style={{ background: 'linear-gradient(135deg, #0a1528 0%, #13223c 50%, #0a1528 100%)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem 1.5rem' }}>
-          <img src={logoBadgeUrl} alt="" aria-hidden="true" style={{ height: '64px', width: 'auto', borderRadius: '8px' }} />
+      <div className="V2HeroBanner V2HeroBanner--rep">
+        <div className="V2HeroBanner__badgeRow">
+          <img src={logoBadgeUrl} alt="" aria-hidden="true" className="V2HeroBanner__badge" />
           <div>
             <span className="V2HeroBanner__title">{name} Scorecard</span>
-            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', margin: '0.25rem 0 0' }}>Daily coaching snapshot</p>
+            <p className="V2HeroBanner__subtitle">Daily coaching snapshot</p>
           </div>
         </div>
       </div>
 
       <V2PageHeader
         title={`${name} Scorecard`}
-        subtitle={`Daily summary for ${day || 'today'} (${BUSINESS_TZ}) with day-over-day change vs ${prevDay || 'yesterday'}.`}
+        subtitle={`Daily summary for ${day || 'today'} (${DEFAULT_BUSINESS_TIME_ZONE}) with day-over-day change vs ${prevDay || 'yesterday'}.`}
       />
 
       <section className="V2MetricsGrid sms-pattern-bg">

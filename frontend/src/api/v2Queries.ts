@@ -342,14 +342,16 @@ export const useV2WeeklySummary = (params: { weekStart?: string; tz?: string }) 
   });
 };
 
-export const useV2InsightsSummary = (params: {
+type InsightsSummaryQueryParams = {
   from?: string;
   to?: string;
   day?: string;
   range?: 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
   tz?: string;
   rep?: 'jack' | 'brandon' | null;
-}) => {
+};
+
+const toInsightsSummarySearchParams = (params: InsightsSummaryQueryParams): URLSearchParams => {
   const searchParams = new URLSearchParams();
   if (params.from && params.to) {
     searchParams.set('from', params.from);
@@ -361,6 +363,11 @@ export const useV2InsightsSummary = (params: {
   }
   if (params.tz) searchParams.set('tz', params.tz);
   if (params.rep) searchParams.set('rep', params.rep);
+  return searchParams;
+};
+
+export const useV2InsightsSummary = (params: InsightsSummaryQueryParams) => {
+  const searchParams = toInsightsSummarySearchParams(params);
 
   return useQuery({
     queryKey: ['v2', 'insights', 'summary', params],
@@ -376,14 +383,16 @@ export const useV2InsightsSummary = (params: {
   });
 };
 
-export const useV2SequencesDeep = (params: {
+type SequencesDeepQueryParams = {
   from?: string;
   to?: string;
   day?: string;
   range?: 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
   tz?: string;
   status?: 'active' | 'inactive';
-}) => {
+};
+
+const toSequencesDeepSearchParams = (params: SequencesDeepQueryParams): URLSearchParams => {
   const searchParams = new URLSearchParams();
   if (params.from && params.to) {
     searchParams.set('from', params.from);
@@ -395,6 +404,11 @@ export const useV2SequencesDeep = (params: {
   }
   if (params.tz) searchParams.set('tz', params.tz);
   if (params.status) searchParams.set('status', params.status);
+  return searchParams;
+};
+
+export const useV2SequencesDeep = (params: SequencesDeepQueryParams) => {
+  const searchParams = toSequencesDeepSearchParams(params);
 
   return useQuery({
     queryKey: ['v2', 'sequences', 'deep', params],

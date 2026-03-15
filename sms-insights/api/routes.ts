@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
@@ -266,18 +266,33 @@ const isDashboardSlackOauthEnabled = (): boolean => parseBooleanFlag(process.env
 const shouldUseSecureCookies = (): boolean =>
   parseBooleanFlag(process.env.COOKIE_SECURE, (process.env.NODE_ENV || '').trim() === 'production');
 
+// Memoized at module level — env vars don't change at runtime
+let _allowedOriginsCache: Set<string> | null = null;
 const getAllowedOrigins = (): Set<string> => {
+  if (_allowedOriginsCache) return _allowedOriginsCache;
   const configured = (process.env.ALLOWED_ORIGINS || process.env.CORS_ALLOWED_ORIGINS || '').trim();
   if (!configured) {
-    return new Set(DEFAULT_ALLOWED_ORIGINS);
+    _allowedOriginsCache = new Set(DEFAULT_ALLOWED_ORIGINS);
+    return _allowedOriginsCache;
   }
-
   const values = configured
     .split(',')
     .map((value) => value.trim())
     .filter((value) => value.length > 0);
+  _allowedOriginsCache = new Set(values);
+  return _allowedOriginsCache;
+};
 
-  return new Set(values);
+// Timing-safe string comparison to prevent timing attacks on secrets
+const timingSafeStringEqual = (a: string, b: string): boolean => {
+  try {
+    const bufA = Buffer.from(a, 'utf8');
+    const bufB = Buffer.from(b, 'utf8');
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  } catch {
+    return false;
+  }
 };
 
 const resolveCorsOrigin = (requestOrigin?: string): string | undefined => {
@@ -631,7 +646,7 @@ const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => 
     sendJson(res, 503, { error: 'Password auth is not configured on the server' }, origin);
     return;
   }
-  if (!expected || password !== expected) {
+  if (!expected || !timingSafeStringEqual(password, expected)) {
     sendJson(res, 401, { error: 'Invalid password' }, origin);
     return;
   }
@@ -721,18 +736,15 @@ const handleGetRuntimeStatus: RequestHandler = async (_req, res, _logger, origin
       checks: {
         slack_auth: {
           status: slackAuthRuntime.status,
-          detail: slackAuthRuntime.detail,
           updatedAt: slackAuthRuntime.updatedAt,
         },
         stream_token_config: {
           status: streamTokenConfig.status,
           configured: streamTokenConfig.configured,
-          detail: streamTokenConfig.reason,
         },
         prisma_accelerate: {
           status: prismaRuntime.status,
           configured: prismaRuntime.configured,
-          detail: prismaRuntime.detail,
         },
         build_sha: {
           status: buildSha === 'unknown' ? 'warn' : 'ok',
@@ -1011,11 +1023,13 @@ const handleGetRunById: RequestHandler = async (req, res, logger, origin) => {
 };
 
 const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
-  const botToken = req.headers['x-bot-token'];
-  if (!process.env.SLACK_BOT_TOKEN) {
+  const botTokenRaw = req.headers['x-bot-token'];
+  const botToken = Array.isArray(botTokenRaw) ? botTokenRaw[0] : botTokenRaw || '';
+  const expectedBotToken = (process.env.SLACK_BOT_TOKEN || '').trim();
+  if (!expectedBotToken) {
     return sendJson(res, 503, { error: 'Bot token not configured' }, origin);
   }
-  if (botToken !== process.env.SLACK_BOT_TOKEN) {
+  if (!timingSafeStringEqual(botToken, expectedBotToken)) {
     return sendJson(res, 401, { error: 'Invalid bot token' }, origin);
   }
 
@@ -4478,7 +4492,12 @@ const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, ori
 const handleGetDailyReportV2: RequestHandler = async (req, res, logger, origin) => {
   const url = new URL(req.url ?? '', `http://${req.headers.host}`);
   const dateParam = url.searchParams.get('date');
-  const compare = url.searchParams.get('compare') as 'prev_day' | 'prev_week' | 'prev_month' | undefined;
+  const compareParam = url.searchParams.get('compare');
+  if (compareParam && !['prev_day', 'prev_week', 'prev_month'].includes(compareParam)) {
+    sendJson(res, 400, { error: "Invalid 'compare' parameter. Must be one of 'prev_day', 'prev_week', 'prev_month'." }, origin);
+    return;
+  }
+  const compare = compareParam as 'prev_day' | 'prev_week' | 'prev_month' | undefined;
 
   if (!dateParam) {
     sendJson(res, 400, { error: 'Missing required query param: date (YYYY-MM-DD)' }, origin);
@@ -4492,10 +4511,11 @@ const handleGetDailyReportV2: RequestHandler = async (req, res, logger, origin) 
 
   try {
     const report = await computeDailyReport(dateParam, compare ? { compare } : undefined);
-    sendJson(res, 200, toEnvelope({ data: report, timeZone: 'America/Chicago' }), origin);
-  } catch (err: any) {
-    logger?.error(`Daily report V2 error: ${err.message}`);
-    sendJson(res, 500, { error: `Failed to compute daily report: ${err.message}` }, origin);
+    sendJson(res, 200, toEnvelope({ data: report, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger?.error(`Daily report V2 error: ${message}`);
+    sendJson(res, 500, { error: 'Failed to compute daily report' }, origin);
   }
 };
 
@@ -4517,10 +4537,11 @@ const handleGetDailyReportRangeV2: RequestHandler = async (req, res, logger, ori
 
   try {
     const range = await computeDailyReportRange(from, to);
-    sendJson(res, 200, toEnvelope({ data: range, timeZone: 'America/Chicago' }), origin);
-  } catch (err: any) {
-    logger?.error(`Daily report range V2 error: ${err.message}`);
-    sendJson(res, 500, { error: `Failed to compute daily report range: ${err.message}` }, origin);
+    sendJson(res, 200, toEnvelope({ data: range, timeZone: DEFAULT_BUSINESS_TIMEZONE }), origin);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger?.error(`Daily report range V2 error: ${message}`);
+    sendJson(res, 500, { error: 'Failed to compute daily report range' }, origin);
   }
 };
 
@@ -4533,9 +4554,16 @@ type ApiRoute = {
   handler: RequestHandler;
 };
 
+// Compile-on-first-use cache for route pattern regexes
+const _compiledRoutePatterns = new Map<string, RegExp>();
 const routeMatches = (pathname: string, pattern: string): boolean => {
-  const patternRegex = pattern.replace(/:[^\s/]+/g, '[^\\/]+');
-  return new RegExp(`^${patternRegex}$`).test(pathname);
+  let regex = _compiledRoutePatterns.get(pattern);
+  if (!regex) {
+    const patternRegex = pattern.replace(/:[^\s/]+/g, '[^\\/]+');
+    regex = new RegExp(`^${patternRegex}$`);
+    _compiledRoutePatterns.set(pattern, regex);
+  }
+  return regex.test(pathname);
 };
 
 const apiRoutes: ApiRoute[] = [

@@ -2,6 +2,7 @@ import { useV2SalesMetrics } from '../../api/v2Queries';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
 import { v2Copy } from '../copy';
 import { UnattributedAuditTable } from '../components/UnattributedAuditTable';
+import { DEFAULT_BUSINESS_TIME_ZONE } from '../../utils/runDay';
 
 // Asset URLs
 const heroBannerUrl = '/assets/sms-kit/analytics_wave_banner.webp';
@@ -9,7 +10,7 @@ const arrowDividerUrl = '/assets/sms-kit/arrow_strip_divider.webp';
 const networkDividerUrl = '/assets/sms-kit/network_bar_divider.webp';
 
 export default function AttributionV2() {
-  const { data, isLoading, isError, error } = useV2SalesMetrics({ range: 'today', tz: 'America/Chicago' });
+  const { data, isLoading, isError, error } = useV2SalesMetrics({ range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE });
   const payload = data?.data;
 
   if (isLoading) return <V2State kind="loading">Loading booking source details…</V2State>;

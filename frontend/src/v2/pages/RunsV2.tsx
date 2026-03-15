@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { useV2Channels, useV2Run, useV2Runs, useV2SalesMetrics } from '../../api/v2Queries';
+import { DEFAULT_BUSINESS_TIME_ZONE as BUSINESS_TZ } from '../../utils/runDay';
 import { SkeletonTable } from '../components/Skeleton';
 import type { RunV2 } from '../../api/v2-types';
 import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser';
@@ -28,7 +29,6 @@ const nodeDividerUrl = '/assets/sms-kit/node_bar_divider.webp';
 const divider2Url = '/assets/sms-kit/divider2.webp';
 
 const savedViewsStorageKey = 'ptbizsms-v2-runs-saved-views';
-const BUSINESS_TZ = 'America/Chicago';
 const DAILY_SNAPSHOT_TITLE_PATTERN = /PT BIZ - DAILY SMS SNAPSHOT/i;
 const DAILY_SETTER_SUMMARY_PATTERN = /Daily Setter Snapshot/i;
 const REPORT_DATE_LINE_PATTERN = /^Date:\s*(.+)$/im;
@@ -229,7 +229,7 @@ const getTodayCT = (): { date: string; hour: number } => {
   // Use formatToParts for reliable cross-browser parsing — toLocaleString string-splitting
   // is fragile and can return "24" for midnight with hour12:false in some environments.
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Chicago',
+    timeZone: BUSINESS_TZ,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

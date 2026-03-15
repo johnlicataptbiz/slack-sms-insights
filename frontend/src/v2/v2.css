@@ -9171,12 +9171,6 @@ display: inline-block;
   z-index: 1;
 }
 
-/* Pattern rotation utility - can be applied to sidebar or panels */
-.V2Shell__sidebarPattern--alt {
-  background-image: url('/assets/sms-kit/smspattern2.png') !important;
-  background-size: 200px auto !important;
-  opacity: 0.06 !important;
-}
 
 /* SMS Card Variant */
 .V2MetricCard--sms {
@@ -9241,6 +9235,17 @@ display: inline-block;
   opacity: 0.7;
 }
 
+/* Compact divider variant — reduced opacity & height for tighter sections */
+.sms-section-divider--compact {
+  opacity: 0.4;
+  max-height: 28px;
+}
+
+/* Subtle pattern background — lower opacity for content-heavy pages */
+.sms-pattern-bg--subtle::before {
+  opacity: 0.03;
+}
+
 /* V2 Hero Banner with Overlay Text */
 .V2HeroBanner {
   position: relative;
@@ -9265,7 +9270,7 @@ display: inline-block;
   display: flex;
   align-items: center;
   padding: 0 var(--v2-space-5);
-  background: linear-gradient(90deg, rgba(5, 9, 19, 0.55) 0%, rgba(5, 9, 19, 0.15) 60%, transparent 100%);
+  background: linear-gradient(90deg, rgba(5 9 19 / 0.55) 0%, rgba(5 9 19 / 0.15) 60%, transparent 100%);
 }
 
 .V2HeroBanner__title {
@@ -9338,7 +9343,31 @@ display: inline-block;
 }
 
 [data-theme="dark"] .V2HeroBanner__overlay {
-  background: linear-gradient(90deg, rgba(5, 9, 19, 0.7) 0%, rgba(5, 9, 19, 0.3) 60%, transparent 100%);
+  background: linear-gradient(90deg, rgba(5 9 19 / 0.7) 0%, rgba(5 9 19 / 0.3) 60%, transparent 100%);
+}
+
+/* Rep scorecard hero banner variant */
+.V2HeroBanner--rep {
+  background: linear-gradient(135deg, #0a1528 0%, #13223c 50%, #0a1528 100%);
+}
+
+.V2HeroBanner__badgeRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+}
+
+.V2HeroBanner__badge {
+  height: 64px;
+  width: auto;
+  border-radius: 8px;
+}
+
+.V2HeroBanner__subtitle {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.8rem;
+  margin: 0.25rem 0 0;
 }
 
 [data-theme="dark"] .sms-section-divider {

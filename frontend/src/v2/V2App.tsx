@@ -13,6 +13,8 @@ import { easing } from './utils/motion';
 import './v2.css';
 import './styles/components.css';
 
+const InboxV2 = lazy(() => import('./pages/InboxV2'));
+
 // Enhanced page transition variants
 const enhancedPageVariants: Variants = {
   initial: {
@@ -163,4 +165,3 @@ export default function V2App() {
     </ErrorBoundary>
   );
 }
-const InboxV2 = lazy(() => import('./pages/InboxV2'));

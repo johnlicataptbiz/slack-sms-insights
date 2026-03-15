@@ -4,6 +4,7 @@ import { MessageSquare, Users, Reply, Phone, CalendarCheck, UserMinus, AlertCirc
 import { useV2SequenceQualification, useV2SequencesDeep } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
+import { DEFAULT_BUSINESS_TIME_ZONE } from '../../utils/runDay';
 
 // Asset URLs
 const heroBannerUrl = '/assets/sms-kit/banner3.webp';
@@ -69,10 +70,10 @@ export default function SequencesV2() {
 
   const query = useV2SequencesDeep({
     range: mode,
-    tz: 'America/Chicago',
+    tz: DEFAULT_BUSINESS_TIME_ZONE,
     ...(status ? { status } : {}),
   });
-  const qualificationQuery = useV2SequenceQualification({ range: mode, tz: 'America/Chicago' });
+  const qualificationQuery = useV2SequenceQualification({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
   const data = query.data?.data;
   const qualificationItems = qualificationQuery.data?.data.items ?? [];
   const qualificationSummary = useMemo(() => {

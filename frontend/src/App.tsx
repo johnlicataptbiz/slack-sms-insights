@@ -1,15 +1,9 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { parseUiMode, type UiMode } from './uiMode';
 import { client, setUnauthorizedHandler } from './api/client';
 import { PasswordGate } from './components/PasswordGate';
 
 const V2App = lazy(() => import('./v2/V2App'));
-
-const resolveUiMode = (): UiMode => {
-  const envMode = parseUiMode(import.meta.env.VITE_UI_VERSION);
-  return envMode || 'v2';
-};
 
 const DefaultRoute = () => {
   return <Navigate to="/v2/insights" replace />;
@@ -34,7 +28,7 @@ const AppRoutes = () => (
 );
 
 export default function App() {
-  const [isAuthed, setIsAuthed] = useState<boolean | null>(true);
+  const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -46,7 +40,7 @@ export default function App() {
 
     const verifySession = async () => {
       try {
-        // await client.get('/api/auth/verify');
+        await client.get('/api/auth/verify');
         if (active) setIsAuthed(true);
       } catch {
         if (active) setIsAuthed(false);
@@ -87,4 +81,3 @@ export default function App() {
   return <AppRoutes />;
 }
 
-export const detectUiMode = resolveUiMode;

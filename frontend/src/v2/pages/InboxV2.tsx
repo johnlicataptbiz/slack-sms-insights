@@ -1863,7 +1863,7 @@ export default function InboxV2() {
   };
 
   return (
-    <div className="V2Page V2Inbox V2PageTransition sms-pattern-bg" style={{ '--sms-pattern-opacity': '0.03' } as React.CSSProperties}>
+    <div className="V2Page V2Inbox V2PageTransition sms-pattern-bg sms-pattern-bg--subtle">
       {/* Floating Filter Bar */}
       <div className="V2Inbox__filterBar">
         <div className="V2Inbox__filterGroup">
@@ -2008,7 +2008,7 @@ export default function InboxV2() {
         </div>
       </div>
 
-      <img className="sms-section-divider" src={arrowDividerUrl} alt="" aria-hidden="true" style={{ opacity: 0.4, maxHeight: '28px' }} />
+      <img className="sms-section-divider sms-section-divider--compact" src={arrowDividerUrl} alt="" aria-hidden="true" />
 
       <section className="V2Inbox__commandDeck" aria-label="Inbox quick actions">
         <button

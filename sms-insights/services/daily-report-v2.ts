@@ -311,7 +311,7 @@ async function getAlerts(targetDate: Date): Promise<DailyReportAlertV2[]> {
     type: r.alert_type,
     severity: r.severity,
     message: r.message,
-    createdAt: r.created_at?.toISOString() ?? new Date().toISOString(),
+    createdAt: r.created_at?.toISOString() ?? null,
   }));
 }
 

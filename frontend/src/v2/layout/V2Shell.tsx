@@ -34,22 +34,33 @@ const networkPatternUrl = '/assets/sms-kit/sms_network_pattern.webp';
 const smsGrowthHeroUrl = '/assets/sms-kit/sms_growth_hero.webp';
 const mobileMediaQuery = '(max-width: 1080px)';
 
-// Image rotation for visual variety across routes
-const getPatternForRoute = (pathname: string): string => {
-  if (pathname.includes('/insights')) return smsPattern2Url;
-  if (pathname.includes('/inbox')) return networkPatternUrl;
-  if (pathname.includes('/sequences')) return ptbizPatternUrl;
-  if (pathname.includes('/runs')) return networkPatternUrl;
-  if (pathname.includes('/rep')) return patternUrl;
-  return patternUrl;
+// Data-driven route → asset maps for visual variety across routes
+const ROUTE_PATTERN_MAP: Record<string, string> = {
+  '/insights': smsPattern2Url,
+  '/inbox': networkPatternUrl,
+  '/sequences': ptbizPatternUrl,
+  '/runs': networkPatternUrl,
+  '/rep': patternUrl,
 };
 
-const getHeroBannerForRoute = (pathname: string): string => {
-  if (pathname.includes('/sequences')) return banner3Url;
-  if (pathname.includes('/runs')) return banner2Url;
-  if (pathname.includes('/rep')) return smsGrowthHeroUrl;
-  return heroBannerUrl;
+const ROUTE_HERO_BANNER_MAP: Record<string, string> = {
+  '/sequences': banner3Url,
+  '/runs': banner2Url,
+  '/rep': smsGrowthHeroUrl,
 };
+
+const resolveRouteAsset = (pathname: string, map: Record<string, string>, fallback: string): string => {
+  for (const key of Object.keys(map)) {
+    if (pathname.includes(key)) return map[key];
+  }
+  return fallback;
+};
+
+const getPatternForRoute = (pathname: string): string =>
+  resolveRouteAsset(pathname, ROUTE_PATTERN_MAP, patternUrl);
+
+const getHeroBannerForRoute = (pathname: string): string =>
+  resolveRouteAsset(pathname, ROUTE_HERO_BANNER_MAP, heroBannerUrl);
 const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
 
 const isRouteActive = (pathname: string, to: string) =>
@@ -61,7 +72,10 @@ const navigateWithTransition = (navigate: ReturnType<typeof useNavigate>, to: st
   };
 
   if (doc.startViewTransition) {
-    doc.startViewTransition(() => navigate(to));
+    const transition = doc.startViewTransition(() => navigate(to));
+    transition.finished.catch(() => {
+      // Transition was interrupted or not supported — navigation already completed
+    });
     return;
   }
   navigate(to);
@@ -144,8 +158,6 @@ export default function V2Shell({ children }: { children: ReactNode }) {
   const handleSidebarToggle = () => {
     setIsMenuOpen((value) => !value);
   };
-
-  const isDesktopCollapsed = false;
 
   const handleLogout = async () => {
     try {
@@ -277,10 +289,10 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         </div>
       </motion.header>
 
-      <div className={`V2Shell__body ${isDesktopCollapsed ? 'is-collapsed' : ''}`}>
+      <div className="V2Shell__body">
         {/* Sidebar */}
         <motion.aside
-          className={`V2Shell__sidebar ${isMenuOpen ? 'is-open' : ''} ${isDesktopCollapsed ? 'is-collapsed' : ''}`}
+          className={`V2Shell__sidebar ${isMenuOpen ? 'is-open' : ''}`}
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}

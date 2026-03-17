@@ -163,8 +163,7 @@ const normalizeContactName = (value: string | null): string | null => {
 
 const buildManualItemName = (contactName: string, eventTs: string): string => {
   const cleaned = normalizeContactName(contactName) || 'Manual Call';
-  const callDate = resolveCallDate(eventTs);
-  return `${cleaned} - ${callDate}`;
+  return cleaned; // Just the name, no date suffix
 };
 
 const buildManualMarkdown = (params: ManualSyncParams): string => {
@@ -271,10 +270,9 @@ const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
 };
 
 const buildItemName = (source: BookedCallAttributionSource): string => {
-  const callDate = resolveCallDate(source.eventTs);
   const contactName = normalizeContactName(source.contactName);
   const who = contactName || 'Booked Call';
-  return `${who} - ${callDate}`;
+  return who; // Just the name, no date suffix
 };
 
 const loadBoardMapping = async (

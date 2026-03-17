@@ -87,6 +87,9 @@ import {
 } from '../services/monday-governed-analytics.js';
 import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
 import { createManualMondayBookedCall } from '../services/monday-personal-writeback.js';
+import { syncMondaySmsBoard, listMondaySmsSyncBoardIds } from '../services/monday-sms-sync.js';
+import { syncMondaySmsSequencesBoard, listMondaySmsSequencesSyncBoardIds } from '../services/monday-sms-sequences.js';
+import { syncMondaySmsReportsBoard, listMondaySmsReportsSyncBoardIds } from '../services/monday-sms-reports.js';
 import { getPrismaRuntimeStatus } from '../services/prisma.js';
 import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
@@ -4286,6 +4289,99 @@ const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, o
   }
 };
 
+const handleGetMondaySmsSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+  const boardIds = listMondaySmsSyncBoardIds();
+  sendJson(res, 200, { boardIds }, origin);
+};
+
+const handlePostMondaySmsSync: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const boardId = url.searchParams.get('boardId');
+  const force = url.searchParams.get('force') === 'true';
+
+  if (!boardId) {
+    return sendJson(res, 400, { error: 'boardId query parameter is required' }, origin);
+  }
+
+  try {
+    const result = await syncMondaySmsBoard(boardId, logger, { force });
+    sendJson(res, 200, { result }, origin);
+  } catch (error) {
+    logger?.error('Failed to sync Monday SMS board:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to sync Monday SMS board',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
+const handleGetMondaySmsSequencesSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+  const boardIds = listMondaySmsSequencesSyncBoardIds();
+  sendJson(res, 200, { boardIds }, origin);
+};
+
+const handlePostMondaySmsSequencesSync: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const boardId = url.searchParams.get('boardId');
+  const force = url.searchParams.get('force') === 'true';
+
+  if (!boardId) {
+    return sendJson(res, 400, { error: 'boardId query parameter is required' }, origin);
+  }
+
+  try {
+    const result = await syncMondaySmsSequencesBoard(boardId, logger, { force });
+    sendJson(res, 200, { result }, origin);
+  } catch (error) {
+    logger?.error('Failed to sync Monday SMS Sequences board:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to sync Monday SMS Sequences board',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
+const handleGetMondaySmsReportsSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+  const boardIds = listMondaySmsReportsSyncBoardIds();
+  sendJson(res, 200, { boardIds }, origin);
+};
+
+const handlePostMondaySmsReportsSync: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const boardId = url.searchParams.get('boardId');
+  const force = url.searchParams.get('force') === 'true';
+
+  if (!boardId) {
+    return sendJson(res, 400, { error: 'boardId query parameter is required' }, origin);
+  }
+
+  try {
+    const result = await syncMondaySmsReportsBoard(boardId, logger, { force });
+    sendJson(res, 200, { result }, origin);
+  } catch (error) {
+    logger?.error('Failed to sync Monday SMS Reports board:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to sync Monday SMS Reports board',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
 const handlePostManualBookedCallV2: RequestHandler = async (req, res, logger, origin) => {
   const session = getSessionFromRequest(req);
   if (!session) {
@@ -4721,6 +4817,12 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
   { method: 'GET', path: '/api/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
   { method: 'GET', path: '/api/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
+  { method: 'GET', path: '/api/admin/monday/sms/sync-board-ids', handler: handleGetMondaySmsSyncBoardIds },
+  { method: 'POST', path: '/api/admin/monday/sms/sync', handler: handlePostMondaySmsSync },
+  { method: 'GET', path: '/api/admin/monday/sms-sequences/sync-board-ids', handler: handleGetMondaySmsSequencesSyncBoardIds },
+  { method: 'POST', path: '/api/admin/monday/sms-sequences/sync', handler: handlePostMondaySmsSequencesSync },
+  { method: 'GET', path: '/api/admin/monday/sms-reports/sync-board-ids', handler: handleGetMondaySmsReportsSyncBoardIds },
+  { method: 'POST', path: '/api/admin/monday/sms-reports/sync', handler: handlePostMondaySmsReportsSync },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
   { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },

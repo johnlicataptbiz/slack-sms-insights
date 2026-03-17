@@ -12,6 +12,9 @@ import { initDatabase } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
 import { logger } from './services/logger.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
+import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
+import { startMondaySmsSequencesSyncJobs } from './services/monday-sms-sequences.js';
+import { startMondaySmsReportsSyncJobs } from './services/monday-sms-reports.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
 import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
 
@@ -258,6 +261,11 @@ app.error(async (error) => {
 
     // monday read-sync/writeback maintenance jobs (feature-flag gated).
     startMondaySyncJobs(app.logger);
+
+    // Monday SMS sync jobs (feature-flag gated)
+    startMondaySmsSyncJobs(app.logger);
+    startMondaySmsSequencesSyncJobs(app.logger);
+    startMondaySmsReportsSyncJobs(app.logger);
   } catch (error) {
     logger.app.error(`[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`);
     await reportError(app, error, 'Startup Failure');

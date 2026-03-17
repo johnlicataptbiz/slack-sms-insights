@@ -298,6 +298,41 @@ const loadBoardMapping = async (
   };
 };
 
+/**
+ * Map line/source values to valid Monday.com status column values
+ */
+const mapLineToChannel = (line: string | null): string | null => {
+  if (!line) return null;
+  const normalized = line.toLowerCase();
+  // Map your actual line names to Monday.com Channel? column values
+  if (normalized.includes('aloware') || normalized.includes('sms')) return 'Aloware SMS';
+  if (normalized.includes('circle')) return 'Circle DM';
+  if (normalized.includes('instagram') || normalized.includes('ig')) return 'Instagram DM';
+  if (normalized.includes('email')) return 'Email Marketing';
+  if (normalized.includes('self')) return 'SELF BOOK';
+  // Default fallback
+  return 'Aloware SMS';
+};
+
+const mapSourceToMondaySource = (firstConversion: string | null): string | null => {
+  if (!firstConversion) return 'Direct Outreach'; // Default value
+  const normalized = firstConversion.toLowerCase();
+  // Map your first conversion sources to Monday.com Source? column values
+  if (normalized.includes('circle')) return 'Circle Group';
+  if (normalized.includes('book buyer')) return 'Book Buyer';
+  if (normalized.includes('checklist')) return 'Start-Up Checklist';
+  if (normalized.includes('rates')) return 'Raise Your Rates';
+  if (normalized.includes('space')) return 'Stand Alone Space Setup Guide';
+  if (normalized.includes('email')) return 'Marketing Email';
+  if (normalized.includes('social')) return 'Social Media';
+  if (normalized.includes('hiring')) return 'Hiring Guide';
+  if (normalized.includes('webinar')) return 'Webinar';
+  if (normalized.includes('workshop')) return 'Workshop Playbook';
+  if (normalized.includes('self book')) return 'Signature Self Book';
+  // Default fallback
+  return 'Direct Outreach';
+};
+
 const toColumnValues = (
   source: BookedCallAttributionSource,
   mapping: PersonalBoardColumnMapping,
@@ -312,10 +347,13 @@ const toColumnValues = (
   addColumnValue(values, columnsById, mapping.contactNameColumnId, normalizeContactName(source.contactName));
   addColumnValue(values, columnsById, mapping.phoneColumnId, source.contactPhone, { isPhone: true });
   addColumnValue(values, columnsById, mapping.setterColumnId, source.rep || setter, { isSetter: true });
-  addColumnValue(values, columnsById, mapping.stageColumnId, 'Booked');
-  addColumnValue(values, columnsById, mapping.firstConversionColumnId, source.firstConversion);
-  addColumnValue(values, columnsById, mapping.lineColumnId, source.line);
-  addColumnValue(values, columnsById, mapping.sourceColumnId, 'Slack booked call');
+  
+  // FIXED: Use valid Monday.com status values
+  addColumnValue(values, columnsById, mapping.stageColumnId, 'First Swing'); // Changed from 'Booked' to 'First Swing'
+  addColumnValue(values, columnsById, mapping.firstConversionColumnId, source.firstConversion); // Keep original if not status column
+  addColumnValue(values, columnsById, mapping.lineColumnId, mapLineToChannel(source.line)); // Map to valid Channel value
+  addColumnValue(values, columnsById, mapping.sourceColumnId, mapSourceToMondaySource(source.firstConversion)); // Map to valid Source value
+  
   addColumnValue(values, columnsById, mapping.slackLinkColumnId, link, { isLink: true });
   addColumnValue(
     values,

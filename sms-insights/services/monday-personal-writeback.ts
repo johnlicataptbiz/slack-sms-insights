@@ -21,8 +21,10 @@ type ManualSyncParams = {
   setter?: PersonalSetterBucket;
 };
 
+// MODIFIED: Added dateHeldColumnId and advisorColumnId
 type PersonalBoardColumnMapping = {
-  callDateColumnId: string | null;
+  callDateColumnId: string | null; // "Date Set" - when they booked
+  dateHeldColumnId: string | null; // "Date Held" - appointment date
   contactNameColumnId: string | null;
   phoneColumnId: string | null;
   setterColumnId: string | null;
@@ -32,6 +34,7 @@ type PersonalBoardColumnMapping = {
   sourceColumnId: string | null;
   slackLinkColumnId: string | null;
   notesColumnId: string | null;
+  advisorColumnId: string | null; // New column for Advisor
 };
 
 const parseJsonMapping = (raw: string | undefined): unknown => {
@@ -57,8 +60,10 @@ const findColumnBySignals = (columns: MondayBoardColumn[], signals: string[]): s
   return null;
 };
 
+// MODIFIED: Added inference for dateHeld and advisor columns
 const inferPersonalMapping = (columns: MondayBoardColumn[]): PersonalBoardColumnMapping => ({
-  callDateColumnId: findColumnBySignals(columns, ['call date', 'appointment date', 'date']),
+  callDateColumnId: findColumnBySignals(columns, ['date set']),
+  dateHeldColumnId: findColumnBySignals(columns, ['date held', 'appointment date']),
   contactNameColumnId: findColumnBySignals(columns, ['contact name', 'lead name', 'name']),
   phoneColumnId: findColumnBySignals(columns, ['phone', 'mobile']),
   setterColumnId: findColumnBySignals(columns, ['setter', 'rep', 'owner']),
@@ -68,6 +73,7 @@ const inferPersonalMapping = (columns: MondayBoardColumn[]): PersonalBoardColumn
   sourceColumnId: findColumnBySignals(columns, ['source type', 'source', 'origin']),
   slackLinkColumnId: findColumnBySignals(columns, ['slack', 'thread link', 'link']),
   notesColumnId: findColumnBySignals(columns, ['notes', 'summary', 'details']),
+  advisorColumnId: findColumnBySignals(columns, ['advisor', 'contact owner']),
 });
 
 const asNullableString = (value: unknown): string | null => {
@@ -75,11 +81,13 @@ const asNullableString = (value: unknown): string | null => {
   return null;
 };
 
+// MODIFIED: Coerce new mapping fields
 const coercePersonalMapping = (value: unknown): PersonalBoardColumnMapping | null => {
   if (typeof value !== 'object' || value === null) return null;
   const row = value as Record<string, unknown>;
   return {
     callDateColumnId: asNullableString(row.callDateColumnId),
+    dateHeldColumnId: asNullableString(row.dateHeldColumnId),
     contactNameColumnId: asNullableString(row.contactNameColumnId),
     phoneColumnId: asNullableString(row.phoneColumnId),
     setterColumnId: asNullableString(row.setterColumnId),
@@ -89,6 +97,7 @@ const coercePersonalMapping = (value: unknown): PersonalBoardColumnMapping | nul
     sourceColumnId: asNullableString(row.sourceColumnId),
     slackLinkColumnId: asNullableString(row.slackLinkColumnId),
     notesColumnId: asNullableString(row.notesColumnId),
+    advisorColumnId: asNullableString(row.advisorColumnId),
   };
 };
 
@@ -96,6 +105,7 @@ export const readPersonalMappingFromEnv = (raw?: string): PersonalBoardColumnMap
   return coercePersonalMapping(parseJsonMapping(raw ?? process.env.MONDAY_PERSONAL_COLUMN_MAP_JSON));
 };
 
+// MODIFIED: Merge new mapping fields
 const mergeMappings = (
   persisted: PersonalBoardColumnMapping | null,
   inferred: PersonalBoardColumnMapping,
@@ -103,6 +113,7 @@ const mergeMappings = (
   if (!persisted) return inferred;
   return {
     callDateColumnId: persisted.callDateColumnId || inferred.callDateColumnId,
+    dateHeldColumnId: persisted.dateHeldColumnId || inferred.dateHeldColumnId,
     contactNameColumnId: persisted.contactNameColumnId || inferred.contactNameColumnId,
     phoneColumnId: persisted.phoneColumnId || inferred.phoneColumnId,
     setterColumnId: persisted.setterColumnId || inferred.setterColumnId,
@@ -112,9 +123,11 @@ const mergeMappings = (
     sourceColumnId: persisted.sourceColumnId || inferred.sourceColumnId,
     slackLinkColumnId: persisted.slackLinkColumnId || inferred.slackLinkColumnId,
     notesColumnId: persisted.notesColumnId || inferred.notesColumnId,
+    advisorColumnId: persisted.advisorColumnId || inferred.advisorColumnId,
   };
 };
 
+// MODIFIED: Merge new mapping fields
 const mergePersonalOverrides = (
   base: PersonalBoardColumnMapping,
   override: PersonalBoardColumnMapping | null,
@@ -122,6 +135,7 @@ const mergePersonalOverrides = (
   if (!override) return base;
   return {
     callDateColumnId: override.callDateColumnId || base.callDateColumnId,
+    dateHeldColumnId: override.dateHeldColumnId || base.dateHeldColumnId,
     contactNameColumnId: override.contactNameColumnId || base.contactNameColumnId,
     phoneColumnId: override.phoneColumnId || base.phoneColumnId,
     setterColumnId: override.setterColumnId || base.setterColumnId,
@@ -131,6 +145,7 @@ const mergePersonalOverrides = (
     sourceColumnId: override.sourceColumnId || base.sourceColumnId,
     slackLinkColumnId: override.slackLinkColumnId || base.slackLinkColumnId,
     notesColumnId: override.notesColumnId || base.notesColumnId,
+    advisorColumnId: override.advisorColumnId || base.advisorColumnId,
   };
 };
 
@@ -188,6 +203,75 @@ const slackPermalink = (channelId: string, messageTs: string): string => {
 const resolveCallDate = (eventTs: string): string => {
   const tz = (process.env.ALOWARE_REPORT_TIMEZONE || '').trim() || DEFAULT_BUSINESS_TIMEZONE;
   return dayKeyInTimeZone(eventTs, tz) || eventTs.slice(0, 10);
+};
+
+// NEW: Helper functions to parse data from Slack message attachments
+/**
+ * Convert M/D/YY or M/D/YYYY to YYYY-MM-DD
+ */
+const parseMDYDate = (dateStr: string): string | null => {
+  const match = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!match) return null;
+
+  const month = match[1].padStart(2, '0');
+  const day = match[2].padStart(2, '0');
+  let year = match[3];
+
+  // Convert 2-digit year to 4-digit
+  if (year.length === 2) {
+    const yearNum = parseInt(year, 10);
+    year = yearNum >= 0 && yearNum <= 50 ? `20${year}` : `19${year}`;
+  }
+
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Parse appointment date from HubSpot Slack attachment text
+ */
+const parseDateHeldFromSlackRaw = (raw: unknown): string | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const typed = raw as { attachments?: Array<{ text?: string; fallback?: string }> };
+  const firstAttachment = Array.isArray(typed.attachments) ? typed.attachments[0] : null;
+  if (!firstAttachment) return null;
+
+  const text = firstAttachment.text || firstAttachment.fallback || '';
+
+  const nextActivityMatch = text.match(/\*Next Activity Date\*:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  if (nextActivityMatch && nextActivityMatch[1]) {
+    return parseMDYDate(nextActivityMatch[1]);
+  }
+
+  const meetingDateMatch = text.match(/\*Date of last meeting booked[^:]*\*:\s*(\d{1,2}\/\d{1,2}\/\d{2,4})/i);
+  if (meetingDateMatch && meetingDateMatch[1]) {
+    return parseMDYDate(meetingDateMatch[1]);
+  }
+
+  return null;
+};
+
+/**
+ * Parse advisor (contact owner) from HubSpot Slack attachment text
+ */
+const parseAdvisorFromSlackRaw = (raw: unknown): string | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const typed = raw as { attachments?: Array<{ text?: string; fallback?: string }> };
+  const firstAttachment = Array.isArray(typed.attachments) ? typed.attachments[0] : null;
+  if (!firstAttachment) return null;
+
+  const text = firstAttachment.text || firstAttachment.fallback || '';
+
+  const ownerMatch = text.match(/\*Contact owner\*:\s*(.+)/i);
+  if (ownerMatch && ownerMatch[1]) {
+    const potentialLink = ownerMatch[1];
+    const linkMatch = potentialLink.match(/<mailto:[^|]+\|([^>]+)>/);
+    if (linkMatch && linkMatch[1]) {
+      return linkMatch[1].trim();
+    }
+    return potentialLink.trim();
+  }
+
+  return null;
 };
 
 const setterMondayUserId = Number.parseInt((process.env.MONDAY_PERSONAL_SETTER_MONDAY_USER_ID || '').trim(), 10);
@@ -331,6 +415,7 @@ const mapSourceToMondaySource = (firstConversion: string | null): string | null 
   return 'Direct Outreach';
 };
 
+// MODIFIED: Added Date Held and Advisor columns
 const toColumnValues = (
   source: BookedCallAttributionSource,
   mapping: PersonalBoardColumnMapping,
@@ -361,6 +446,14 @@ const toColumnValues = (
       .filter(Boolean)
       .join('\n'),
   );
+
+  // NEW: Add Date Held and Advisor
+  const dateHeld = parseDateHeldFromSlackRaw(source.raw);
+  addColumnValue(values, columnsById, mapping.dateHeldColumnId, dateHeld, { isDate: true });
+
+  const advisor = parseAdvisorFromSlackRaw(source.raw);
+  addColumnValue(values, columnsById, mapping.advisorColumnId, advisor);
+  
   return values;
 };
 
@@ -379,6 +472,7 @@ const buildManualSource = (params: ManualSyncParams): BookedCallAttributionSourc
     slackChannelId: 'manual',
     slackMessageTs: `${Date.now()}`,
     text: params.notes || null,
+    raw: { attachments: [{ text: params.notes }]}, // Add a raw-like structure for parsing
   };
 };
 

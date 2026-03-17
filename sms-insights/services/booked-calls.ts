@@ -37,6 +37,7 @@ export type BookedCallAttributionSource = {
   slackChannelId: string;
   slackMessageTs: string;
   text: string | null;
+  raw: unknown; // Add raw field to access Slack message attachments
 };
 
 export type BookedCallSmsReplyLink = {
@@ -333,6 +334,7 @@ export const getBookedCallAttributionSources = async (params: {
       slackChannelId: c.slack_channel_id,
       slackMessageTs: c.slack_message_ts,
       text: c.text,
+      raw: c.raw, // Add raw field to pass Slack message attachments
     });
   }
 

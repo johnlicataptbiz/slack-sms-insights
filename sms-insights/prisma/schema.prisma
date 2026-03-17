@@ -752,11 +752,11 @@ model sms_events {
   sequence_id         String?              @db.Uuid
   raw                 Json?
   created_at          DateTime             @default(now()) @db.Timestamptz(6)
-  conversation_id     String?              @db.Uuid
+  conversation_id     String               @db.Uuid
   conversion_examples conversion_examples?
   draft_suggestions   draft_suggestions[]
-  conversations       Conversation?        @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_sms_events_conversation")
-  sequence_registry   sequence_registry?   @relation(fields: [sequence_id], references: [id], onUpdate: NoAction)
+  conversations       Conversation         @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sms_events_conversation")
+  sequence_registry   sequence_registry    @relation(fields: [sequence_id], references: [id], onUpdate: NoAction)
   work_items          work_items[]
 
   @@unique([slack_channel_id, slack_message_ts])

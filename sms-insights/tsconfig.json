@@ -5,10 +5,11 @@
   "$schema": "https://www.schemastore.org/tsconfig.json",
   "compilerOptions": {
     "target": "esnext",
+    "esModuleInterop": true,
     "module": "NodeNext",
     "outDir": "./dist",
     "strict": true
   },
   "include": ["app.ts", "listeners/**/*.ts", "services/**/*.ts", "api/**/*.ts", "types/**/*.ts"],
-  "exclude": ["tests/**", "dist/**", "node_modules/**", "scripts/**"]
+  "exclude": ["tests/**", "dist/**", "node_modules/**"],
 }

@@ -354,6 +354,7 @@ const buildManualSource = (params: ManualSyncParams): BookedCallAttributionSourc
     slackChannelId: 'manual',
     slackMessageTs: `${Date.now()}`,
     text: params.notes || null,
+    raw: null,
   };
 };
 

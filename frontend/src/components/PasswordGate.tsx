@@ -1,15 +1,62 @@
-import { FormEvent, useState, useRef } from 'react';
+import { FormEvent, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lock } from 'lucide-react';
+import { KeyRound, Sun, Moon, Info } from 'lucide-react';
 
 import { ApiError, client } from '../api/client';
 
 import './PasswordGate.css';
 
-// Asset URLs — all WebP
-const pagePatternUrl = '/assets/sms-kit/ptbiz_sms_pattern.webp';
-const modalSkinUrl = '/assets/sms-kit/sms_network_pattern.webp';
-const brandLogoUrl = '/assets/sms-kit/logo1sms.webp';
+const brandLogoUrl = '/assets/sms-kit/logo1sms.png';
+const logoBadgeUrl = '/assets/sms-kit/ptbiz_sms_logo_badge.png';
+const patternHeaderUrl = '/assets/sms-kit/ptbiz_sms_pattern.png';
+const divider2Url = '/assets/sms-kit/divider2.png';
+const dividerUrl = '/assets/sms-kit/divider.png';
+const divider3Url = '/assets/sms-kit/divider3.png';
+const divider3SmsUrl = '/assets/sms-kit/divider%203%20sms.png';
+const arrowStripDividerUrl = '/assets/sms-kit/arrow_strip_divider.png';
+const networkBarDividerUrl = '/assets/sms-kit/network_bar_divider.png';
+const nodeBarDividerUrl = '/assets/sms-kit/node_bar_divider.png';
+const waveSmsDividerUrl = '/assets/sms-kit/wave_sms_divider.png';
+
+// Button background rotates daily through divider images
+const getDividerForToday = (): string => {
+  const day = new Date().getDay();
+  if (day === 0) return divider2Url;
+  if (day === 1) return dividerUrl;
+  if (day === 2) return divider3Url;
+  if (day === 3) return divider3SmsUrl;
+  if (day === 4) return arrowStripDividerUrl;
+  if (day === 5) return networkBarDividerUrl;
+  if (day === 6) return nodeBarDividerUrl;
+  return waveSmsDividerUrl;
+};
+
+const getLogoForToday = (): string => {
+  const day = new Date().getDay();
+  return day === 0 || day === 6 ? logoBadgeUrl : brandLogoUrl;
+};
+
+// Floating orb component for background ambiance
+function FloatingOrb({ delay, x, y, size, color }: { delay: number; x: string; y: string; size: number; color: string }) {
+  return (
+    <motion.div
+      className="PasswordGate__orb"
+      style={{ left: x, top: y, width: size, height: size, background: color }}
+      animate={{
+        y: [0, -30, 0],
+        x: [0, 15, 0],
+        scale: [1, 1.08, 1],
+        opacity: [0.55, 0.75, 0.55],
+      }}
+      transition={{
+        duration: 7 + delay,
+        repeat: Infinity,
+        ease: 'easeInOut',
+        delay,
+      }}
+    />
+  );
+}
 
 export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   const [username] = useState('dashboard');
@@ -18,16 +65,18 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [ripple, setRipple] = useState<{ x: number; y: number; id: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (isSubmitting) return;
+
     if (!password.trim()) {
       setError('Password is required');
       return;
     }
+
     setIsSubmitting(true);
     setError('');
     try {
@@ -36,7 +85,7 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
         stayLoggedIn,
       });
       setIsSuccess(true);
-      setTimeout(() => onUnlock(), 900);
+      setTimeout(() => onUnlock(), 600);
     } catch (requestError) {
       if (requestError instanceof ApiError && requestError.status === 401) {
         setError('Incorrect password. Try again.');
@@ -47,187 +96,189 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
     }
   };
 
-  const handleBtnClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!btnRef.current) return;
-    const rect = btnRef.current.getBoundingClientRect();
-    setRipple({ x: e.clientX - rect.left, y: e.clientY - rect.top, id: Date.now() });
-    setTimeout(() => setRipple(null), 700);
+  const toggleTheme = () => {
+    setIsDarkMode(!isDarkMode);
+    document.documentElement.setAttribute('data-theme', isDarkMode ? 'light' : 'dark');
   };
 
+  const btnBgImage = getDividerForToday();
+
   return (
-    <main
-      className="PasswordGate"
-      style={{ backgroundImage: `url(${pagePatternUrl})` }}
-    >
-      {/* Dark overlay on page pattern */}
-      <div className="PasswordGate__pageOverlay" />
+    <main className="PasswordGate" data-theme={isDarkMode ? 'dark' : 'light'}>
+      {/* Animated background orbs */}
+      <FloatingOrb delay={0} x="8%" y="15%" size={320} color="radial-gradient(circle, rgba(17,184,214,0.28) 0%, transparent 70%)" />
+      <FloatingOrb delay={2} x="72%" y="5%" size={280} color="radial-gradient(circle, rgba(19,185,129,0.22) 0%, transparent 70%)" />
+      <FloatingOrb delay={4} x="55%" y="65%" size={240} color="radial-gradient(circle, rgba(17,184,214,0.18) 0%, transparent 70%)" />
+      <FloatingOrb delay={1.5} x="2%" y="60%" size={200} color="radial-gradient(circle, rgba(19,185,129,0.15) 0%, transparent 70%)" />
 
-      {/* Card */}
-      <motion.div
-        className="PasswordGate__cardContainer"
-        initial={{ opacity: 0, y: 40, scale: 0.94 }}
-        animate={
-          isSuccess
-            ? { opacity: 0, y: -30, scale: 1.04 }
-            : { opacity: 1, y: 0, scale: 1 }
-        }
-        transition={
-          isSuccess
-            ? { duration: 0.55, ease: [0.22, 1, 0.36, 1] }
-            : { duration: 0.6, ease: [0.22, 1, 0.36, 1] }
-        }
-      >
-        <section
-          className={`PasswordGate__card ${isSuccess ? 'PasswordGate__card--success' : ''}`}
-          style={{ backgroundImage: `url(${modalSkinUrl})` }}
+      {/* 3D Card Container */}
+      <div className="PasswordGate__cardContainer">
+        <motion.div
+          className={`PasswordGate__cardInner ${isFlipped ? 'PasswordGate__cardInner--flipped' : ''}`}
+          initial={{ opacity: 0, y: 32, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Overlay so content is readable over the pattern skin */}
-          <div className="PasswordGate__skinOverlay" />
+          {/* Front Face - Login Form */}
+          <section className={`PasswordGate__card ${isSuccess ? 'PasswordGate__card--success' : ''}`}>
 
-          {/* Card content */}
-          <div className="PasswordGate__cardBody">
-
-            {/* Logo */}
-            <motion.img
-              className="PasswordGate__logo"
-              src={brandLogoUrl}
-              alt="PT Biz SMS"
-              initial={{ opacity: 0, y: -12, scale: 0.93 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.15, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-            />
-
-            {/* Form */}
-            <motion.form
-              onSubmit={handleSubmit}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.28, duration: 0.45 }}
+            {/* Pattern Header — replaces carousel */}
+            <div
+              className="PasswordGate__patternHeader"
+              style={{ backgroundImage: `url(${patternHeaderUrl})` }}
             >
-              {/* Hidden username for password managers */}
-              <input
-                type="text"
-                name="username"
-                value={username}
-                readOnly
-                tabIndex={-1}
-                autoComplete="username"
-                aria-hidden="true"
-                style={{ position: 'absolute', left: '-10000px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}
+              <div className="PasswordGate__patternHeaderOverlay" />
+              {/* Theme Toggle */}
+              <button
+                className="PasswordGate__themeToggle"
+                onClick={toggleTheme}
+                aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+            </div>
+
+            {/* Card body — padded content area */}
+            <div className="PasswordGate__cardBody">
+
+              {/* Logo - rotates on weekends */}
+              <motion.img
+                className="PasswordGate__logo"
+                src={getLogoForToday()}
+                alt="PT Biz SMS"
+                initial={{ opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15, duration: 0.45 }}
               />
 
-              {/* Password field — white, lock icon, exactly like the image */}
-              <div className="PasswordGate__inputWrap">
-                <span className="PasswordGate__inputIcon">
-                  <Lock size={18} strokeWidth={2} />
-                </span>
-                <input
-                  type="password"
-                  name="password"
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value);
-                    if (error) setError('');
-                  }}
-                  placeholder="Password"
-                  autoComplete="current-password"
-                  autoFocus
-                  disabled={isSubmitting || isSuccess}
-                  className={error ? 'is-error' : ''}
-                />
-              </div>
-
-              {/* Blue "Log In" button — animated on click */}
-              <motion.button
-                ref={btnRef}
-                type="submit"
-                disabled={isSubmitting || isSuccess}
-                className={`PasswordGate__submitBtn ${isSubmitting ? 'is-submitting' : ''} ${isSuccess ? 'is-success' : ''}`}
-                onClick={handleBtnClick}
-                whileHover={!isSubmitting && !isSuccess ? { scale: 1.025, y: -1 } : {}}
-                whileTap={!isSubmitting && !isSuccess ? { scale: 0.97 } : {}}
-                animate={
-                  isSuccess
-                    ? { backgroundColor: '#16a34a' }
-                    : { backgroundColor: '#2563eb' }
-                }
-                transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+              {/* Form */}
+              <motion.form
+                onSubmit={handleSubmit}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.4 }}
               >
-                {/* Ripple effect on click */}
-                <AnimatePresence>
-                  {ripple && (
-                    <motion.span
-                      key={ripple.id}
-                      className="PasswordGate__ripple"
-                      style={{ left: ripple.x, top: ripple.y }}
-                      initial={{ width: 0, height: 0, opacity: 0.55, x: '-50%', y: '-50%' }}
-                      animate={{ width: 340, height: 340, opacity: 0 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.65, ease: 'easeOut' }}
-                    />
-                  )}
-                </AnimatePresence>
-
-                {/* Shimmer sweep */}
-                <span className="PasswordGate__btnShimmer" />
-
-                {/* Button label */}
-                <span className="PasswordGate__btnContent">
-                  {isSuccess ? (
-                    <motion.span
-                      initial={{ opacity: 0, scale: 0.75 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      ✓ Unlocked
-                    </motion.span>
-                  ) : isSubmitting ? (
-                    <span className="PasswordGate__spinner" />
-                  ) : (
-                    'Log In'
-                  )}
-                </span>
-              </motion.button>
-
-              <label className="PasswordGate__checkbox">
+                {/* Hidden username for password managers */}
                 <input
-                  type="checkbox"
-                  checked={stayLoggedIn}
-                  onChange={(event) => setStayLoggedIn(event.target.checked)}
-                  disabled={isSubmitting || isSuccess}
+                  type="text"
+                  name="username"
+                  value={username}
+                  readOnly
+                  tabIndex={-1}
+                  autoComplete="username"
+                  aria-hidden="true"
+                  style={{ position: 'absolute', left: '-10000px', top: 'auto', width: '1px', height: '1px', overflow: 'hidden' }}
                 />
-                <span>Stay logged in on this device</span>
-              </label>
-            </motion.form>
 
-            {/* Error */}
-            <AnimatePresence>
-              {error ? (
-                <motion.p
-                  className="PasswordGate__error"
-                  initial={{ opacity: 0, y: -6, height: 0 }}
-                  animate={{ opacity: 1, y: 0, height: 'auto' }}
-                  exit={{ opacity: 0, y: -6, height: 0 }}
-                  transition={{ duration: 0.25 }}
+                <div className="PasswordGate__inputWrap">
+                  <input
+                    type="password"
+                    name="password"
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      if (error) setError('');
+                    }}
+                    placeholder="Password"
+                    autoComplete="current-password"
+                    autoFocus
+                    disabled={isSubmitting || isSuccess}
+                    className={error ? 'is-error' : ''}
+                  />
+                  <span className="PasswordGate__inputIcon"><KeyRound size={16} /></span>
+                </div>
+
+                {/* Type Motion Image Button */}
+                <motion.button
+                  type="submit"
+                  disabled={isSubmitting || isSuccess}
+                  className={`PasswordGate__submitBtn ${isSuccess ? 'is-success' : ''}`}
+                  style={{ backgroundImage: `url(${btnBgImage})` }}
+                  whileHover={{ scale: isSubmitting || isSuccess ? 1 : 1.025, y: isSubmitting || isSuccess ? 0 : -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ type: 'spring', stiffness: 420, damping: 26 }}
                 >
-                  ⚠ {error}
-                </motion.p>
-              ) : null}
-            </AnimatePresence>
+                  <span className="PasswordGate__btnOverlay" />
+                  <span className="PasswordGate__btnShimmer" />
+                  <span className="PasswordGate__btnContent">
+                    {isSuccess ? (
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                      >
+                        ✓ Unlocked
+                      </motion.span>
+                    ) : isSubmitting ? (
+                      <span className="PasswordGate__spinner" />
+                    ) : (
+                      'Enter Dashboard'
+                    )}
+                  </span>
+                </motion.button>
 
-            {/* Footer */}
-            <motion.p
-              className="PasswordGate__footer"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.55 }}
+                <label className="PasswordGate__checkbox">
+                  <input
+                    type="checkbox"
+                    checked={stayLoggedIn}
+                    onChange={(event) => setStayLoggedIn(event.target.checked)}
+                    disabled={isSubmitting || isSuccess}
+                  />
+                  <span>Stay logged in on this device</span>
+                </label>
+              </motion.form>
+
+              {/* Error message */}
+              <AnimatePresence>
+                {error ? (
+                  <motion.p
+                    className="PasswordGate__error"
+                    initial={{ opacity: 0, y: -6, height: 0 }}
+                    animate={{ opacity: 1, y: 0, height: 'auto' }}
+                    exit={{ opacity: 0, y: -6, height: 0 }}
+                    transition={{ duration: 0.25 }}
+                  >
+                    ⚠ {error}
+                  </motion.p>
+                ) : null}
+              </AnimatePresence>
+
+              {/* Footer */}
+              <motion.p
+                className="PasswordGate__footer"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.55 }}
+              >
+                PT Biz Setter Ops · Secure Access
+              </motion.p>
+
+              {/* Flip hint */}
+              <button
+                className="PasswordGate__flipHint"
+                onClick={() => setIsFlipped(true)}
+              >
+                <Info size={12} /> Learn more
+              </button>
+
+            </div>{/* end .PasswordGate__cardBody */}
+          </section>
+
+          {/* Back Face - Info Panel */}
+          <section className="PasswordGate__cardBack">
+            <h2 className="PasswordGate__backTitle">About PT Biz SMS</h2>
+            <p className="PasswordGate__backText">
+              PT Biz SMS Insights provides real-time analytics for your SMS campaigns,
+              tracking response rates, booked calls, and team performance metrics.
+            </p>
+            <button
+              className="PasswordGate__backButton"
+              onClick={() => setIsFlipped(false)}
             >
-              PT Biz Setter Ops · Secure Access
-            </motion.p>
-
-          </div>
-        </section>
-      </motion.div>
+              Back to Login
+            </button>
+          </section>
+        </motion.div>
+      </div>{/* end .PasswordGate__cardContainer */}
     </main>
   );
 }

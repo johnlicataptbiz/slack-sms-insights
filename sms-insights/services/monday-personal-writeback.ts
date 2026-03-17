@@ -10,7 +10,7 @@ import {
 import { mondayConfig } from './monday-sync.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
 
-type PersonalSetterBucket = 'jack' | 'brandon';
+type PersonalSetterBucket = 'jack' | 'brandon' | 'selfBooked';
 
 type ManualSyncParams = {
   contactName: string;
@@ -135,10 +135,17 @@ const mergePersonalOverrides = (
 };
 
 const parseBucket = (value: string | undefined): PersonalSetterBucket => {
-  return value?.trim().toLowerCase() === 'brandon' ? 'brandon' : 'jack';
+  const normalized = (value || '').trim().toLowerCase();
+  if (normalized === 'brandon') return 'brandon';
+  if (normalized === 'self' || normalized === 'selfbooked' || normalized === 'self_booked') return 'selfBooked';
+  return 'jack';
 };
 
-const formatSetter = (bucket: PersonalSetterBucket): string => (bucket === 'brandon' ? 'Brandon' : 'Jack');
+const formatSetter = (bucket: PersonalSetterBucket): string => {
+  if (bucket === 'brandon') return 'Brandon';
+  if (bucket === 'selfBooked') return 'Self Booked';
+  return 'Jack';
+};
 
 const cleanPhone = (value: string | null): string | null => {
   if (!value) return null;
@@ -252,7 +259,7 @@ const addColumnValue = (
 };
 
 const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
-  const setter = formatSetter(source.bucket === 'brandon' ? 'brandon' : 'jack');
+  const setter = formatSetter(source.bucket);
   const contactName = normalizeContactName(source.contactName);
   const lines = [
     `# Slack Booked Call (${setter})`,
@@ -304,18 +311,22 @@ const toColumnValues = (
   columnsById: Map<string, MondayBoardColumn>,
 ): Record<string, unknown> => {
   const values: Record<string, unknown> = {};
-  const setter = formatSetter(source.bucket === 'brandon' ? 'brandon' : 'jack');
+  const setter = formatSetter(source.bucket);
   const callDate = resolveCallDate(source.eventTs);
   const link = slackPermalink(source.slackChannelId, source.slackMessageTs);
 
   addColumnValue(values, columnsById, mapping.callDateColumnId, callDate, { isDate: true });
   addColumnValue(values, columnsById, mapping.contactNameColumnId, normalizeContactName(source.contactName));
   addColumnValue(values, columnsById, mapping.phoneColumnId, source.contactPhone, { isPhone: true });
-  addColumnValue(values, columnsById, mapping.setterColumnId, source.rep || setter, { isSetter: true });
+  const setterValue = source.bucket === 'selfBooked' ? 'Self Booked' : source.rep || setter;
+  addColumnValue(values, columnsById, mapping.setterColumnId, setterValue, {
+    isSetter: source.bucket !== 'selfBooked',
+  });
   addColumnValue(values, columnsById, mapping.stageColumnId, 'Booked');
   addColumnValue(values, columnsById, mapping.firstConversionColumnId, source.firstConversion);
   addColumnValue(values, columnsById, mapping.lineColumnId, source.line);
-  addColumnValue(values, columnsById, mapping.sourceColumnId, 'Slack booked call');
+  const sourceValue = source.bucket === 'selfBooked' ? 'Self booked call' : 'Slack booked call';
+  addColumnValue(values, columnsById, mapping.sourceColumnId, sourceValue);
   addColumnValue(values, columnsById, mapping.slackLinkColumnId, link, { isLink: true });
   addColumnValue(
     values,
@@ -379,9 +390,13 @@ const pushOne = async (
     boardId: string;
     mapping: PersonalBoardColumnMapping;
     columnsById: Map<string, MondayBoardColumn>;
+    includeSelfBooked?: boolean;
   },
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<'synced' | 'skipped' | 'error'> => {
+  if (source.bucket === 'selfBooked' && !params.includeSelfBooked) {
+    return 'skipped';
+  }
   const existing = await getMondayBookedCallPush(
     source.slackChannelId,
     source.slackMessageTs,
@@ -458,6 +473,11 @@ const pushOne = async (
 
 const targetBucket = (): PersonalSetterBucket => parseBucket(process.env.MONDAY_PERSONAL_SETTER_BUCKET || 'jack');
 
+const isPersonalSelfBookedEnabled = (): boolean => {
+  const normalized = (process.env.MONDAY_PERSONAL_SELF_BOOKED_ENABLED || '').trim().toLowerCase();
+  return normalized === 'true';
+};
+
 const personalBoardId = (): string => {
   return (process.env.MONDAY_PERSONAL_BOARD_ID || mondayConfig.myCallsBoardId || '').trim();
 };
@@ -482,7 +502,8 @@ const loadRelevantSources = async (params: {
   });
 
   const bucket = targetBucket();
-  return rows.filter((row) => row.bucket === bucket);
+  const includeSelfBooked = isPersonalSelfBookedEnabled();
+  return rows.filter((row) => row.bucket === bucket || (includeSelfBooked && row.bucket === 'selfBooked'));
 };
 
 export const syncRecentSetterBookedCallsToMonday = async (
@@ -504,10 +525,11 @@ export const syncRecentSetterBookedCallsToMonday = async (
   }
 
   const { mapping, columnsById } = await loadBoardMapping(boardId, logger);
+  const includeSelfBooked = isPersonalSelfBookedEnabled();
 
   let pushed = 0;
   for (const row of rows) {
-    const result = await pushOne(row, { boardId, mapping, columnsById }, logger);
+    const result = await pushOne(row, { boardId, mapping, columnsById, includeSelfBooked }, logger);
     if (result === 'synced') pushed += 1;
   }
 
@@ -547,6 +569,6 @@ export const syncBookedCallToPersonalBoardFromSlackMessage = async (
   }
 
   const { mapping, columnsById } = await loadBoardMapping(boardId, logger);
-  const result = await pushOne(match, { boardId, mapping, columnsById }, logger);
+  const result = await pushOne(match, { boardId, mapping, columnsById, includeSelfBooked: true }, logger);
   return result === 'error' ? { status: 'error' } : result === 'synced' ? { status: 'synced' } : { status: 'skipped' };
 };

@@ -1,9 +1,14 @@
 import { Suspense, lazy, useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { client, setUnauthorizedHandler } from './api/client';
-import { PasswordGate } from './components/PasswordGate';
+import { parseUiMode, type UiMode } from './uiMode';
+import { Analytics } from '@vercel/analytics/react';
 
 const V2App = lazy(() => import('./v2/V2App'));
+
+const resolveUiMode = (): UiMode => {
+  const envMode = parseUiMode(import.meta.env.VITE_UI_VERSION);
+  return envMode || 'v2';
+};
 
 const DefaultRoute = () => {
   return <Navigate to="/v2/insights" replace />;
@@ -31,28 +36,8 @@ export default function App() {
   const [isAuthed, setIsAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    let active = true;
-
-    const handleUnauthorized = () => {
-      if (active) setIsAuthed(false);
-    };
-    setUnauthorizedHandler(handleUnauthorized);
-
-    const verifySession = async () => {
-      try {
-        await client.get('/api/auth/verify');
-        if (active) setIsAuthed(true);
-      } catch {
-        if (active) setIsAuthed(false);
-      }
-    };
-
-    verifySession();
-
-    return () => {
-      active = false;
-      setUnauthorizedHandler(() => {});
-    };
+    // Password gate removed - always authenticated
+    setIsAuthed(true);
   }, []);
 
   if (isAuthed === null) {
@@ -63,21 +48,12 @@ export default function App() {
     );
   }
 
-  if (isAuthed === false) {
-    return (
-      <PasswordGate
-        onUnlock={async () => {
-          try {
-            await client.get('/api/auth/verify');
-            setIsAuthed(true);
-          } catch {
-            setIsAuthed(false);
-          }
-        }}
-      />
-    );
-  }
-
-  return <AppRoutes />;
+  return (
+    <>
+      <AppRoutes />
+      <Analytics />
+    </>
+  );
 }
 
+export const detectUiMode = resolveUiMode;

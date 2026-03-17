@@ -1,0 +1,16 @@
+## Model Behavior Rules
+Always think step by step on every task.
+Break complex tasks into smaller logical steps.
+Provide clear reasoning before code or solutions.
+Balance speed with quality and accuracy.
+
+## Coding Standards
+Write clean modular and maintainable code.
+Include clear comments and docstrings.
+Add proper error handling and logging.
+Prioritize readability and scalability.
+
+## General Instructions
+Consider edge cases and long term maintainability.
+Follow modern best practices for the chosen stack.
+Optimize for your workload.

@@ -1,8 +1,242 @@
 {
-  "generatedAt": "2026-03-11T15:07:48.234Z",
+  "generatedAt": "2026-03-17T23:30:10.839Z",
   "daysIncluded": 365,
-  "totalCount": 348,
+  "totalCount": 374,
   "entries": [
+    {
+      "hash": "4c8adc9",
+      "date": "2026-03-17T18:21:32-05:00",
+      "message": "feat: parse Date Held and Advisor from HubSpot Slack attachments",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Parse Date Held and Advisor from HubSpot Slack attachments"
+    },
+    {
+      "hash": "0c1e4dc",
+      "date": "2026-03-17T17:41:57-05:00",
+      "message": "Remove date suffix from Monday item names",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Remove date suffix from Monday item names"
+    },
+    {
+      "hash": "b773394",
+      "date": "2026-03-17T17:19:48-05:00",
+      "message": "feat: Complete Monday.com SMS integration with auto-board creation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Complete Monday.com SMS integration with auto-board creation"
+    },
+    {
+      "hash": "a73b1c4",
+      "date": "2026-03-17T17:06:14-05:00",
+      "message": "Fix: Return default value when line is null instead of null",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Return default value when line is null instead of null"
+    },
+    {
+      "hash": "da7663e",
+      "date": "2026-03-17T16:45:24-05:00",
+      "message": "Fix Monday.com sync: Use valid status column values",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Fix Monday.com sync: Use valid status column values"
+    },
+    {
+      "hash": "fb75ed9",
+      "date": "2026-03-14T20:46:48-05:00",
+      "message": "fix(sequences): remove manual row and add attribution fallback for CPFM",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Remove manual row and add attribution fallback for CPFM"
+    },
+    {
+      "hash": "6d22fed",
+      "date": "2026-03-14T20:11:14-05:00",
+      "message": "fix: apply Gemini review fixes (phases 1-3), cleanup, and UI/CSS refactors",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Apply Gemini review fixes (phases 1-3), cleanup, and UI/CSS refactors"
+    },
+    {
+      "hash": "d68e1eb",
+      "date": "2026-03-14T18:14:15-05:00",
+      "message": "feat: PasswordGate exact image match - white input field with lock icon, blue Log In button with ripple/shimmer animation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "PasswordGate exact image match - white input field with lock icon, blue Log In button with ripple..."
+    },
+    {
+      "hash": "1d14c38",
+      "date": "2026-03-14T16:28:46-05:00",
+      "message": "feat: Redesign PasswordGate login - pattern page bg, network skin modal, raw image button with unlock animation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "Redesign PasswordGate login - pattern page bg, network skin modal, raw image button with unlock a..."
+    },
+    {
+      "hash": "bd4ab79",
+      "date": "2026-03-14T15:09:40-05:00",
+      "message": "feat: Asset Kit UI integration - WebP assets, hero banners, dividers, pattern backgrounds across all V2 pages",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Asset Kit UI integration - WebP assets, hero banners, dividers, pattern backgrounds across all V2..."
+    },
+    {
+      "hash": "41e74a2",
+      "date": "2026-03-14T14:13:48-05:00",
+      "message": "feat: Daily Reports V2 Phase 1 — compute-on-read from fact tables",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Daily Reports V2 Phase 1 — compute-on-read from fact tables"
+    },
+    {
+      "hash": "b5edb76",
+      "date": "2026-03-14T12:47:43-05:00",
+      "message": "chore: clean up error runs from daily_runs DB, add Daily Reports V2 design doc",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Clean up error runs from daily_runs DB, add Daily Reports V2 design doc"
+    },
+    {
+      "hash": "a7b9fb2",
+      "date": "2026-03-14T11:57:05-05:00",
+      "message": "fix(cron): isolate maintenance tasks in own try/catch to prevent false daily-run error logs",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Isolate maintenance tasks in own try/catch to prevent false daily-run error logs"
+    },
+    {
+      "hash": "f9ee1c8",
+      "date": "2026-03-14T11:27:36-05:00",
+      "message": "chore: repo root cleanup — remove duplicates/empties, organize loose files into docs/scripts",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Repo root cleanup — remove duplicates/empties, organize loose files into docs/scripts"
+    },
+    {
+      "hash": "827eefc",
+      "date": "2026-03-14T10:57:12-05:00",
+      "message": "feat: add V2PageTransition to all V2 pages, glow effects on KPI cards, glassmorphism panels",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add V2PageTransition to all V2 pages, glow effects on KPI cards, glassmorphism panels"
+    },
+    {
+      "hash": "6bb8c91",
+      "date": "2026-03-14T08:45:22-05:00",
+      "message": "feat(login): replace carousel with pattern header, image-based Type Motion submit button",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "Replace carousel with pattern header, image-based Type Motion submit button"
+    },
+    {
+      "hash": "adfd8cc",
+      "date": "2026-03-14T08:03:58-05:00",
+      "message": "feat: implement type motion phase 6 integration, assets, docs, and dashboard enhancements",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Implement type motion phase 6 integration, assets, docs, and dashboard enhancements"
+    },
+    {
+      "hash": "f261572",
+      "date": "2026-03-13T18:41:06-05:00",
+      "message": "Add SMS visual assets - local images, update logo/branding URLs",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add SMS visual assets - local images, update logo/branding URLs"
+    },
+    {
+      "hash": "a19cd11",
+      "date": "2026-03-13T13:04:20-05:00",
+      "message": "feat: complete lucide-react icon integration",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Complete lucide-react icon integration"
+    },
+    {
+      "hash": "1defb2e",
+      "date": "2026-03-13T12:04:51-05:00",
+      "message": "fix(login): banner edge-to-edge, remove redundant title/notice, card width matches banner",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Authentication",
+      "description": "Banner edge-to-edge, remove redundant title/notice, card width matches banner"
+    },
+    {
+      "hash": "d0b344c",
+      "date": "2026-03-13T11:43:24-05:00",
+      "message": "fix: move position:relative to base sidebar rule so mobile position:fixed isn't overridden",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Move position:relative to base sidebar rule so mobile position:fixed isn't overridden"
+    },
+    {
+      "hash": "488e3fc",
+      "date": "2026-03-13T11:05:11-05:00",
+      "message": "fix: shrink login card to 400px so banner2 fills edge-to-edge",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Authentication",
+      "description": "Shrink login card to 400px so banner2 fills edge-to-edge"
+    },
+    {
+      "hash": "3e1a2e4",
+      "date": "2026-03-13T10:46:18-05:00",
+      "message": "feat: incorporate HubSpot CDN brand assets into UI",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Incorporate HubSpot CDN brand assets into UI"
+    },
+    {
+      "hash": "f36f6a0",
+      "date": "2026-03-13T09:12:08-05:00",
+      "message": "Fix CORS: add ptbizsms-dashboard.vercel.app to allowed origins",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Fix CORS: add ptbizsms-dashboard.vercel.app to allowed origins"
+    },
+    {
+      "hash": "e496118",
+      "date": "2026-03-13T08:57:28-05:00",
+      "message": "Add sequences table features: min-sends filter, sortable columns, attribution fix",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add sequences table features: min-sends filter, sortable columns, attribution fix"
+    },
+    {
+      "hash": "d4c1f99",
+      "date": "2026-03-11T10:08:30-05:00",
+      "message": "Attribute bookings to reply-triggered sequences",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Attribute bookings to reply-triggered sequences"
+    },
     {
       "hash": "5050ca5",
       "date": "2026-03-11T10:05:49-05:00",

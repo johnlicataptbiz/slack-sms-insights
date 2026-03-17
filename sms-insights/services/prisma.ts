@@ -44,7 +44,20 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
     return (new PrismaClient({ accelerateUrl: config.url }) as any).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
-  throw new Error('Direct postgres URLs are not supported by this runtime. Set PRISMA_ACCELERATE_URL (prisma+postgres://).');
+  // Direct connection - For Prisma 7, we need to provide an accelerateUrl even for direct connections
+  // or use an adapter. Since we don't have an adapter, we'll tell it to use accelerate mode
+  // but with the regular DATABASE_URL
+  if (config.url.startsWith('postgresql://')) {
+    // Convert to accelerate format for Prisma 7 compatibility
+    const accelerateUrl = config.url.replace('postgresql://', 'prisma+postgres://');
+    // @ts-ignore - Prisma 7 uses accelerateUrl
+    return (new PrismaClient({ accelerateUrl }) as any).$extends(withAccelerate()) as unknown as PrismaClient;
+  }
+  
+  // Fallback: try direct connection with minimal config
+  return new PrismaClient({
+    log: ['error', 'warn'],
+  });
 };
 
 export const getPrismaClient = (): PrismaRuntimeClient => {

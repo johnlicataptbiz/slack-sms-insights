@@ -278,10 +278,9 @@ const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
 };
 
 const buildItemName = (source: BookedCallAttributionSource): string => {
-  const callDate = resolveCallDate(source.eventTs);
   const contactName = normalizeContactName(source.contactName);
   const who = contactName || 'Booked Call';
-  return `${who} - ${callDate}`;
+  return who; // Just the name, no date suffix
 };
 
 const loadBoardMapping = async (

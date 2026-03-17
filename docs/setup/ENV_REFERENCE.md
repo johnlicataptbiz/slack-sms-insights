@@ -172,6 +172,7 @@ Get your key at [platform.openai.com/api-keys](https://platform.openai.com/api-k
 | `MONDAY_PERSONAL_SETTER_BUCKET` | optional | — | Setter name bucket for personal board (e.g. `jack`). |
 | `MONDAY_PERSONAL_SETTER_MONDAY_USER_ID` | optional | — | Monday.com user ID for the setter. |
 | `MONDAY_PERSONAL_PUSH_LOOKBACK_DAYS` | optional | `14` | Days to look back when pushing personal board data. |
+| `MONDAY_PERSONAL_SELF_BOOKED_ENABLED` | optional | `false` | When true, also push self-booked calls to the personal board. |
 | `MONDAY_SYNC_BACKFILL_DAYS` | optional | `90` | Days to backfill on initial sync. |
 | `MONDAY_API_TIMEOUT_MS` | optional | `12000` | Monday API request timeout in milliseconds. |
 | `MONDAY_API_MAX_RETRIES` | optional | `2` | Maximum retry attempts for Monday API calls. |

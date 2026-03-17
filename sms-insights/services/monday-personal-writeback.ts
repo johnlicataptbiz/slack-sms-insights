@@ -302,7 +302,7 @@ const loadBoardMapping = async (
  * Map line/source values to valid Monday.com status column values
  */
 const mapLineToChannel = (line: string | null): string | null => {
-  if (!line) return null;
+  if (!line) return 'Aloware SMS'; // Default when line is null
   const normalized = line.toLowerCase();
   // Map your actual line names to Monday.com Channel? column values
   if (normalized.includes('aloware') || normalized.includes('sms')) return 'Aloware SMS';

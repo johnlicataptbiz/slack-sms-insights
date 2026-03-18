@@ -1,9 +1,38 @@
 import type { Logger } from '@slack/bolt';
+import {
+  getBookedCallAttributionSources,
+  getBookedCallSequenceFromSmsEvents,
+  getBookedCallSmsReplyLinks,
+  type UnattributedAuditRow,
+} from './booked-calls.js';
 import { getPrismaClient } from './prisma.js';
+import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
 
 const getPrisma = () => getPrismaClient();
 const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
 const isMondayBackfillLabel = (label: string): boolean => label.toLowerCase().includes('monday backfill');
+const HIGH_CONFIDENCE_BOOKING_PATTERN =
+  /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
+const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
+const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
+
+const contactKeyFor = (event: {
+  contact_id: string | null;
+  contact_phone: string | null;
+}): string | null => {
+  if (event.contact_id) return `contact:${event.contact_id}`;
+  if (event.contact_phone) return `phone:${event.contact_phone.replace(/\D/g, '')}`;
+  return null;
+};
+
+const isBookingSignal = (direction: string, body: string): boolean => {
+  if (!body) return false;
+  if (BOOKED_CONFIRMATION_LINK_PATTERN.test(body)) return true;
+  return direction === 'inbound' && HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) && !CANCELLATION_PATTERN.test(body);
+};
+
+const isOptOutSignal = (direction: string, body: string): boolean =>
+  direction === 'inbound' && CANCELLATION_PATTERN.test(body);
 
 export type SequenceDeepParams = {
   from: Date;
@@ -15,6 +44,7 @@ export type SequenceDeepParams = {
 export type SequenceDeepPayload = {
   window: { from: string; to: string; timeZone: string };
   warnings?: string[];
+  unattributedAuditRows?: UnattributedAuditRow[];
   sequences: Array<{
     sequenceId: string;
     label: string;
@@ -25,6 +55,7 @@ export type SequenceDeepPayload = {
     isManualBucket: boolean;
     messagesSent: number;
     uniqueContacted: number;
+    inboundTexts: number;
     repliesReceived: number;
     replyRatePct: number;
     bookedCalls: number;
@@ -59,6 +90,12 @@ export type SequenceDeepPayload = {
     slackBookedTotal: number;
     mondayBookedTotal: number;
     deltaBookedVsMonday: number;
+    matchedCalls: number;
+    unattributedCalls: number;
+    manualCalls: number;
+    strictSmsReplyLinkedCalls: number;
+    smsPhoneMatchedCalls: number;
+    fuzzyTextMatchedCalls: number;
     manualDirectBooked: number;
     manualDirectSharePct: number;
     attributionConversationMapped: number;
@@ -74,26 +111,9 @@ export const getSequencesDeep = async (
   const salesTeamBoardId = (process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID).trim();
   const fromDay = params.from.toISOString().slice(0, 10);
   const toDay = params.to.toISOString().slice(0, 10);
+  const scanFrom = new Date(params.from.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  const [smsRows, bookingRows, leadRows, sequenceRows, mondayRows, manualBucketRows, attributionStats, mondayBookedTotalRows, attributedByLabelRows] = await Promise.all([
-    prisma.fact_sms_daily.findMany({
-      where: {
-        day: {
-          gte: new Date(`${fromDay}T00:00:00.000Z`),
-          lte: new Date(`${toDay}T00:00:00.000Z`),
-        },
-      },
-      select: {
-        sequence_id: true,
-        messages_sent: true,
-        unique_contacted: true,
-        replies_received: true,
-        reply_rate_pct: true,
-        opt_outs: true,
-        opt_out_rate_pct: true,
-        booking_signals_sms: true,
-      },
-    }),
+  const [bookingRows, leadRows, sequenceRows, mondayRows, manualBucketRows, attributionStats, mondayBookedTotalRows, attributedByLabelRows, rawEventRows] = await Promise.all([
     prisma.fact_booking_daily.findMany({
       where: {
         day: {
@@ -191,26 +211,39 @@ export const getSequencesDeep = async (
     prisma.$queryRawUnsafe<Array<{ sequence_label: string; booked_total: number; booked_jack: number; booked_brandon: number; booked_self: number }>>(
       `
       SELECT
-        b.sequence_label,
+        COALESCE(NULLIF(BTRIM(b.first_conversion), ''), NULLIF(BTRIM(b.setter_final), ''), 'No sequence (manual/direct)') AS sequence_label,
         COUNT(*)::int AS booked_total,
-        COUNT(*) FILTER (WHERE LOWER(COALESCE(b.set_by, '')) LIKE '%jack%')::int AS booked_jack,
-        COUNT(*) FILTER (WHERE LOWER(COALESCE(b.set_by, '')) LIKE '%brandon%')::int AS booked_brandon,
+        COUNT(*) FILTER (WHERE LOWER(COALESCE(b.setter_final, '')) LIKE '%jack%')::int AS booked_jack,
+        COUNT(*) FILTER (WHERE LOWER(COALESCE(b.setter_final, '')) LIKE '%brandon%')::int AS booked_brandon,
         COUNT(*) FILTER (
           WHERE NOT (
-            LOWER(COALESCE(b.set_by, '')) LIKE '%jack%'
-            OR LOWER(COALESCE(b.set_by, '')) LIKE '%brandon%'
+            LOWER(COALESCE(b.setter_final, '')) LIKE '%jack%'
+            OR LOWER(COALESCE(b.setter_final, '')) LIKE '%brandon%'
           )
         )::int AS booked_self
       FROM booked_call_attribution b
       WHERE b.booked_event_ts >= $1::timestamptz
         AND b.booked_event_ts <= $2::timestamptz
-        AND b.sequence_label IS NOT NULL
-        AND BTRIM(b.sequence_label) <> ''
-      GROUP BY b.sequence_label
+      GROUP BY 1
       `,
       params.from.toISOString(),
       params.to.toISOString(),
     ),
+    prisma.sms_events.findMany({
+      where: {
+        event_ts: { gte: scanFrom, lte: params.to },
+        direction: { in: ['inbound', 'outbound'] },
+      },
+      orderBy: { event_ts: 'asc' },
+      select: {
+        event_ts: true,
+        direction: true,
+        sequence_id: true,
+        body: true,
+        contact_id: true,
+        contact_phone: true,
+      },
+    }),
   ]);
 
   const manualSequenceId = sequenceRows.find((row) => row.is_manual_bucket)?.id || null;
@@ -222,9 +255,30 @@ export const getSequencesDeep = async (
   const resolveSequenceId = (sequenceId: string): string =>
     manualSequenceId && backfillSequenceIds.has(sequenceId) ? manualSequenceId : sequenceId;
 
+  type Event = (typeof rawEventRows)[number] & { _contactKey: string; _seqId: string };
+  const events: Event[] = [];
+  for (const row of rawEventRows) {
+    const contactKey = contactKeyFor(row);
+    if (!contactKey) continue;
+    const resolvedSequenceId = row.sequence_id || manualSequenceId;
+    if (!resolvedSequenceId) continue;
+    events.push({
+      ...row,
+      _contactKey: contactKey,
+      _seqId: resolveSequenceId(resolvedSequenceId),
+    });
+  }
+
+  const eventsByContact = new Map<string, Event[]>();
+  for (const event of events) {
+    const list = eventsByContact.get(event._contactKey) || [];
+    list.push(event);
+    eventsByContact.set(event._contactKey, list);
+  }
+
   const summary = new Map<string, {
     messagesSent: number;
-    uniqueContacted: number;
+    inboundTexts: number;
     repliesReceived: number;
     optOuts: number;
     bookingSignals: number;
@@ -238,6 +292,9 @@ export const getSequencesDeep = async (
     qualityFullTime: number;
     qualityMostlyCash: number;
     qualityStep34: number;
+    uniqueContactedSet: Set<string>;
+    repliedSet: Set<string>;
+    optOutSet: Set<string>;
   }>();
 
   const ensure = (sequenceId: string) => {
@@ -245,7 +302,7 @@ export const getSequencesDeep = async (
     if (!row) {
       row = {
         messagesSent: 0,
-        uniqueContacted: 0,
+        inboundTexts: 0,
         repliesReceived: 0,
         optOuts: 0,
         bookingSignals: 0,
@@ -259,19 +316,61 @@ export const getSequencesDeep = async (
         qualityFullTime: 0,
         qualityMostlyCash: 0,
         qualityStep34: 0,
+        uniqueContactedSet: new Set<string>(),
+        repliedSet: new Set<string>(),
+        optOutSet: new Set<string>(),
       };
       summary.set(sequenceId, row);
     }
     return row;
   };
 
-  for (const row of smsRows) {
-    const stat = ensure(resolveSequenceId(row.sequence_id));
-    stat.messagesSent += row.messages_sent;
-    stat.uniqueContacted += row.unique_contacted;
-    stat.repliesReceived += row.replies_received;
-    stat.optOuts += row.opt_outs;
-    stat.bookingSignals += row.booking_signals_sms;
+  for (const event of events) {
+    if (event.event_ts < params.from) continue;
+    if (event.direction !== 'outbound') continue;
+    const stat = ensure(event._seqId);
+    stat.messagesSent += 1;
+    stat.uniqueContactedSet.add(event._contactKey);
+  }
+
+  for (const contactEvents of eventsByContact.values()) {
+    for (const inbound of contactEvents) {
+      if (inbound.event_ts < params.from || inbound.direction !== 'inbound') continue;
+
+      const inboundTs = inbound.event_ts.getTime();
+      let latestAny: Event | null = null;
+      let latestSequenced: Event | null = null;
+
+      for (const candidate of contactEvents) {
+        if (candidate.direction !== 'outbound') continue;
+        const ts = candidate.event_ts.getTime();
+        if (ts > inboundTs) break;
+        if (inboundTs - ts > 14 * 24 * 60 * 60 * 1000) continue;
+        latestAny = candidate;
+        if (candidate.sequence_id) latestSequenced = candidate;
+      }
+
+      const attributed = latestSequenced || latestAny;
+      if (!attributed) continue;
+
+      const stat = ensure(attributed._seqId);
+      stat.inboundTexts += 1;
+
+      if (!stat.repliedSet.has(inbound._contactKey)) {
+        stat.repliedSet.add(inbound._contactKey);
+        stat.repliesReceived += 1;
+      }
+
+      const body = (inbound.body || '').trim();
+      if (isOptOutSignal(inbound.direction, body) && !stat.optOutSet.has(inbound._contactKey)) {
+        stat.optOutSet.add(inbound._contactKey);
+        stat.optOuts += 1;
+      }
+
+      if (isBookingSignal(inbound.direction, body)) {
+        stat.bookingSignals += 1;
+      }
+    }
   }
 
   for (const row of bookingRows) {
@@ -320,7 +419,8 @@ export const getSequencesDeep = async (
     .map((row) => {
       const stat = summary.get(row.id);
       const messagesSent = stat?.messagesSent || 0;
-      const uniqueContacted = stat?.uniqueContacted || 0;
+      const uniqueContacted = stat?.uniqueContactedSet.size || 0;
+      const inboundTexts = stat?.inboundTexts || 0;
       const repliesReceived = stat?.repliesReceived || 0;
       const bookedCalls = stat?.bookedCalls || 0;
       const optOuts = stat?.optOuts || 0;
@@ -336,6 +436,7 @@ export const getSequencesDeep = async (
         isManualBucket: row.is_manual_bucket,
         messagesSent,
         uniqueContacted,
+        inboundTexts,
         repliesReceived,
         replyRatePct: uniqueContacted > 0 ? (repliesReceived / uniqueContacted) * 100 : 0,
         bookedCalls,
@@ -372,6 +473,25 @@ export const getSequencesDeep = async (
   const mondayBookedTotal = mondayBookedTotalRows[0]?.monday_booked_total || 0;
   const attributionTotal = attributionStats[0]?.total || 0;
   const attributionMappedConversation = attributionStats[0]?.mapped_conversation || 0;
+  const bookedCallSources = await getBookedCallAttributionSources({ from: params.from, to: params.to });
+  const smsReplyLinks = await getBookedCallSmsReplyLinks(bookedCallSources);
+  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(bookedCallSources, undefined, smsReplyLinks);
+  const sequenceAttribution = attributeSlackBookedCallsToSequences(
+    sequences.map((row) => ({
+      label: row.label,
+      messagesSent: row.messagesSent,
+      repliesReceived: row.repliesReceived,
+      replyRatePct: row.replyRatePct,
+      bookingSignalsSms: row.bookedBreakdown.diagnosticSignals,
+      booked: row.bookedCalls,
+      optOuts: row.optOuts,
+      uniqueContacted: row.uniqueContacted,
+      bookingRatePct: row.bookingRatePct,
+    })),
+    bookedCallSources,
+    smsReplyLinks,
+    smsSequenceLookup,
+  );
 
   if (mondayRows.length === 0) {
     logger?.warn?.('sequences-deep: no monday health rows in requested window');
@@ -379,6 +499,7 @@ export const getSequencesDeep = async (
 
   return {
     window: { from: params.from.toISOString(), to: params.to.toISOString(), timeZone: params.timeZone },
+    unattributedAuditRows: sequenceAttribution.unattributedAuditRows,
     sequences,
     monday: {
       boards,
@@ -399,6 +520,12 @@ export const getSequencesDeep = async (
       slackBookedTotal,
       mondayBookedTotal,
       deltaBookedVsMonday: slackBookedTotal - mondayBookedTotal,
+      matchedCalls: sequenceAttribution.totals.matchedCalls,
+      unattributedCalls: sequenceAttribution.totals.unattributedCalls,
+      manualCalls: sequenceAttribution.totals.manualCalls,
+      strictSmsReplyLinkedCalls: sequenceAttribution.totals.bookedAfterSmsReply,
+      smsPhoneMatchedCalls: sequenceAttribution.totals.smsPhoneMatchedCalls,
+      fuzzyTextMatchedCalls: sequenceAttribution.totals.fuzzyTextMatchedCalls,
       manualDirectBooked,
       manualDirectSharePct: slackBookedTotal > 0 ? (manualDirectBooked / slackBookedTotal) * 100 : 0,
       attributionConversationMapped: attributionMappedConversation,

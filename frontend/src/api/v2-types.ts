@@ -783,6 +783,7 @@ export type InsightsSummaryV2 = {
 export type SequenceDeepV2 = {
   window: { from: string; to: string; timeZone: string };
   warnings?: string[];
+  unattributedAuditRows?: UnattributedAuditRow[];
   sequences: Array<{
     sequenceId: string;
     label: string;
@@ -793,6 +794,7 @@ export type SequenceDeepV2 = {
     isManualBucket: boolean;
     messagesSent: number;
     uniqueContacted: number;
+    inboundTexts: number;
     repliesReceived: number;
     replyRatePct: number;
     bookedCalls: number;
@@ -827,6 +829,12 @@ export type SequenceDeepV2 = {
     slackBookedTotal: number;
     mondayBookedTotal: number;
     deltaBookedVsMonday: number;
+    matchedCalls: number;
+    unattributedCalls: number;
+    manualCalls: number;
+    strictSmsReplyLinkedCalls: number;
+    smsPhoneMatchedCalls: number;
+    fuzzyTextMatchedCalls: number;
     manualDirectBooked: number;
     manualDirectSharePct: number;
     attributionConversationMapped: number;

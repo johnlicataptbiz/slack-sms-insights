@@ -48,6 +48,14 @@ export function AttributionHealthPanel() {
           <span>Latest attributed</span>
           <strong>{formatTimestamp(data.maxAttributionTs)}</strong>
         </div>
+        <div>
+          <span>Needs review</span>
+          <strong>{data.openReviewItems.toLocaleString()}</strong>
+        </div>
+        <div>
+          <span>Unresolved view</span>
+          <strong>{data.unresolvedAttributions.toLocaleString()}</strong>
+        </div>
       </div>
       {data.isLagging && (
         <div className="V2InlineWarning" style={{ marginTop: '1rem' }}>

@@ -21,6 +21,11 @@ import type {
   WeeklyManagerSummaryV2,
   SequenceDeepV2,
   AttributionHealthV2,
+  AttributionReviewQueueRowV2,
+  AttributionMethodDailyRowV2,
+  RepResponseDailyRowV2,
+  SequenceFunnelDailyRowV2,
+  UnresolvedAttributionRowV2,
 } from './v2-types';
 
 const isObject = (value: unknown): value is Record<string, unknown> => {
@@ -423,6 +428,8 @@ export function assertAttributionHealthV2Envelope(value: unknown): asserts value
     throw new Error('Invalid attribution health response: lagHours must be number or null');
   }
   if (!isBoolean(data.isLagging)) throw new Error('Invalid attribution health response: isLagging must be boolean');
+  if (!isNumber(data.openReviewItems)) throw new Error('Invalid attribution health response: openReviewItems must be number');
+  if (!isNumber(data.unresolvedAttributions)) throw new Error('Invalid attribution health response: unresolvedAttributions must be number');
 }
 
 export function assertSequenceDeepV2Envelope(value: unknown): asserts value is ApiEnvelope<SequenceDeepV2> {
@@ -431,6 +438,94 @@ export function assertSequenceDeepV2Envelope(value: unknown): asserts value is A
   if (!isObject(value.data)) throw new Error('Invalid v2 sequences deep response: data must be object');
   if (!Array.isArray(value.data.sequences)) throw new Error('Invalid v2 sequences deep response: sequences missing');
   if (!isObject(value.data.monday)) throw new Error('Invalid v2 sequences deep response: monday missing');
+}
+
+export function assertAttributionReviewQueueV2Envelope(
+  value: unknown,
+): asserts value is ApiEnvelope<AttributionReviewQueueRowV2[]> {
+  if (!isObject(value)) throw new Error('Invalid attribution review queue response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!Array.isArray(value.data)) throw new Error('Invalid attribution review queue response: data must be array');
+  for (const item of value.data) {
+    if (!isObject(item)) throw new Error('Invalid attribution review queue row: not an object');
+    if (!isString(item.id)) throw new Error('Invalid attribution review queue row.id');
+    if (!isString(item.booked_call_id)) throw new Error('Invalid attribution review queue row.booked_call_id');
+    if (!isNumber(item.priority)) throw new Error('Invalid attribution review queue row.priority');
+    if (!isString(item.created_at)) throw new Error('Invalid attribution review queue row.created_at');
+    if (!isString(item.updated_at)) throw new Error('Invalid attribution review queue row.updated_at');
+  }
+}
+
+export function assertSequenceFunnelV2Envelope(
+  value: unknown,
+): asserts value is ApiEnvelope<SequenceFunnelDailyRowV2[]> {
+  if (!isObject(value)) throw new Error('Invalid sequence funnel response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!Array.isArray(value.data)) throw new Error('Invalid sequence funnel response: data must be array');
+  for (const item of value.data) {
+    if (!isObject(item)) throw new Error('Invalid sequence funnel row: not an object');
+    if (!isString(item.day)) throw new Error('Invalid sequence funnel row.day');
+    if (!isString(item.sequence_id)) throw new Error('Invalid sequence funnel row.sequence_id');
+    if (!isString(item.rep_id)) throw new Error('Invalid sequence funnel row.rep_id');
+    if (!isNumber(item.new_leads_contacted)) throw new Error('Invalid sequence funnel row.new_leads_contacted');
+    if (!isNumber(item.leads_replied)) throw new Error('Invalid sequence funnel row.leads_replied');
+    if (!isNumber(item.qualified_leads)) throw new Error('Invalid sequence funnel row.qualified_leads');
+    if (!isNumber(item.booked_calls)) throw new Error('Invalid sequence funnel row.booked_calls');
+    if (!isNumber(item.opt_outs)) throw new Error('Invalid sequence funnel row.opt_outs');
+  }
+}
+
+export function assertAttributionMethodV2Envelope(
+  value: unknown,
+): asserts value is ApiEnvelope<AttributionMethodDailyRowV2[]> {
+  if (!isObject(value)) throw new Error('Invalid attribution method response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!Array.isArray(value.data)) throw new Error('Invalid attribution method response: data must be array');
+  for (const item of value.data) {
+    if (!isObject(item)) throw new Error('Invalid attribution method row: not an object');
+    if (!isString(item.day)) throw new Error('Invalid attribution method row.day');
+    if (!isNumber(item.matched_calls)) throw new Error('Invalid attribution method row.matched_calls');
+    if (!isNumber(item.manual_direct_calls)) throw new Error('Invalid attribution method row.manual_direct_calls');
+    if (!isNumber(item.unattributed_calls)) throw new Error('Invalid attribution method row.unattributed_calls');
+    if (!isNumber(item.sms_phone_match_calls)) throw new Error('Invalid attribution method row.sms_phone_match_calls');
+    if (!isNumber(item.fuzzy_match_calls)) throw new Error('Invalid attribution method row.fuzzy_match_calls');
+    if (!isNumber(item.reply_linked_calls)) throw new Error('Invalid attribution method row.reply_linked_calls');
+  }
+}
+
+export function assertRepResponseV2Envelope(
+  value: unknown,
+): asserts value is ApiEnvelope<RepResponseDailyRowV2[]> {
+  if (!isObject(value)) throw new Error('Invalid rep response response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!Array.isArray(value.data)) throw new Error('Invalid rep response response: data must be array');
+  for (const item of value.data) {
+    if (!isObject(item)) throw new Error('Invalid rep response row: not an object');
+    if (!isString(item.day)) throw new Error('Invalid rep response row.day');
+    if (!isString(item.rep_id)) throw new Error('Invalid rep response row.rep_id');
+    if (!isNumber(item.new_leads_contacted)) throw new Error('Invalid rep response row.new_leads_contacted');
+    if (!isNumber(item.leads_replied)) throw new Error('Invalid rep response row.leads_replied');
+    if (!isNumber(item.booked_calls)) throw new Error('Invalid rep response row.booked_calls');
+    if (item.median_reply_time_minutes !== null && !isNumber(item.median_reply_time_minutes)) {
+      throw new Error('Invalid rep response row.median_reply_time_minutes');
+    }
+    if (item.median_book_time_days !== null && !isNumber(item.median_book_time_days)) {
+      throw new Error('Invalid rep response row.median_book_time_days');
+    }
+  }
+}
+
+export function assertUnresolvedAttributionV2Envelope(
+  value: unknown,
+): asserts value is ApiEnvelope<UnresolvedAttributionRowV2[]> {
+  if (!isObject(value)) throw new Error('Invalid unresolved attribution response: not an object');
+  assertEnvelopeMeta(value.meta);
+  if (!Array.isArray(value.data)) throw new Error('Invalid unresolved attribution response: data must be array');
+  for (const item of value.data) {
+    if (!isObject(item)) throw new Error('Invalid unresolved attribution row: not an object');
+    if (!isString(item.booked_call_id)) throw new Error('Invalid unresolved attribution row.booked_call_id');
+    if (!isString(item.booked_event_ts)) throw new Error('Invalid unresolved attribution row.booked_event_ts');
+  }
 }
 
 export function assertSequenceVersionHistoryV2Envelope(

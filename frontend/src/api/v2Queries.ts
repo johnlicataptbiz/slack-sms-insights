@@ -24,6 +24,11 @@ import {
   assertWeeklySummaryV2Envelope,
   assertSequenceKpisV2Envelope,
   assertAttributionHealthV2Envelope,
+  assertAttributionReviewQueueV2Envelope,
+  assertAttributionMethodV2Envelope,
+  assertRepResponseV2Envelope,
+  assertSequenceFunnelV2Envelope,
+  assertUnresolvedAttributionV2Envelope,
   assertManualMondayEnvelope,
 } from './v2Guards';
 import type {
@@ -52,10 +57,15 @@ import type {
   SequenceDeepV2,
   SequenceKpisV2,
   AttributionHealthV2,
+  AttributionReviewQueueRowV2,
+  AttributionMethodDailyRowV2,
+  RepResponseDailyRowV2,
   ScoreboardV2,
   SendMessageResultV2,
   StageConversionRowV2,
+  SequenceFunnelDailyRowV2,
   WeeklyManagerSummaryV2,
+  UnresolvedAttributionRowV2,
 } from './v2-types';
 
 export type SalesMetricsQueryParams =
@@ -138,6 +148,46 @@ const fetchV2AttributionHealth = async () => {
   return response as ApiEnvelope<AttributionHealthV2>;
 };
 
+const fetchV2AttributionReviewQueue = async (take: number) => {
+  const response = await client.get<unknown>(`/api/v2/attribution/review-queue?take=${take}`);
+  assertAttributionReviewQueueV2Envelope(response);
+  return response as ApiEnvelope<AttributionReviewQueueRowV2[]>;
+};
+
+const fetchV2SequenceFunnel = async (params: { range: string; tz?: string; sequenceId?: string | null }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+  if (params.sequenceId) searchParams.set('sequenceId', params.sequenceId);
+  const response = await client.get<unknown>(`/api/v2/sequences/funnel?${searchParams.toString()}`);
+  assertSequenceFunnelV2Envelope(response);
+  return response as ApiEnvelope<SequenceFunnelDailyRowV2[]>;
+};
+
+const fetchV2AttributionMethodDaily = async (params: { range: string; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+  const response = await client.get<unknown>(`/api/v2/attribution/methods?${searchParams.toString()}`);
+  assertAttributionMethodV2Envelope(response);
+  return response as ApiEnvelope<AttributionMethodDailyRowV2[]>;
+};
+
+const fetchV2RepResponseDaily = async (params: { range: string; tz?: string }) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set('range', params.range);
+  if (params.tz) searchParams.set('tz', params.tz);
+  const response = await client.get<unknown>(`/api/v2/reps/response?${searchParams.toString()}`);
+  assertRepResponseV2Envelope(response);
+  return response as ApiEnvelope<RepResponseDailyRowV2[]>;
+};
+
+const fetchV2UnresolvedAttributions = async (take: number) => {
+  const response = await client.get<unknown>(`/api/v2/attribution/unresolved?take=${take}`);
+  assertUnresolvedAttributionV2Envelope(response);
+  return response as ApiEnvelope<UnresolvedAttributionRowV2[]>;
+};
+
 const fetchV2SalesMetricsBatch = async (params: { days: string[]; tz?: string }) => {
   const searchParams = new URLSearchParams();
   searchParams.set('days', params.days.join(','));
@@ -165,6 +215,76 @@ export const useV2AttributionHealth = () => {
     queryKey: ['v2', 'attribution', 'health'],
     queryFn: async () => {
       const envelope = await fetchV2AttributionHealth();
+      return envelope.data;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 3,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2AttributionReviewQueue = (take = 50) => {
+  return useQuery({
+    queryKey: ['v2', 'attribution', 'review-queue', take],
+    queryFn: async () => {
+      const envelope = await fetchV2AttributionReviewQueue(take);
+      return envelope.data;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 3,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2SequenceFunnel = (params: { range: string; tz?: string; sequenceId?: string | null }) => {
+  return useQuery({
+    queryKey: ['v2', 'sequences', 'funnel', params],
+    queryFn: async () => {
+      const envelope = await fetchV2SequenceFunnel(params);
+      return envelope.data;
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2AttributionMethodDaily = (params: { range: string; tz?: string }) => {
+  return useQuery({
+    queryKey: ['v2', 'attribution', 'methods', params],
+    queryFn: async () => {
+      const envelope = await fetchV2AttributionMethodDaily(params);
+      return envelope.data;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2RepResponseDaily = (params: { range: string; tz?: string }) => {
+  return useQuery({
+    queryKey: ['v2', 'reps', 'response', params],
+    queryFn: async () => {
+      const envelope = await fetchV2RepResponseDaily(params);
+      return envelope.data;
+    },
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    retry: 2,
+    refetchOnWindowFocus: false,
+  });
+};
+
+export const useV2UnresolvedAttributions = (take = 100) => {
+  return useQuery({
+    queryKey: ['v2', 'attribution', 'unresolved', take],
+    queryFn: async () => {
+      const envelope = await fetchV2UnresolvedAttributions(take);
       return envelope.data;
     },
     staleTime: 60 * 1000,

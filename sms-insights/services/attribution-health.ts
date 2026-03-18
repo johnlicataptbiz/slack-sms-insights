@@ -7,6 +7,8 @@ export type AttributionLagStatus = {
   maxAttributionTs: string | null;
   lagHours: number | null;
   isLagging: boolean;
+  openReviewItems: number;
+  unresolvedAttributions: number;
 };
 
 export const getAttributionLagStatus = async (thresholdHours = 24): Promise<AttributionLagStatus> => {
@@ -26,6 +28,12 @@ export const getAttributionLagStatus = async (thresholdHours = 24): Promise<Attr
   const row = rows[0];
   const maxBooked = row?.max_booked_calls_ts ? new Date(row.max_booked_calls_ts) : null;
   const maxAttr = row?.max_attr_ts ? new Date(row.max_attr_ts) : null;
+  const [openReviewItems, unresolvedAttributions] = await Promise.all([
+    prisma.attribution_review_queue.count({
+      where: { status: { in: ['open', 'pending', 'needs_review'] } },
+    }),
+    prisma.analytics_unresolved_attribution_v.count(),
+  ]);
 
   let lagHours: number | null = null;
   if (maxBooked && maxAttr) {
@@ -37,6 +45,7 @@ export const getAttributionLagStatus = async (thresholdHours = 24): Promise<Attr
     maxAttributionTs: maxAttr ? maxAttr.toISOString() : null,
     lagHours: lagHours != null ? Number(lagHours.toFixed(2)) : null,
     isLagging: lagHours != null ? lagHours > thresholdHours : false,
+    openReviewItems,
+    unresolvedAttributions,
   };
 };
-

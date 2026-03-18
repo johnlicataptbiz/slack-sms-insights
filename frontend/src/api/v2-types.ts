@@ -37,6 +37,66 @@ export type AttributionHealthV2 = {
   maxAttributionTs: string | null;
   lagHours: number | null;
   isLagging: boolean;
+  openReviewItems: number;
+  unresolvedAttributions: number;
+};
+
+export type AttributionReviewQueueRowV2 = {
+  id: string;
+  booked_call_id: string;
+  priority: number;
+  issue_type: string | null;
+  issue_summary: string | null;
+  candidate_sequences: unknown;
+  status: string | null;
+  resolved_by: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SequenceFunnelDailyRowV2 = {
+  day: string;
+  sequence_id: string;
+  rep_id: string;
+  new_leads_contacted: number;
+  leads_replied: number;
+  qualified_leads: number;
+  booked_calls: number;
+  opt_outs: number;
+};
+
+export type AttributionMethodDailyRowV2 = {
+  day: string;
+  matched_calls: number;
+  manual_direct_calls: number;
+  unattributed_calls: number;
+  sms_phone_match_calls: number;
+  fuzzy_match_calls: number;
+  reply_linked_calls: number;
+};
+
+export type RepResponseDailyRowV2 = {
+  day: string;
+  rep_id: string;
+  new_leads_contacted: number;
+  leads_replied: number;
+  booked_calls: number;
+  median_reply_time_minutes: number | null;
+  median_book_time_days: number | null;
+};
+
+export type UnresolvedAttributionRowV2 = {
+  booked_call_id: string;
+  booked_event_ts: string;
+  attribution_status: string | null;
+  needs_review: boolean | null;
+  review_reason: string | null;
+  mapper_version: string | null;
+  conversation_id: string | null;
+  resolved_sequence_id: string | null;
+  resolved_sequence_label: string | null;
+  created_at: string | null;
 };
 
 export type SalesMetricsV2 = {

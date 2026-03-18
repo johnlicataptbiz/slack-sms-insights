@@ -2,9 +2,11 @@ import type { Logger } from '@slack/bolt';
 import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
+  getBookedCallSmsReplyLinks,
   normalizeContactNameKey,
   type BookedCallAttributionSource,
 } from './booked-calls.js';
+import { upsertAttributionReviewItem } from './attribution-review-queue.js';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
@@ -171,6 +173,53 @@ const mapSetterHint = (bucket: 'jack' | 'brandon' | 'selfBooked'): string | null
   return null;
 };
 
+const confidenceBandFor = (confidence: number | null): string | null => {
+  if (confidence == null || !Number.isFinite(confidence)) return null;
+  if (confidence >= 0.9) return 'high';
+  if (confidence >= 0.75) return 'medium';
+  return 'low';
+};
+
+const buildAttributionStatus = (args: {
+  hasConversation: boolean;
+  confidence: number | null;
+  smsMatched: boolean;
+  replyLinked: boolean;
+}): {
+  attributionStatus: string;
+  attributionConfidenceBand: string | null;
+  fallbackUsed: boolean;
+  needsReview: boolean;
+  reviewReason: string | null;
+  attributionPath: string;
+} => {
+  const confidenceBand = confidenceBandFor(args.confidence);
+  const fallbackUsed = !args.smsMatched || !args.replyLinked;
+  const needsReview = !args.hasConversation || (args.confidence != null && args.confidence < 0.8) || !args.smsMatched;
+  const reviewReason = !args.hasConversation
+    ? 'conversation_unresolved'
+    : !args.smsMatched
+      ? 'sms_sequence_unresolved'
+      : args.confidence != null && args.confidence < 0.8
+        ? 'low_confidence'
+        : null;
+  const attributionStatus = needsReview ? 'needs_review' : 'confirmed';
+  const attributionPath = [
+    args.replyLinked ? 'reply_link' : 'no_reply_link',
+    args.smsMatched ? 'sms_lookup' : 'candidate_resolution',
+    confidenceBand || 'no_confidence',
+  ].join(' > ');
+
+  return {
+    attributionStatus,
+    attributionConfidenceBand: confidenceBand,
+    fallbackUsed,
+    needsReview,
+    reviewReason,
+    attributionPath,
+  };
+};
+
 export type RefreshBookedCallAttributionResult = {
   processed: number;
   upserted: number;
@@ -188,7 +237,16 @@ export const refreshBookedCallAttribution = async (
     channelId: params.channelId,
   });
   const attributionLogger = logger ? { ...logger, debug: logger.info } : undefined;
-  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(sources, attributionLogger);
+  const [smsReplyLinks, smsSequenceLookup, sequenceRows] = await Promise.all([
+    getBookedCallSmsReplyLinks(sources, attributionLogger),
+    getBookedCallSequenceFromSmsEvents(sources, attributionLogger),
+    prisma.sequence_registry.findMany({
+      select: { id: true, label: true, normalized_label: true },
+    }),
+  ]);
+  const sequenceIdByLabel = new Map(
+    sequenceRows.map((row) => [row.normalized_label.trim().toLowerCase(), row.id]),
+  );
   const existingRows =
     sources.length === 0
       ? []
@@ -201,6 +259,8 @@ export const refreshBookedCallAttribution = async (
             conversation_id: true,
             conversation_match_seconds: true,
             first_conversion: true,
+            resolved_sequence_id: true,
+            resolved_sequence_label: true,
           },
         });
   const existingByBookedCallId = new Map(existingRows.map((row) => [row.booked_call_id, row]));
@@ -363,6 +423,7 @@ export const refreshBookedCallAttribution = async (
     }
 
     const smsLookup = smsSequenceLookup.get(source.bookedCallId);
+    const replyLink = smsReplyLinks.get(`${source.slackChannelId}::${source.slackMessageTs}`);
     const existing = existingByBookedCallId.get(source.bookedCallId);
     const candidateResolution = resolveBestConversationCandidate(bookingTs, [...candidatesByConversationId.values()]);
 
@@ -389,6 +450,18 @@ export const refreshBookedCallAttribution = async (
           ? 0.82
           : 0.98
         : candidateResolution.confidence ?? (source.bucket === 'selfBooked' ? 0.7 : 0.95);
+    const attributionState = buildAttributionStatus({
+      hasConversation: Boolean(resolvedConversationId),
+      confidence: matchConfidence,
+      smsMatched: Boolean(smsLookup?.sequenceLabel || smsLookup?.conversationId),
+      replyLinked: Boolean(replyLink?.hasPriorReply),
+    });
+    const resolvedSequenceLabel =
+      smsLookup?.sequenceLabel || resolvedFirstConversion || existing?.resolved_sequence_label || null;
+    const resolvedSequenceId =
+      (resolvedSequenceLabel ? sequenceIdByLabel.get(resolvedSequenceLabel.trim().toLowerCase()) || null : null) ||
+      existing?.resolved_sequence_id ||
+      null;
 
     await prisma.booked_call_attribution.upsert({
       where: { booked_call_id: source.bookedCallId },
@@ -399,6 +472,11 @@ export const refreshBookedCallAttribution = async (
         canonical_booking: true,
         mapping_method: mappingMethod,
         match_confidence: matchConfidence,
+        attribution_status: attributionState.attributionStatus,
+        attribution_confidence_band: attributionState.attributionConfidenceBand,
+        fallback_used: attributionState.fallbackUsed,
+        needs_review: attributionState.needsReview,
+        review_reason: attributionState.reviewReason,
         conversation_id: resolvedConversationId,
         conversation_match_seconds: resolvedConversationMatchSeconds,
         setter_hint: mapSetterHint(source.bucket),
@@ -406,6 +484,12 @@ export const refreshBookedCallAttribution = async (
         closer_final: null,
         first_conversion: resolvedFirstConversion,
         source_bucket: source.bucket === 'selfBooked' ? 'self_booked' : 'setter_attributed',
+        resolved_sequence_id: resolvedSequenceId,
+        resolved_sequence_label: resolvedSequenceLabel,
+        attribution_path: attributionState.attributionPath,
+        matched_via_phone: Boolean(source.contactPhone && smsLookup?.conversationId),
+        matched_via_fuzzy: Boolean(candidateResolution.evidence && !smsLookup?.conversationId),
+        matched_via_reply_link: Boolean(replyLink?.hasPriorReply),
         hubspot_contact_id: null,
         lead_score: null,
         lead_score_source: null,
@@ -417,15 +501,43 @@ export const refreshBookedCallAttribution = async (
         canonical_booking: true,
         mapping_method: mappingMethod,
         match_confidence: matchConfidence,
+        attribution_status: attributionState.attributionStatus,
+        attribution_confidence_band: attributionState.attributionConfidenceBand,
+        fallback_used: attributionState.fallbackUsed,
+        needs_review: attributionState.needsReview,
+        review_reason: attributionState.reviewReason,
         conversation_id: resolvedConversationId,
         conversation_match_seconds: resolvedConversationMatchSeconds,
         setter_hint: mapSetterHint(source.bucket),
         setter_final: mapSetterFromBucket(source.bucket),
         first_conversion: resolvedFirstConversion,
         source_bucket: source.bucket === 'selfBooked' ? 'self_booked' : 'setter_attributed',
+        resolved_sequence_id: resolvedSequenceId,
+        resolved_sequence_label: resolvedSequenceLabel,
+        attribution_path: attributionState.attributionPath,
+        matched_via_phone: Boolean(source.contactPhone && smsLookup?.conversationId),
+        matched_via_fuzzy: Boolean(candidateResolution.evidence && !smsLookup?.conversationId),
+        matched_via_reply_link: Boolean(replyLink?.hasPriorReply),
         mapper_version: mapperVersion,
       },
     });
+
+    if (attributionState.needsReview) {
+      await upsertAttributionReviewItem({
+        booked_call_id: source.bookedCallId,
+        priority: matchConfidence != null && matchConfidence < 0.8 ? 80 : 50,
+        issue_type: attributionState.reviewReason || 'needs_review',
+        issue_summary: `Attribution needs review for ${source.contactName || source.contactPhone || source.bookedCallId}`,
+        candidate_sequences: {
+          booked_call_id: source.bookedCallId,
+          resolved_sequence_id: resolvedSequenceId,
+          resolved_sequence_label: resolvedSequenceLabel,
+          confidence: matchConfidence,
+          conversation_id: resolvedConversationId,
+        },
+        status: 'open',
+      });
+    }
 
     upserted += 1;
     if (resolvedConversationId) matchedConversations += 1;

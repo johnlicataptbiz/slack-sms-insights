@@ -1,10 +1,25 @@
 import { useMemo, useRef, useState, useCallback } from 'react';
-import { MessageSquare, Users, Reply, Phone, ChevronUp, ChevronDown, Filter } from 'lucide-react';
+import { MessageSquare, Users, Reply, Phone, ChevronUp, ChevronDown } from 'lucide-react';
 
-import { useV2SequenceQualification, useV2SequencesDeep } from '../../api/v2Queries';
+import {
+  useV2AttributionMethodDaily,
+  useV2AttributionReviewQueue,
+  useV2RepResponseDaily,
+  useV2SequenceFunnel,
+  useV2SequenceQualification,
+  useV2SequencesDeep,
+  useV2UnresolvedAttributions,
+} from '../../api/v2Queries';
 import type { SequenceQualificationItem } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
-import { UnattributedAuditTable } from '../components/UnattributedAuditTable';
+import { AttributionHealthPanel } from '../components/AttributionHealthPanel';
+import {
+  AttributionMethodPanel,
+  AttributionReviewQueuePanel,
+  RepResponsePanel,
+  SequenceFunnelPanel,
+  UnresolvedAttributionPanel,
+} from '../components/SequenceAttributionPanels';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 import { DEFAULT_BUSINESS_TIME_ZONE } from '../../utils/runDay';
 
@@ -71,8 +86,18 @@ export default function SequencesV2() {
     tz: DEFAULT_BUSINESS_TIME_ZONE,
     ...(status ? { status } : {}),
   });
+  const funnelQuery = useV2SequenceFunnel({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
+  const attributionMethodQuery = useV2AttributionMethodDaily({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
+  const repResponseQuery = useV2RepResponseDaily({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
+  const reviewQueueQuery = useV2AttributionReviewQueue(8);
+  const unresolvedQuery = useV2UnresolvedAttributions(8);
   const qualificationQuery = useV2SequenceQualification({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
   const data = query.data?.data;
+  const funnelRows = funnelQuery.data ?? [];
+  const attributionMethodRows = attributionMethodQuery.data ?? [];
+  const repResponseRows = repResponseQuery.data ?? [];
+  const reviewQueueRows = reviewQueueQuery.data ?? [];
+  const unresolvedRows = unresolvedQuery.data ?? [];
   const qualificationItems = qualificationQuery.data?.data.items ?? [];
   const qualificationSummary = useMemo(() => {
     const total = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.totalConversations, 0);
@@ -129,10 +154,6 @@ export default function SequencesV2() {
     );
   }, [tableEligibleSequences]);
 
-  const filteredCount = useMemo(() => {
-    return tableEligibleSequences.filter((row) => row.messagesSent < minSendsThreshold).length;
-  }, [tableEligibleSequences, minSendsThreshold]);
-
   const sortedSequences = useMemo(() => {
     const filtered = tableEligibleSequences.filter((row) => row.messagesSent >= minSendsThreshold);
     const dir = sortDirection === 'asc' ? 1 : -1;
@@ -146,22 +167,12 @@ export default function SequencesV2() {
     });
   }, [tableEligibleSequences, minSendsThreshold, sortKey, sortDirection]);
 
-  const verification = data?.verification ?? {
-    slackBookedTotal: 0,
-    mondayBookedTotal: 0,
-    deltaBookedVsMonday: 0,
-    matchedCalls: 0,
-    unattributedCalls: 0,
-    manualCalls: 0,
-    strictSmsReplyLinkedCalls: 0,
-    smsPhoneMatchedCalls: 0,
-    fuzzyTextMatchedCalls: 0,
-    manualDirectSharePct: 0,
-    manualDirectBooked: 0,
-    attributionConversationMapped: 0,
-    attributionConversationMappedPct: 0,
-  };
-  const unattributedAuditRows = data?.unattributedAuditRows ?? [];
+  const summaryCopy = [
+    `${fmtInt(totals.messagesSent)} outbound`,
+    `${fmtInt(totals.uniqueContacted)} leads contacted`,
+    `${fmtInt(totals.repliesReceived)} replied`,
+    `${fmtInt(totals.bookedCalls)} booked`,
+  ].join(' · ');
 
   return (
     <div className="V2Page V2PageTransition V2Page--sequencesClean">
@@ -221,19 +232,15 @@ export default function SequencesV2() {
             <V2MetricCard label={<IconLabel icon={<Users size={11} />}>New leads contacted</IconLabel>} value={fmtInt(totals.uniqueContacted)} />
             <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Leads who replied</IconLabel>} value={fmtInt(totals.repliesReceived)} />
             <V2MetricCard label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>} value={fmtInt(totals.bookedCalls)} tone="positive" />
-            {filteredCount > 0 && (
-              <V2MetricCard
-                label={<IconLabel icon={<Filter size={11} />}>Filtered out (low activity)</IconLabel>}
-                value={fmtInt(filteredCount)}
-                tone="default"
-              />
-            )}
+          </div>
+          <div style={{ marginTop: '0.85rem', color: 'var(--v2-muted)', fontSize: '0.88rem' }}>
+            {summaryCopy}
           </div>
 
           <div ref={tableRef}>
             <V2Panel
               title="Sequence Results"
-              caption="At-a-glance sequence performance for this date range. Tip: swipe left/right if needed."
+              caption="Outbound, response, and booked-call performance for each sequence."
             >
               <div className="V2TableWrap V2TableWrap--sequences">
                 <table className="V2Table V2Table--sequences">
@@ -308,118 +315,85 @@ export default function SequencesV2() {
                 </table>
               </div>
             </V2Panel>
+          </div>
 
-          <V2Panel
-            title="Booking Attribution Snapshot"
-            caption="Booked-call totals, attribution path breakdowns, and reviewable gaps."
-          >
-            <div className="V2TableWrap V2TableWrap--sequences">
-              <table className="V2Table V2Table--sequences">
-                <thead>
-                  <tr>
-                    <th>Group</th>
-                    <th>Metric</th>
-                    <th className="is-right">Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th colSpan={3} style={{ textAlign: 'left', paddingTop: '1rem', paddingBottom: '0.5rem', color: 'var(--v2-text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      Volume
-                    </th>
-                  </tr>
-                  <tr>
-                    <td>Volume</td>
-                    <td>Total outbound sent</td>
-                    <td className="is-right">{fmtInt(totals.messagesSent)}</td>
-                  </tr>
-                  <tr>
-                    <td>Volume</td>
-                    <td>Total inbound texts</td>
-                    <td className="is-right">{fmtInt(totals.inboundTexts)}</td>
-                  </tr>
-                  <tr>
-                    <td>Volume</td>
-                    <td>New leads contacted</td>
-                    <td className="is-right">{fmtInt(totals.uniqueContacted)}</td>
-                  </tr>
-                  <tr>
-                    <td>Volume</td>
-                    <td>Leads who replied</td>
-                    <td className="is-right">{fmtInt(totals.repliesReceived)}</td>
-                  </tr>
+          <div className="V2Grid V2Grid--2">
+            {funnelQuery.isLoading ? (
+              <V2Panel title="Sequence Funnel" caption="Daily contacted-to-booked funnel across the selected range.">
+                <V2State kind="loading">Loading funnel data…</V2State>
+              </V2Panel>
+            ) : funnelQuery.isError ? (
+              <V2Panel title="Sequence Funnel" caption="Daily contacted-to-booked funnel across the selected range.">
+                <V2State kind="error" onRetry={() => void funnelQuery.refetch()}>
+                  Failed to load funnel data.
+                </V2State>
+              </V2Panel>
+            ) : (
+              <SequenceFunnelPanel rows={funnelRows} />
+            )}
 
-                  <tr>
-                    <th colSpan={3} style={{ textAlign: 'left', paddingTop: '1rem', paddingBottom: '0.5rem', color: 'var(--v2-text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      Attribution path
-                    </th>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>Calls booked</td>
-                    <td className="is-right">{fmtInt(verification.slackBookedTotal ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>Matched to sequence</td>
-                    <td className="is-right">{fmtInt(verification.matchedCalls ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>Manual / direct</td>
-                    <td className="is-right">{fmtInt(verification.manualCalls ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>Unattributed</td>
-                    <td className="is-right" style={{ color: (verification.unattributedCalls ?? 0) > 0 ? 'var(--v2-warning)' : 'inherit' }}>
-                      {fmtInt(verification.unattributedCalls ?? 0)}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>Strict SMS reply linked</td>
-                    <td className="is-right">{fmtInt(verification.strictSmsReplyLinkedCalls ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>SMS phone matched</td>
-                    <td className="is-right">{fmtInt(verification.smsPhoneMatchedCalls ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>Fuzzy text matched</td>
-                    <td className="is-right">{fmtInt(verification.fuzzyTextMatchedCalls ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>Attribution</td>
-                    <td>Attribution coverage</td>
-                    <td className="is-right">{fmtPct(verification.attributionConversationMappedPct ?? 0)}</td>
-                  </tr>
+            {reviewQueueQuery.isLoading ? (
+              <V2Panel title="Attribution Review Queue" caption="Ambiguous bookings that need a second look.">
+                <V2State kind="loading">Loading review queue…</V2State>
+              </V2Panel>
+            ) : reviewQueueQuery.isError ? (
+              <V2Panel title="Attribution Review Queue" caption="Ambiguous bookings that need a second look.">
+                <V2State kind="error" onRetry={() => void reviewQueueQuery.refetch()}>
+                  Failed to load review queue.
+                </V2State>
+              </V2Panel>
+            ) : (
+              <AttributionReviewQueuePanel rows={reviewQueueRows} />
+            )}
+          </div>
 
-                  <tr>
-                    <th colSpan={3} style={{ textAlign: 'left', paddingTop: '1rem', paddingBottom: '0.5rem', color: 'var(--v2-text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-                      Cross-checks
-                    </th>
-                  </tr>
-                  <tr>
-                    <td>Cross-check</td>
-                    <td>Monday booked</td>
-                    <td className="is-right">{fmtInt(verification.mondayBookedTotal ?? 0)}</td>
-                  </tr>
-                  <tr>
-                    <td>Cross-check</td>
-                    <td>Slack vs Monday delta</td>
-                    <td className="is-right">{fmtInt(verification.deltaBookedVsMonday ?? 0)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </V2Panel>
+          <div className="V2Grid V2Grid--2">
+            <AttributionHealthPanel />
 
-          {unattributedAuditRows.length > 0 ? (
-            <UnattributedAuditTable rows={unattributedAuditRows} />
-          ) : null}
+            {unresolvedQuery.isLoading ? (
+              <V2Panel title="Unresolved Attributions" caption="Latest bookings that still need a sequence decision.">
+                <V2State kind="loading">Loading unresolved attributions…</V2State>
+              </V2Panel>
+            ) : unresolvedQuery.isError ? (
+              <V2Panel title="Unresolved Attributions" caption="Latest bookings that still need a sequence decision.">
+                <V2State kind="error" onRetry={() => void unresolvedQuery.refetch()}>
+                  Failed to load unresolved attributions.
+                </V2State>
+              </V2Panel>
+            ) : (
+              <UnresolvedAttributionPanel rows={unresolvedRows} />
+            )}
+          </div>
+
+          <div className="V2Grid V2Grid--2">
+            {attributionMethodQuery.isLoading ? (
+              <V2Panel title="Attribution Methods" caption="How booked calls were matched in the selected range.">
+                <V2State kind="loading">Loading attribution methods…</V2State>
+              </V2Panel>
+            ) : attributionMethodQuery.isError ? (
+              <V2Panel title="Attribution Methods" caption="How booked calls were matched in the selected range.">
+                <V2State kind="error" onRetry={() => void attributionMethodQuery.refetch()}>
+                  Failed to load attribution methods.
+                </V2State>
+              </V2Panel>
+            ) : (
+              <AttributionMethodPanel rows={attributionMethodRows} />
+            )}
+
+            {repResponseQuery.isLoading ? (
+              <V2Panel title="Rep Response" caption="Contacted-to-booked funnel and timing by rep.">
+                <V2State kind="loading">Loading rep response…</V2State>
+              </V2Panel>
+            ) : repResponseQuery.isError ? (
+              <V2Panel title="Rep Response" caption="Contacted-to-booked funnel and timing by rep.">
+                <V2State kind="error" onRetry={() => void repResponseQuery.refetch()}>
+                  Failed to load rep response.
+                </V2State>
+              </V2Panel>
+            ) : (
+              <RepResponsePanel rows={repResponseRows} />
+            )}
+          </div>
 
             {!qualificationQuery.isLoading && !qualificationQuery.isError && qualificationItems.length > 0 ? (
               <div className="V2QualSummary">
@@ -456,7 +430,6 @@ export default function SequencesV2() {
                 </article>
               </div>
             ) : null}
-          </div>
 
           <V2Panel
             title="Lead Qualification by Sequence"

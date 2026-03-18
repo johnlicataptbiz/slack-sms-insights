@@ -79,6 +79,7 @@ export type KpiFactRefreshResult = {
   toDay: string;
   smsRows: number;
   bookingRows: number;
+  funnelRows: number;
   fallbackBookingRows: number;
   fallbackBookedTotal: number;
 };
@@ -733,6 +734,281 @@ export const refreshKpiFacts = async (
     source_bucket_known: 0,
   }));
 
+  const funnelFactRowsMap = new Map<string, {
+    day: Date;
+    sequence_id: string;
+    rep_id: string;
+    new_leads_contacted: number;
+    leads_replied: number;
+    qualified_leads: number;
+    booked_calls: number;
+    opt_outs: number;
+  }>();
+
+  const ensureFunnelRow = (day: string, sequenceId: string, repId: string) => {
+    const key = `${day}|${sequenceId}|${repId}`;
+    let row = funnelFactRowsMap.get(key);
+    if (!row) {
+      row = {
+        day: toDayDate(day),
+        sequence_id: sequenceId,
+        rep_id: repId,
+        new_leads_contacted: 0,
+        leads_replied: 0,
+        qualified_leads: 0,
+        booked_calls: 0,
+        opt_outs: 0,
+      };
+      funnelFactRowsMap.set(key, row);
+    }
+    return row;
+  };
+
+  for (const row of smsRows) {
+    const funnel = ensureFunnelRow(row.day, row.sequenceId, row.repId);
+    funnel.new_leads_contacted = row.uniqueContacted;
+    funnel.leads_replied = row.repliesReceived;
+    funnel.opt_outs = row.optOuts;
+  }
+
+  for (const row of leadRows) {
+    const funnel = ensureFunnelRow(row.day_key, row.sequence_id, row.rep_id);
+    funnel.qualified_leads = row.p3 + row.p4;
+  }
+
+  for (const row of bookingFactRows) {
+    const funnel = ensureFunnelRow(row.day.toISOString().slice(0, 10), row.sequence_id, row.rep_id);
+    funnel.booked_calls = row.booked_total;
+  }
+
+  const funnelFactRows = Array.from(funnelFactRowsMap.values()).filter(
+    (row) =>
+      row.new_leads_contacted > 0 ||
+      row.leads_replied > 0 ||
+      row.qualified_leads > 0 ||
+      row.booked_calls > 0 ||
+      row.opt_outs > 0,
+  );
+
+  const conversationJourneyInsert = prisma.$executeRawUnsafe(
+    `
+    INSERT INTO conversation_journey (
+      conversation_id,
+      window_start,
+      window_end,
+      first_outbound_at,
+      first_reply_at,
+      first_qualified_at,
+      first_booked_at,
+      sequence_id,
+      rep_id,
+      reply_latency_minutes,
+      book_latency_days,
+      messages_before_reply,
+      messages_before_book,
+      created_at,
+      updated_at
+    )
+    WITH scoped_events AS (
+      SELECT
+        se.conversation_id,
+        se.event_ts,
+        se.direction,
+        se.sequence_id,
+        COALESCE(NULLIF(LOWER(BTRIM(se.aloware_user)), ''), 'unknown') AS rep_id
+      FROM sms_events se
+      WHERE se.conversation_id IS NOT NULL
+        AND se.event_ts >= $1::timestamptz
+        AND se.event_ts <= $2::timestamptz
+        AND se.direction IN ('inbound', 'outbound')
+    ),
+    first_outbound AS (
+      SELECT conversation_id, MIN(event_ts) AS first_outbound_at
+      FROM scoped_events
+      WHERE direction = 'outbound'
+      GROUP BY conversation_id
+    ),
+    first_reply AS (
+      SELECT se.conversation_id, MIN(se.event_ts) AS first_reply_at
+      FROM scoped_events se
+      JOIN first_outbound fo ON fo.conversation_id = se.conversation_id
+      WHERE se.direction = 'inbound'
+        AND se.event_ts >= fo.first_outbound_at
+      GROUP BY se.conversation_id
+    ),
+    sequence_rep AS (
+      SELECT se.conversation_id,
+        COALESCE(se.sequence_id, $3::uuid) AS sequence_id,
+        se.rep_id
+      FROM scoped_events se
+      JOIN first_outbound fo
+        ON fo.conversation_id = se.conversation_id
+       AND fo.first_outbound_at = se.event_ts
+    ),
+    booked AS (
+      SELECT conversation_id, MIN(booked_event_ts) AS first_booked_at
+      FROM booked_call_attribution
+      WHERE conversation_id IS NOT NULL
+        AND booked_event_ts >= $1::timestamptz
+        AND booked_event_ts <= $2::timestamptz
+      GROUP BY conversation_id
+    ),
+    qualified AS (
+      SELECT cs.conversation_id, MIN(cs.updated_at) AS first_qualified_at
+      FROM conversation_state cs
+      JOIN first_outbound fo ON fo.conversation_id = cs.conversation_id
+      WHERE cs.qualification_progress_step >= 3
+        AND cs.updated_at >= $1::timestamptz
+        AND cs.updated_at <= $2::timestamptz
+      GROUP BY cs.conversation_id
+    ),
+    outbound_counts AS (
+      SELECT
+        se.conversation_id,
+        COUNT(*) FILTER (
+          WHERE se.direction = 'outbound'
+            AND fr.first_reply_at IS NOT NULL
+            AND se.event_ts <= fr.first_reply_at
+        ) AS messages_before_reply,
+        COUNT(*) FILTER (
+          WHERE se.direction = 'outbound'
+            AND b.first_booked_at IS NOT NULL
+            AND se.event_ts <= b.first_booked_at
+        ) AS messages_before_book
+      FROM scoped_events se
+      LEFT JOIN first_reply fr ON fr.conversation_id = se.conversation_id
+      LEFT JOIN booked b ON b.conversation_id = se.conversation_id
+      GROUP BY se.conversation_id
+    )
+    SELECT
+      fo.conversation_id,
+      date_trunc('day', fo.first_outbound_at) AS window_start,
+      date_trunc('day', fo.first_outbound_at) + INTERVAL '1 day' AS window_end,
+      fo.first_outbound_at,
+      fr.first_reply_at,
+      q.first_qualified_at,
+      b.first_booked_at,
+      sr.sequence_id,
+      sr.rep_id,
+      CASE
+        WHEN fr.first_reply_at IS NOT NULL
+          THEN ROUND(EXTRACT(EPOCH FROM (fr.first_reply_at - fo.first_outbound_at)) / 60)::int
+        ELSE NULL
+      END AS reply_latency_minutes,
+      CASE
+        WHEN b.first_booked_at IS NOT NULL
+          THEN ROUND(EXTRACT(EPOCH FROM (b.first_booked_at - fo.first_outbound_at)) / 86400, 2)
+        ELSE NULL
+      END AS book_latency_days,
+      COALESCE(oc.messages_before_reply, 0) AS messages_before_reply,
+      COALESCE(oc.messages_before_book, 0) AS messages_before_book,
+      NOW(),
+      NOW()
+    FROM first_outbound fo
+    JOIN sequence_rep sr ON sr.conversation_id = fo.conversation_id
+    LEFT JOIN first_reply fr ON fr.conversation_id = fo.conversation_id
+    LEFT JOIN qualified q ON q.conversation_id = fo.conversation_id
+    LEFT JOIN booked b ON b.conversation_id = fo.conversation_id
+    LEFT JOIN outbound_counts oc ON oc.conversation_id = fo.conversation_id
+    ON CONFLICT (conversation_id, window_start) DO UPDATE SET
+      window_end = EXCLUDED.window_end,
+      first_outbound_at = EXCLUDED.first_outbound_at,
+      first_reply_at = EXCLUDED.first_reply_at,
+      first_qualified_at = EXCLUDED.first_qualified_at,
+      first_booked_at = EXCLUDED.first_booked_at,
+      sequence_id = EXCLUDED.sequence_id,
+      rep_id = EXCLUDED.rep_id,
+      reply_latency_minutes = EXCLUDED.reply_latency_minutes,
+      book_latency_days = EXCLUDED.book_latency_days,
+      messages_before_reply = EXCLUDED.messages_before_reply,
+      messages_before_book = EXCLUDED.messages_before_book,
+      updated_at = NOW()
+    `,
+    rangeFrom.toISOString(),
+    rangeTo.toISOString(),
+    manual.id,
+  );
+
+  const attributionMethodInsert = prisma.$executeRawUnsafe(
+    `
+    INSERT INTO fact_attribution_method_daily (
+      day,
+      matched_calls,
+      manual_direct_calls,
+      unattributed_calls,
+      sms_phone_match_calls,
+      fuzzy_match_calls,
+      reply_linked_calls,
+      created_at,
+      updated_at
+    )
+    SELECT
+      date_trunc('day', booked_event_ts)::date AS day,
+      COUNT(*) FILTER (WHERE resolved_sequence_id IS NOT NULL) AS matched_calls,
+      COUNT(*) FILTER (WHERE resolved_sequence_label = $3) AS manual_direct_calls,
+      COUNT(*) FILTER (WHERE resolved_sequence_id IS NULL) AS unattributed_calls,
+      COUNT(*) FILTER (WHERE matched_via_phone IS TRUE) AS sms_phone_match_calls,
+      COUNT(*) FILTER (WHERE matched_via_fuzzy IS TRUE) AS fuzzy_match_calls,
+      COUNT(*) FILTER (WHERE matched_via_reply_link IS TRUE) AS reply_linked_calls,
+      NOW(),
+      NOW()
+    FROM booked_call_attribution
+    WHERE booked_event_ts >= $1::timestamptz
+      AND booked_event_ts <= $2::timestamptz
+    GROUP BY 1
+    ON CONFLICT (day) DO UPDATE SET
+      matched_calls = EXCLUDED.matched_calls,
+      manual_direct_calls = EXCLUDED.manual_direct_calls,
+      unattributed_calls = EXCLUDED.unattributed_calls,
+      sms_phone_match_calls = EXCLUDED.sms_phone_match_calls,
+      fuzzy_match_calls = EXCLUDED.fuzzy_match_calls,
+      reply_linked_calls = EXCLUDED.reply_linked_calls,
+      updated_at = NOW()
+    `,
+    rangeFrom.toISOString(),
+    rangeTo.toISOString(),
+    MANUAL_LABEL,
+  );
+
+  const repResponseInsert = prisma.$executeRawUnsafe(
+    `
+    INSERT INTO fact_rep_response_daily (
+      day,
+      rep_id,
+      new_leads_contacted,
+      leads_replied,
+      booked_calls,
+      median_reply_time_minutes,
+      median_book_time_days,
+      created_at,
+      updated_at
+    )
+    SELECT
+      window_start::date AS day,
+      rep_id,
+      COUNT(*)::int AS new_leads_contacted,
+      COUNT(*) FILTER (WHERE first_reply_at IS NOT NULL)::int AS leads_replied,
+      COUNT(*) FILTER (WHERE first_booked_at IS NOT NULL)::int AS booked_calls,
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY reply_latency_minutes) FILTER (WHERE reply_latency_minutes IS NOT NULL),
+      PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY book_latency_days) FILTER (WHERE book_latency_days IS NOT NULL),
+      NOW(),
+      NOW()
+    FROM conversation_journey
+    WHERE window_start >= $1::timestamptz
+      AND window_start < ($2::timestamptz + INTERVAL '1 day')
+    GROUP BY 1, 2
+    ON CONFLICT (day, rep_id) DO UPDATE SET
+      new_leads_contacted = EXCLUDED.new_leads_contacted,
+      leads_replied = EXCLUDED.leads_replied,
+      booked_calls = EXCLUDED.booked_calls,
+      median_reply_time_minutes = EXCLUDED.median_reply_time_minutes,
+      median_book_time_days = EXCLUDED.median_book_time_days,
+      updated_at = NOW()
+    `,
+    rangeFrom.toISOString(),
+    rangeTo.toISOString(),
+  );
+
   const mondayRows = await prisma.$queryRawUnsafe<Array<{
     board_id: string;
     board_class: string;
@@ -776,6 +1052,12 @@ export const refreshKpiFacts = async (
   }));
 
   const writes = [
+    prisma.$executeRawUnsafe(
+      `DELETE FROM conversation_journey WHERE window_start >= $1::timestamptz AND window_start < ($2::timestamptz + INTERVAL '1 day')`,
+      rangeFrom.toISOString(),
+      rangeTo.toISOString(),
+    ),
+    conversationJourneyInsert,
     prisma.$executeRawUnsafe(`DELETE FROM fact_sms_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
     ...(smsRows.length > 0
       ? [
@@ -811,6 +1093,18 @@ export const refreshKpiFacts = async (
           }),
         ]
       : []),
+    prisma.$executeRawUnsafe(`DELETE FROM fact_sequence_funnel_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    ...(funnelFactRows.length > 0
+      ? [
+          prisma.fact_sequence_funnel_daily.createMany({
+            data: funnelFactRows,
+          }),
+        ]
+      : []),
+    prisma.$executeRawUnsafe(`DELETE FROM fact_attribution_method_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    attributionMethodInsert,
+    prisma.$executeRawUnsafe(`DELETE FROM fact_rep_response_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    repResponseInsert,
     prisma.$executeRawUnsafe(`DELETE FROM fact_monday_health_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
     ...(mondayFactRows.length > 0
       ? [
@@ -828,6 +1122,7 @@ export const refreshKpiFacts = async (
     toDay,
     smsRows: smsRows.length,
     bookingRows: bookingFactRows.length,
+    funnelRows: funnelFactRows.length,
     fallbackBookingRows,
     fallbackBookedTotal,
   });
@@ -837,6 +1132,7 @@ export const refreshKpiFacts = async (
     toDay,
     smsRows: smsRows.length,
     bookingRows: bookingFactRows.length,
+    funnelRows: funnelFactRows.length,
     fallbackBookingRows,
     fallbackBookedTotal,
   };

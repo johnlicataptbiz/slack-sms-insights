@@ -104,6 +104,13 @@ import { computeDailyReport, computeDailyReportRange } from '../services/daily-r
 import { getInsightsSummary } from '../services/insights-summary.js';
 import { getSequencesDeep } from '../services/sequences-deep.js';
 import { getAttributionLagStatus } from '../services/attribution-health.js';
+import {
+  listOpenAttributionReviewItems,
+  listAttributionMethodDaily,
+  listRepResponseDaily,
+  listSequenceFunnelDaily,
+  listUnresolvedAttributions,
+} from '../services/attribution-review-queue.js';
 import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../services/security-headers.js';
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
@@ -1279,6 +1286,62 @@ const handleGetAttributionHealthV2: RequestHandler = async (req, res, logger, or
   }
 };
 
+const handleGetAttributionReviewQueueV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const takeRaw = Number.parseInt(url.searchParams.get('take') || '50', 10);
+  const take = Number.isFinite(takeRaw) && takeRaw > 0 ? Math.min(takeRaw, 200) : 50;
+
+  try {
+    const data = await listOpenAttributionReviewItems(take);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: 'snapshot',
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch attribution review queue:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch attribution review queue', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetUnresolvedAttributionV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  const takeRaw = Number.parseInt(url.searchParams.get('take') || '100', 10);
+  const take = Number.isFinite(takeRaw) && takeRaw > 0 ? Math.min(takeRaw, 500) : 100;
+
+  try {
+    const data = await listUnresolvedAttributions(take);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: 'snapshot',
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch unresolved attribution view:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch unresolved attribution view', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
 const shouldRefreshFactsOnRead = (): boolean => {
   const raw = (process.env.KPI_FACT_REFRESH_ON_READ || 'true').trim().toLowerCase();
   return raw !== 'false' && raw !== '0' && raw !== 'off';
@@ -1331,6 +1394,132 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
       res,
       500,
       { error: 'Failed to fetch insights summary', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetSequenceFunnelV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  const sequenceId = (url.searchParams.get('sequenceId') || '').trim() || null;
+
+  try {
+    const data = await listSequenceFunnelDaily({
+      from: resolved.from,
+      to: resolved.to,
+      sequenceId,
+    });
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch sequence funnel data:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch sequence funnel data', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetAttributionMethodV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  try {
+    const data = await listAttributionMethodDaily({
+      from: resolved.from,
+      to: resolved.to,
+    });
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch attribution method data:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch attribution method data', details: error instanceof Error ? error.message : String(error) },
+      origin,
+    );
+  }
+};
+
+const handleGetRepResponseV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  try {
+    const data = await listRepResponseDaily({
+      from: resolved.from,
+      to: resolved.to,
+    });
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch rep response data:', error);
+    sendJson(
+      res,
+      500,
+      { error: 'Failed to fetch rep response data', details: error instanceof Error ? error.message : String(error) },
       origin,
     );
   }
@@ -4761,9 +4950,14 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
   { method: 'GET', path: '/api/v2/insights/summary', handler: handleGetInsightsSummaryV2 },
   { method: 'GET', path: '/api/v2/attribution/health', handler: handleGetAttributionHealthV2 },
+  { method: 'GET', path: '/api/v2/attribution/review-queue', handler: handleGetAttributionReviewQueueV2 },
+  { method: 'GET', path: '/api/v2/attribution/unresolved', handler: handleGetUnresolvedAttributionV2 },
+  { method: 'GET', path: '/api/v2/attribution/methods', handler: handleGetAttributionMethodV2 },
   { method: 'GET', path: '/api/v2/scoreboard', handler: handleGetScoreboardV2 },
   { method: 'GET', path: '/api/v2/sequences/kpis', handler: handleGetSequenceKpisV2 },
   { method: 'GET', path: '/api/v2/sequences/deep', handler: handleGetSequencesDeepV2 },
+  { method: 'GET', path: '/api/v2/sequences/funnel', handler: handleGetSequenceFunnelV2 },
+  { method: 'GET', path: '/api/v2/reps/response', handler: handleGetRepResponseV2 },
   { method: 'GET', path: '/api/v2/sequences/qualification', handler: handleGetSequenceQualificationV2 },
   { method: 'GET', path: '/api/v2/sequences/version-history', handler: handleGetSequenceVersionHistoryV2 },
   { method: 'POST', path: '/api/v2/sequences/version-decisions', handler: handlePostSequenceVersionDecisionV2 },

@@ -141,6 +141,11 @@ model booked_call_attribution {
   canonical_booking          Boolean  @default(false)
   mapping_method             String?
   match_confidence           Decimal? @db.Decimal(5, 3)
+  attribution_status         String?
+  attribution_confidence_band String?
+  fallback_used              Boolean  @default(false)
+  needs_review               Boolean  @default(false)
+  review_reason              String?
   conversation_id            String?  @db.Uuid
   conversation_match_seconds Int?
   setter_hint                String?
@@ -148,6 +153,12 @@ model booked_call_attribution {
   closer_final               String?
   first_conversion           String?
   source_bucket              String?
+  resolved_sequence_id       String?  @db.Uuid
+  resolved_sequence_label    String?
+  attribution_path           String?
+  matched_via_phone          Boolean  @default(false)
+  matched_via_fuzzy          Boolean  @default(false)
+  matched_via_reply_link     Boolean  @default(false)
   hubspot_contact_id         String?
   lead_score                 Decimal? @db.Decimal
   lead_score_source          String?
@@ -158,6 +169,22 @@ model booked_call_attribution {
   @@index([conversation_id], map: "idx_booked_call_attribution_conversation_id")
   @@index([booked_event_ts(sort: Desc)], map: "idx_booked_call_attribution_event_ts")
   @@index([setter_final], map: "idx_booked_call_attribution_setter_final")
+}
+
+model attribution_review_queue {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  booked_call_id     String   @db.Uuid
+  priority           Int      @default(0)
+  issue_type         String?
+  issue_summary      String?
+  candidate_sequences Json?
+  status             String?  @default("open")
+  resolved_by        String?
+  resolved_at        DateTime? @db.Timestamptz(6)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @updatedAt @db.Timestamptz(6)
+  @@index([status, priority, created_at(sort: Desc)], map: "idx_attr_review_status_priority_created")
+  @@unique([booked_call_id], map: "uniq_attribution_review_queue_booked_call_id")
 }
 
 model booked_call_reactions {
@@ -744,12 +771,16 @@ model sms_events {
   direction           SmsDirection
   contact_id          String?
   contact_phone       String?
+  normalized_contact_key String?
+  normalized_phone    String?
   contact_name        String?
   aloware_user        String?
   body                String?
   line                String?
   sequence            String?
   sequence_id         String?              @db.Uuid
+  sequence_version_id String?              @db.Uuid
+  event_role          String?
   raw                 Json?
   created_at          DateTime             @default(now()) @db.Timestamptz(6)
   conversation_id     String?              @db.Uuid
@@ -762,10 +793,103 @@ model sms_events {
   @@unique([slack_channel_id, slack_message_ts])
   @@index([contact_id, event_ts(sort: Desc)], map: "idx_sms_events_contact_id_event_ts")
   @@index([contact_phone, event_ts(sort: Desc)], map: "idx_sms_events_contact_phone_event_ts")
+  @@index([normalized_contact_key, event_ts(sort: Desc)], map: "idx_sms_events_norm_contact_key_event_ts")
+  @@index([normalized_phone, event_ts(sort: Desc)], map: "idx_sms_events_norm_phone_event_ts")
   @@index([conversation_id, event_ts(sort: Desc)], map: "idx_sms_events_conversation_event_ts")
   @@index([sequence, event_ts(sort: Desc)], map: "idx_sms_events_sequence_event_ts")
   @@index([sequence_id, event_ts(sort: Desc)], map: "idx_sms_events_sequence_id_event_ts")
+  @@index([sequence_version_id, event_ts(sort: Desc)], map: "idx_sms_events_sequence_version_event_ts")
+  @@index([event_role, event_ts(sort: Desc)], map: "idx_sms_events_role_event_ts")
   @@index([event_ts(sort: Desc)], map: "idx_sms_events_event_ts")
+}
+
+model fact_sequence_funnel_daily {
+  day                DateTime @db.Date
+  sequence_id        String   @db.Uuid
+  rep_id             String   @default("unknown")
+  new_leads_contacted Int     @default(0)
+  leads_replied      Int      @default(0)
+  qualified_leads    Int      @default(0)
+  booked_calls       Int      @default(0)
+  opt_outs           Int      @default(0)
+  created_at         DateTime @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime @default(now()) @db.Timestamptz(6)
+  @@id([day, sequence_id, rep_id])
+  @@index([sequence_id, day], map: "idx_fact_sequence_funnel_daily_sequence_day")
+  @@index([rep_id, day], map: "idx_fact_sequence_funnel_daily_rep_day")
+  @@map("fact_sequence_funnel_daily")
+}
+
+model conversation_journey {
+  conversation_id       String   @db.Uuid
+  window_start          DateTime @db.Timestamptz(6)
+  window_end            DateTime @db.Timestamptz(6)
+  first_outbound_at      DateTime @db.Timestamptz(6)
+  first_reply_at         DateTime? @db.Timestamptz(6)
+  first_qualified_at     DateTime? @db.Timestamptz(6)
+  first_booked_at        DateTime? @db.Timestamptz(6)
+  sequence_id            String   @db.Uuid
+  rep_id                 String
+  reply_latency_minutes  Int?
+  book_latency_days      Decimal? @db.Decimal(8, 2)
+  messages_before_reply  Int      @default(0)
+  messages_before_book   Int      @default(0)
+  created_at             DateTime @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime @updatedAt @db.Timestamptz(6)
+
+  @@id([conversation_id, window_start])
+  @@index([window_start], map: "idx_conversation_journey_window_start")
+  @@index([sequence_id, window_start], map: "idx_conversation_journey_sequence_window")
+  @@index([rep_id, window_start], map: "idx_conversation_journey_rep_window")
+  @@map("conversation_journey")
+}
+
+model fact_attribution_method_daily {
+  day                   DateTime @db.Date
+  matched_calls         Int      @default(0)
+  manual_direct_calls   Int      @default(0)
+  unattributed_calls    Int      @default(0)
+  sms_phone_match_calls Int      @default(0)
+  fuzzy_match_calls     Int      @default(0)
+  reply_linked_calls    Int      @default(0)
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day])
+  @@index([day], map: "idx_fact_attribution_method_daily_day")
+  @@map("fact_attribution_method_daily")
+}
+
+model fact_rep_response_daily {
+  day                       DateTime @db.Date
+  rep_id                    String
+  new_leads_contacted       Int      @default(0)
+  leads_replied             Int      @default(0)
+  booked_calls              Int      @default(0)
+  median_reply_time_minutes Decimal? @db.Decimal(8, 2)
+  median_book_time_days     Decimal? @db.Decimal(8, 2)
+  created_at                DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day, rep_id])
+  @@index([rep_id, day], map: "idx_fact_rep_response_daily_rep_day")
+  @@map("fact_rep_response_daily")
+}
+
+/// Prisma model for the analytics_unresolved_attribution_v view; ignored by client generation.
+model analytics_unresolved_attribution_v {
+  booked_call_id          String   @id @db.Uuid
+  booked_event_ts         DateTime @db.Timestamptz(6)
+  attribution_status      String?
+  needs_review            Boolean?
+  review_reason           String?
+  mapper_version          String?
+  conversation_id         String?  @db.Uuid
+  resolved_sequence_id    String?  @db.Uuid
+  resolved_sequence_label String?
+  created_at              DateTime? @db.Timestamptz(6)
+
+  @@map("analytics_unresolved_attribution_v")
 }
 
 model trend_alerts {

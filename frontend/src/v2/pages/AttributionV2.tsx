@@ -4,11 +4,6 @@ import { v2Copy } from '../copy';
 import { UnattributedAuditTable } from '../components/UnattributedAuditTable';
 import { DEFAULT_BUSINESS_TIME_ZONE } from '../../utils/runDay';
 
-// Asset URLs
-const heroBannerUrl = '/assets/sms-kit/analytics_wave_banner.webp';
-const arrowDividerUrl = '/assets/sms-kit/arrow_strip_divider.webp';
-const networkDividerUrl = '/assets/sms-kit/network_bar_divider.webp';
-
 export default function AttributionV2() {
   const { data, isLoading, isError, error } = useV2SalesMetrics({ range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE });
   const payload = data?.data;
@@ -19,31 +14,21 @@ export default function AttributionV2() {
   }
 
   return (
-    <div className="V2Page V2PageTransition">
-      {/* Hero Banner */}
-      <div className="V2HeroBanner">
-        <img className="V2HeroBanner__img" src={heroBannerUrl} alt="" aria-hidden="true" />
-        <div className="V2HeroBanner__overlay">
-          <span className="V2HeroBanner__title">Booking Attribution</span>
-        </div>
-      </div>
-
+    <div className="V2Page V2PageTransition V2Page--clean">
       <V2PageHeader
         title={v2Copy.nav.attribution}
         subtitle="See where your booked calls are coming from."
       />
 
-      <section className="V2MetricsGrid sms-pattern-bg--ptbiz">
+      <section className="V2MetricsGrid">
         <V2MetricCard label={<V2Term term="callsBookedSlack" />} value={payload.bookedCredit.total.toLocaleString()} tone="positive" />
         <V2MetricCard label="Overall reply rate" value={`${payload.totals.replyRatePct.toFixed(1)}%`} />
         <V2MetricCard label={<V2Term term="manualReplyRate" />} value={`${payload.totals.manualReplyRatePct.toFixed(1)}%`} />
         <V2MetricCard label={<V2Term term="sequenceReplyRate" />} value={`${payload.totals.sequenceReplyRatePct.toFixed(1)}%`} />
       </section>
 
-      <img className="sms-section-divider" src={arrowDividerUrl} alt="" aria-hidden="true" />
-
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Booked Calls Source (Slack)" caption="This is the main booked-call number and credit source." className="sms-pattern-bg">
+        <V2Panel title="Booked Calls Source (Slack)" caption="This is the main booked-call number and credit source.">
           <ul className="V2BulletList">
             <li>Source: Slack booked-call channel plus reaction-based credit routing.</li>
             <li>This is the booked-call number used in scorecards and weekly reviews.</li>
@@ -60,9 +45,7 @@ export default function AttributionV2() {
         </V2Panel>
       </div>
 
-      <img className="sms-section-divider" src={networkDividerUrl} alt="" aria-hidden="true" />
-
-      <V2Panel title="Sequence Match Summary" caption='How many booked calls matched a sequence name vs "No sequence (manual/direct)".' className="sms-pattern-bg--network">
+      <V2Panel title="Sequence Match Summary" caption='How many booked calls matched a sequence name vs "No sequence (manual/direct)".'>
         <div className="V2SplitStat">
           <div>
             <span>Total Calls Booked</span>

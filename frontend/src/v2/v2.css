@@ -59,75 +59,59 @@
   position: sticky;
   top: 0;
   z-index: 30;
-  height: var(--v2-topbar-height);
-  padding: 0 var(--v2-space-5);
+  min-height: var(--v2-topbar-height);
+  padding: var(--v2-space-4) var(--v2-space-5);
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgba(16, 27, 50, 0.08);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  background:
+    linear-gradient(90deg, rgba(248, 251, 253, 0.96), rgba(255, 255, 255, 0.9)),
+    radial-gradient(circle at 0% 50%, rgba(17, 184, 214, 0.08), transparent 28%);
+}
+
+.V2Shell__topbarInner {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--v2-space-5);
+}
+
+.V2Shell__brandBlock {
+  display: flex;
+  align-items: center;
   gap: var(--v2-space-4);
-  border-bottom: 1px solid rgba(16, 27, 50, 0.08);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  background: rgba(248, 251, 253, 0.92);
-}
-
-.V2Shell__topStart {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.9rem;
   min-width: 0;
-  flex: 1;
 }
 
-.V2Shell__menuButton {
+.V2Shell__brandKicker {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 46px;
-  height: 40px;
-  border: 1px solid rgba(9, 20, 36, 0.14);
-  border-radius: var(--v2-radius-sm);
-  background: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  color: var(--v2-text);
-}
-
-.V2Shell__menuButton span {
-  display: block;
-  width: 18px;
-  height: 2px;
-  background: var(--v2-base-800);
-  margin: 6px auto;
-}
-
-.V2Shell__brand {
-  display: inline-flex;
-  align-items: center;
-  width: 180px;
-  height: 50px;
-  overflow: visible;
-  cursor: pointer;
-}
-
-.V2Shell__brandLogo {
-  display: block;
-  width: auto;
-  height: 50px;
-  max-width: none;
-  object-fit: contain;
-  transform: none;
+  padding: 0.42rem 0.72rem;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 184, 214, 0.18);
+  background: rgba(17, 184, 214, 0.06);
+  color: var(--v2-base-700);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .V2Shell__context {
   display: grid;
+  gap: 0.14rem;
   min-width: 0;
 }
 
 .V2Shell__contextTitle {
   margin: 0;
   font-family: var(--v2-font-display);
-  font-size: 1.14rem;
-  line-height: 1.15;
+  font-size: 1.22rem;
+  line-height: 1.1;
   color: var(--v2-base-800);
   white-space: nowrap;
   overflow: hidden;
@@ -135,105 +119,53 @@
   max-width: 100%;
 }
 
-.V2Shell__quickLinks {
+.V2Shell__contextSubtitle {
+  margin: 0;
+  max-width: 52rem;
+  color: var(--v2-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
+.V2Shell__topbarPills {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  margin-left: 0.8rem;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-.V2Shell__quickLink {
-  border: 1px solid rgba(8, 12, 29, 0.12);
-  border-radius: 999px;
-  padding: 0.36rem 0.72rem;
-  background: rgba(255, 255, 255, 0.68);
-  color: var(--v2-base-800);
-  font: 700 0.74rem/1 var(--v2-font-ui);
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
-}
-
-.V2Shell__quickLink:hover {
-  transform: none;
-  border-color: rgba(17, 184, 214, 0.46);
-  background: rgba(17, 184, 214, 0.08);
-}
-
-.V2Shell__quickLink.is-active {
-  border-color: rgba(17, 184, 214, 0.5);
-  background: rgba(17, 184, 214, 0.18);
-  color: var(--v2-base-800);
-}
-
-.V2Shell__modeButton {
+.V2Shell__topbarPill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: 1px solid rgba(8, 12, 29, 0.16);
+  padding: 0.42rem 0.7rem;
   border-radius: 999px;
-  padding: 0.55rem 1rem;
+  border: 1px solid rgba(8, 12, 29, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--v2-muted);
+  font-size: 0.71rem;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.74);
-  color: var(--v2-base-800);
-  cursor: pointer;
-}
-
-.V2Shell__topActions {
-  display: flex;
-  align-items: center;
-  gap: var(--v2-space-2);
-  flex-shrink: 0;
-}
-
-.V2Shell__defsButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid rgba(17, 184, 214, 0.4);
-  border-radius: 999px;
-  padding: 0.55rem 1rem;
-  font-weight: 700;
-  background: rgba(17, 184, 214, 0.14);
-  color: var(--v2-base-800);
-  cursor: pointer;
-}
-
-.V2Shell__defsFab {
-  position: fixed;
-  right: 1.2rem;
-  bottom: 1.2rem;
-  z-index: 24;
-  border: 1px solid rgba(17, 184, 214, 0.45);
-  border-radius: 999px;
-  padding: 0.58rem 0.9rem;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--v2-base-800);
-  font-weight: 700;
-  box-shadow: var(--v2-shadow-1);
-  cursor: pointer;
-  display: none;
-  align-items: center;
-  gap: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .V2Shell__body {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 240px 1fr;
   min-height: calc(100vh - var(--v2-topbar-height));
   overflow-x: clip;
-}
-
-.V2Shell__body.is-collapsed {
-  grid-template-columns: 72px 1fr;
 }
 
 .V2Shell__sidebar {
   position: relative;
   border-right: 1px solid rgba(8, 12, 29, 0.08);
-  background: linear-gradient(180deg, rgba(8, 18, 35, 0.98), rgba(9, 18, 31, 0.96));
+  background:
+    linear-gradient(180deg, rgba(10, 21, 40, 0.98), rgba(12, 22, 37, 0.96)),
+    radial-gradient(circle at 50% 0%, rgba(17, 184, 214, 0.14), transparent 24%);
   padding: var(--v2-space-5);
-  transition: width 220ms ease, padding 220ms ease, transform 260ms ease;
+  display: flex;
+  flex-direction: column;
 }
 
 .V2Shell__sidebarBrand {
@@ -241,66 +173,64 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  margin: -0.1rem 0 0.9rem;
+  margin: 0 0 1rem;
   padding: 0;
 }
 
 .V2Shell__sidebarWordmark {
   display: grid;
   justify-items: center;
-  gap: 0.1rem;
+  gap: 0.22rem;
   width: 100%;
-  padding: 0.85rem 0.75rem;
-  border: 1px solid rgba(145, 237, 248, 0.2);
-  border-radius: var(--v2-radius-md);
-  background: rgba(255, 255, 255, 0.03);
+  padding: 0.95rem 0.85rem;
+  border: 1px solid rgba(145, 237, 248, 0.16);
+  border-radius: var(--v2-radius-lg);
+  background: linear-gradient(135deg, rgba(17, 184, 214, 0.08), rgba(255, 255, 255, 0.02));
 }
 
 .V2Shell__sidebarWordmarkLine {
   display: block;
   color: #f7fbff;
   font-family: var(--v2-font-display);
-  font-size: 0.88rem;
+  font-size: 1.08rem;
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.V2Shell__sidebar.is-collapsed {
-  padding: var(--v2-space-3) var(--v2-space-2);
-}
-
-.V2Shell__sidebar.is-collapsed .V2Shell__sidebarWordmark {
-  padding: 0.65rem 0.35rem;
-}
-
-.V2Shell__sidebar.is-collapsed .V2Shell__sidebarWordmarkLine {
-  font-size: 0.66rem;
+.V2Shell__sidebarWordmarkSubline {
+  display: block;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
 }
 
 .V2Shell__nav {
   display: grid;
   gap: var(--v2-space-2);
+  flex: 1;
 }
 
 .V2Shell__navItem {
   display: grid;
-  grid-template-columns: 1.6rem 1fr;
+  grid-template-columns: 0.6rem 1.6rem 1fr;
   align-items: center;
-  gap: var(--v2-space-2);
+  gap: 0.75rem;
   text-decoration: none;
   color: rgba(235, 244, 255, 0.8);
   border-radius: var(--v2-radius-sm);
-  padding: 0.6rem 0.7rem;
+  padding: 0.84rem 0.9rem;
   border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.02);
   transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
   font-size: 0.9rem;
 }
 
 .V2Shell__navItem:hover {
   transform: none;
-  border-color: rgba(145, 237, 248, 0.35);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(145, 237, 248, 0.28);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .V2Shell__navItem.is-active {
@@ -309,37 +239,43 @@
   background: linear-gradient(90deg, rgba(17, 184, 214, 0.34), rgba(17, 184, 214, 0.08));
 }
 
+.V2Shell__navBullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.V2Shell__navItem.is-active .V2Shell__navBullet {
+  background: var(--v2-accent);
+  box-shadow: 0 0 0 6px rgba(17, 184, 214, 0.08);
+}
+
 .V2Shell__navIcon {
   width: 1.6rem;
   height: 1.6rem;
-  border-radius: 50%;
+  border-radius: 0.6rem;
   display: grid;
   place-content: center;
-  font-size: 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  font-family: var(--v2-font-display);
+  color: #f7fbff;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.V2Shell__navLabelWrap {
+  display: grid;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.V2Shell__navLabel {
+  font-weight: 700;
 }
 
 .V2Shell__navLabelShort {
-  display: none;
-}
-
-.V2Shell__sidebar.is-collapsed .V2Shell__navItem {
-  grid-template-columns: 1fr;
-  justify-items: center;
-  text-align: center;
-  gap: var(--v2-space-1);
-  padding: 0.5rem 0.25rem;
-}
-
-.V2Shell__sidebar.is-collapsed .V2Shell__navLabel {
-  display: none;
-}
-
-.V2Shell__sidebar.is-collapsed .V2Shell__navLabelShort {
-  display: inline;
-  font-size: 0.66rem;
-  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
@@ -8850,14 +8786,45 @@ display: inline-block;
 }
 
 [data-theme="dark"] .V2Shell__topbar {
-  background: linear-gradient(90deg, rgba(10, 21, 40, 0.95), rgba(19, 34, 60, 0.9));
-  border-bottom-color: rgba(145, 237, 248, 0.1);
+  background:
+    linear-gradient(90deg, rgba(10, 21, 40, 0.96), rgba(19, 34, 60, 0.92)),
+    radial-gradient(circle at 0% 50%, rgba(17, 184, 214, 0.1), transparent 28%);
+  border-bottom-color: rgba(145, 237, 248, 0.12);
+}
+
+[data-theme="dark"] .V2Shell__brandKicker {
+  background: rgba(17, 184, 214, 0.12);
+  border-color: rgba(145, 237, 248, 0.16);
+  color: #dff9ff;
+}
+
+[data-theme="dark"] .V2Shell__contextTitle {
+  color: #f7fbff;
+}
+
+[data-theme="dark"] .V2Shell__contextSubtitle {
+  color: rgba(235, 244, 255, 0.68);
+}
+
+[data-theme="dark"] .V2Shell__topbarPill {
+  background: rgba(10, 21, 40, 0.82);
+  border-color: rgba(145, 237, 248, 0.12);
+  color: rgba(235, 244, 255, 0.72);
 }
 
 [data-theme="dark"] .V2Shell__sidebar {
   background:
     linear-gradient(180deg, rgba(8, 18, 35, 0.98), rgba(9, 18, 31, 0.96)),
     radial-gradient(700px 420px at 12% -18%, rgba(17, 184, 214, 0.25), transparent 50%);
+}
+
+[data-theme="dark"] .V2Shell__sidebarWordmark {
+  background: linear-gradient(135deg, rgba(17, 184, 214, 0.12), rgba(255, 255, 255, 0.03));
+  border-color: rgba(145, 237, 248, 0.18);
+}
+
+[data-theme="dark"] .V2Shell__sidebarWordmarkSubline {
+  color: rgba(235, 244, 255, 0.66);
 }
 
 [data-theme="dark"] .V2MetricCard,
@@ -8984,34 +8951,33 @@ display: inline-block;
   flex: 1;
 }
 
-/* Page-level hero banner */
+/* Page-level hero band */
 .V2PageHeroBanner {
   display: block;
   width: 100%;
-  height: 88px;
-  object-fit: cover;
-  object-position: center;
+  min-height: 88px;
   border-radius: var(--v2-radius-lg);
   margin-bottom: 1.5rem;
-  opacity: 0.92;
-  box-shadow: 0 4px 20px rgba(8, 12, 29, 0.1);
+  background:
+    linear-gradient(90deg, rgba(17, 184, 214, 0.16), rgba(19, 185, 129, 0.1)),
+    linear-gradient(135deg, rgba(9, 18, 34, 0.08), rgba(255, 255, 255, 0.78));
+  box-shadow: 0 4px 20px rgba(8, 12, 29, 0.08);
 }
 
-/* Generic brand divider image */
+/* Generic brand divider */
 .V2BrandDivider {
   display: block;
   width: 100%;
-  max-height: 44px;
-  object-fit: contain;
+  height: 1px;
   margin: 1.5rem 0;
-  opacity: 0.7;
+  background: linear-gradient(90deg, transparent, rgba(17, 184, 214, 0.35), transparent);
+  opacity: 0.85;
 }
 
 /* =============================================================
    SMS Theme - PT Biz SMS Visual Assets
    ============================================================= */
 
-/* SMS Logo Badge */
 .sms-logo-badge {
   display: inline-flex;
   align-items: center;
@@ -9022,39 +8988,11 @@ display: inline-block;
   border-radius: 999px;
 }
 
-.sms-logo-badge img {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-}
-
 .sms-logo-badge span {
   font-size: 0.72rem;
   font-weight: 700;
   color: var(--v2-base-800);
   letter-spacing: 0.04em;
-}
-
-/* SMS Hero Banner */
-.sms-hero-banner {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 120px;
-  object-fit: cover;
-  border-radius: var(--v2-radius-lg);
-  margin-bottom: var(--v2-space-4);
-  box-shadow: var(--v2-shadow-1);
-}
-
-/* SMS Section Divider */
-.sms-divider {
-  display: block;
-  width: 100%;
-  max-height: 48px;
-  object-fit: contain;
-  margin: var(--v2-space-4) 0;
-  opacity: 0.65;
 }
 
 /* SMS Pattern Background */
@@ -9066,9 +9004,8 @@ display: inline-block;
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('/assets/sms-kit/patternsms.png');
-  background-size: 280px auto;
-  background-repeat: repeat;
+  background: radial-gradient(circle at 20% 20%, rgba(17, 184, 214, 0.06), transparent 28%),
+    radial-gradient(circle at 80% 0%, rgba(19, 185, 129, 0.05), transparent 24%);
   opacity: 0.06;
   pointer-events: none;
   z-index: 0;
@@ -9079,7 +9016,6 @@ display: inline-block;
   z-index: 1;
 }
 
-/* SMS Pattern Background - Alternate (smspattern2.png) */
 .sms-pattern-bg--alt {
   position: relative;
 }
@@ -9088,9 +9024,8 @@ display: inline-block;
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('/assets/sms-kit/smspattern2.png');
-  background-size: 320px auto;
-  background-repeat: repeat;
+  background: radial-gradient(circle at 50% 20%, rgba(17, 184, 214, 0.05), transparent 26%),
+    radial-gradient(circle at 20% 80%, rgba(19, 185, 129, 0.05), transparent 28%);
   opacity: 0.05;
   pointer-events: none;
   z-index: 0;
@@ -9113,20 +9048,12 @@ display: inline-block;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 249, 252, 0.88));
 }
 
-/* Sidebar Logo with SMS branding */
-.V2Shell__sidebarLogo--sms {
-  width: 160px;
-  max-width: 100%;
-}
-
-/* Topbar SMS accent */
 .V2Shell__topbar--sms {
-  background: 
+  background:
     linear-gradient(90deg, rgba(17, 184, 214, 0.08), rgba(19, 185, 129, 0.04)),
     linear-gradient(90deg, rgba(245, 251, 255, 0.92), rgba(255, 255, 255, 0.84));
 }
 
-/* SMS Grid Coach Background */
 .sms-grid-bg {
   position: relative;
 }
@@ -9135,10 +9062,9 @@ display: inline-block;
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('/assets/sms-kit/gridcoachbg.webp');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(17, 184, 214, 0.05), transparent 20%),
+    radial-gradient(circle at 80% 80%, rgba(19, 185, 129, 0.04), transparent 24%);
   opacity: 0.04;
   pointer-events: none;
   z-index: 0;
@@ -9150,25 +9076,22 @@ display: inline-block;
   z-index: 1;
 }
 
-/* SMS Section Divider - Enhanced */
 .sms-section-divider {
   display: block;
   width: 100%;
-  max-height: 40px;
-  object-fit: contain;
+  height: 1px;
   margin: var(--v2-space-3) 0;
-  opacity: 0.5;
+  background: linear-gradient(90deg, transparent, rgba(17, 184, 214, 0.25), transparent);
+  opacity: 0.65;
   transition: opacity 0.3s ease;
 }
 
 .sms-section-divider:hover {
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
-/* Compact divider variant — reduced opacity & height for tighter sections */
 .sms-section-divider--compact {
-  opacity: 0.4;
-  max-height: 28px;
+  opacity: 0.45;
 }
 
 /* Subtle pattern background — lower opacity for content-heavy pages */
@@ -9184,6 +9107,10 @@ display: inline-block;
   overflow: hidden;
   margin-bottom: var(--v2-space-4);
   box-shadow: var(--v2-shadow-1);
+  min-height: 120px;
+  background:
+    linear-gradient(90deg, rgba(5 9 19 / 0.55) 0%, rgba(5 9 19 / 0.15) 60%, transparent 100%),
+    linear-gradient(135deg, rgba(17, 184, 214, 0.18), rgba(19, 185, 129, 0.12));
 }
 
 .V2HeroBanner__img {
@@ -9221,9 +9148,9 @@ display: inline-block;
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('/assets/sms-kit/sms_network_pattern.webp');
-  background-size: 360px auto;
-  background-repeat: repeat;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(17, 184, 214, 0.05), transparent 22%),
+    radial-gradient(circle at 70% 70%, rgba(19, 185, 129, 0.04), transparent 24%);
   opacity: 0.035;
   pointer-events: none;
   z-index: 0;
@@ -9244,9 +9171,9 @@ display: inline-block;
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('/assets/sms-kit/ptbiz_sms_pattern.webp');
-  background-size: 300px auto;
-  background-repeat: repeat;
+  background:
+    radial-gradient(circle at 25% 25%, rgba(17, 184, 214, 0.04), transparent 22%),
+    radial-gradient(circle at 75% 75%, rgba(19, 185, 129, 0.035), transparent 24%);
   opacity: 0.04;
   pointer-events: none;
   z-index: 0;

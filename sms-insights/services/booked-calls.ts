@@ -63,6 +63,12 @@ const normalizePhoneKey = (value: string | null | undefined): string | null => {
   return digits.slice(-10);
 };
 
+const normalizeEmailKey = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+};
+
 export const normalizeContactNameKey = (value: string | null | undefined): string | null => {
   if (!value) return null;
   const normalized = value.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -347,7 +353,114 @@ export type BookedCallSmsSequenceLookup = {
   conversationId: string | null;
 };
 
+type SequenceLookupEvidence = 'conversation_id' | 'profile_email' | 'phone' | 'profile_name';
+
+type SequenceLookupCandidate = {
+  sequenceLabel: string;
+  latestOutboundTs: number;
+  conversationId: string | null;
+  evidence: Set<SequenceLookupEvidence>;
+};
+
+type ResolvedSequenceLookupCandidate = {
+  sequenceLabel: string;
+  latestOutboundTs: number;
+  conversationId: string | null;
+};
+
 const SMS_SEQUENCE_LOOKBACK_DAYS = 30;
+
+const SEQUENCE_LOOKUP_EVIDENCE_PRIORITY: Record<SequenceLookupEvidence, number> = {
+  conversation_id: 4,
+  profile_email: 3,
+  phone: 2,
+  profile_name: 1,
+};
+
+const chooseBestSequenceEvidence = (evidence: Set<SequenceLookupEvidence>): SequenceLookupEvidence | null => {
+  let best: SequenceLookupEvidence | null = null;
+  let bestPriority = -1;
+  for (const item of evidence) {
+    const priority = SEQUENCE_LOOKUP_EVIDENCE_PRIORITY[item];
+    if (priority > bestPriority) {
+      best = item;
+      bestPriority = priority;
+    }
+  }
+  return best;
+};
+
+const getOrCreateSequenceCandidate = (
+  candidates: Map<string, SequenceLookupCandidate>,
+  candidate: { sequenceLabel: string; latestOutboundTs: number; conversationId: string | null },
+): SequenceLookupCandidate => {
+  const key = `${candidate.sequenceLabel}::${candidate.conversationId || ''}::${candidate.latestOutboundTs}`;
+  const existing = candidates.get(key);
+  if (existing) return existing;
+
+  const created: SequenceLookupCandidate = {
+    sequenceLabel: candidate.sequenceLabel,
+    latestOutboundTs: candidate.latestOutboundTs,
+    conversationId: candidate.conversationId,
+    evidence: new Set(),
+  };
+  candidates.set(key, created);
+  return created;
+};
+
+export const resolveBestSequenceLookupCandidate = (
+  bookingTs: number,
+  candidates: SequenceLookupCandidate[],
+): ResolvedSequenceLookupCandidate | null => {
+  if (!Number.isFinite(bookingTs) || candidates.length === 0) return null;
+
+  let best:
+    | {
+        sequenceLabel: string;
+        latestOutboundTs: number;
+        conversationId: string | null;
+        score: number;
+      }
+    | null = null;
+
+  for (const candidate of candidates) {
+    const evidence = chooseBestSequenceEvidence(candidate.evidence);
+    if (!evidence) continue;
+    if (!Number.isFinite(candidate.latestOutboundTs)) continue;
+    if (candidate.latestOutboundTs > bookingTs) continue;
+    if (bookingTs - candidate.latestOutboundTs > SMS_SEQUENCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000) continue;
+
+    const ageMs = bookingTs - candidate.latestOutboundTs;
+    const recencyScore = Math.max(0, 14 - ageMs / (24 * 60 * 60 * 1000));
+    const evidenceScore = SEQUENCE_LOOKUP_EVIDENCE_PRIORITY[evidence] * 100;
+    const corroborationBonus = Math.max(0, candidate.evidence.size - 1) * 2;
+    const score = evidenceScore + recencyScore + corroborationBonus;
+
+    if (
+      !best ||
+      score > best.score ||
+      (score === best.score && candidate.latestOutboundTs > best.latestOutboundTs) ||
+      (score === best.score &&
+        candidate.latestOutboundTs === best.latestOutboundTs &&
+        candidate.sequenceLabel.localeCompare(best.sequenceLabel) < 0)
+    ) {
+      best = {
+        sequenceLabel: candidate.sequenceLabel,
+        latestOutboundTs: candidate.latestOutboundTs,
+        conversationId: candidate.conversationId,
+        score,
+      };
+    }
+  }
+
+  return best
+    ? {
+        sequenceLabel: best.sequenceLabel,
+        latestOutboundTs: best.latestOutboundTs,
+        conversationId: best.conversationId,
+      }
+    : null;
+};
 
 /**
  * For each BookedCallAttributionSource that has a contactPhone, queries sms_events
@@ -367,7 +480,13 @@ export const getBookedCallSequenceFromSmsEvents = async (
 
   const prisma = getPrismaClient();
 
-  type CallEntry = { bookedCallId: string; bookingTs: number };
+  type CallEntry = {
+    bookedCallId: string;
+    bookingTs: number;
+    phoneKey: string | null;
+    emailKey: string | null;
+    nameKey: string | null;
+  };
 
   // Build phone key → entries (primary signal — direct phone match)
   const phoneKeyToEntries = new Map<string, CallEntry[]>();
@@ -386,18 +505,19 @@ export const getBookedCallSequenceFromSmsEvents = async (
     const targetTs =
       replyLink?.hasPriorReply && Number.isFinite(replyTs) ? replyTs : bookingTs;
 
-    const entry = { bookedCallId: call.bookedCallId, bookingTs: targetTs };
+    const phoneKey = normalizePhoneKey(call.contactPhone);
+    const emailKey = normalizeEmailKey(call.contactEmail);
+    const nameKey = normalizeContactNameKey(call.contactName);
+    const entry = { bookedCallId: call.bookedCallId, bookingTs: targetTs, phoneKey, emailKey, nameKey };
 
     // Email is primary — always add to email map when available (email → profile → phone is most accurate).
-    if (call.contactEmail) {
-      const emailKey = call.contactEmail;
+    if (emailKey) {
       const list = emailKeyToEntries.get(emailKey) || [];
       list.push(entry);
       emailKeyToEntries.set(emailKey, list);
     }
 
     // Phone is always added as a fallback (used when email lookup yields no result).
-    const phoneKey = normalizePhoneKey(call.contactPhone);
     if (phoneKey) {
       const list = phoneKeyToEntries.get(phoneKey) || [];
       list.push(entry);
@@ -407,7 +527,6 @@ export const getBookedCallSequenceFromSmsEvents = async (
     // Name lookup is a useful fallback whenever phone is absent, even if email exists.
     // (email -> profile lookup is incomplete in production data)
     if (!phoneKey) {
-      const nameKey = normalizeContactNameKey(call.contactName);
       if (nameKey) {
         const list = nameKeyToEntries.get(nameKey) || [];
         list.push(entry);
@@ -431,106 +550,111 @@ export const getBookedCallSequenceFromSmsEvents = async (
   const fromIso = new Date(minBookingTs - lookbackMs).toISOString();
   const toIso = new Date(maxBookingTs).toISOString();
 
-  // Helper: find the most recent outbound sequence within lookback window before bookingTs
-  const resolveBest = (
-    outbounds: Array<{ sequence: string; ts: number; conversationId: string | null }>,
-    bookingTs: number,
-  ): { sequence: string; ts: number; conversationId: string | null } | null => {
-    let bestSequence: string | null = null;
-    let bestTs = -1;
-    let bestConversationId: string | null = null;
-    for (const outbound of outbounds) {
-      if (outbound.ts > bookingTs) continue;
-      if (bookingTs - outbound.ts > lookbackMs) continue;
-      if (outbound.ts > bestTs) {
-        bestTs = outbound.ts;
-        bestSequence = outbound.sequence;
-        bestConversationId = outbound.conversationId;
-      }
-    }
-    return bestSequence ? { sequence: bestSequence, ts: bestTs, conversationId: bestConversationId } : null;
-  };
-
   try {
-    // --- Email-based lookup (PRIMARY — email → inbox_contact_profiles → phone → sms_events) ---
-    // Runs first so email-derived results take priority over direct phone match.
-    if (emailKeyToEntries.size > 0) {
-      const emailKeys = [...emailKeyToEntries.keys()];
-      // Step 1: resolve email → phone via inbox_contact_profiles
-      const profileRows = await prisma.$queryRawUnsafe<{ email_key: string; phone_key: string }[]>(
-        `
-        SELECT
-          LOWER(TRIM(email)) AS email_key,
-          RIGHT(regexp_replace(phone, '\\D', '', 'g'), 10) AS phone_key
-        FROM inbox_contact_profiles
-        WHERE email IS NOT NULL AND TRIM(email) != ''
-          AND phone IS NOT NULL AND TRIM(phone) != ''
-          AND LOWER(TRIM(email)) = ANY($1::text[])
-        `,
-        emailKeys,
-      );
+    const sequenceCandidatesByBookedCallId = new Map<string, Map<string, SequenceLookupCandidate>>();
+    const addCandidate = (
+      bookedCallId: string,
+      candidate: { sequenceLabel: string; latestOutboundTs: number; conversationId: string | null },
+      evidence: SequenceLookupEvidence,
+    ) => {
+      const map = sequenceCandidatesByBookedCallId.get(bookedCallId) || new Map<string, SequenceLookupCandidate>();
+      const resolved = getOrCreateSequenceCandidate(map, candidate);
+      resolved.evidence.add(evidence);
+      sequenceCandidatesByBookedCallId.set(bookedCallId, map);
+    };
 
-      const emailToPhoneKey = new Map<string, string>();
-      for (const row of profileRows) {
-        if (row.email_key && row.phone_key && row.phone_key.length === 10) {
-          emailToPhoneKey.set(row.email_key, row.phone_key);
-        }
+    const emailKeys = [...emailKeyToEntries.keys()];
+    const phoneKeys = [...phoneKeyToEntries.keys()];
+    const nameKeys = [...nameKeyToEntries.keys()];
+
+    const profileRows =
+      emailKeys.length === 0 && phoneKeys.length === 0 && nameKeys.length === 0
+        ? []
+        : await prisma.$queryRawUnsafe<
+            {
+              email_key: string | null;
+              phone_key: string | null;
+              name_key: string | null;
+              conversation_id: string | null;
+            }[]
+          >(
+            `
+            SELECT
+              LOWER(TRIM(COALESCE(email, ''))) AS email_key,
+              RIGHT(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) AS phone_key,
+              LOWER(regexp_replace(TRIM(COALESCE(name, '')), '\\s+', ' ', 'g')) AS name_key,
+              conversation_id
+            FROM inbox_contact_profiles
+            WHERE
+              (
+                (array_length($1::text[], 1) IS NOT NULL AND LOWER(TRIM(COALESCE(email, ''))) = ANY($1::text[]))
+                OR (array_length($2::text[], 1) IS NOT NULL AND RIGHT(regexp_replace(COALESCE(phone, ''), '\\D', '', 'g'), 10) = ANY($2::text[]))
+                OR (array_length($3::text[], 1) IS NOT NULL AND LOWER(regexp_replace(TRIM(COALESCE(name, '')), '\\s+', ' ', 'g')) = ANY($3::text[]))
+              )
+            `,
+            emailKeys,
+            phoneKeys,
+            nameKeys,
+          );
+
+    const emailToProfiles = new Map<string, Array<{ phoneKey: string | null; conversationId: string | null }>>();
+    const phoneToProfiles = new Map<string, Array<{ conversationId: string | null }>>();
+    const nameToProfiles = new Map<string, Array<{ conversationId: string | null; phoneKey: string | null }>>();
+
+    for (const row of profileRows) {
+      if (row.email_key) {
+        const list = emailToProfiles.get(row.email_key) || [];
+        list.push({ phoneKey: row.phone_key || null, conversationId: row.conversation_id || null });
+        emailToProfiles.set(row.email_key, list);
       }
-
-      const emailDerivedPhoneKeys = [...new Set([...emailToPhoneKey.values()])];
-      if (emailDerivedPhoneKeys.length > 0) {
-        // Step 2: phone → sms_events outbound sequence
-        const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]>(
-          `
-          SELECT
-            RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
-            TRIM(sequence) AS sequence,
-            event_ts,
-            conversation_id
-          FROM sms_events
-          WHERE direction = 'outbound'
-            AND contact_phone IS NOT NULL
-            AND sequence IS NOT NULL AND TRIM(sequence) != ''
-            AND RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) = ANY($1::text[])
-            AND event_ts >= $2::timestamptz
-            AND event_ts <= $3::timestamptz
-          ORDER BY event_ts ASC
-          `,
-          emailDerivedPhoneKeys, fromIso, toIso,
-        );
-        const outboundByEmailPhone = new Map<string, Array<{ sequence: string; ts: number; conversationId: string | null }>>();
-        for (const row of rows) {
-          const ts = new Date(row.event_ts).getTime();
-          if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
-          const list = outboundByEmailPhone.get(row.phone_key) || [];
-          list.push({ sequence: row.sequence, ts, conversationId: row.conversation_id });
-          outboundByEmailPhone.set(row.phone_key, list);
-        }
-        for (const [emailKey, entries] of emailKeyToEntries) {
-          const phoneKey = emailToPhoneKey.get(emailKey);
-          if (!phoneKey) continue;
-          const outbounds = outboundByEmailPhone.get(phoneKey);
-          if (!outbounds || outbounds.length === 0) continue;
-          for (const { bookedCallId, bookingTs } of entries) {
-            const best = resolveBest(outbounds, bookingTs);
-            if (best) {
-              results.set(bookedCallId, {
-                sequenceLabel: best.sequence,
-                latestOutboundAt: new Date(best.ts).toISOString(),
-                conversationId: best.conversationId,
-              });
-            }
-          }
-        }
+      if (row.phone_key) {
+        const list = phoneToProfiles.get(row.phone_key) || [];
+        list.push({ conversationId: row.conversation_id || null });
+        phoneToProfiles.set(row.phone_key, list);
+      }
+      if (row.name_key) {
+        const list = nameToProfiles.get(row.name_key) || [];
+        list.push({ conversationId: row.conversation_id || null, phoneKey: row.phone_key || null });
+        nameToProfiles.set(row.name_key, list);
       }
     }
 
-    // --- Phone-based lookup (FALLBACK — direct contactPhone → sms_events) ---
-    // Runs second; skips calls already resolved by email lookup above.
-    const outboundByPhone = new Map<string, Array<{ sequence: string; ts: number; conversationId: string | null }>>();
-    if (phoneKeyToEntries.size > 0) {
-      const phoneKeys = [...phoneKeyToEntries.keys()];
-      const rows = await prisma.$queryRawUnsafe<{ phone_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]>(
+    const conversationIds = [
+      ...new Set(profileRows.map((row) => row.conversation_id).filter((value): value is string => Boolean(value))),
+    ];
+    const outboundByConversationId = new Map<string, Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>>();
+    if (conversationIds.length > 0) {
+      const rows = await prisma.$queryRawUnsafe<
+        { conversation_id: string; sequence: string; event_ts: Date }[]
+      >(
+        `
+        SELECT conversation_id, TRIM(sequence) AS sequence, event_ts
+        FROM sms_events
+        WHERE direction = 'outbound'
+          AND conversation_id = ANY($1::uuid[])
+          AND sequence IS NOT NULL AND TRIM(sequence) != ''
+          AND event_ts >= $2::timestamptz
+          AND event_ts <= $3::timestamptz
+        ORDER BY event_ts ASC
+        `,
+        conversationIds,
+        fromIso,
+        toIso,
+      );
+      for (const row of rows) {
+        const ts = new Date(row.event_ts).getTime();
+        if (!row.conversation_id || !row.sequence || !Number.isFinite(ts)) continue;
+        const list = outboundByConversationId.get(row.conversation_id) || [];
+        list.push({ sequenceLabel: row.sequence, latestOutboundTs: ts, conversationId: row.conversation_id });
+        outboundByConversationId.set(row.conversation_id, list);
+      }
+    }
+
+    const outboundByPhone = new Map<string, Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>>();
+    if (phoneKeys.length > 0) {
+      const rows = await prisma.$queryRawUnsafe<
+        { phone_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]
+      >(
         `
         SELECT
           RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
@@ -546,37 +670,24 @@ export const getBookedCallSequenceFromSmsEvents = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        phoneKeys, fromIso, toIso,
+        phoneKeys,
+        fromIso,
+        toIso,
       );
       for (const row of rows) {
         const ts = new Date(row.event_ts).getTime();
         if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
         const list = outboundByPhone.get(row.phone_key) || [];
-        list.push({ sequence: row.sequence, ts, conversationId: row.conversation_id });
+        list.push({ sequenceLabel: row.sequence, latestOutboundTs: ts, conversationId: row.conversation_id });
         outboundByPhone.set(row.phone_key, list);
-      }
-      for (const [phoneKey, entries] of phoneKeyToEntries) {
-        const outbounds = outboundByPhone.get(phoneKey);
-        if (!outbounds || outbounds.length === 0) continue;
-        for (const { bookedCallId, bookingTs } of entries) {
-          if (results.has(bookedCallId)) continue; // email result already resolved — skip
-          const best = resolveBest(outbounds, bookingTs);
-          if (best) {
-            results.set(bookedCallId, {
-              sequenceLabel: best.sequence,
-              latestOutboundAt: new Date(best.ts).toISOString(),
-              conversationId: best.conversationId,
-            });
-          }
-        }
       }
     }
 
-    // --- Name-based lookup (last resort for calls without phone or email) ---
-    const outboundByName = new Map<string, Array<{ sequence: string; ts: number; conversationId: string | null }>>();
-    if (nameKeyToEntries.size > 0) {
-      const nameKeys = [...nameKeyToEntries.keys()];
-      const rows = await prisma.$queryRawUnsafe<{ contact_name_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]>(
+    const outboundByName = new Map<string, Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>>();
+    if (nameKeys.length > 0) {
+      const rows = await prisma.$queryRawUnsafe<
+        { contact_name_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]
+      >(
         `
         SELECT
           LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) AS contact_name_key,
@@ -592,30 +703,76 @@ export const getBookedCallSequenceFromSmsEvents = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        nameKeys, fromIso, toIso,
+        nameKeys,
+        fromIso,
+        toIso,
       );
       for (const row of rows) {
         const ts = new Date(row.event_ts).getTime();
         if (!row.contact_name_key || !row.sequence || !Number.isFinite(ts)) continue;
         const list = outboundByName.get(row.contact_name_key) || [];
-        list.push({ sequence: row.sequence, ts, conversationId: row.conversation_id });
+        list.push({ sequenceLabel: row.sequence, latestOutboundTs: ts, conversationId: row.conversation_id });
         outboundByName.set(row.contact_name_key, list);
       }
-      for (const [nameKey, entries] of nameKeyToEntries) {
-        const outbounds = outboundByName.get(nameKey);
-        if (!outbounds || outbounds.length === 0) continue;
-        for (const { bookedCallId, bookingTs } of entries) {
-          if (results.has(bookedCallId)) continue; // already resolved via phone
-          const best = resolveBest(outbounds, bookingTs);
-          if (best) {
-            results.set(bookedCallId, {
-              sequenceLabel: best.sequence,
-              latestOutboundAt: new Date(best.ts).toISOString(),
-              conversationId: best.conversationId,
-            });
+    }
+
+    for (const entry of allEntries) {
+      if (entry.emailKey) {
+        for (const profile of emailToProfiles.get(entry.emailKey) || []) {
+          if (profile.conversationId) {
+            for (const outbound of outboundByConversationId.get(profile.conversationId) || []) {
+              addCandidate(entry.bookedCallId, outbound, 'conversation_id');
+            }
+          }
+          if (profile.phoneKey) {
+            for (const outbound of outboundByPhone.get(profile.phoneKey) || []) {
+              addCandidate(entry.bookedCallId, outbound, 'profile_email');
+            }
           }
         }
       }
+
+      if (entry.phoneKey) {
+        for (const outbound of outboundByPhone.get(entry.phoneKey) || []) {
+          addCandidate(entry.bookedCallId, outbound, 'phone');
+        }
+        for (const profile of phoneToProfiles.get(entry.phoneKey) || []) {
+          if (!profile.conversationId) continue;
+          for (const outbound of outboundByConversationId.get(profile.conversationId) || []) {
+            addCandidate(entry.bookedCallId, outbound, 'conversation_id');
+          }
+        }
+      }
+
+      if (entry.nameKey) {
+        for (const outbound of outboundByName.get(entry.nameKey) || []) {
+          addCandidate(entry.bookedCallId, outbound, 'profile_name');
+        }
+        for (const profile of nameToProfiles.get(entry.nameKey) || []) {
+          if (profile.conversationId) {
+            for (const outbound of outboundByConversationId.get(profile.conversationId) || []) {
+              addCandidate(entry.bookedCallId, outbound, 'conversation_id');
+            }
+          }
+          if (profile.phoneKey) {
+            for (const outbound of outboundByPhone.get(profile.phoneKey) || []) {
+              addCandidate(entry.bookedCallId, outbound, 'profile_name');
+            }
+          }
+        }
+      }
+    }
+
+    for (const [bookedCallId, candidates] of sequenceCandidatesByBookedCallId) {
+      const callEntry = allEntries.find((entry) => entry.bookedCallId === bookedCallId);
+      if (!callEntry) continue;
+      const best = resolveBestSequenceLookupCandidate(callEntry.bookingTs, [...candidates.values()]);
+      if (!best) continue;
+      results.set(bookedCallId, {
+        sequenceLabel: best.sequenceLabel,
+        latestOutboundAt: new Date(best.latestOutboundTs).toISOString(),
+        conversationId: best.conversationId,
+      });
     }
   } catch (error) {
     logger?.error?.('Failed to compute booked-call sequence from SMS events', error);

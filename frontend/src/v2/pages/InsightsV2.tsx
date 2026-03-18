@@ -8,7 +8,6 @@ import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Pr
 import { BookingAttributionPanel } from '../components/BookingAttributionPanel';
 import { AttributionHealthPanel } from '../components/AttributionHealthPanel';
 import { SkeletonDashboard } from '../components/Skeleton';
-import { MetricCarousel } from '../components/MetricCarousel';
 
 function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -18,34 +17,6 @@ function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.
     </span>
   );
 }
-
-const smsBannerUrl = '/assets/sms-kit/smsbanner1.webp';
-const analyticsWaveBannerUrl = '/assets/sms-kit/analytics_wave_banner.webp';
-const smsGrowthBannerUrl = '/assets/sms-kit/sms_growth_banner.webp';
-const smsWaveBannerUrl = '/assets/sms-kit/sms_wave_banner.webp';
-const banner2Url = '/assets/sms-kit/banner2.webp';
-const smsGrowthHeroUrl = '/assets/sms-kit/sms_growth_hero.webp';
-const heroBannerUrl = '/assets/sms-kit/herobannersms.webp';
-
-// Section divider assets
-const waveDividerUrl = '/assets/sms-kit/wave_sms_divider.webp';
-const arrowDividerUrl = '/assets/sms-kit/arrow_strip_divider.webp';
-const nodeDividerUrl = '/assets/sms-kit/node_bar_divider.webp';
-
-// Banner rotation — full 7-day cycle for visual variety
-const getInsightsBannerForToday = (): string => {
-  const day = new Date().getDay();
-  const banners = [
-    smsBannerUrl,           // Sunday
-    analyticsWaveBannerUrl, // Monday
-    smsGrowthBannerUrl,     // Tuesday
-    banner2Url,             // Wednesday
-    smsWaveBannerUrl,       // Thursday
-    smsGrowthHeroUrl,       // Friday
-    heroBannerUrl,          // Saturday
-  ];
-  return banners[day] || smsBannerUrl;
-};
 
 type Range = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
 
@@ -101,50 +72,6 @@ export function InsightsV2() {
 
   // KPI threshold constants — named to avoid magic numbers
   const REPLY_RATE_GOOD_THRESHOLD = 10;   // % — below this is considered low engagement
-  const BOOKING_RATE_GOOD_THRESHOLD = 2;  // % — below this is considered low conversion
-  const OPT_OUT_RATE_HIGH_THRESHOLD = 3;  // % — at or above this is considered high churn risk
-
-  // Metric carousel slides — must be declared before any early returns (Rules of Hooks)
-  const metricSlides = useMemo(() => {
-    if (!data) return [];
-    return [
-      {
-        id: 'reply-rate',
-        title: 'Reply Rate',
-        value: fmtPct(data.kpis.replyRatePct),
-        description: 'SMS response rate for selected period',
-        trend: (data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'up' : 'down') as 'up' | 'down' | 'neutral',
-        trendValue: data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? '+Strong' : '-Low',
-        color: (data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-      {
-        id: 'booking-rate',
-        title: 'Booking Rate',
-        value: fmtPct(data.kpis.bookingRatePct),
-        description: 'Calls booked per message sent',
-        trend: (data.kpis.bookingRatePct >= BOOKING_RATE_GOOD_THRESHOLD ? 'up' : 'down') as 'up' | 'down' | 'neutral',
-        trendValue: data.kpis.bookingRatePct >= BOOKING_RATE_GOOD_THRESHOLD ? '+Good' : '-Low',
-        color: (data.kpis.bookingRatePct >= BOOKING_RATE_GOOD_THRESHOLD ? 'positive' : 'warning') as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-      {
-        id: 'booked-calls',
-        title: 'Booked Calls',
-        value: fmtInt(data.kpis.bookedCalls),
-        description: 'Total calls booked',
-        trend: 'neutral' as 'up' | 'down' | 'neutral',
-        color: 'accent' as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-      {
-        id: 'opt-out-rate',
-        title: 'Opt-out Rate',
-        value: fmtPct(data.kpis.optOutRatePct),
-        description: 'Unsubscribe rate',
-        trend: (data.kpis.optOutRatePct >= OPT_OUT_RATE_HIGH_THRESHOLD ? 'down' : 'up') as 'up' | 'down' | 'neutral',
-        trendValue: data.kpis.optOutRatePct >= OPT_OUT_RATE_HIGH_THRESHOLD ? '-High' : '+Good',
-        color: (data.kpis.optOutRatePct >= OPT_OUT_RATE_HIGH_THRESHOLD ? 'critical' : 'positive') as 'accent' | 'positive' | 'critical' | 'warning',
-      },
-    ];
-  }, [data]);
 
   const renderBookingAttributionSection = () => {
     if (salesMetricsQuery.isLoading) {
@@ -199,16 +126,7 @@ export function InsightsV2() {
   }
 
   return (
-    <div className="V2Page V2PageTransition">
-      <div className="V2HeroBannerOverlay">
-        <img className="V2PageHeroBanner" src={getInsightsBannerForToday()} alt="" aria-hidden="true" />
-      </div>
-      
-      {/* Metric Carousel - Type Motion Pattern */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <MetricCarousel slides={metricSlides} autoPlay={true} autoPlayInterval={6000} />
-      </div>
-
+    <div className="V2Page V2PageTransition V2Page--clean">
       <V2PageHeader
         title="Performance"
         subtitle="Team and setter results, what needs attention, and Monday board health."
@@ -234,9 +152,7 @@ export function InsightsV2() {
         </div>
       ) : null}
 
-      <img className="sms-section-divider" src={waveDividerUrl} alt="" aria-hidden="true" />
-
-      <section className="V2MetricsGrid V2MetricsGrid--compact sms-grid-bg">
+      <section className="V2MetricsGrid V2MetricsGrid--compact">
         <V2MetricCard label={<IconLabel icon={<MessageSquare size={11} />}>Messages sent</IconLabel>} value={fmtInt(data.kpis.messagesSent)} />
         <V2MetricCard label={<IconLabel icon={<Users size={11} />}>People reached</IconLabel>} value={fmtInt(data.kpis.uniqueContacted)} />
         <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Replies</IconLabel>} value={fmtInt(data.kpis.repliesReceived)} />
@@ -244,19 +160,16 @@ export function InsightsV2() {
           label={<IconLabel icon={<Percent size={11} />}>Reply rate</IconLabel>}
           value={fmtPct(data.kpis.replyRatePct)}
           tone={data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'positive' : 'default'}
-          glow={data.kpis.replyRatePct >= REPLY_RATE_GOOD_THRESHOLD ? 'positive' : 'critical'}
         />
         <V2MetricCard
           label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>}
           value={fmtInt(data.kpis.bookedCalls)}
           tone="positive"
-          glow={true}
         />
         <V2MetricCard
           label={<IconLabel icon={<CalendarCheck size={11} />}>Booking rate</IconLabel>}
           value={fmtPct(data.kpis.bookingRatePct)}
           tone={data.kpis.bookingRatePct >= 2 ? 'positive' : data.kpis.bookingRatePct <= 1 ? 'critical' : 'default'}
-          glow={data.kpis.bookingRatePct >= 2 ? 'positive' : 'critical'}
         />
         <V2MetricCard label={<IconLabel icon={<Share2 size={11} />}>Manual share (Slack)</IconLabel>} value={fmtPct(manualSharePct)} />
         {mondayCoverageCards.map((card) => (
@@ -271,14 +184,11 @@ export function InsightsV2() {
           label={<IconLabel icon={<TrendingDown size={11} />}>Opt-out rate</IconLabel>}
           value={fmtPct(data.kpis.optOutRatePct)}
           tone={data.kpis.optOutRatePct >= 3 ? 'critical' : 'default'}
-          glow={data.kpis.optOutRatePct >= 3 ? 'critical' : 'positive'}
         />
       </section>
 
-      <img className="sms-section-divider" src={arrowDividerUrl} alt="" aria-hidden="true" />
-
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range." className="V2Panel--glass sms-pattern-bg">
+        <V2Panel title="Setter Comparison" caption="Side-by-side view of Jack and Brandon for this date range.">
           <div className="V2TableWrap">
             <table className="V2Table">
               <thead>
@@ -322,10 +232,8 @@ export function InsightsV2() {
         </div>
       </div>
 
-      <img className="sms-section-divider" src={nodeDividerUrl} alt="" aria-hidden="true" />
-
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked." className="V2Panel--glass sms-pattern-bg--alt">
+        <V2Panel title="Contact Journey" caption="How people move from reached to replied to booked.">
           <div className="V2SplitStat">
             <div>
               <span>Contacted</span>
@@ -400,7 +308,7 @@ export function InsightsV2() {
               </div>
               <div>
                 <span>Fallback SMS matches</span>
-                <strong>{fmtInt(bookingAttributionMeta?.smsPhoneMatchedCalls ?? 0)}</strong>
+                <strong>{fmtInt(bookingAttributionMeta?.matchedCalls ?? 0)}</strong>
               </div>
               <div>
                 <span>Strict SMS reply matches</span>
@@ -412,7 +320,7 @@ export function InsightsV2() {
       </div>
 
       <div style={{ marginTop: '1rem' }}>
-        <V2Panel title="Watch List" caption="Items that need attention based on this range." className="V2Panel--glass">
+        <V2Panel title="Watch List" caption="Items that need attention based on this range.">
           {data.risks.length === 0 ? (
             <V2State kind="empty">No issues flagged for this date range.</V2State>
           ) : (

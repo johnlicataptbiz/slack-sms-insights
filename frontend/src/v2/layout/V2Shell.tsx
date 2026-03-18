@@ -23,44 +23,7 @@ const navItems: NavItem[] = [
   { to: '/v2/sequences', label: v2Copy.nav.sequences, shortLabel: 'Sequences', icon: <GitBranch size={16} /> },
 ];
 
-const brandLogoUrl = '/assets/sms-kit/logo1sms.webp';
-const patternUrl = '/assets/sms-kit/patternsms.webp';
-const heroBannerUrl = '/assets/sms-kit/herobannersms.webp';
-const banner2Url = '/assets/sms-kit/banner2.webp';
-const banner3Url = '/assets/sms-kit/banner3.webp';
-const smsPattern2Url = '/assets/sms-kit/smspattern2.webp';
-const ptbizPatternUrl = '/assets/sms-kit/ptbiz_sms_pattern.webp';
-const networkPatternUrl = '/assets/sms-kit/sms_network_pattern.webp';
-const smsGrowthHeroUrl = '/assets/sms-kit/sms_growth_hero.webp';
 const mobileMediaQuery = '(max-width: 1080px)';
-
-// Data-driven route → asset maps for visual variety across routes
-const ROUTE_PATTERN_MAP: Record<string, string> = {
-  '/insights': smsPattern2Url,
-  '/inbox': networkPatternUrl,
-  '/sequences': ptbizPatternUrl,
-  '/runs': networkPatternUrl,
-  '/rep': patternUrl,
-};
-
-const ROUTE_HERO_BANNER_MAP: Record<string, string> = {
-  '/sequences': banner3Url,
-  '/runs': banner2Url,
-  '/rep': smsGrowthHeroUrl,
-};
-
-const resolveRouteAsset = (pathname: string, map: Record<string, string>, fallback: string): string => {
-  for (const key of Object.keys(map)) {
-    if (pathname.includes(key)) return map[key];
-  }
-  return fallback;
-};
-
-const getPatternForRoute = (pathname: string): string =>
-  resolveRouteAsset(pathname, ROUTE_PATTERN_MAP, patternUrl);
-
-const getHeroBannerForRoute = (pathname: string): string =>
-  resolveRouteAsset(pathname, ROUTE_HERO_BANNER_MAP, heroBannerUrl);
 const topQuickLinks = ['/v2/insights', '/v2/inbox', '/v2/runs', '/v2/sequences'] as const;
 
 const isRouteActive = (pathname: string, to: string) =>
@@ -186,8 +149,8 @@ export default function V2Shell({ children }: { children: ReactNode }) {
               aria-label="Toggle navigation"
               aria-expanded={isMenuOpen}
               onClick={handleSidebarToggle}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1 }}
+              whileTap={{ scale: 0.98 }}
             >
               <AnimatePresence mode="wait" initial={false}>
                 {isMenuOpen ? (
@@ -218,7 +181,6 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           ) : null}
 
           <div className="V2Shell__context">
-            <p className="V2Shell__contextEyebrow">PT Biz SMS</p>
             <p className="V2Shell__contextTitle">
               {activeNavItem?.label || 'Command Center'}
             </p>
@@ -253,7 +215,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             className="V2ThemeToggle"
             type="button"
             onClick={toggleTheme}
-            whileHover={{ scale: 1.1 }}
+            whileHover={{ scale: 1 }}
             whileTap={{ scale: 0.95 }}
             aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
           >
@@ -267,10 +229,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             aria-expanded={isDefinitionsOpen}
             aria-controls="v2-kpi-definitions"
             onClick={() => setIsDefinitionsOpen((v) => !v)}
-            whileHover={{
-              scale: 1.05,
-              boxShadow: '0 4px 15px rgba(17, 184, 214, 0.25)',
-            }}
+            whileHover={{ scale: 1 }}
             whileTap={{ scale: 0.95 }}
           >
             <BookOpen size={13} />
@@ -280,7 +239,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             className="V2Shell__modeButton"
             type="button"
             onClick={() => void handleLogout()}
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1 }}
             whileTap={{ scale: 0.95 }}
           >
             <LogOut size={13} />
@@ -297,24 +256,11 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/* Brand pattern overlay - rotates based on route */}
-          <div
-            className="V2Shell__sidebarPattern"
-            style={{ 
-              backgroundImage: `url(${getPatternForRoute(location.pathname)})`,
-              animation: 'v2-pattern-drift 60s linear infinite'
-            }}
-            aria-hidden="true"
-          />
-
           <div className="V2Shell__sidebarBrand">
-            <motion.img 
-              className="V2Shell__sidebarLogo" 
-              src={brandLogoUrl} 
-              alt="PT Biz SMS"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.2 }}
-            />
+            <div className="V2Shell__sidebarWordmark" aria-label="PT Biz SMS">
+              <span className="V2Shell__sidebarWordmarkLine">PT Biz</span>
+              <span className="V2Shell__sidebarWordmarkLine">SMS</span>
+            </div>
           </div>
           <nav className="V2Shell__nav" aria-label="V2 primary navigation">
             <motion.div
@@ -334,7 +280,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                   >
                     <NavLink
                       to={item.to}
-                      className={({ isActive }) => `V2Shell__navItem V2Shell__navItem--enhanced ${isActive ? 'is-active' : ''}`}
+                      className={({ isActive }) => `V2Shell__navItem ${isActive ? 'is-active' : ''}`}
                     >
                       <motion.span
                         className="V2Shell__navIcon"
@@ -348,32 +294,12 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                       </motion.span>
                       <span className="V2Shell__navLabel">{item.label}</span>
                       <span className="V2Shell__navLabelShort">{item.shortLabel}</span>
-                      {/* Active indicator */}
-                      {isActive && (
-                        <motion.div
-                          className="V2Shell__activeIndicator"
-                          layoutId="activeNav"
-                          initial={{ opacity: 0, scale: 0 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={springs.soft}
-                        />
-                      )}
                     </NavLink>
                   </motion.div>
                 );
               })}
             </motion.div>
           </nav>
-          {/* Hero banner strip at bottom of sidebar - rotates based on route */}
-          <motion.img
-            className="V2Shell__sidebarHeroBanner"
-            src={getHeroBannerForRoute(location.pathname)}
-            alt=""
-            aria-hidden="true"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 0.82, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-          />
         </motion.aside>
 
         <main className="V2Shell__content">{children}</main>
@@ -386,10 +312,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         onClick={() => setIsDefinitionsOpen((v) => !v)}
         initial={{ opacity: 0, scale: 0 }}
         animate={{ opacity: 1, scale: 1 }}
-        whileHover={{
-          scale: 1.1,
-          boxShadow: '0 8px 25px rgba(17, 184, 214, 0.35)',
-        }}
+        whileHover={{ scale: 1 }}
         whileTap={{ scale: 0.9 }}
         transition={springs.bouncy}
       >
@@ -438,7 +361,6 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             />
             <div className="V2DefsDrawer__header">
               <div>
-                <p className="V2DefsDrawer__eyebrow">Shared Vocabulary</p>
                 <Drawer.Title asChild>
                   <h2>{v2Copy.actions.kpiDefinitions}</h2>
                 </Drawer.Title>
@@ -446,7 +368,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
               <motion.button
                 type="button"
                 onClick={() => setIsDefinitionsOpen(false)}
-                whileHover={{ scale: 1.1, rotate: 90 }}
+                whileHover={{ scale: 1 }}
                 whileTap={{ scale: 0.9 }}
               >
                 <X size={18} />

@@ -17,11 +17,9 @@ export function AttributionHealthPanel() {
     return `${data.lagHours.toFixed(1)}h`;
   }, [data?.lagHours]);
 
-  const panelTone = data?.isLagging ? 'critical' : 'default';
-
   if (isLoading) {
     return (
-      <V2Panel title="Attribution Health" caption="Ensuring Slack bookings stay current." tone={panelTone}>
+      <V2Panel title="Attribution Health" caption="Ensuring Slack bookings stay current.">
         <V2State kind="loading">Checking attribution freshness…</V2State>
       </V2Panel>
     );
@@ -29,14 +27,14 @@ export function AttributionHealthPanel() {
 
   if (isError || !data) {
     return (
-      <V2Panel title="Attribution Health" caption="Ensuring Slack bookings stay current." tone="critical">
+      <V2Panel title="Attribution Health" caption="Ensuring Slack bookings stay current.">
         <V2State kind="error">Failed to load attribution health: {(error as any)?.message || 'unknown'}</V2State>
       </V2Panel>
     );
   }
 
   return (
-    <V2Panel title="Attribution Health" caption="Latest booked call vs. attribution timestamps." tone={panelTone}>
+    <V2Panel title="Attribution Health" caption="Latest booked call vs. attribution timestamps.">
       <div className="V2SplitStat">
         <div>
           <span>Lag</span>

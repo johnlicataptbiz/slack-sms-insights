@@ -310,9 +310,10 @@ export const upsertBookedCallItem = async (
 
     if (!itemId) throw new Error('Failed to create monday booked call item');
   } else {
+    // board_id is required by Monday API v2 for change_simple_column_value
     const renameMutation = `
-      mutation RenameBookedCallItem($itemId: ID!, $itemName: String!) {
-        change_simple_column_value(item_id: $itemId, column_id: "name", value: $itemName) {
+      mutation RenameBookedCallItem($boardId: ID!, $itemId: ID!, $itemName: String!) {
+        change_simple_column_value(board_id: $boardId, item_id: $itemId, column_id: "name", value: $itemName) {
           id
         }
       }
@@ -321,6 +322,7 @@ export const upsertBookedCallItem = async (
       await requestGraphQl(
         renameMutation,
         {
+          boardId,
           itemId,
           itemName: payload.itemName,
         },
@@ -332,7 +334,11 @@ export const upsertBookedCallItem = async (
     }
   }
 
+  let columnUpdateFailed = false;
+
   if (itemId && hasColumnValues) {
+    // create_labels_if_missing: true auto-creates status labels that don't yet exist on the board,
+    // preventing "invalid value" errors when new label values are introduced.
     const patchColumnsMutation = `
       mutation PatchBookedCallColumns($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
         change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $columnValues) {
@@ -353,9 +359,14 @@ export const upsertBookedCallItem = async (
       );
       action = 'updated';
     } catch (error) {
+      columnUpdateFailed = true;
       logger?.warn?.('Booked call column update failed; item update will still be posted', error);
     }
   }
+
+  const updateBodyPrefix = columnUpdateFailed
+    ? `${payload.updateMarkdown}\n\n> Warning: monday column values could not be fully updated on this writeback attempt.`
+    : payload.updateMarkdown;
 
   const updateMutation = `
     mutation AddBookedCallUpdate($itemId: ID!, $body: String!) {
@@ -364,7 +375,7 @@ export const upsertBookedCallItem = async (
       }
     }
   `;
-  await requestGraphQl(updateMutation, { itemId, body: payload.updateMarkdown }, logger);
+  await requestGraphQl(updateMutation, { itemId, body: updateBodyPrefix }, logger);
 
   return { itemId, action };
 };

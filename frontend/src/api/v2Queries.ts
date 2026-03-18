@@ -56,7 +56,6 @@ import type {
   SendMessageResultV2,
   StageConversionRowV2,
   WeeklyManagerSummaryV2,
-  SequenceQualificationBreakdown,
 } from './v2-types';
 
 export type SalesMetricsQueryParams =

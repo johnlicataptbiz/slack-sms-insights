@@ -4,6 +4,7 @@ import {
   attributeSlackBookedCallsToSequences,
   MANUAL_SEQUENCE_LABEL,
 } from '../../services/sequence-booked-attribution.js';
+import { resolveBestSequenceLookupCandidate } from '../../services/booked-calls.js';
 
 describe('sequence booked-call attribution', () => {
   it('maps HubSpot first-conversion text to the closest sequence label and keeps bucket credit', () => {
@@ -153,5 +154,27 @@ describe('sequence booked-call attribution', () => {
     assert.equal(audit?.attributionSource, 'fuzzy_text_match');
     assert.equal(audit?.convertedViaSequence, 'Call Pitched NO Reply - 2026 v1.0');
     assert.equal(audit?.smsSequenceLabel, 'Call Pitched NO Reply - 2026 v1.0');
+  });
+
+  it('prefers stronger sequence identity evidence over weaker but slightly newer candidates', () => {
+    const bookingTs = new Date('2026-03-18T18:00:00.000Z').getTime();
+    const resolved = resolveBestSequenceLookupCandidate(bookingTs, [
+      {
+        sequenceLabel: 'Late Phone Match',
+        latestOutboundTs: new Date('2026-03-18T17:55:00.000Z').getTime(),
+        conversationId: null,
+        evidence: new Set(['phone']),
+      },
+      {
+        sequenceLabel: 'Conversation-backed Sequence',
+        latestOutboundTs: new Date('2026-03-18T17:10:00.000Z').getTime(),
+        conversationId: 'conv_123',
+        evidence: new Set(['conversation_id', 'profile_email']),
+      },
+    ]);
+
+    assert.ok(resolved);
+    assert.equal(resolved?.sequenceLabel, 'Conversation-backed Sequence');
+    assert.equal(resolved?.conversationId, 'conv_123');
   });
 });

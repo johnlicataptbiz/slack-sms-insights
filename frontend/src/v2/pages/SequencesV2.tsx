@@ -1,15 +1,12 @@
 import { useMemo, useRef, useState, useCallback } from 'react';
-import { MessageSquare, Users, Reply, Phone, CalendarCheck, UserMinus, AlertCircle, ChevronUp, ChevronDown, ArrowDownToLine, Filter } from 'lucide-react';
+import { MessageSquare, Users, Reply, Phone, ChevronUp, ChevronDown, Filter } from 'lucide-react';
 
 import { useV2SequenceQualification, useV2SequencesDeep } from '../../api/v2Queries';
+import type { SequenceQualificationItem } from '../../api/v2Queries';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
+import { UnattributedAuditTable } from '../components/UnattributedAuditTable';
 import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
 import { DEFAULT_BUSINESS_TIME_ZONE } from '../../utils/runDay';
-
-// Asset URLs
-const heroBannerUrl = '/assets/sms-kit/banner3.webp';
-const divider3SmsUrl = '/assets/sms-kit/divider%203%20sms.webp';
-const networkDividerUrl = '/assets/sms-kit/network_bar_divider.webp';
 
 function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -24,6 +21,7 @@ type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
 type SortKey =
   | 'label'
   | 'messagesSent'
+  | 'uniqueContacted'
   | 'repliesReceived'
   | 'replyRatePct'
   | 'bookedCalls'
@@ -77,15 +75,15 @@ export default function SequencesV2() {
   const data = query.data?.data;
   const qualificationItems = qualificationQuery.data?.data.items ?? [];
   const qualificationSummary = useMemo(() => {
-    const total = qualificationItems.reduce((sum, item) => sum + item.totalConversations, 0);
-    const sumFullTime = qualificationItems.reduce((sum, item) => sum + item.fullTime.count, 0);
-    const sumPartTime = qualificationItems.reduce((sum, item) => sum + item.partTime.count, 0);
-    const sumCash = qualificationItems.reduce((sum, item) => sum + item.mostlyCash.count, 0);
-    const sumInsurance = qualificationItems.reduce((sum, item) => sum + item.mostlyInsurance.count, 0);
-    const sumBalanced = qualificationItems.reduce((sum, item) => sum + item.balancedMix.count, 0);
-    const sumHighInterest = qualificationItems.reduce((sum, item) => sum + item.highInterest.count, 0);
-    const sumMediumInterest = qualificationItems.reduce((sum, item) => sum + item.mediumInterest.count, 0);
-    const sumLowInterest = qualificationItems.reduce((sum, item) => sum + item.lowInterest.count, 0);
+    const total = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.totalConversations, 0);
+    const sumFullTime = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.fullTime.count, 0);
+    const sumPartTime = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.partTime.count, 0);
+    const sumCash = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.mostlyCash.count, 0);
+    const sumInsurance = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.mostlyInsurance.count, 0);
+    const sumBalanced = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.balancedMix.count, 0);
+    const sumHighInterest = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.highInterest.count, 0);
+    const sumMediumInterest = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.mediumInterest.count, 0);
+    const sumLowInterest = qualificationItems.reduce((sum: number, item: SequenceQualificationItem) => sum + item.lowInterest.count, 0);
     const nicheMap = new Map<string, number>();
     for (const item of qualificationItems) {
       for (const niche of item.topNiches) {
@@ -111,29 +109,32 @@ export default function SequencesV2() {
     };
   }, [qualificationItems]);
 
+  const tableEligibleSequences = useMemo(() => {
+    if (!data) return [];
+    return data.sequences.filter((row) => !row.isManualBucket);
+  }, [data]);
+
   const totals = useMemo(() => {
-    if (!data) return null;
-    return data.sequences.reduce(
+    return tableEligibleSequences.reduce(
       (acc, row) => {
         acc.messagesSent += row.messagesSent;
         acc.uniqueContacted += row.uniqueContacted;
+        acc.inboundTexts += row.inboundTexts;
         acc.repliesReceived += row.repliesReceived;
         acc.bookedCalls += row.bookedCalls;
         acc.optOuts += row.optOuts;
         return acc;
       },
-      { messagesSent: 0, uniqueContacted: 0, repliesReceived: 0, bookedCalls: 0, optOuts: 0 },
+      { messagesSent: 0, uniqueContacted: 0, inboundTexts: 0, repliesReceived: 0, bookedCalls: 0, optOuts: 0 },
     );
-  }, [data]);
+  }, [tableEligibleSequences]);
 
   const filteredCount = useMemo(() => {
-    if (!data) return 0;
-    return data.sequences.filter((row) => row.messagesSent < minSendsThreshold).length;
-  }, [data, minSendsThreshold]);
+    return tableEligibleSequences.filter((row) => row.messagesSent < minSendsThreshold).length;
+  }, [tableEligibleSequences, minSendsThreshold]);
 
   const sortedSequences = useMemo(() => {
-    if (!data) return [];
-    const filtered = data.sequences.filter((row) => row.messagesSent >= minSendsThreshold && !row.isManualBucket);
+    const filtered = tableEligibleSequences.filter((row) => row.messagesSent >= minSendsThreshold);
     const dir = sortDirection === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       if (sortKey === 'label') return a.label.localeCompare(b.label) * dir;
@@ -143,32 +144,30 @@ export default function SequencesV2() {
       if (aVal > bVal) return 1 * dir;
       return a.label.localeCompare(b.label);
     });
-  }, [data, minSendsThreshold, sortKey, sortDirection]);
+  }, [tableEligibleSequences, minSendsThreshold, sortKey, sortDirection]);
 
-  const bookingRatePct = totals && totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0;
   const verification = data?.verification ?? {
     slackBookedTotal: 0,
     mondayBookedTotal: 0,
     deltaBookedVsMonday: 0,
+    matchedCalls: 0,
+    unattributedCalls: 0,
+    manualCalls: 0,
+    strictSmsReplyLinkedCalls: 0,
+    smsPhoneMatchedCalls: 0,
+    fuzzyTextMatchedCalls: 0,
     manualDirectSharePct: 0,
     manualDirectBooked: 0,
     attributionConversationMapped: 0,
-    smsPhoneMatchedCalls: 0,
+    attributionConversationMappedPct: 0,
   };
+  const unattributedAuditRows = data?.unattributedAuditRows ?? [];
 
   return (
-    <div className="V2Page V2PageTransition">
-      {/* Hero Banner */}
-      <div className="V2HeroBanner">
-        <img className="V2HeroBanner__img" src={heroBannerUrl} alt="" aria-hidden="true" />
-        <div className="V2HeroBanner__overlay">
-          <span className="V2HeroBanner__title">Sequence Performance</span>
-        </div>
-      </div>
-
+    <div className="V2Page V2PageTransition V2Page--sequencesClean">
       <V2PageHeader
         title="Sequences"
-        subtitle="How each sequence is performing: volume, replies, and booked calls."
+        subtitle="How each sequence is performing: outbound texts, contact response, and booked calls."
         right={
           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
             {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
@@ -205,7 +204,7 @@ export default function SequencesV2() {
 
       {query.isLoading ? (
         <V2State kind="loading">Loading sequence performance…</V2State>
-      ) : query.isError || !data || !totals ? (
+      ) : query.isError || !data ? (
         <V2State kind="error" onRetry={() => void query.refetch()}>
           Failed to load sequence performance.
         </V2State>
@@ -217,21 +216,11 @@ export default function SequencesV2() {
             </div>
           ) : null}
 
-          <div className="V2MetricsGrid V2MetricsGrid--compact sms-pattern-bg--ptbiz">
-            <V2MetricCard label={<IconLabel icon={<MessageSquare size={11} />}>Messages sent</IconLabel>} value={fmtInt(totals.messagesSent)} />
-            <V2MetricCard label={<IconLabel icon={<Users size={11} />}>People reached</IconLabel>} value={fmtInt(totals.uniqueContacted)} />
-            <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Replies</IconLabel>} value={fmtInt(totals.repliesReceived)} />
-            <V2MetricCard
-              label={<IconLabel icon={<ArrowDownToLine size={11} />}>Reply rate</IconLabel>}
-              value={fmtPct(totals.uniqueContacted > 0 ? (totals.repliesReceived / totals.uniqueContacted) * 100 : 0)}
-            />
+          <div className="V2MetricsGrid V2MetricsGrid--compact">
+            <V2MetricCard label={<IconLabel icon={<MessageSquare size={11} />}>Total outbound sent</IconLabel>} value={fmtInt(totals.messagesSent)} />
+            <V2MetricCard label={<IconLabel icon={<Users size={11} />}>New leads contacted</IconLabel>} value={fmtInt(totals.uniqueContacted)} />
+            <V2MetricCard label={<IconLabel icon={<Reply size={11} />}>Leads who replied</IconLabel>} value={fmtInt(totals.repliesReceived)} />
             <V2MetricCard label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>} value={fmtInt(totals.bookedCalls)} tone="positive" />
-            <V2MetricCard
-              label={<IconLabel icon={<CalendarCheck size={11} />}>Booking rate</IconLabel>}
-              value={fmtPct(totals.uniqueContacted > 0 ? (totals.bookedCalls / totals.uniqueContacted) * 100 : 0)}
-            />
-            <V2MetricCard label={<IconLabel icon={<UserMinus size={11} />}>Opt-outs</IconLabel>} value={fmtInt(totals.optOuts)} tone={totals.optOuts > 0 ? 'critical' : 'default'} />
-            <V2MetricCard label={<IconLabel icon={<AlertCircle size={11} />}>Monday boards behind</IconLabel>} value={fmtInt(data.monday.staleBoards)} tone={data.monday.staleBoards > 0 ? 'critical' : 'default'} />
             {filteredCount > 0 && (
               <V2MetricCard
                 label={<IconLabel icon={<Filter size={11} />}>Filtered out (low activity)</IconLabel>}
@@ -241,51 +230,10 @@ export default function SequencesV2() {
             )}
           </div>
 
-          <img className="sms-section-divider" src={divider3SmsUrl} alt="" aria-hidden="true" />
-
-          <V2Panel title="Verification snapshot" caption="Slack totals, Monday totals, and fallback cues.">
-            <div className="V2SplitStat">
-              <div>
-                <span>Slack booked</span>
-                <strong>{fmtInt(verification.slackBookedTotal ?? 0)}</strong>
-              </div>
-              <div>
-                <span>Monday booked</span>
-                <strong>{fmtInt(verification.mondayBookedTotal ?? 0)}</strong>
-              </div>
-              <div>
-                <span>Delta</span>
-                <strong>{fmtInt(verification.deltaBookedVsMonday ?? 0)}</strong>
-              </div>
-            </div>
-            <div className="V2DeltaList" style={{ marginTop: '1rem' }}>
-              <div>
-                <span>Manual booked calls</span>
-                <strong>{fmtInt(verification.manualDirectBooked ?? 0)}</strong>
-              </div>
-              <div>
-                <span>SMS conversations mapped</span>
-                <strong>{fmtInt(verification.attributionConversationMapped ?? 0)}</strong>
-              </div>
-              <div>
-                <span>Fallback SMS matches</span>
-                <strong>{fmtInt(verification.smsPhoneMatchedCalls ?? 0)}</strong>
-              </div>
-            </div>
-            {(verification.smsPhoneMatchedCalls ?? 0) > 0 && (
-              <div className="V2InlineWarning" style={{ marginTop: '1rem' }}>
-                Fallback SMS matches are being used for attribution; consider the Slack reaction data the source of truth until the refresh finishes.
-              </div>
-            )}
-          </V2Panel>
-
-          <img className="sms-section-divider" src={networkDividerUrl} alt="" aria-hidden="true" />
-
           <div ref={tableRef}>
             <V2Panel
               title="Sequence Results"
               caption="At-a-glance sequence performance for this date range. Tip: swipe left/right if needed."
-              className="sms-pattern-bg--network"
             >
               <div className="V2TableWrap V2TableWrap--sequences">
                 <table className="V2Table V2Table--sequences">
@@ -297,28 +245,28 @@ export default function SequencesV2() {
                         </button>
                       </th>
                       <th className="is-right">
-                        <button type="button" className="V2SortButton" onClick={() => onSort('messagesSent')}>
-                          Sent{sortIndicator('messagesSent')}
+                        <button type="button" className="V2SortButton" onClick={() => onSort('uniqueContacted')}>
+                          New leads contacted{sortIndicator('uniqueContacted')}
                         </button>
                       </th>
                       <th className="is-right">
                         <button type="button" className="V2SortButton" onClick={() => onSort('repliesReceived')}>
-                          Replies{sortIndicator('repliesReceived')}
+                          Leads who replied{sortIndicator('repliesReceived')}
                         </button>
                       </th>
                       <th className="is-right">
                         <button type="button" className="V2SortButton" onClick={() => onSort('replyRatePct')}>
-                          Reply %{sortIndicator('replyRatePct')}
+                          Reply rate{sortIndicator('replyRatePct')}
                         </button>
                       </th>
                       <th className="is-right">
                         <button type="button" className="V2SortButton" onClick={() => onSort('bookedCalls')}>
-                          Booked{sortIndicator('bookedCalls')}
+                          Calls booked{sortIndicator('bookedCalls')}
                         </button>
                       </th>
                       <th className="is-right">
                         <button type="button" className="V2SortButton" onClick={() => onSort('bookingRatePct')}>
-                          Book %{sortIndicator('bookingRatePct')}
+                          Booking rate{sortIndicator('bookingRatePct')}
                         </button>
                       </th>
                       <th className="is-right">
@@ -328,7 +276,7 @@ export default function SequencesV2() {
                       </th>
                       <th className="is-right">
                         <button type="button" className="V2SortButton" onClick={() => onSort('optOutRatePct')}>
-                          Opt %{sortIndicator('optOutRatePct')}
+                          Opt-out rate{sortIndicator('optOutRatePct')}
                         </button>
                       </th>
                       <th className="is-right" title="Booked split as Jack / Brandon / Self">J / B / Self</th>
@@ -346,7 +294,7 @@ export default function SequencesV2() {
                         <td title={`${row.label}${row.leadMagnet ? ` • ${row.leadMagnet}` : ''}`}>
                           <span className="V2Table__seqName">{row.label}</span>
                         </td>
-                        <td className="is-right">{fmtInt(row.messagesSent)}</td>
+                        <td className="is-right">{fmtInt(row.uniqueContacted)}</td>
                         <td className="is-right">{fmtInt(row.repliesReceived)}</td>
                         <td className="is-right">{fmtPct(row.replyRatePct)}</td>
                         <td className="is-right">{fmtInt(row.bookedCalls)}</td>
@@ -361,39 +309,153 @@ export default function SequencesV2() {
               </div>
             </V2Panel>
 
-          <div className="V2QualSummary">
-            <article className="V2QualSummary__cell">
-              <strong>{fmtPct(qualificationSummary.fullTimePct)}</strong>
-              <span>Full-time</span>
-              <small>{fmtPct(qualificationSummary.partTimePct)} part-time</small>
-            </article>
-            <article className="V2QualSummary__cell">
-              <strong>{fmtPct(qualificationSummary.cashPct)}</strong>
-              <span>Revenue mix</span>
-              <small>
-                {fmtPct(qualificationSummary.insurancePct)} insurance · {fmtPct(qualificationSummary.balancedPct)} balanced
-              </small>
-            </article>
-            <article className="V2QualSummary__cell">
-              <strong>{fmtPct(qualificationSummary.highInterestPct)}</strong>
-              <span>Coaching interest</span>
-              <small>
-                {fmtPct(qualificationSummary.mediumInterestPct)} medium · {fmtPct(qualificationSummary.lowInterestPct)} low
-              </small>
-            </article>
-            <article className="V2QualSummary__cell">
-              <strong>Top niches</strong>
-              <span>Incoming interests</span>
-              <div className="V2QualSummary__niches">
-                {qualificationSummary.topNiches.map((niche) => (
-                  <span key={niche.niche} className="V2QualSummary__niche">
-                    {niche.niche}
-                    <strong>{fmtInt(niche.count)}</strong>
-                  </span>
-                ))}
+          <V2Panel
+            title="Booking Attribution Snapshot"
+            caption="Booked-call totals, attribution path breakdowns, and reviewable gaps."
+          >
+            <div className="V2TableWrap V2TableWrap--sequences">
+              <table className="V2Table V2Table--sequences">
+                <thead>
+                  <tr>
+                    <th>Group</th>
+                    <th>Metric</th>
+                    <th className="is-right">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th colSpan={3} style={{ textAlign: 'left', paddingTop: '1rem', paddingBottom: '0.5rem', color: 'var(--v2-text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Volume
+                    </th>
+                  </tr>
+                  <tr>
+                    <td>Volume</td>
+                    <td>Total outbound sent</td>
+                    <td className="is-right">{fmtInt(totals.messagesSent)}</td>
+                  </tr>
+                  <tr>
+                    <td>Volume</td>
+                    <td>Total inbound texts</td>
+                    <td className="is-right">{fmtInt(totals.inboundTexts)}</td>
+                  </tr>
+                  <tr>
+                    <td>Volume</td>
+                    <td>New leads contacted</td>
+                    <td className="is-right">{fmtInt(totals.uniqueContacted)}</td>
+                  </tr>
+                  <tr>
+                    <td>Volume</td>
+                    <td>Leads who replied</td>
+                    <td className="is-right">{fmtInt(totals.repliesReceived)}</td>
+                  </tr>
+
+                  <tr>
+                    <th colSpan={3} style={{ textAlign: 'left', paddingTop: '1rem', paddingBottom: '0.5rem', color: 'var(--v2-text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Attribution path
+                    </th>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>Calls booked</td>
+                    <td className="is-right">{fmtInt(verification.slackBookedTotal ?? 0)}</td>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>Matched to sequence</td>
+                    <td className="is-right">{fmtInt(verification.matchedCalls ?? 0)}</td>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>Manual / direct</td>
+                    <td className="is-right">{fmtInt(verification.manualCalls ?? 0)}</td>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>Unattributed</td>
+                    <td className="is-right" style={{ color: (verification.unattributedCalls ?? 0) > 0 ? 'var(--v2-warning)' : 'inherit' }}>
+                      {fmtInt(verification.unattributedCalls ?? 0)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>Strict SMS reply linked</td>
+                    <td className="is-right">{fmtInt(verification.strictSmsReplyLinkedCalls ?? 0)}</td>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>SMS phone matched</td>
+                    <td className="is-right">{fmtInt(verification.smsPhoneMatchedCalls ?? 0)}</td>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>Fuzzy text matched</td>
+                    <td className="is-right">{fmtInt(verification.fuzzyTextMatchedCalls ?? 0)}</td>
+                  </tr>
+                  <tr>
+                    <td>Attribution</td>
+                    <td>Attribution coverage</td>
+                    <td className="is-right">{fmtPct(verification.attributionConversationMappedPct ?? 0)}</td>
+                  </tr>
+
+                  <tr>
+                    <th colSpan={3} style={{ textAlign: 'left', paddingTop: '1rem', paddingBottom: '0.5rem', color: 'var(--v2-text-muted, #64748b)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      Cross-checks
+                    </th>
+                  </tr>
+                  <tr>
+                    <td>Cross-check</td>
+                    <td>Monday booked</td>
+                    <td className="is-right">{fmtInt(verification.mondayBookedTotal ?? 0)}</td>
+                  </tr>
+                  <tr>
+                    <td>Cross-check</td>
+                    <td>Slack vs Monday delta</td>
+                    <td className="is-right">{fmtInt(verification.deltaBookedVsMonday ?? 0)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </V2Panel>
+
+          {unattributedAuditRows.length > 0 ? (
+            <UnattributedAuditTable rows={unattributedAuditRows} />
+          ) : null}
+
+            {!qualificationQuery.isLoading && !qualificationQuery.isError && qualificationItems.length > 0 ? (
+              <div className="V2QualSummary">
+                <article className="V2QualSummary__cell">
+                  <strong>{fmtPct(qualificationSummary.fullTimePct)}</strong>
+                  <span>Full-time</span>
+                  <small>{fmtPct(qualificationSummary.partTimePct)} part-time</small>
+                </article>
+                <article className="V2QualSummary__cell">
+                  <strong>{fmtPct(qualificationSummary.cashPct)}</strong>
+                  <span>Revenue mix</span>
+                  <small>
+                    {fmtPct(qualificationSummary.insurancePct)} insurance · {fmtPct(qualificationSummary.balancedPct)} balanced
+                  </small>
+                </article>
+                <article className="V2QualSummary__cell">
+                  <strong>{fmtPct(qualificationSummary.highInterestPct)}</strong>
+                  <span>Coaching interest</span>
+                  <small>
+                    {fmtPct(qualificationSummary.mediumInterestPct)} medium · {fmtPct(qualificationSummary.lowInterestPct)} low
+                  </small>
+                </article>
+                <article className="V2QualSummary__cell">
+                  <strong>Top niches</strong>
+                  <span>Incoming interests</span>
+                  <div className="V2QualSummary__niches">
+                    {qualificationSummary.topNiches.map((niche) => (
+                      <span key={niche.niche} className="V2QualSummary__niche">
+                        {niche.niche}
+                        <strong>{fmtInt(niche.count)}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </article>
               </div>
-            </article>
-          </div>
+            ) : null}
           </div>
 
           <V2Panel
@@ -402,6 +464,10 @@ export default function SequencesV2() {
           >
             {qualificationQuery.isLoading ? (
               <V2State kind="loading">Loading qualification breakdown...</V2State>
+            ) : qualificationQuery.isError ? (
+              <V2State kind="error" onRetry={() => void qualificationQuery.refetch()}>
+                Failed to load qualification breakdown.
+              </V2State>
             ) : qualificationItems.length === 0 ? (
               <V2State kind="empty">No qualification breakdown available for this date range.</V2State>
             ) : (

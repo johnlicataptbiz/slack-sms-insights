@@ -2,8 +2,8 @@ import { motion } from 'framer-motion';
 
 interface V2LoadingProps {
   size?: 'sm' | 'md' | 'lg';
-  message?: string;
-  stage?: string;
+  message?: string | undefined;
+  stage?: string | undefined;
   className?: string;
 }
 
@@ -67,7 +67,7 @@ export function V2LoadingOverlay({
 }: Omit<V2LoadingProps, 'size' | 'className'>) {
   return (
     <div className="V2LoadingOverlay">
-      <V2Loading size="lg" message={message} stage={stage} />
+      <V2Loading size="lg" {...(message !== undefined ? { message } : {})} {...(stage !== undefined ? { stage } : {})} />
     </div>
   );
 }

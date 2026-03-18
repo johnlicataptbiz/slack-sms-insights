@@ -67,9 +67,6 @@ import { V2State } from "../components/V2Primitives";
 import { SkeletonText } from "../components/Skeleton";
 import { useToast } from "../hooks/useToast";
 
-// Asset URLs (subtle — inbox is dense, keep assets minimal)
-const arrowDividerUrl = '/assets/sms-kit/arrow_strip_divider.webp';
-
 const LazyEmojiPicker = lazy(async () => ({ default: (await import("emoji-picker-react")).default }));
 
 const parseDateValue = (value: string): Date | null => {
@@ -449,7 +446,10 @@ const MentionTextarea = ({ value, onChange, placeholder, className, inputRef }: 
       setActiveIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
     } else if (event.key === "Enter" || event.key === "Tab") {
       event.preventDefault();
-      applyMention(suggestions[activeIndex]);
+      const selectedSuggestion = suggestions[activeIndex];
+      if (selectedSuggestion) {
+        applyMention(selectedSuggestion);
+      }
     } else if (event.key === "Escape") {
       event.preventDefault();
       setActive(null);
@@ -899,13 +899,11 @@ export default function InboxV2() {
   const detail = detailQuery.data?.data || null;
   const manualContactNameFromDetail =
     detail?.contactCard.name ||
-    detail?.conversation.profile_name ||
-    detail?.conversation.contact_name ||
+    detail?.conversation.contactName ||
     "";
   const manualContactPhoneFromDetail =
     detail?.contactCard.phone ||
-    detail?.conversation.profile_phone ||
-    detail?.conversation.contact_phone ||
+    detail?.conversation.contactPhone ||
     "";
   useEffect(() => {
     setManualContactNameInput(manualContactNameFromDetail);
@@ -1784,13 +1782,14 @@ export default function InboxV2() {
       return;
     }
     try {
+      const eventTs = detail.conversation.lastTouchAt || detail.conversation.lastInboundAt;
       await manualMutation.mutateAsync({
         contactName: manualContactNameInput.trim(),
-        contactPhone: manualContactPhoneInput || undefined,
-        eventTs: detail.conversation.last_touch_at || detail.conversation.last_inbound_at || undefined,
-        line: manualLine.trim() || undefined,
-        notes: manualNotes.trim() || undefined,
+        contactPhone: manualContactPhoneInput.trim() || null,
+        line: manualLine.trim() || null,
+        notes: manualNotes.trim() || null,
         setter: manualSetter,
+        ...(eventTs ? { eventTs } : {}),
       });
       setFlashMessage("Manual Monday booked call created.");
       setManualPanelOpen(false);
@@ -1863,7 +1862,7 @@ export default function InboxV2() {
   };
 
   return (
-    <div className="V2Page V2Inbox V2PageTransition sms-pattern-bg sms-pattern-bg--subtle">
+    <div className="V2Page V2Inbox V2PageTransition V2Page--clean">
       {/* Floating Filter Bar */}
       <div className="V2Inbox__filterBar">
         <div className="V2Inbox__filterGroup">
@@ -2007,8 +2006,6 @@ export default function InboxV2() {
           </label>
         </div>
       </div>
-
-      <img className="sms-section-divider sms-section-divider--compact" src={arrowDividerUrl} alt="" aria-hidden="true" />
 
       <section className="V2Inbox__commandDeck" aria-label="Inbox quick actions">
         <button

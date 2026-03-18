@@ -22,6 +22,7 @@
     "test:monday-sms-sync": "node --import tsx --test tests/services/monday-sms-sync.test.ts",
     "test:monday-sms-sequences": "node --import tsx --test tests/services/monday-sms-sequences.test.ts",
     "test:monday-sms-reports": "node --import tsx --test tests/services/monday-sms-reports.test.ts",
+    "test:outcome-keywords-api": "node --import tsx ./scripts/test-outcome-keywords-api.ts",
     "refresh:booked-attribution": "node --import tsx ./scripts/refresh-booked-call-attribution.ts",
     "regenerate:runs": "node --import tsx ./scripts/regenerate-daily-runs.ts",
     "prisma:generate": "prisma generate --config prisma.config.ts",

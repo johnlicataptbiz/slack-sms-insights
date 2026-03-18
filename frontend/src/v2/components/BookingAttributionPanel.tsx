@@ -9,14 +9,10 @@ interface BookingAttributionPanelProps {
   mode: string;
 }
 
-const fmtInt = (value: number) => value.toLocaleString();
-
 export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel }: BookingAttributionPanelProps) {
   const navigate = useNavigate();
 
   if (!bookedCredit) return null;
-
-  const fallbackMatches = attribution?.smsPhoneMatchedCalls ?? 0;
 
   return (
     <V2Panel title="Booking Attribution" caption={`How ${modeLabel} bookings are being credited and sourced.`}>
@@ -67,11 +63,6 @@ export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel }
         })}
       </div>
 
-      {fallbackMatches > 0 && (
-        <div className="V2InlineWarning" style={{ marginTop: '1rem' }}>
-          Fallback SMS matches ({fmtInt(fallbackMatches)}) are powering attribution for some calls; Slack reactions remain the trusted source.
-        </div>
-      )}
     </V2Panel>
   );
 }

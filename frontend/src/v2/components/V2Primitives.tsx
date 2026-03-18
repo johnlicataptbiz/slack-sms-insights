@@ -113,14 +113,6 @@ export function V2PageHeader({
       transition={{ duration: 0.4, ease: easing.smooth }}
     >
       <div>
-        <motion.p
-          className="V2PageHeader__eyebrow"
-          initial={{ opacity: 0, x: -10 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, delay: 0.1 }}
-        >
-          PT Biz Setter Ops
-        </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}

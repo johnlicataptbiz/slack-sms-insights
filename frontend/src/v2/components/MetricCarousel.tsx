@@ -54,7 +54,8 @@ export function MetricCarousel({
 
   if (slides.length === 0) return null;
 
-  const slide = slides[currentSlide];
+  const slide = slides[currentSlide] ?? slides[0];
+  if (!slide) return null;
 
   const getTrendIcon = () => {
     switch (slide.trend) {

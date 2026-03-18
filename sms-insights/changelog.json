@@ -1,8 +1,17 @@
 {
-  "generatedAt": "2026-03-18T00:35:08.732Z",
+  "generatedAt": "2026-03-18T13:16:45.978Z",
   "daysIncluded": 365,
-  "totalCount": 382,
+  "totalCount": 383,
   "entries": [
+    {
+      "hash": "d451796",
+      "date": "2026-03-17T19:35:28-05:00",
+      "message": "feat: implement Date Held and Advisor parsing from HubSpot Slack attachments",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Implement Date Held and Advisor parsing from HubSpot Slack attachments"
+    },
     {
       "hash": "a3f8f2a",
       "date": "2026-03-17T18:55:51-05:00",

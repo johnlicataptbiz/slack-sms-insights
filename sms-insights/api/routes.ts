@@ -86,6 +86,7 @@ import {
   parseScope,
 } from '../services/monday-governed-analytics.js';
 import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
+import { getOutcomeKeywordAnalytics } from '../services/outcome-keyword-analytics.js';
 import { createManualMondayBookedCall } from '../services/monday-personal-writeback.js';
 import { syncMondaySmsBoard, listMondaySmsSyncBoardIds } from '../services/monday-sms-sync.js';
 import { syncMondaySmsSequencesBoard, listMondaySmsSequencesSyncBoardIds } from '../services/monday-sms-sequences.js';
@@ -4289,6 +4290,80 @@ const handleGetMondayLeadInsightsV2: RequestHandler = async (req, res, logger, o
   }
 };
 
+const handleGetOutcomeKeywordAnalyticsV2: RequestHandler = async (req, res, logger, origin) => {
+  const url = new URL(req.url || '', `http://${req.headers.host}`);
+  let resolved: ReturnType<typeof resolveMetricsRange>;
+  try {
+    resolved = resolveMetricsRange({
+      from: url.searchParams.get('from'),
+      to: url.searchParams.get('to'),
+      day: url.searchParams.get('day'),
+      range: url.searchParams.get('range') ?? '30d',
+      tz: url.searchParams.get('tz'),
+    });
+  } catch (error) {
+    return sendJson(res, 400, { error: error instanceof Error ? error.message : 'Invalid range query' }, origin);
+  }
+
+  const directionRaw = (url.searchParams.get('direction') || 'inbound').trim().toLowerCase();
+  const direction =
+    directionRaw === 'inbound' || directionRaw === 'outbound' || directionRaw === 'all'
+      ? directionRaw
+      : null;
+  if (!direction) {
+    return sendJson(res, 400, { error: 'direction must be one of: inbound, outbound, all' }, origin);
+  }
+
+  const minConversationsRaw = Number.parseInt(url.searchParams.get('minConversations') || '2', 10);
+  const limitPerOutcomeRaw = Number.parseInt(url.searchParams.get('limitPerOutcome') || '12', 10);
+  const minWordsRaw = Number.parseInt(url.searchParams.get('minWords') || '1', 10);
+  const maxWordsRaw = Number.parseInt(url.searchParams.get('maxWords') || '2', 10);
+  const minConversations = Number.isFinite(minConversationsRaw) ? Math.max(1, Math.min(100, minConversationsRaw)) : 2;
+  const limitPerOutcome = Number.isFinite(limitPerOutcomeRaw) ? Math.max(1, Math.min(50, limitPerOutcomeRaw)) : 12;
+  const minWords = Number.isFinite(minWordsRaw) ? Math.max(1, Math.min(5, minWordsRaw)) : 1;
+  const maxWords = Number.isFinite(maxWordsRaw) ? Math.max(1, Math.min(5, maxWordsRaw)) : 2;
+
+  if (minWords > maxWords) {
+    return sendJson(res, 400, { error: 'minWords cannot be greater than maxWords' }, origin);
+  }
+
+  try {
+    const data = await getOutcomeKeywordAnalytics(
+      {
+        from: resolved.from.toISOString(),
+        to: resolved.to.toISOString(),
+        direction,
+        minConversations,
+        limitPerOutcome,
+        minWords,
+        maxWords,
+      },
+      logger,
+    );
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
+  } catch (error) {
+    logger?.error('Failed to fetch outcome keyword analytics:', error);
+    sendJson(
+      res,
+      500,
+      {
+        error: 'Failed to fetch outcome keyword analytics',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      origin,
+    );
+  }
+};
+
 const handleGetMondaySmsSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
   const boardIds = listMondaySmsSyncBoardIds();
   sendJson(res, 200, { boardIds }, origin);
@@ -4809,11 +4884,13 @@ const apiRoutes: ApiRoute[] = [
   { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },
   { method: 'GET', path: '/api/v2/admin/audit-logs', handler: handleGetAuditLogsV2 },
   { method: 'GET', path: '/api/v2/admin/cron-status', handler: handleGetCronStatus },
+  { method: 'GET', path: '/api/v2/admin/analytics/outcome-keywords', handler: handleGetOutcomeKeywordAnalyticsV2 },
   { method: 'GET', path: '/api/v2/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
   { method: 'GET', path: '/api/v2/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
   { method: 'GET', path: '/api/v2/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
   { method: 'POST', path: '/api/v2/monday/manual-booked-call', handler: handlePostManualBookedCallV2 },
   { method: 'GET', path: '/api/admin/cron-status', handler: handleGetCronStatus },
+  { method: 'GET', path: '/api/admin/analytics/outcome-keywords', handler: handleGetOutcomeKeywordAnalyticsV2 },
   { method: 'GET', path: '/api/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
   { method: 'GET', path: '/api/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
   { method: 'GET', path: '/api/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },

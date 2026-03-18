@@ -1,4 +1,4 @@
-# Monday.com Board Redesign Plan (Database-Aligned, Workflow-First)
+  Monday.com Board Redesign Plan (Database-Aligned, Workflow-First)
 
 ## 1) Audit Summary: What data exists and how it flows
 

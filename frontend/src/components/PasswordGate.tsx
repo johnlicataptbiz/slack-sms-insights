@@ -43,11 +43,12 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
     <main className="PasswordGate PasswordGate--minimal">
       <div className="PasswordGate__card PasswordGate__card--minimal">
         <div className="PasswordGate__textBlock">
-          <p className="PasswordGate__eyebrow">PT Biz SMS Insights</p>
-          <h1>Command Center</h1>
-          <p className="PasswordGate__description">
-            Enter the secure dashboard password to continue. Sessions stay in your browser while you keep the box checked below.
-          </p>
+          <img
+            className="PasswordGate__logo"
+            src="/assets/sms-kit/ptbiz_sms_logo_badge.png"
+            alt="PT Biz SMS"
+          />
+          <h1>Enter password</h1>
         </div>
 
         <form className="PasswordGate__form" onSubmit={handleSubmit}>
@@ -88,12 +89,8 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
               onChange={(event) => setStayLoggedIn(event.target.checked)}
               disabled={isSubmitting}
             />
-            Stay logged in on this device
+            Keep me signed in
           </label>
-
-          <p className="PasswordGate__footer">
-            Access is logged to keep the dashboard secure.
-          </p>
         </form>
       </div>
     </main>

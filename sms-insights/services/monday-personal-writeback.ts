@@ -452,6 +452,15 @@ const addColumnValue = (
   const column = columnsById.get(columnId);
   if (!column) return;
 
+  // Skip read-only and unsettable column types to prevent batch mutation failures.
+  // board_relation: requires linked item IDs, not free-form values.
+  // mirror / lookup: computed from linked boards, read-only.
+  // formula: computed, read-only.
+  // name: item name is set via the rename mutation in upsertBookedCallItem, not here.
+  // checkbox: only accepts boolean true/false, not text strings.
+  const SKIP_TYPES = new Set(["board_relation", "mirror", "lookup", "formula", "name", "checkbox"]);
+  if (SKIP_TYPES.has(column.type)) return;
+
   if (options?.isDate || column.type.includes("date")) {
     out[columnId] = { date: value };
     return;
@@ -501,7 +510,9 @@ const addColumnValue = (
   out[columnId] = value;
 };
 
-const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
+export const buildUpdateMarkdown = (
+  source: BookedCallAttributionSource,
+): string => {
   const setter = formatSetter(source.bucket);
   const contactName = normalizeContactName(source.contactName);
   const lines = [
@@ -520,13 +531,13 @@ const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
   return lines.join("\n");
 };
 
-const buildItemName = (source: BookedCallAttributionSource): string => {
+export const buildItemName = (source: BookedCallAttributionSource): string => {
   const contactName = normalizeContactName(source.contactName);
   const who = contactName || "Booked Call";
   return who; // Just the name, no date suffix
 };
 
-const loadBoardMapping = async (
+export const loadBoardMapping = async (
   boardId: string,
   logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
 ): Promise<{
@@ -556,7 +567,7 @@ const loadBoardMapping = async (
   };
 };
 
-const toColumnValues = (
+export const toColumnValues = (
   source: BookedCallAttributionSource,
   mapping: PersonalBoardColumnMapping,
   columnsById: Map<string, MondayBoardColumn>,

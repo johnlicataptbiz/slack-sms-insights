@@ -32,6 +32,8 @@ type PersonalBoardColumnMapping = {
   sourceColumnId: string | null;
   slackLinkColumnId: string | null;
   notesColumnId: string | null;
+  dateHeldColumnId: string | null; // Appointment date from HubSpot
+  advisorColumnId: string | null; // Contact owner from HubSpot
 };
 
 const parseJsonMapping = (raw: string | undefined): unknown => {
@@ -68,6 +70,8 @@ const inferPersonalMapping = (columns: MondayBoardColumn[]): PersonalBoardColumn
   sourceColumnId: findColumnBySignals(columns, ['source type', 'source', 'origin']),
   slackLinkColumnId: findColumnBySignals(columns, ['slack', 'thread link', 'link']),
   notesColumnId: findColumnBySignals(columns, ['notes', 'summary', 'details']),
+  dateHeldColumnId: findColumnBySignals(columns, ['date held', 'appointment date', 'appt date']),
+  advisorColumnId: findColumnBySignals(columns, ['advisor', 'contact owner', 'owner']),
 });
 
 const asNullableString = (value: unknown): string | null => {
@@ -89,6 +93,8 @@ const coercePersonalMapping = (value: unknown): PersonalBoardColumnMapping | nul
     sourceColumnId: asNullableString(row.sourceColumnId),
     slackLinkColumnId: asNullableString(row.slackLinkColumnId),
     notesColumnId: asNullableString(row.notesColumnId),
+    dateHeldColumnId: asNullableString(row.dateHeldColumnId),
+    advisorColumnId: asNullableString(row.advisorColumnId),
   };
 };
 
@@ -112,6 +118,8 @@ const mergeMappings = (
     sourceColumnId: persisted.sourceColumnId || inferred.sourceColumnId,
     slackLinkColumnId: persisted.slackLinkColumnId || inferred.slackLinkColumnId,
     notesColumnId: persisted.notesColumnId || inferred.notesColumnId,
+    dateHeldColumnId: persisted.dateHeldColumnId || inferred.dateHeldColumnId,
+    advisorColumnId: persisted.advisorColumnId || inferred.advisorColumnId,
   };
 };
 
@@ -131,6 +139,8 @@ const mergePersonalOverrides = (
     sourceColumnId: override.sourceColumnId || base.sourceColumnId,
     slackLinkColumnId: override.slackLinkColumnId || base.slackLinkColumnId,
     notesColumnId: override.notesColumnId || base.notesColumnId,
+    dateHeldColumnId: override.dateHeldColumnId || base.dateHeldColumnId,
+    advisorColumnId: override.advisorColumnId || base.advisorColumnId,
   };
 };
 
@@ -196,6 +206,93 @@ const slackPermalink = (channelId: string, messageTs: string): string => {
 const resolveCallDate = (eventTs: string): string => {
   const tz = (process.env.ALOWARE_REPORT_TIMEZONE || '').trim() || DEFAULT_BUSINESS_TIMEZONE;
   return dayKeyInTimeZone(eventTs, tz) || eventTs.slice(0, 10);
+};
+
+/**
+ * Converts M/D/YY or M/D/YYYY date format to YYYY-MM-DD
+ * Examples: "3/17/26" → "2026-03-17", "12/1/2025" → "2025-12-01"
+ */
+const parseMDYDate = (value: string | null): string | null => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const match = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!match) return null;
+  
+  const month = match[1].padStart(2, '0');
+  const day = match[2].padStart(2, '0');
+  let year = match[3];
+  
+  // Convert 2-digit year to 4-digit (assume 20xx for now)
+  if (year.length === 2) {
+    year = `20${year}`;
+  }
+  
+  return `${year}-${month}-${day}`;
+};
+
+/**
+ * Extracts fallback field value from Slack attachment structure
+ * Same logic as parseFallbackField from booked-calls.ts
+ */
+const parseFallbackField = (fallback: string, label: string): string | null => {
+  if (!fallback) return null;
+  const pattern = new RegExp(`\\*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\*:\\s*(.*)$`, 'im');
+  const match = fallback.match(pattern);
+  const value = (match?.[1] || '')
+    .trim()
+    .replace(/<mailto:[^|>]+\|([^>]+)>/gi, '$1')
+    .replace(/<[^|>]+\|([^>]+)>/g, '$1');
+  return value.length > 0 ? value : null;
+};
+
+/**
+ * Extracts fallback string from raw Slack message attachments
+ */
+const fallbackFromRaw = (raw: unknown): string => {
+  if (!raw || typeof raw !== 'object') return '';
+  const typed = raw as { attachments?: Array<{ fallback?: string }> };
+  const first = Array.isArray(typed.attachments) ? typed.attachments[0] : null;
+  if (!first) return '';
+  return String(first.fallback || '');
+};
+
+/**
+ * Parse "Date Held" (appointment date) from HubSpot data in Slack attachment
+ * Looks for "Next Activity Date" or "Date of last meeting booked" fields
+ * Returns YYYY-MM-DD format or null
+ */
+const parseDateHeldFromSlackRaw = (raw: unknown): string | null => {
+  const fallback = fallbackFromRaw(raw);
+  if (!fallback) return null;
+  
+  // Try "Next Activity Date" first (most common)
+  const nextActivity = parseFallbackField(fallback, 'Next Activity Date');
+  if (nextActivity) {
+    const parsed = parseMDYDate(nextActivity);
+    if (parsed) return parsed;
+  }
+  
+  // Fallback to "Date of last meeting booked"
+  const lastMeeting = parseFallbackField(fallback, 'Date of last meeting booked');
+  if (lastMeeting) {
+    const parsed = parseMDYDate(lastMeeting);
+    if (parsed) return parsed;
+  }
+  
+  return null;
+};
+
+/**
+ * Parse "Advisor" (contact owner) from HubSpot data in Slack attachment
+ * Looks for "Contact owner" field
+ * Returns owner name or null
+ */
+const parseAdvisorFromSlackRaw = (raw: unknown): string | null => {
+  const fallback = fallbackFromRaw(raw);
+  if (!fallback) return null;
+  
+  const owner = parseFallbackField(fallback, 'Contact owner');
+  return owner || null;
 };
 
 const setterMondayUserId = Number.parseInt((process.env.MONDAY_PERSONAL_SETTER_MONDAY_USER_ID || '').trim(), 10);
@@ -335,6 +432,14 @@ const toColumnValues = (
       .filter(Boolean)
       .join('\n'),
   );
+  
+  // NEW: Parse Date Held and Advisor from HubSpot data
+  const dateHeld = parseDateHeldFromSlackRaw(source.raw);
+  addColumnValue(values, columnsById, mapping.dateHeldColumnId, dateHeld, { isDate: true });
+  
+  const advisor = parseAdvisorFromSlackRaw(source.raw);
+  addColumnValue(values, columnsById, mapping.advisorColumnId, advisor);
+  
   return values;
 };
 

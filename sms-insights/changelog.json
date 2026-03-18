@@ -1,8 +1,53 @@
 {
-  "generatedAt": "2026-03-17T23:30:10.839Z",
+  "generatedAt": "2026-03-18T00:35:08.732Z",
   "daysIncluded": 365,
-  "totalCount": 374,
+  "totalCount": 382,
   "entries": [
+    {
+      "hash": "a3f8f2a",
+      "date": "2026-03-17T18:55:51-05:00",
+      "message": "fix: Remove date suffix from booked call item names (for real this time)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Remove date suffix from booked call item names (for real this time)"
+    },
+    {
+      "hash": "109f034",
+      "date": "2026-03-17T18:54:39-05:00",
+      "message": "fix: add missing 'raw' property to buildManualSource",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add missing 'raw' property to buildManualSource"
+    },
+    {
+      "hash": "f61047e",
+      "date": "2026-03-17T18:50:49-05:00",
+      "message": "fix: revert schema changes to make fields optional",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Revert schema changes to make fields optional"
+    },
+    {
+      "hash": "de5cc4c",
+      "date": "2026-03-17T18:43:53-05:00",
+      "message": "Refactor schema and add new services for Monday.com integration",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Refactor schema and add new services for Monday.com integration"
+    },
+    {
+      "hash": "3e30b84",
+      "date": "2026-03-17T18:32:15-05:00",
+      "message": "fix: Force rebuild to ensure latest code is deployed",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Force rebuild to ensure latest code is deployed"
+    },
     {
       "hash": "4c8adc9",
       "date": "2026-03-17T18:21:32-05:00",
@@ -47,6 +92,15 @@
       "type": "fix",
       "category": "Integrations",
       "description": "Fix Monday.com sync: Use valid status column values"
+    },
+    {
+      "hash": "219d24a",
+      "date": "2026-03-17T02:45:20Z",
+      "message": "chore(project): proceed with setup tasks",
+      "author": "Blackbox Agent",
+      "type": "chore",
+      "category": "General",
+      "description": "Proceed with setup tasks"
     },
     {
       "hash": "fb75ed9",
@@ -140,6 +194,15 @@
     },
     {
       "hash": "6bb8c91",
+      "date": "2026-03-14T08:45:22-05:00",
+      "message": "feat(login): replace carousel with pattern header, image-based Type Motion submit button",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "Replace carousel with pattern header, image-based Type Motion submit button"
+    },
+    {
+      "hash": "8f6ac9a",
       "date": "2026-03-14T08:45:22-05:00",
       "message": "feat(login): replace carousel with pattern header, image-based Type Motion submit button",
       "author": "Jack Licata",
@@ -470,6 +533,15 @@
       "type": "fix",
       "category": "Dashboard",
       "description": "Restore dashboard auth gate"
+    },
+    {
+      "hash": "8f17c0b",
+      "date": "2026-03-10T04:42:57Z",
+      "message": "Set up Vercel Web Analytics integration",
+      "author": "Vercel",
+      "type": "other",
+      "category": "Dashboard",
+      "description": "Set up Vercel Web Analytics integration"
     },
     {
       "hash": "730b1e9",

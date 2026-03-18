@@ -88,22 +88,26 @@ postgresql://postgres:<password>@postgres.railway.internal:5432/railway
 
 ## 4. Dashboard Authentication
 
+The dashboard uses **password-based** authentication. Users enter a shared password; the backend creates a server-side session on success.
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DASHBOARD_AUTH_REDIRECT_URI` | **yes** | — | OAuth callback URL. Must be registered in Slack app redirect URL list. |
-| `DASHBOARD_AUTH_SUCCESS_URL` | **yes** | — | Where the frontend redirects after successful login. |
-| `DASHBOARD_OAUTH_USER_SCOPES` | no | `users:read` | Slack OAuth user scopes to request. |
-| `ALLOW_DUMMY_AUTH_TOKEN` | no | `false` | Set `true` to bypass Slack OAuth locally with a static test token. **Never use in production.** |
+| `DASHBOARD_PASSWORD` | **yes** | — | Shared password for dashboard login. Required in production at startup. |
+| `STREAM_TOKEN_SECRET` | **yes** | — | Secret used to sign short-lived realtime stream tokens. Required in production. |
+| `ALLOW_DUMMY_AUTH_TOKEN` | no | `false` | Set `true` to bypass password auth locally with a static test token. **Never use in production.** |
+| `DASHBOARD_PERSIST_SESSION_TTL_SECONDS` | no | `2592000` (30 days) | Session TTL when "stay logged in" is selected. |
 
 ### Values by environment
 
 | Variable | Local | Production |
 |----------|-------|-----------|
-| `DASHBOARD_AUTH_REDIRECT_URI` | `http://localhost:3000/api/oauth/callback` | `https://your-railway-app.up.railway.app/api/oauth/callback` |
-| `DASHBOARD_AUTH_SUCCESS_URL` | `http://localhost:5173` | `https://your-project.vercel.app` |
-| `ALLOW_DUMMY_AUTH_TOKEN` | `true` | `false` |
+| `DASHBOARD_PASSWORD` | any test value | strong secret required |
+| `STREAM_TOKEN_SECRET` | any test value | strong secret required |
+| `ALLOW_DUMMY_AUTH_TOKEN` | `true` | `false` (must not be set) |
 
-> The redirect URI must be added to your Slack app under **OAuth & Permissions → Redirect URLs**.
+> **Security:** Both `DASHBOARD_PASSWORD` and `STREAM_TOKEN_SECRET` must be set in production. The app will refuse to start if either is missing.
+
+> **Deprecated:** Slack OAuth endpoints (`/api/oauth/start`, `/api/oauth/callback`) still exist but redirect to the password login flow. The env vars `DASHBOARD_AUTH_REDIRECT_URI`, `DASHBOARD_AUTH_SUCCESS_URL`, and `DASHBOARD_OAUTH_USER_SCOPES` are no longer required.
 
 ---
 

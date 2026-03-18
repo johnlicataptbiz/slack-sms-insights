@@ -42,7 +42,6 @@
   },
   "oauth_config": {
     "redirect_urls": [
-      "https://localhost:3000/api/oauth/callback",
       "https://ptbizsms.com/api/oauth/callback"
     ],
     "scopes": {

@@ -184,7 +184,7 @@ slack-sms-insights/
 | Tables | TanStack Table v8 | Headless table logic |
 | Animation | Framer Motion | UI transitions |
 | AI | OpenAI (via `ai` SDK) | AI-assisted SMS drafting |
-| Auth | Slack OAuth 2.0 | Dashboard authentication |
+| Auth | Password (session cookie) | Dashboard authentication |
 | CRM sync | Monday.com API | Lead management & call tracking |
 | SMS platform | Aloware API | SMS campaign data source |
 | CRM | HubSpot API | Contact enrichment |
@@ -210,16 +210,17 @@ slack-sms-insights/
 
 ## 🔐 Authentication
 
-The dashboard uses **Slack OAuth 2.0** for authentication:
+The dashboard uses **password-based** authentication:
 
-1. User clicks "Sign in with Slack" on the dashboard
-2. Redirected to Slack OAuth (`GET /api/oauth/start`)
-3. Slack redirects back with an auth code (`GET /api/oauth/callback`)
-4. Backend exchanges code for a user token and creates a session
-5. Frontend verifies session via `GET /api/auth/verify` on each load
-6. CSRF tokens are required for protected write operations
+1. User visits the dashboard and enters the shared `DASHBOARD_PASSWORD`
+2. Backend validates the password and creates a server-side session (`POST /api/auth/password`)
+3. A session cookie is set; the frontend stores the CSRF token returned in the response
+4. Frontend verifies session via `GET /api/auth/verify` on each load
+5. CSRF tokens are required for protected write operations
 
-> **Local development:** Set `ALLOW_DUMMY_AUTH_TOKEN=true` in `.env` to bypass OAuth and use a static test token.
+> **Local development:** Set `ALLOW_DUMMY_AUTH_TOKEN=true` in `.env` to bypass password auth and use a static test token. **Never use in production.**
+
+> **Note:** Slack OAuth endpoints (`/api/oauth/start`, `/api/oauth/callback`) exist in the codebase but are deprecated. They redirect to the password login flow.
 
 ## 📊 Data Flow
 
@@ -457,11 +458,9 @@ cp .env.example .env
 | `SLACK_BOT_TOKEN` | Slack bot OAuth token (`xoxb-...`) |
 | `SLACK_APP_TOKEN` | Slack app-level token for Socket Mode (`xapp-...`) |
 | `SLACK_SIGNING_SECRET` | Slack request signing secret |
-| `SLACK_CLIENT_ID` | Slack OAuth app client ID |
-| `SLACK_CLIENT_SECRET` | Slack OAuth app client secret |
 | `OPENAI_API_KEY` | OpenAI API key for AI drafting |
-| `DASHBOARD_AUTH_REDIRECT_URI` | OAuth callback URL |
-| `DASHBOARD_AUTH_SUCCESS_URL` | Post-login redirect URL |
+| `DASHBOARD_PASSWORD` | Shared password for dashboard login |
+| `STREAM_TOKEN_SECRET` | Secret used to sign realtime stream tokens |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins |
 
 **Optional integrations:**

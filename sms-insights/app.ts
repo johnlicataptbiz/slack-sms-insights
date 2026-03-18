@@ -28,6 +28,9 @@ const assertStartupSecurityConfig = (): void => {
     throw new Error('ALLOW_DUMMY_AUTH_TOKEN cannot be enabled in production.');
   }
   assertStreamTokenSecretConfigured();
+  if (isProduction() && !(process.env.DASHBOARD_PASSWORD || '').trim()) {
+    throw new Error('DASHBOARD_PASSWORD is required in production.');
+  }
 };
 
 type SlackStartupErrorLike = {

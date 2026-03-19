@@ -262,6 +262,26 @@ export const getConversationState = async (
   try {
     const result = await prisma.conversation_state.findUnique({
       where: { conversation_id: conversationId },
+      select: {
+        conversation_id: true,
+        qualification_full_or_part_time: true,
+        qualification_niche: true,
+        qualification_revenue_mix: true,
+        qualification_delivery_model: true,
+        qualification_coaching_interest: true,
+        qualification_progress_step: true,
+        escalation_level: true,
+        escalation_reason: true,
+        escalation_overridden: true,
+        last_podcast_sent_at: true,
+        next_followup_due_at: true,
+        cadence_status: true,
+        objection_tags: true,
+        guardrail_override_count: true,
+        call_outcome: true,
+        created_at: true,
+        updated_at: true,
+      },
     });
     return result as unknown as ConversationStateRow | null;
   } catch (err) {

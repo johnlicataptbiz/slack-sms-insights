@@ -1,8 +1,44 @@
 {
-  "generatedAt": "2026-03-19T19:49:04.373Z",
+  "generatedAt": "2026-03-19T23:41:44.306Z",
   "daysIncluded": 365,
-  "totalCount": 405,
+  "totalCount": 409,
   "entries": [
+    {
+      "hash": "4b86d6b",
+      "date": "2026-03-19T15:18:52-05:00",
+      "message": "fix(vercel): replace symlink with real JSON, remove stale alias and npm ci",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Replace symlink with real JSON, remove stale alias and npm ci"
+    },
+    {
+      "hash": "8d3586f",
+      "date": "2026-03-19T14:57:33-05:00",
+      "message": "style: biome formatter rewrites across backend services",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "UI/UX",
+      "description": "Biome formatter rewrites across backend services"
+    },
+    {
+      "hash": "28439a2",
+      "date": "2026-03-19T14:56:35-05:00",
+      "message": "fix(ci): firebase chunk + test-backend DATABASE_URL and lint bypass",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Firebase chunk + test-backend DATABASE_URL and lint bypass"
+    },
+    {
+      "hash": "373bdc7",
+      "date": "2026-03-19T14:49:31-05:00",
+      "message": "fix(ci): fix TS build errors, add gitleaks allowlist, upgrade workflows to Node 22",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Fix TS build errors, add gitleaks allowlist, upgrade workflows to Node 22"
+    },
     {
       "hash": "a16fb84",
       "date": "2026-03-19T12:25:46-05:00",

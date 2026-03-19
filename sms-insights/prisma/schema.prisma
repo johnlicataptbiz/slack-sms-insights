@@ -103,6 +103,7 @@ model Conversation {
   @@index([contactKey], map: "idx_conversations_contact_key")
   @@index([nextFollowupAt], map: "idx_conversations_next_followup_due")
   @@index([current_rep_id, last_touch_at(sort: Desc)], map: "idx_conversations_rep_last_touch")
+  @@index([current_rep_id, status, last_touch_at(sort: Desc)], map: "idx_conversations_rep_status_touch")
   @@index([status], map: "idx_conversations_status")
   @@map("conversations")
 }
@@ -370,6 +371,8 @@ model inbox_contact_profiles {
   @@index([contact_key], map: "idx_inbox_contact_profiles_contact_key")
   @@index([last_engagement_at(sort: Desc)], map: "idx_inbox_contact_profiles_last_engagement_at")
   @@index([lead_source], map: "idx_inbox_contact_profiles_lead_source")
+  @@index([lead_source, last_engagement_at(sort: Desc)], map: "idx_inbox_profiles_source_engagement")
+  @@index([text_authorized, is_blocked, last_engagement_at(sort: Desc)], map: "idx_inbox_profiles_auth_blocked_engagement")
   @@index([sequence_id], map: "idx_inbox_contact_profiles_sequence_id")
 }
 
@@ -536,6 +539,7 @@ model monday_metric_facts {
 
   @@id([board_id, item_id, metric_name, item_updated_at])
   @@index([board_id, metric_date(sort: Desc)], map: "idx_monday_metric_facts_board_date")
+  @@index([metric_name, board_id, metric_date(sort: Desc)], map: "idx_monday_facts_metric_board_date")
   @@index([metric_name, metric_date(sort: Desc)], map: "idx_monday_metric_facts_metric_name_date")
   @@index([metric_owner, metric_date(sort: Desc)], map: "idx_monday_metric_facts_owner_date")
 }

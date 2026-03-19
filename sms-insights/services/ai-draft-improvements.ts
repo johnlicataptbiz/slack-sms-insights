@@ -133,8 +133,18 @@ export async function getHighPerformingTemplates(limit = 10): Promise<
 > {
   const prisma = getPrisma();
 
+  interface TemplatePerformanceRow {
+    body: string;
+    sequence: string | null;
+    sent_count: bigint;
+    reply_count: bigint;
+    booking_count: bigint;
+    reply_rate: string | null;
+    booking_rate: string | null;
+  }
+
   // Find outbound messages that led to replies or bookings
-  const rows = await prisma.$queryRawUnsafe<any[]>(
+  const rows = await prisma.$queryRawUnsafe<TemplatePerformanceRow[]>(
     `
     WITH outbound_performance AS (
       SELECT
@@ -178,8 +188,8 @@ export async function getHighPerformingTemplates(limit = 10): Promise<
 
   return rows.map((row) => ({
     body: row.body,
-    replyRate: Number.parseFloat(row.reply_rate) || 0,
-    bookingRate: Number.parseFloat(row.booking_rate) || 0,
+    replyRate: Number.parseFloat(row.reply_rate ?? '') || 0,
+    bookingRate: Number.parseFloat(row.booking_rate ?? '') || 0,
     sequence: row.sequence,
   }));
 }

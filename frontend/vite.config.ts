@@ -48,6 +48,9 @@ export default defineConfig({
           'vendor-query': ['@tanstack/react-query'],
           'vendor-motion': ['framer-motion'],
           'vendor-ui': ['sonner', 'clsx', 'tailwind-merge'],
+          'vendor-firebase': ['firebase'],
+          'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
+          'vendor-charts': ['recharts'],
           // App chunks
           'v2-pages': [
             './src/v2/pages/InsightsV2.tsx',

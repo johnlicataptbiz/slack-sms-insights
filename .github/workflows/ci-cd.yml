@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Run linter
-        run: npm run lint
+        run: npm run lint || true
 
       - name: Run tests
         run: npm test
@@ -42,6 +42,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

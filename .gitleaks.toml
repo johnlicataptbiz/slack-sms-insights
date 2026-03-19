@@ -1,0 +1,31 @@
+title = "Gitleaks Configuration"
+
+[allowlist]
+  description = "Known historical findings — credentials were rotated and files replaced with env-var lookups"
+  commits = [
+    # Initial monorepo commit: contained dev key files (sms-insights/services/openapikey,
+    # sms-insights/services/slack keys). Files deleted in 7f3f8e552236383b2746004002f10cd573b7a86c.
+    "678ba7fd25ccf8406528fc3c1ff1c5bd559aba6c",
+
+    # post-test-cards.py had hardcoded xoxb-... bot token.
+    # Replaced with os.getenv("SLACK_BOT_TOKEN", "") in a later commit.
+    "857c53def3857390f7bc55c086712259c9eee12c",
+
+    # firebase.ts had inline Firebase project config (apiKey, appId, etc.).
+    # Firebase Web API keys are public client identifiers, not secrets.
+    # Replaced with VITE_FIREBASE_* env vars in a later commit.
+    "a9e11f15c2f5d37614340f694172682c2785e845",
+
+    # docs/planning/implementation_plan.md — example JWT/API key strings in docs.
+    "0e80c7957d0ab983b21c0d1cdbb72bac6912d57f",
+
+    # sms-insights/scripts/verify-database-migration.ts — example connection string in script.
+    "42af26bdea5f7fd6be88c633b19778040ccd2cc3",
+
+    # frontend/src/v2/components/SequencePerformanceTable.tsx — false positive generic-api-key rule.
+    "1caa30a6665ae7e16d44ba1a3f534f74ec37e7a4",
+    "a222b7705d68a13aa734d58c22b547a8b31302bd",
+
+    # frontend/src/v2/pages/SequencesV2.tsx — false positive generic-api-key rule.
+    "3d645523f049f7e7445ae78b34605716a3ce8dd5",
+  ]

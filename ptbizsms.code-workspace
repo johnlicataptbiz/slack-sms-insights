@@ -1,7 +1,28 @@
 {
   "folders": [
     {
-      "path": ".",
+      "name": "Root",
+      "path": "."
     },
+    {
+      "name": "Frontend",
+      "path": "frontend"
+    },
+    {
+      "name": "Backend",
+      "path": "sms-insights"
+    },
+    {
+      "name": "Slack Workflow",
+      "path": "sms-insights-workflow"
+    }
   ],
+  "settings": {
+    "git.ignoreLimitWarning": true,
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.git": true
+    }
+  }
 }

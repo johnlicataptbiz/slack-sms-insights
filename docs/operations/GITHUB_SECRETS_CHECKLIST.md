@@ -29,7 +29,7 @@ gh secret list -R jacklicata/slack-sms-insights
 
 ### 2. Manual Verification
 
-1. Go to: https://github.com/jacklicata/slack-sms-insights/settings/secrets/actions
+1. Go to: [GitHub Secrets Settings](https://github.com/jacklicata/slack-sms-insights/settings/secrets/actions)
 2. Verify all 4 secrets are listed:
    - [ ] `RAILWAY_TOKEN`
    - [ ] `VERCEL_TOKEN`

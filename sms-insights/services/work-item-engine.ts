@@ -48,9 +48,9 @@ export const upsertNeedsReplyWorkItem = async (
 
     // Ensure only one open needs_reply per conversation.
     // We can use updateMany to try to update an existing open item.
-    // Note: for returning the updated row, updateMany doesn't help. 
+    // Note: for returning the updated row, updateMany doesn't help.
     // We'll use a transaction to find and update/create.
-    
+
     return await prisma.$transaction(async (tx) => {
       const existing = await tx.work_items.findFirst({
         where: {
@@ -65,7 +65,7 @@ export const upsertNeedsReplyWorkItem = async (
           where: { id: existing.id },
           data: {
             rep_id: existing.rep_id || conversation.current_rep_id,
-            severity: (severity === 'high' || existing.severity === 'high') ? 'high' : 'med',
+            severity: severity === 'high' || existing.severity === 'high' ? 'high' : 'med',
             due_at: existing.due_at < dueAt ? existing.due_at : dueAt,
           },
         });

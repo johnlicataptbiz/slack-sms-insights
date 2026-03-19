@@ -1,4 +1,4 @@
-import { getPrismaClient } from './prisma.js';
+import { getPrismaClient } from "./prisma.js";
 
 const getPrisma = () => getPrismaClient();
 
@@ -72,7 +72,12 @@ export function analyzeDraftQuality(
 
   // Personalization scoring
   let personalizationScore = 30; // Base score
-  if (context.contactName && draft.toLowerCase().includes(context.contactName.toLowerCase().split(' ')[0])) {
+  if (
+    context.contactName &&
+    draft
+      .toLowerCase()
+      .includes(context.contactName.toLowerCase().split(" ")[0])
+  ) {
     personalizationScore += 35;
   }
   if (context.lastMessage && draft.length > 20) {
@@ -109,12 +114,17 @@ export function analyzeDraftQuality(
 
   // Overall score (weighted average)
   scores.overall = Math.round(
-    scores.tone * 0.2 + scores.length * 0.15 + scores.personalization * 0.35 + scores.callToAction * 0.3,
+    scores.tone * 0.2 +
+      scores.length * 0.15 +
+      scores.personalization * 0.35 +
+      scores.callToAction * 0.3,
   );
 
   // Confidence (based on how well we can analyze)
   scores.confidence = Math.round(
-    (scores.overall > 70 ? 80 : 50) + (context.contactName ? 10 : 0) + (context.lastMessage ? 10 : 0),
+    (scores.overall > 70 ? 80 : 50) +
+      (context.contactName ? 10 : 0) +
+      (context.lastMessage ? 10 : 0),
   );
 
   return scores;
@@ -188,8 +198,8 @@ export async function getHighPerformingTemplates(limit = 10): Promise<
 
   return rows.map((row) => ({
     body: row.body,
-    replyRate: Number.parseFloat(row.reply_rate ?? '') || 0,
-    bookingRate: Number.parseFloat(row.booking_rate ?? '') || 0,
+    replyRate: Number.parseFloat(row.reply_rate ?? "") || 0,
+    bookingRate: Number.parseFloat(row.booking_rate ?? "") || 0,
     sequence: row.sequence,
   }));
 }
@@ -208,7 +218,7 @@ export async function getDraftAcceptancePatterns(): Promise<{
   const accepted = await prisma.draft_suggestions.findMany({
     where: { accepted: true },
     select: { generated_text: true, lint_score: true, structural_score: true },
-    orderBy: { created_at: 'desc' },
+    orderBy: { created_at: "desc" },
     take: 50,
   });
 
@@ -216,7 +226,7 @@ export async function getDraftAcceptancePatterns(): Promise<{
   const rejected = await prisma.draft_suggestions.findMany({
     where: { accepted: false },
     select: { generated_text: true, lint_score: true, structural_score: true },
-    orderBy: { created_at: 'desc' },
+    orderBy: { created_at: "desc" },
     take: 50,
   });
 
@@ -226,21 +236,21 @@ export async function getDraftAcceptancePatterns(): Promise<{
 
   // Analyze patterns
   if (accepted.length === 0 && rejected.length > 0) {
-    recommendations.push('No drafts have been accepted yet. Consider:');
-    recommendations.push('- Making drafts shorter and more conversational');
-    recommendations.push('- Including specific call-to-actions');
-    recommendations.push('- Personalizing with contact name');
-    recommendations.push('- Referencing their specific situation');
+    recommendations.push("No drafts have been accepted yet. Consider:");
+    recommendations.push("- Making drafts shorter and more conversational");
+    recommendations.push("- Including specific call-to-actions");
+    recommendations.push("- Personalizing with contact name");
+    recommendations.push("- Referencing their specific situation");
   }
 
   // Find common patterns in rejected drafts
   for (const row of rejected) {
-    const body = row.generated_text || '';
+    const body = row.generated_text || "";
     if (body.length > 200) {
-      rejectedPatterns.push('Too long (>200 chars)');
+      rejectedPatterns.push("Too long (>200 chars)");
     }
-    if (!body.includes('?')) {
-      rejectedPatterns.push('No question/CTA');
+    if (!body.includes("?")) {
+      rejectedPatterns.push("No question/CTA");
     }
     if ((body.match(/\bI\b/g)?.length ?? 0) > 3) {
       rejectedPatterns.push('Too self-focused (many "I" statements)');
@@ -280,14 +290,15 @@ export async function generateImprovedDraft(context: {
   }
 
   // Personalize template
-  let draft = bestTemplate?.body || 'Hey! What time works for a quick call this week?';
+  let draft =
+    bestTemplate?.body || "Hey! What time works for a quick call this week?";
 
   // Replace generic placeholders
   if (context.contactName) {
-    const firstName = context.contactName.split(' ')[0];
+    const firstName = context.contactName.split(" ")[0];
     // Add name if not present
     if (!draft.toLowerCase().includes(firstName.toLowerCase())) {
-      draft = `Hey ${firstName}! ${draft.replace(/^hey!?\s*/i, '')}`;
+      draft = `Hey ${firstName}! ${draft.replace(/^hey!?\s*/i, "")}`;
     }
   }
 
@@ -296,6 +307,6 @@ export async function generateImprovedDraft(context: {
   return {
     draft,
     qualityScore,
-    basedOn: bestTemplate?.sequence || 'general',
+    basedOn: bestTemplate?.sequence || "general",
   };
 }

@@ -3,13 +3,13 @@ import { generateAiResponse } from '../../services/ai-response.js';
 import { buildAlowareAnalyticsReport } from '../../services/aloware-analytics.js';
 import { isAlowareChannel, isReplyGenerationRequest, REPLY_BLOCKED_MESSAGE } from '../../services/aloware-policy.js';
 import { isChannelAllowed } from '../../services/channel-access.js';
+import { createManualMondayBookedCall } from '../../services/monday-personal-writeback.js';
 import { generateAndPostReport } from '../../services/report-poster.js';
 import {
   ALOWARE_CHANNEL_ID,
   ALOWARE_CHANNEL_NAME,
   generateAndPostScoreboard,
 } from '../../services/scoreboard-poster.js';
-import { createManualMondayBookedCall } from '../../services/monday-personal-writeback.js';
 
 const SLACK_TEXT_CHUNK_LIMIT = 3000;
 
@@ -271,21 +271,18 @@ const register = (app: App) => {
       return;
     }
 
-    const parts = (command.text || "")
-      .split("|")
+    const parts = (command.text || '')
+      .split('|')
       .map((value) => value.trim())
       .filter((value) => value.length > 0);
 
     const contactName = parts[0];
     if (!contactName) {
-      await respond(
-        'Usage: `/manual-monday <Contact Name> | [Phone] | [Setter jack/brandon] | [Line] | [Notes]`',
-      );
+      await respond('Usage: `/manual-monday <Contact Name> | [Phone] | [Setter jack/brandon] | [Line] | [Notes]`');
       return;
     }
 
-    const setterBucket: 'jack' | 'brandon' =
-      parts[2] && parts[2].toLowerCase() === "brandon" ? "brandon" : "jack";
+    const setterBucket: 'jack' | 'brandon' = parts[2] && parts[2].toLowerCase() === 'brandon' ? 'brandon' : 'jack';
 
     const payload = {
       contactName,
@@ -300,9 +297,7 @@ const register = (app: App) => {
       await respond(`✅ Manual Monday booked call created for *${contactName}*.`);
     } catch (error) {
       logger.error('[/manual-monday] Manual call failed:', error);
-      await respond(
-        `❌ Manual Monday push failed: ${String((error as Error)?.message || error)}`,
-      );
+      await respond(`❌ Manual Monday push failed: ${String((error as Error)?.message || error)}`);
     }
   });
 };

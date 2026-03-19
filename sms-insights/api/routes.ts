@@ -14,12 +14,21 @@ import {
   syncQualificationToAloware,
 } from '../services/aloware-contact-sync.js';
 import { getAlowareIngestHealthSnapshot } from '../services/aloware-ingest-monitor.js';
+import { getAttributionLagStatus } from '../services/attribution-health.js';
+import {
+  listAttributionMethodDaily,
+  listOpenAttributionReviewItems,
+  listRepResponseDaily,
+  listSequenceFunnelDaily,
+  listUnresolvedAttributions,
+} from '../services/attribution-review-queue.js';
 import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
   getBookedCallsSummary,
 } from '../services/booked-calls.js';
+import { getChangelogByDateRange, getChangelogTimeline } from '../services/changelog-service.js';
 import {
   autoAssignWorkItems,
   bulkInferQualification,
@@ -34,8 +43,8 @@ import {
 import { getConversationById, listSmsEventsForConversation } from '../services/conversation-store.js';
 import { getCronStatusSnapshot } from '../services/cron-scheduler.js';
 import { detectRunOutliers, parseRunMetrics } from '../services/daily-report-summary.js';
+import { computeDailyReport, computeDailyReportRange } from '../services/daily-report-v2.js';
 import { getChannelsWithRuns, getDailyRunById, getDailyRuns, logDailyRun } from '../services/daily-run-logger.js';
-import { getPrisma } from '../services/prisma.js';
 import { enrichContactProfileFromAloware } from '../services/inbox-contact-enrichment.js';
 import { getInboxContactProfileByKey, upsertInboxContactProfile } from '../services/inbox-contact-profiles.js';
 import { generateCrmNotesSuggestion } from '../services/inbox-crm-notes-engine.js';
@@ -51,6 +60,7 @@ import {
   getSendAttemptVolumeCounts,
   getSetterAssistPerformanceAnalytics,
   getStageConversionAnalytics,
+  type InboxMessageRow,
   incrementGuardrailOverride,
   insertConversationNote,
   insertDraftSuggestion,
@@ -70,8 +80,9 @@ import {
   updateObjectionTags,
   upsertConversionExample,
   VALID_CALL_OUTCOMES,
-  type InboxMessageRow,
 } from '../services/inbox-store.js';
+import { getInsightsSummary } from '../services/insights-summary.js';
+import { refreshKpiFacts } from '../services/kpi-facts.js';
 import { buildMessageLinkPreviews } from '../services/link-previews.js';
 import {
   getMetricsOverview,
@@ -86,42 +97,30 @@ import {
   parseScope,
 } from '../services/monday-governed-analytics.js';
 import { getMondayLeadInsights } from '../services/monday-lead-insights.js';
-import { getOutcomeKeywordAnalytics } from '../services/outcome-keyword-analytics.js';
 import { createManualMondayBookedCall } from '../services/monday-personal-writeback.js';
-import { syncMondaySmsBoard, listMondaySmsSyncBoardIds } from '../services/monday-sms-sync.js';
-import { syncMondaySmsSequencesBoard, listMondaySmsSequencesSyncBoardIds } from '../services/monday-sms-sequences.js';
-import { syncMondaySmsReportsBoard, listMondaySmsReportsSyncBoardIds } from '../services/monday-sms-reports.js';
-import { getPrismaRuntimeStatus } from '../services/prisma.js';
+import { listMondaySmsReportsSyncBoardIds, syncMondaySmsReportsBoard } from '../services/monday-sms-reports.js';
+import { listMondaySmsSequencesSyncBoardIds, syncMondaySmsSequencesBoard } from '../services/monday-sms-sequences.js';
+import { listMondaySmsSyncBoardIds, syncMondaySmsBoard } from '../services/monday-sms-sync.js';
+import { getOutcomeKeywordAnalytics } from '../services/outcome-keyword-analytics.js';
+import { getPrisma, getPrismaRuntimeStatus } from '../services/prisma.js';
 import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 import { subscribeRealtimeEvents } from '../services/realtime.js';
 import { getSlackAuthRuntimeStatus } from '../services/runtime-status.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
 import { buildCanonicalSalesMetricsSlice } from '../services/sales-metrics-contract.js';
 import { getScoreboardData } from '../services/scoreboard.js';
-import { getSequenceKpis } from '../services/sequence-kpis.js';
-import { refreshKpiFacts } from '../services/kpi-facts.js';
-import { computeDailyReport, computeDailyReportRange } from '../services/daily-report-v2.js';
-import { getInsightsSummary } from '../services/insights-summary.js';
-import { getSequencesDeep } from '../services/sequences-deep.js';
-import { getAttributionLagStatus } from '../services/attribution-health.js';
-import {
-  listOpenAttributionReviewItems,
-  listAttributionMethodDaily,
-  listRepResponseDaily,
-  listSequenceFunnelDaily,
-  listUnresolvedAttributions,
-} from '../services/attribution-review-queue.js';
 import { applyRateLimitHeaders, applySecurityHeaders, checkRateLimit } from '../services/security-headers.js';
 import { findSendLineOption, listSendLineOptions } from '../services/send-line-catalog.js';
 import { attributeSlackBookedCallsToSequences } from '../services/sequence-booked-attribution.js';
+import { getSequenceKpis } from '../services/sequence-kpis.js';
 import { buildSequenceQualificationBreakdown } from '../services/sequence-qualification-analytics.js';
-import { getChangelogTimeline, getChangelogByDateRange } from '../services/changelog-service.js';
 import {
   isSequenceVersionStatus,
   listSequenceVersionDecisions,
   upsertSequenceVersionDecision,
 } from '../services/sequence-version-decisions.js';
 import { getSequenceVersionHistory } from '../services/sequence-version-history.js';
+import { getSequencesDeep } from '../services/sequences-deep.js';
 import {
   createDashboardSession,
   type DashboardSession,
@@ -787,7 +786,8 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
   const buildSha = getBuildSha();
   const hasBuildSha = buildSha !== 'unknown';
   const criticalFailure = dbStatus === 'error' || streamTokenConfig.status === 'error';
-  const hasWarnings = (dbStatus as string) === 'warn' || (streamTokenConfig.status as string) === 'warn' || !hasBuildSha;
+  const hasWarnings =
+    (dbStatus as string) === 'warn' || (streamTokenConfig.status as string) === 'warn' || !hasBuildSha;
 
   const status = criticalFailure ? 'degraded' : hasWarnings ? 'degraded' : 'ok';
 
@@ -1115,9 +1115,7 @@ const handleGetRunsV2: RequestHandler = async (req, res, logger, origin) => {
     logger,
   );
 
-  const parsedMetrics = rows.map((row) =>
-    parseRunMetrics(row.id, row.report_date, row.summary_text, row.duration_ms),
-  );
+  const parsedMetrics = rows.map((row) => parseRunMetrics(row.id, row.report_date, row.summary_text, row.duration_ms));
   const outliers = detectRunOutliers(parsedMetrics);
 
   sendJson(
@@ -1308,7 +1306,10 @@ const handleGetAttributionReviewQueueV2: RequestHandler = async (req, res, logge
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch attribution review queue', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch attribution review queue',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -1336,7 +1337,10 @@ const handleGetUnresolvedAttributionV2: RequestHandler = async (req, res, logger
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch unresolved attribution view', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch unresolved attribution view',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -1437,7 +1441,10 @@ const handleGetSequenceFunnelV2: RequestHandler = async (req, res, logger, origi
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch sequence funnel data', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch sequence funnel data',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -1478,7 +1485,10 @@ const handleGetAttributionMethodV2: RequestHandler = async (req, res, logger, or
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch attribution method data', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch attribution method data',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -4496,9 +4506,7 @@ const handleGetOutcomeKeywordAnalyticsV2: RequestHandler = async (req, res, logg
 
   const directionRaw = (url.searchParams.get('direction') || 'inbound').trim().toLowerCase();
   const direction =
-    directionRaw === 'inbound' || directionRaw === 'outbound' || directionRaw === 'all'
-      ? directionRaw
-      : null;
+    directionRaw === 'inbound' || directionRaw === 'outbound' || directionRaw === 'all' ? directionRaw : null;
   if (!direction) {
     return sendJson(res, 400, { error: 'direction must be one of: inbound, outbound, all' }, origin);
   }
@@ -4854,7 +4862,12 @@ const handleGetDailyReportV2: RequestHandler = async (req, res, logger, origin) 
   const dateParam = url.searchParams.get('date');
   const compareParam = url.searchParams.get('compare');
   if (compareParam && !['prev_day', 'prev_week', 'prev_month'].includes(compareParam)) {
-    sendJson(res, 400, { error: "Invalid 'compare' parameter. Must be one of 'prev_day', 'prev_week', 'prev_month'." }, origin);
+    sendJson(
+      res,
+      400,
+      { error: "Invalid 'compare' parameter. Must be one of 'prev_day', 'prev_week', 'prev_month'." },
+      origin,
+    );
     return;
   }
   const compare = compareParam as 'prev_day' | 'prev_week' | 'prev_month' | undefined;
@@ -5090,9 +5103,17 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
   { method: 'GET', path: '/api/admin/monday/sms/sync-board-ids', handler: handleGetMondaySmsSyncBoardIds },
   { method: 'POST', path: '/api/admin/monday/sms/sync', handler: handlePostMondaySmsSync },
-  { method: 'GET', path: '/api/admin/monday/sms-sequences/sync-board-ids', handler: handleGetMondaySmsSequencesSyncBoardIds },
+  {
+    method: 'GET',
+    path: '/api/admin/monday/sms-sequences/sync-board-ids',
+    handler: handleGetMondaySmsSequencesSyncBoardIds,
+  },
   { method: 'POST', path: '/api/admin/monday/sms-sequences/sync', handler: handlePostMondaySmsSequencesSync },
-  { method: 'GET', path: '/api/admin/monday/sms-reports/sync-board-ids', handler: handleGetMondaySmsReportsSyncBoardIds },
+  {
+    method: 'GET',
+    path: '/api/admin/monday/sms-reports/sync-board-ids',
+    handler: handleGetMondaySmsReportsSyncBoardIds,
+  },
   { method: 'POST', path: '/api/admin/monday/sms-reports/sync', handler: handlePostMondaySmsReportsSync },
 
   { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },

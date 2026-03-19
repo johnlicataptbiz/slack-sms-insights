@@ -708,12 +708,14 @@ export type TimeToBookingStats = {
 export const getTimeToBookingStats = async (): Promise<TimeToBookingStats> => {
   const prisma = getPrisma();
 
-  const statsRows = await prisma.$queryRawUnsafe<{
-    avg_days: number | string | null;
-    median_days: number | string | null;
-    min_days: number | string | null;
-    max_days: number | string | null;
-  }[]>(`
+  const statsRows = await prisma.$queryRawUnsafe<
+    {
+      avg_days: number | string | null;
+      median_days: number | string | null;
+      min_days: number | string | null;
+      max_days: number | string | null;
+    }[]
+  >(`
     WITH booking_times AS (
       SELECT
         bc.event_time,
@@ -740,11 +742,13 @@ export const getTimeToBookingStats = async (): Promise<TimeToBookingStats> => {
   const stats = statsRows[0];
 
   // By sequence
-  const sequenceRows = await prisma.$queryRawUnsafe<{
-    sequence: string;
-    avg_days: number | string | null;
-    bookings: bigint;
-  }[]>(`
+  const sequenceRows = await prisma.$queryRawUnsafe<
+    {
+      sequence: string;
+      avg_days: number | string | null;
+      bookings: bigint;
+    }[]
+  >(`
     WITH booking_times AS (
       SELECT
         bc.event_time,
@@ -809,11 +813,13 @@ export type ResponseTimeStats = {
 
 export const getResponseTimeStats = async (params: { from: Date; to: Date }): Promise<ResponseTimeStats> => {
   const prisma = getPrisma();
-  const rows = await prisma.$queryRawUnsafe<{
-    avg_minutes: number | string | null;
-    median_minutes: number | string | null;
-    p95_minutes: number | string | null;
-  }[]>(
+  const rows = await prisma.$queryRawUnsafe<
+    {
+      avg_minutes: number | string | null;
+      median_minutes: number | string | null;
+      p95_minutes: number | string | null;
+    }[]
+  >(
     `
     WITH response_pairs AS (
       SELECT
@@ -851,11 +857,13 @@ export const getResponseTimeStats = async (params: { from: Date; to: Date }): Pr
   const stats = rows[0];
 
   // By rep (based on line)
-  const repRows = await prisma.$queryRawUnsafe<{
-    rep: string;
-    avg_minutes: number | string | null;
-    responses: bigint;
-  }[]>(
+  const repRows = await prisma.$queryRawUnsafe<
+    {
+      rep: string;
+      avg_minutes: number | string | null;
+      responses: bigint;
+    }[]
+  >(
     `
     WITH response_pairs AS (
       SELECT
@@ -895,10 +903,12 @@ export const getResponseTimeStats = async (params: { from: Date; to: Date }): Pr
   );
 
   // By hour
-  const hourRows = await prisma.$queryRawUnsafe<{
-    hour: number;
-    avg_minutes: number | string | null;
-  }[]>(
+  const hourRows = await prisma.$queryRawUnsafe<
+    {
+      hour: number;
+      avg_minutes: number | string | null;
+    }[]
+  >(
     `
     WITH response_pairs AS (
       SELECT

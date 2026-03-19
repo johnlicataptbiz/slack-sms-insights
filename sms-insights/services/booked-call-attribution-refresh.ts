@@ -1,12 +1,12 @@
 import type { Logger } from '@slack/bolt';
+import { upsertAttributionReviewItem } from './attribution-review-queue.js';
 import {
+  type BookedCallAttributionSource,
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
   normalizeContactNameKey,
-  type BookedCallAttributionSource,
 } from './booked-calls.js';
-import { upsertAttributionReviewItem } from './attribution-review-queue.js';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
@@ -79,24 +79,23 @@ export const resolveBestConversationCandidate = (
     };
   }
 
-  let best:
-    | {
-        conversationId: string;
-        score: number;
-        deltaMs: number;
-        evidence: ConversationEvidence;
-        confidence: number;
-      }
-    | null = null;
+  let best: {
+    conversationId: string;
+    score: number;
+    deltaMs: number;
+    evidence: ConversationEvidence;
+    confidence: number;
+  } | null = null;
 
   for (const candidate of candidates) {
     const primaryEvidence = choosePrimaryEvidence(candidate.evidence);
     if (!primaryEvidence) continue;
 
-    const deltaMs = Number.isFinite(candidate.lastTouchAtMs || NaN)
+    const deltaMs = Number.isFinite(candidate.lastTouchAtMs || Number.NaN)
       ? Math.abs((candidate.lastTouchAtMs || 0) - bookingTs)
       : Number.POSITIVE_INFINITY;
-    const hasPriorTouch = Number.isFinite(candidate.lastTouchAtMs || NaN) && (candidate.lastTouchAtMs || 0) <= bookingTs;
+    const hasPriorTouch =
+      Number.isFinite(candidate.lastTouchAtMs || Number.NaN) && (candidate.lastTouchAtMs || 0) <= bookingTs;
     const evidenceBonus = Math.max(0, candidate.evidence.size - 1) * 1.5;
     const timingBonus = Number.isFinite(deltaMs)
       ? hasPriorTouch
@@ -244,9 +243,7 @@ export const refreshBookedCallAttribution = async (
       select: { id: true, label: true, normalized_label: true },
     }),
   ]);
-  const sequenceIdByLabel = new Map(
-    sequenceRows.map((row) => [row.normalized_label.trim().toLowerCase(), row.id]),
-  );
+  const sequenceIdByLabel = new Map(sequenceRows.map((row) => [row.normalized_label.trim().toLowerCase(), row.id]));
   const existingRows =
     sources.length === 0
       ? []
@@ -427,15 +424,18 @@ export const refreshBookedCallAttribution = async (
     const existing = existingByBookedCallId.get(source.bookedCallId);
     const candidateResolution = resolveBestConversationCandidate(bookingTs, [...candidatesByConversationId.values()]);
 
-    const resolvedConversationId = smsLookup?.conversationId || candidateResolution.conversationId || existing?.conversation_id || null;
+    const resolvedConversationId =
+      smsLookup?.conversationId || candidateResolution.conversationId || existing?.conversation_id || null;
     const resolvedConversationMatchSeconds =
       smsLookup?.conversationId === resolvedConversationId
         ? 0
-        : candidateResolution.conversationMatchSeconds ?? existing?.conversation_match_seconds ?? null;
+        : (candidateResolution.conversationMatchSeconds ?? existing?.conversation_match_seconds ?? null);
     const resolvedFirstConversion =
       source.firstConversion || smsLookup?.sequenceLabel || existing?.first_conversion || null;
     const smartConversationMethod =
-      candidateResolution.evidence != null ? `reaction_bucket_v3_${candidateResolution.evidence}` : 'reaction_bucket_v2';
+      candidateResolution.evidence != null
+        ? `reaction_bucket_v3_${candidateResolution.evidence}`
+        : 'reaction_bucket_v2';
     const mappingMethod =
       smsLookup?.sequenceLabel || smsLookup?.conversationId ? 'reaction_bucket_v3_sms_lookup' : smartConversationMethod;
     const mapperVersion =
@@ -449,7 +449,7 @@ export const refreshBookedCallAttribution = async (
         ? source.bucket === 'selfBooked'
           ? 0.82
           : 0.98
-        : candidateResolution.confidence ?? (source.bucket === 'selfBooked' ? 0.7 : 0.95);
+        : (candidateResolution.confidence ?? (source.bucket === 'selfBooked' ? 0.7 : 0.95));
     const attributionState = buildAttributionStatus({
       hasConversation: Boolean(resolvedConversationId),
       confidence: matchConfidence,

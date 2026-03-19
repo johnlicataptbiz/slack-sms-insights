@@ -234,8 +234,8 @@ export const getSalesMetricsSummary = async (
   }
 
   const ATTRIBUTION_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
-// ... (rest of the logic remains the same, but let's make sure we find and replace pool.query at the end)
-// Wait, I should provide more lines to be safe.
+  // ... (rest of the logic remains the same, but let's make sure we find and replace pool.query at the end)
+  // Wait, I should provide more lines to be safe.
   // Window for finding the outbound that triggered a contact's first reply.
   // Shorter than the booking attribution window — we want the direct trigger, not a distant touch.
   const REPLY_TRIGGER_WINDOW_MS = 48 * 60 * 60 * 1000;

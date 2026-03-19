@@ -1,5 +1,4 @@
 import type { Logger } from '@slack/bolt';
-import { getPrismaClient } from './prisma.js';
 import type {
   CoachingInterest,
   DeliveryModel,
@@ -7,6 +6,7 @@ import type {
   InboxContactProfileRow,
   RevenueMixCategory,
 } from './inbox-contact-profiles.js';
+import { getPrismaClient } from './prisma.js';
 
 export type CadenceStatus = 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
 
@@ -325,8 +325,10 @@ export const updateConversationState = async (
     if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
     if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
     if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;
-    if (input.lastPodcastSentAt !== undefined) updateData.last_podcast_sent_at = input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null;
-    if (input.nextFollowupDueAt !== undefined) updateData.next_followup_due_at = input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null;
+    if (input.lastPodcastSentAt !== undefined)
+      updateData.last_podcast_sent_at = input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null;
+    if (input.nextFollowupDueAt !== undefined)
+      updateData.next_followup_due_at = input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null;
     if (input.cadenceStatus !== undefined) updateData.cadence_status = input.cadenceStatus;
 
     const result = await prisma.conversation_state.upsert({
@@ -598,7 +600,11 @@ export const getInboxConversationById = async (
       LIMIT 1;
       `;
 
-    const result = await prisma.$queryRawUnsafe<InboxConversationListRow[]>(sql, conversationId, BOOKED_CALLS_CHANNEL_ID ?? null);
+    const result = await prisma.$queryRawUnsafe<InboxConversationListRow[]>(
+      sql,
+      conversationId,
+      BOOKED_CALLS_CHANNEL_ID ?? null,
+    );
     return result[0] ?? null;
   } catch (err) {
     logger?.error('getInboxConversationById failed', err);
@@ -744,8 +750,8 @@ export const insertSendAttempt = async (
       idempotency_key: input.idempotencyKey ?? null,
       status: input.status,
       retry_count: input.retryCount ?? 0,
-      request_payload: input.requestPayload as any ?? null,
-      response_payload: input.responsePayload as any ?? null,
+      request_payload: (input.requestPayload as any) ?? null,
+      response_payload: (input.responsePayload as any) ?? null,
       error_message: input.errorMessage ?? null,
     };
 
@@ -758,7 +764,7 @@ export const insertSendAttempt = async (
           },
         },
         update: {
-          response_payload: input.responsePayload as any ?? undefined,
+          response_payload: (input.responsePayload as any) ?? undefined,
           status: input.status,
           retry_count: {
             increment: 0, // We need to replicate GREATEST. Prisma doesn't have GREATEST in fluent API easily.
@@ -768,7 +774,7 @@ export const insertSendAttempt = async (
         create: data,
       });
 
-      // Special handling for retry_count GREATEST via $executeRaw if needed, 
+      // Special handling for retry_count GREATEST via $executeRaw if needed,
       // but usually retry_count is managed by the caller.
       // The original SQL: retry_count = GREATEST(send_attempts.retry_count, EXCLUDED.retry_count)
       // Let's use $queryRawUnsafe to perfectly match the original behavior for upsert.
@@ -790,18 +796,26 @@ export const insertSendAttempt = async (
       `;
       const rows = await prisma.$queryRawUnsafe<SendAttemptRow[]>(
         upsertSql,
-        input.conversationId, input.messageBody, input.senderIdentity ?? null,
-        input.lineId ?? null, input.fromNumber ?? null, input.allowlistDecision,
-        input.dncDecision, input.idempotencyKey, input.status, input.retryCount ?? 0,
-        input.requestPayload ?? null, input.responsePayload ?? null, input.errorMessage ?? null
+        input.conversationId,
+        input.messageBody,
+        input.senderIdentity ?? null,
+        input.lineId ?? null,
+        input.fromNumber ?? null,
+        input.allowlistDecision,
+        input.dncDecision,
+        input.idempotencyKey,
+        input.status,
+        input.retryCount ?? 0,
+        input.requestPayload ?? null,
+        input.responsePayload ?? null,
+        input.errorMessage ?? null,
       );
       return rows[0];
-    } else {
-      const result = await prisma.send_attempts.create({
-        data,
-      });
-      return result as unknown as SendAttemptRow;
     }
+    const result = await prisma.send_attempts.create({
+      data,
+    });
+    return result as unknown as SendAttemptRow;
   } catch (err) {
     logger?.error('insertSendAttempt failed', err);
     throw err;
@@ -830,9 +844,15 @@ export const reserveSendAttemptIdempotency = async (
     `;
     const rows = await prisma.$queryRawUnsafe<SendAttemptRow[]>(
       sql,
-      input.conversationId, input.messageBody, input.senderIdentity ?? null,
-      input.lineId ?? null, input.fromNumber ?? null, input.allowlistDecision,
-      input.dncDecision, input.idempotencyKey, input.requestPayload ?? null
+      input.conversationId,
+      input.messageBody,
+      input.senderIdentity ?? null,
+      input.lineId ?? null,
+      input.fromNumber ?? null,
+      input.allowlistDecision,
+      input.dncDecision,
+      input.idempotencyKey,
+      input.requestPayload ?? null,
     );
     return rows[0] ?? null;
   } catch (err) {
@@ -929,12 +949,12 @@ export const insertDraftSuggestion = async (
       data: {
         conversation_id: input.conversationId,
         prompt_snapshot_hash: input.promptSnapshotHash,
-        retrieved_exemplar_ids: input.retrievedExemplarIds as any ?? null,
+        retrieved_exemplar_ids: (input.retrievedExemplarIds as any) ?? null,
         generated_text: input.generatedText,
         lint_score: input.lintScore,
         structural_score: input.structuralScore,
-        lint_issues: input.lintIssues as any ?? null,
-        raw: input.raw as any ?? null,
+        lint_issues: (input.lintIssues as any) ?? null,
+        raw: (input.raw as any) ?? null,
       },
     });
 
@@ -963,7 +983,6 @@ export const listDraftSuggestionsForConversation = async (
     throw err;
   }
 };
-
 
 export const getDraftSuggestionById = async (
   draftId: string,
@@ -1024,7 +1043,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? undefined,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? undefined,
-        qualifier_snapshot: input.qualifierSnapshot as any ?? undefined,
+        qualifier_snapshot: (input.qualifierSnapshot as any) ?? undefined,
         channel_marker: input.channelMarker ?? undefined,
       },
       create: {
@@ -1033,7 +1052,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? null,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? null,
-        qualifier_snapshot: input.qualifierSnapshot as any ?? null,
+        qualifier_snapshot: (input.qualifierSnapshot as any) ?? null,
         channel_marker: input.channelMarker || 'sms',
       },
     });

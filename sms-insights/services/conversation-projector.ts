@@ -1,10 +1,10 @@
 import type { Logger } from '@slack/bolt';
 import { maybeRecordConversionExample } from './conversion-example-ingestion.js';
+import { getPrismaClient } from './prisma.js';
 import { syncQualificationFromConversationText } from './qualification-sync.js';
 import { publishRealtimeEvent } from './realtime.js';
 import type { SmsEventDirection, SmsEventRow } from './sms-event-store.js';
 import { linkSmsEventToConversation } from './sms-event-store.js';
-import { getPrismaClient } from './prisma.js';
 
 export type ConversationRow = {
   id: string;

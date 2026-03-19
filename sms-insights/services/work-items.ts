@@ -81,10 +81,7 @@ export const listOpenWorkItems = async (
       include: {
         conversations: true,
       },
-      orderBy: [
-        { due_at: 'asc' },
-        { id: 'asc' },
-      ],
+      orderBy: [{ due_at: 'asc' }, { id: 'asc' }],
       take: limit + 1,
       cursor: params.cursor ? { id: params.cursor.id } : undefined,
       skip: params.offset || (params.cursor ? 1 : undefined),

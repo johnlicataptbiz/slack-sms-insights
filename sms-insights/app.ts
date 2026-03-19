@@ -11,10 +11,10 @@ import registerListeners from './listeners/index.js';
 import { initDatabase } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
 import { logger } from './services/logger.js';
-import { startMondaySyncJobs } from './services/monday-sync.js';
-import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
-import { startMondaySmsSequencesSyncJobs } from './services/monday-sms-sequences.js';
 import { startMondaySmsReportsSyncJobs } from './services/monday-sms-reports.js';
+import { startMondaySmsSequencesSyncJobs } from './services/monday-sms-sequences.js';
+import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
+import { startMondaySyncJobs } from './services/monday-sync.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
 import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
 

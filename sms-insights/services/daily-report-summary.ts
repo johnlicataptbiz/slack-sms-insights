@@ -310,8 +310,7 @@ export const parseRunMetrics = (
   const text = summaryText || '';
   const sequences = aggregateSequenceRows(text);
   const messagesSent =
-    sequences.reduce((s, r) => s + r.messagesSent, 0) ||
-    sumFromPatterns(text, OUTBOUND_CONVERSATIONS_PATTERNS);
+    sequences.reduce((s, r) => s + r.messagesSent, 0) || sumFromPatterns(text, OUTBOUND_CONVERSATIONS_PATTERNS);
   const repliesReceived = sequences.reduce((s, r) => s + r.repliesReceived, 0);
   const replyRatePct = messagesSent > 0 ? (repliesReceived / messagesSent) * 100 : 0;
   const booked = sumFromPatterns(text, BOOKINGS_PATTERNS);
@@ -332,9 +331,7 @@ export const detectRunOutliers = (runs: ParsedRunMetrics[]): RunOutlierAnnotatio
 
   const fences = new Map<NumericField, { q1: number; q3: number; iqr: number; lo: number; hi: number }>();
   for (const field of numericFields) {
-    const values = runs
-      .map((r) => r[field])
-      .filter((v): v is number => v !== null && Number.isFinite(v as number));
+    const values = runs.map((r) => r[field]).filter((v): v is number => v !== null && Number.isFinite(v as number));
     if (values.length < 4) continue;
     const sorted = [...values].sort((a, b) => a - b);
     const q1 = iqrPercentile(sorted, 25);
@@ -354,9 +351,25 @@ export const detectRunOutliers = (runs: ParsedRunMetrics[]): RunOutlierAnnotatio
       if (raw === null || !Number.isFinite(raw as number)) continue;
       const v = raw as number;
       if (v < fence.lo) {
-        outlierFields.push({ field, value: v, direction: 'low', q1: fence.q1, q3: fence.q3, iqr: fence.iqr, fence: fence.lo });
+        outlierFields.push({
+          field,
+          value: v,
+          direction: 'low',
+          q1: fence.q1,
+          q3: fence.q3,
+          iqr: fence.iqr,
+          fence: fence.lo,
+        });
       } else if (v > fence.hi) {
-        outlierFields.push({ field, value: v, direction: 'high', q1: fence.q1, q3: fence.q3, iqr: fence.iqr, fence: fence.hi });
+        outlierFields.push({
+          field,
+          value: v,
+          direction: 'high',
+          q1: fence.q1,
+          q3: fence.q3,
+          iqr: fence.iqr,
+          fence: fence.hi,
+        });
       }
     }
     if (outlierFields.length > 0) {

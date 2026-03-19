@@ -1,15 +1,15 @@
-import { getPrismaClient } from './prisma.js';
 import type {
-  DailyReportV2,
-  DailyReportKpisV2,
+  DailyReportAlertV2,
   DailyReportComparisonV2,
-  DailyReportSequenceRowV2,
-  DailyReportRepRowV2,
+  DailyReportKpisV2,
   DailyReportLeadQualityV2,
   DailyReportMondayHealthRowV2,
-  DailyReportAlertV2,
   DailyReportRangeV2,
+  DailyReportRepRowV2,
+  DailyReportSequenceRowV2,
+  DailyReportV2,
 } from '../api/v2-contract.js';
+import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
 
@@ -150,13 +150,16 @@ async function getSequenceBreakdown(targetDate: Date): Promise<DailyReportSequen
   }
 
   // Fetch sequence names
-  const sequenceIds = [...new Set([...smsGroups.map((g) => g.sequence_id), ...bookingGroups.map((g) => g.sequence_id)])];
-  const sequences = sequenceIds.length > 0
-    ? await prisma.sequence_registry.findMany({
-        where: { id: { in: sequenceIds } },
-        select: { id: true, label: true },
-      })
-    : [];
+  const sequenceIds = [
+    ...new Set([...smsGroups.map((g) => g.sequence_id), ...bookingGroups.map((g) => g.sequence_id)]),
+  ];
+  const sequences =
+    sequenceIds.length > 0
+      ? await prisma.sequence_registry.findMany({
+          where: { id: { in: sequenceIds } },
+          select: { id: true, label: true },
+        })
+      : [];
   const nameMap = new Map(sequences.map((s) => [s.id, s.label]));
 
   return smsGroups
@@ -317,10 +320,7 @@ async function getAlerts(targetDate: Date): Promise<DailyReportAlertV2[]> {
 
 // ─── Comparison Logic ───────────────────────────────────────────────────────────
 
-function resolveComparisonDate(
-  targetDate: Date,
-  period: 'prev_day' | 'prev_week' | 'prev_month',
-): Date {
+function resolveComparisonDate(targetDate: Date, period: 'prev_day' | 'prev_week' | 'prev_month'): Date {
   switch (period) {
     case 'prev_day':
       return addDays(targetDate, -1);
@@ -386,10 +386,7 @@ export async function computeDailyReport(
   };
 }
 
-export async function computeDailyReportRange(
-  fromStr: string,
-  toStr: string,
-): Promise<DailyReportRangeV2> {
+export async function computeDailyReportRange(fromStr: string, toStr: string): Promise<DailyReportRangeV2> {
   const fromDate = parseDateUTC(fromStr);
   const toDate = parseDateUTC(toStr);
 

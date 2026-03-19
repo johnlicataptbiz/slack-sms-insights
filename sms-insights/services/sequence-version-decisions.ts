@@ -54,7 +54,9 @@ export const upsertSequenceVersionDecision = async (
         updated_at = NOW()
       RETURNING sequence_label, status, updated_by, updated_at::text
       `,
-      sequenceLabel, status, updatedBy
+      sequenceLabel,
+      status,
+      updatedBy,
     );
     const row = result[0];
     if (!row) throw new Error('Failed to upsert sequence version decision');

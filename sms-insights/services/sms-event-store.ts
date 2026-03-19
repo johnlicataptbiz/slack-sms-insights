@@ -111,10 +111,7 @@ export const linkSmsEventToConversation = async (
     await prisma.sms_events.updateMany({
       where: {
         id: eventId,
-        OR: [
-          { conversation_id: null },
-          { conversation_id: conversationId },
-        ],
+        OR: [{ conversation_id: null }, { conversation_id: conversationId }],
       },
       data: {
         conversation_id: conversationId,

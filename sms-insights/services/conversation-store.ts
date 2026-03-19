@@ -40,8 +40,10 @@ export const listSmsEventsForConversation = async (
             conversation_id: null,
             OR: [
               conversation.contact_id ? { contact_id: conversation.contact_id } : {},
-              (!conversation.contact_id && conversation.contact_phone) ? { contact_phone: conversation.contact_phone } : {},
-            ].filter(obj => Object.keys(obj).length > 0) as any,
+              !conversation.contact_id && conversation.contact_phone
+                ? { contact_phone: conversation.contact_phone }
+                : {},
+            ].filter((obj) => Object.keys(obj).length > 0) as any,
           },
         ],
       },
@@ -57,7 +59,9 @@ export const listSmsEventsForConversation = async (
       },
     });
 
-    return results as unknown as Array<Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>>;
+    return results as unknown as Array<
+      Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>
+    >;
   } catch (err) {
     logger?.error('listSmsEventsForConversation failed', err);
     throw err;

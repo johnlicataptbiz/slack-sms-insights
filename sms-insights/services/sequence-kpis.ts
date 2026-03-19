@@ -1,11 +1,15 @@
 import type { Logger } from '@slack/bolt';
 
-import { getBookedCallAttributionSources, getBookedCallSequenceFromSmsEvents, getBookedCallSmsReplyLinks } from './booked-calls.js';
+import {
+  getBookedCallAttributionSources,
+  getBookedCallSequenceFromSmsEvents,
+  getBookedCallSmsReplyLinks,
+} from './booked-calls.js';
 import { getPrismaClient } from './prisma.js';
-import { resolveTimeZone, DEFAULT_BUSINESS_TIMEZONE } from './time-range.js';
 import { getSalesMetricsSummary } from './sales-metrics.js';
-import { attributeSlackBookedCallsToSequences, type SequenceBookedBreakdown } from './sequence-booked-attribution.js';
 import { parseLeadMagnetAndVersion } from './scoreboard.js';
+import { attributeSlackBookedCallsToSequences, type SequenceBookedBreakdown } from './sequence-booked-attribution.js';
+import { DEFAULT_BUSINESS_TIMEZONE, resolveTimeZone } from './time-range.js';
 
 export type SequenceKpiRow = {
   label: string;
@@ -102,7 +106,12 @@ export const getSequenceKpis = async (
 
   const smsLinks = await getBookedCallSmsReplyLinks(attributionSources, logger);
   const smsSeqLookup = await getBookedCallSequenceFromSmsEvents(attributionSources, logger, smsLinks);
-  const seqAttribution = attributeSlackBookedCallsToSequences(summary.topSequences, attributionSources, smsLinks, smsSeqLookup);
+  const seqAttribution = attributeSlackBookedCallsToSequences(
+    summary.topSequences,
+    attributionSources,
+    smsLinks,
+    smsSeqLookup,
+  );
   const canonicalMap = await resolveCanonicalSequenceLabels(summary.topSequences.map((row) => row.label));
 
   const bookedByCanonical = new Map<string, SequenceBookedBreakdown>();

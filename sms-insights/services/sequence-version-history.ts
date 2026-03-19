@@ -5,7 +5,7 @@ import { parseLeadMagnetAndVersion } from './scoreboard.js';
 const getPrisma = () => getPrismaClient();
 
 export type SequenceVersionHistoryRow = {
-// ... (rest of type definitions same as before)
+  // ... (rest of type definitions same as before)
   label: string;
   leadMagnet: string;
   version: string;

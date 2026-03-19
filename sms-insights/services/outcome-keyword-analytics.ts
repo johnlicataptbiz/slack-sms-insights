@@ -1,5 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import { VALID_CALL_OUTCOMES, type CallOutcome } from './inbox-store.js';
+import { type CallOutcome, VALID_CALL_OUTCOMES } from './inbox-store.js';
 import { getPrismaClient } from './prisma.js';
 
 const STOPWORDS = new Set([
@@ -164,7 +164,11 @@ export const buildOutcomeKeywordAnalytics = (
       .map(([phrase, byOutcome]): OutcomeKeywordInsight | null => {
         const overallConversations = phraseConversationSets.get(phrase)?.size || 0;
         const outcomeConversations = byOutcome.get(outcome)?.size || 0;
-        if (overallConversations < minConversations || outcomeConversations < minConversations || conversationCount === 0) {
+        if (
+          overallConversations < minConversations ||
+          outcomeConversations < minConversations ||
+          conversationCount === 0
+        ) {
           return null;
         }
 

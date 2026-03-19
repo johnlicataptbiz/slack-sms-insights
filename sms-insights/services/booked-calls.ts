@@ -414,14 +414,12 @@ export const resolveBestSequenceLookupCandidate = (
 ): ResolvedSequenceLookupCandidate | null => {
   if (!Number.isFinite(bookingTs) || candidates.length === 0) return null;
 
-  let best:
-    | {
-        sequenceLabel: string;
-        latestOutboundTs: number;
-        conversationId: string | null;
-        score: number;
-      }
-    | null = null;
+  let best: {
+    sequenceLabel: string;
+    latestOutboundTs: number;
+    conversationId: string | null;
+    score: number;
+  } | null = null;
 
   for (const candidate of candidates) {
     const evidence = chooseBestSequenceEvidence(candidate.evidence);
@@ -501,9 +499,8 @@ export const getBookedCallSequenceFromSmsEvents = async (
 
     const sourceKey = bookedCallSourceKey(call);
     const replyLink = replyLinks.get(sourceKey);
-    const replyTs = replyLink?.latestReplyAt ? new Date(replyLink.latestReplyAt).getTime() : NaN;
-    const targetTs =
-      replyLink?.hasPriorReply && Number.isFinite(replyTs) ? replyTs : bookingTs;
+    const replyTs = replyLink?.latestReplyAt ? new Date(replyLink.latestReplyAt).getTime() : Number.NaN;
+    const targetTs = replyLink?.hasPriorReply && Number.isFinite(replyTs) ? replyTs : bookingTs;
 
     const phoneKey = normalizePhoneKey(call.contactPhone);
     const emailKey = normalizeEmailKey(call.contactEmail);
@@ -622,11 +619,12 @@ export const getBookedCallSequenceFromSmsEvents = async (
     const conversationIds = [
       ...new Set(profileRows.map((row) => row.conversation_id).filter((value): value is string => Boolean(value))),
     ];
-    const outboundByConversationId = new Map<string, Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>>();
+    const outboundByConversationId = new Map<
+      string,
+      Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>
+    >();
     if (conversationIds.length > 0) {
-      const rows = await prisma.$queryRawUnsafe<
-        { conversation_id: string; sequence: string; event_ts: Date }[]
-      >(
+      const rows = await prisma.$queryRawUnsafe<{ conversation_id: string; sequence: string; event_ts: Date }[]>(
         `
         SELECT conversation_id, TRIM(sequence) AS sequence, event_ts
         FROM sms_events
@@ -650,7 +648,10 @@ export const getBookedCallSequenceFromSmsEvents = async (
       }
     }
 
-    const outboundByPhone = new Map<string, Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>>();
+    const outboundByPhone = new Map<
+      string,
+      Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>
+    >();
     if (phoneKeys.length > 0) {
       const rows = await prisma.$queryRawUnsafe<
         { phone_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]
@@ -683,7 +684,10 @@ export const getBookedCallSequenceFromSmsEvents = async (
       }
     }
 
-    const outboundByName = new Map<string, Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>>();
+    const outboundByName = new Map<
+      string,
+      Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>
+    >();
     if (nameKeys.length > 0) {
       const rows = await prisma.$queryRawUnsafe<
         { contact_name_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]
@@ -845,7 +849,9 @@ export const getBookedCallSmsReplyLinks = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        phoneKeys, fromIso, toIso,
+        phoneKeys,
+        fromIso,
+        toIso,
       );
 
       for (const row of rows) {
@@ -872,7 +878,9 @@ export const getBookedCallSmsReplyLinks = async (
           AND event_ts <= $3::timestamptz
         ORDER BY event_ts ASC
         `,
-        contactNameKeys, fromIso, toIso,
+        contactNameKeys,
+        fromIso,
+        toIso,
       );
 
       for (const row of rows) {

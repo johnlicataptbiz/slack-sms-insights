@@ -60,12 +60,14 @@ export const getMetricsOverview = async (
 ): Promise<MetricsOverview> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.$queryRawUnsafe<{
-      open_work_items: string | number | bigint;
-      overdue_work_items: string | number | bigint;
-      open_needs_reply: string | number | bigint;
-      overdue_needs_reply: string | number | bigint;
-    }[]>(
+    const result = await prisma.$queryRawUnsafe<
+      {
+        open_work_items: string | number | bigint;
+        overdue_work_items: string | number | bigint;
+        open_needs_reply: string | number | bigint;
+        overdue_needs_reply: string | number | bigint;
+      }[]
+    >(
       `
       WITH open_items AS (
         SELECT wi.*
@@ -105,14 +107,16 @@ export const getSlaMetrics = async (
   try {
     const repIdParam: string | null = params.repId ? String(params.repId) : null;
 
-    const result = await prisma.$queryRawUnsafe<{
-      open_needs_reply: string | number | bigint;
-      overdue_needs_reply: string | number | bigint;
-      p50_minutes: number | null;
-      p75_minutes: number | null;
-      p90_minutes: number | null;
-      p95_minutes: number | null;
-    }[]>(
+    const result = await prisma.$queryRawUnsafe<
+      {
+        open_needs_reply: string | number | bigint;
+        overdue_needs_reply: string | number | bigint;
+        p50_minutes: number | null;
+        p75_minutes: number | null;
+        p90_minutes: number | null;
+        p95_minutes: number | null;
+      }[]
+    >(
       `
       WITH _params AS (
         SELECT $1::text AS rep_id, $2::int AS window_days
@@ -258,15 +262,17 @@ export const getWorkloadByRepMetrics = async (
 ): Promise<WorkloadByRepMetrics> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.$queryRawUnsafe<{
-      rep_id: string | null;
-      conversations_with_open_items: string | number | bigint;
-      open_work_items: string | number | bigint;
-      overdue_work_items: string | number | bigint;
-      open_needs_reply: string | number | bigint;
-      overdue_needs_reply: string | number | bigint;
-      high_severity_open: string | number | bigint;
-    }[]>(
+    const result = await prisma.$queryRawUnsafe<
+      {
+        rep_id: string | null;
+        conversations_with_open_items: string | number | bigint;
+        open_work_items: string | number | bigint;
+        overdue_work_items: string | number | bigint;
+        open_needs_reply: string | number | bigint;
+        overdue_needs_reply: string | number | bigint;
+        high_severity_open: string | number | bigint;
+      }[]
+    >(
       `
       WITH open_items AS (
         SELECT wi.*
@@ -315,11 +321,13 @@ export const getVolumeByDayMetrics = async (
 ): Promise<VolumeByDayMetrics> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.$queryRawUnsafe<{
-      day: string;
-      inbound: string | number | bigint;
-      outbound: string | number | bigint;
-    }[]>(
+    const result = await prisma.$queryRawUnsafe<
+      {
+        day: string;
+        inbound: string | number | bigint;
+        outbound: string | number | bigint;
+      }[]
+    >(
       `
       WITH days AS (
         SELECT generate_series(

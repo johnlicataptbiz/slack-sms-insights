@@ -22,7 +22,9 @@ describe('monday-sms-sync configuration', () => {
   describe('parseCsv', () => {
     it('should parse CSV string to array', () => {
       process.env.MONDAY_SMS_SYNC_BOARD_IDS = '123,456,789';
-      const result = process.env.MONDAY_SMS_SYNC_BOARD_IDS.split(',').map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+      const result = process.env.MONDAY_SMS_SYNC_BOARD_IDS.split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
       assert.equal(result.length, 3);
       assert.equal(result[0], '123');
       assert.equal(result[1], '456');
@@ -31,7 +33,9 @@ describe('monday-sms-sync configuration', () => {
 
     it('should return empty array for empty string', () => {
       process.env.MONDAY_SMS_SYNC_BOARD_IDS = '';
-      const result = process.env.MONDAY_SMS_SYNC_BOARD_IDS.split(',').map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+      const result = process.env.MONDAY_SMS_SYNC_BOARD_IDS.split(',')
+        .map((entry) => entry.trim())
+        .filter((entry) => entry.length > 0);
       assert.equal(result.length, 0);
     });
   });

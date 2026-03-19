@@ -1,9 +1,15 @@
 import type { Logger } from '@slack/bolt';
-import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallsSummary, getBookedCallSequenceFromSmsEvents } from './booked-calls.js';
+import {
+  getBookedCallAttributionSources,
+  getBookedCallSequenceFromSmsEvents,
+  getBookedCallSmsReplyLinks,
+  getBookedCallsSummary,
+} from './booked-calls.js';
 import { getPrismaClient } from './prisma.js';
 import { getSalesMetricsSummary } from './sales-metrics.js';
 
 const getPrisma = () => getPrismaClient();
+
 import { buildCanonicalSalesMetricsSlice } from './sales-metrics-contract.js';
 import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone, resolveTimeZone } from './time-range.js';
@@ -507,12 +513,14 @@ const buildTimingMetrics = async (
   const prisma = getPrisma();
 
   try {
-    const rows = await prisma.$queryRawUnsafe<{
-      event_ts: Date | string;
-      direction: 'inbound' | 'outbound' | 'unknown';
-      contact_id: string | null;
-      contact_phone: string | null;
-    }[]>(
+    const rows = await prisma.$queryRawUnsafe<
+      {
+        event_ts: Date | string;
+        direction: 'inbound' | 'outbound' | 'unknown';
+        contact_id: string | null;
+        contact_phone: string | null;
+      }[]
+    >(
       `SELECT event_ts, direction, contact_id, contact_phone
        FROM sms_events
        WHERE event_ts >= $1::timestamptz
@@ -690,12 +698,13 @@ export const getScoreboardData = async (
   ]);
 
   // SMS reply links for attribution
-  const [weeklySmsReplyLinks, monthlySmsReplyLinks, weeklySmsSequenceLookup, monthlySmsSequenceLookup] = await Promise.all([
-    getBookedCallSmsReplyLinks(weeklyAttributionSources, logger),
-    getBookedCallSmsReplyLinks(monthlyAttributionSources, logger),
-    getBookedCallSequenceFromSmsEvents(weeklyAttributionSources, logger),
-    getBookedCallSequenceFromSmsEvents(monthlyAttributionSources, logger),
-  ]);
+  const [weeklySmsReplyLinks, monthlySmsReplyLinks, weeklySmsSequenceLookup, monthlySmsSequenceLookup] =
+    await Promise.all([
+      getBookedCallSmsReplyLinks(weeklyAttributionSources, logger),
+      getBookedCallSmsReplyLinks(monthlyAttributionSources, logger),
+      getBookedCallSequenceFromSmsEvents(weeklyAttributionSources, logger),
+      getBookedCallSequenceFromSmsEvents(monthlyAttributionSources, logger),
+    ]);
 
   // Build canonical slices (merges SMS heuristics with Slack booked-calls)
   const weeklyCanonical = buildCanonicalSalesMetricsSlice(weeklySummary, weeklyBooked);

@@ -1,6 +1,6 @@
 import type { Logger } from '@slack/bolt';
-import { getPrisma } from './prisma.js';
 import { type MondayLeadScope, resolveMondayLeadScope } from './monday-governed-analytics.js';
+import { getPrisma } from './prisma.js';
 
 type MondayLeadInsightsParams = {
   fromDay: string;

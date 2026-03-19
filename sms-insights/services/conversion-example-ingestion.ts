@@ -10,8 +10,8 @@
  */
 
 import type { Logger } from '@slack/bolt';
-import { getPrismaClient } from './prisma.js';
 import { upsertConversionExample } from './inbox-store.js';
+import { getPrismaClient } from './prisma.js';
 import type { SmsEventRow } from './sms-event-store.js';
 
 const getPrisma = () => getPrismaClient();

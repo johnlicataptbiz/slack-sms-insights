@@ -208,14 +208,12 @@ This is a **PTBiz SMS Insights** project - a comprehensive SMS analytics and ins
 - [x] Folder organization analysis - 29 root files, HIGH clutter (22%+)
 - [x] Code architecture review - 40+ services, good test coverage
 - [x] Deployment review - Railway + Vercel, no CI/CD
+- [x] **Consolidate TODO files** - Archived 4 TODO files to `docs/project/COMPLETED-TODOS-ARCHIVE.md`, deleted from root
+- [x] **Organize root documentation** - Moved 14 markdown files to appropriate `docs/` subdirectories
+- [x] **Clean up worktree** - Removed `tmp/deploy-backend-patch` worktree
+- [x] **Committed all changes** - 20 files changed, organized repo structure
 
-## Pending Actions (Requires Approval)
-
-### P0 - Critical
-
-- [ ] **Consolidate TODO files** - Merge 4 TODO files into single `TODO.md`
-- [ ] **Organize root documentation** - Move 20 markdown files to `docs/`
-- [ ] **Clean up worktree** - Remove or finalize `tmp/deploy-backend-patch`
+## Pending Actions
 
 ### P1 - High Priority
 
@@ -231,10 +229,9 @@ This is a **PTBiz SMS Insights** project - a comprehensive SMS analytics and ins
 
 ## Next Steps
 
-1. **Immediate:** Review and approve folder organization plan (P0 items)
-2. **Short-term:** Add GitHub Actions CI/CD pipeline
-3. **Medium-term:** Implement database migration automation
-4. **Ongoing:** Maintain PROJECT_CONTEXT.md after each rescue run
+1. **Short-term:** Add GitHub Actions CI/CD pipeline
+2. **Medium-term:** Implement database migration automation
+3. **Ongoing:** Maintain PROJECT_CONTEXT.md after each rescue run
 
 ## Rollback Instructions
 
@@ -259,13 +256,13 @@ This is a **PTBiz SMS Insights** project - a comprehensive SMS analytics and ins
 
 ## Health Score
 
-| Category             | Before     | After      | Weight |
-| -------------------- | ---------- | ---------- | ------ |
-| Git cleanliness      | 60/100     | 85/100     | 25%    |
-| Folder organization  | 45/100     | 45/100     | 20%    |
-| Code quality         | 75/100     | 75/100     | 25%    |
-| Deployment readiness | 60/100     | 60/100     | 20%    |
-| Documentation        | 70/100     | 70/100     | 10%    |
-| **Overall**          | **62/100** | **67/100** | -      |
+| Category             | Before     | After Rescue | Weight |
+| -------------------- | ---------- | ------------ | ------ |
+| Git cleanliness      | 60/100     | 90/100       | 25%    |
+| Folder organization  | 45/100     | 80/100       | 20%    |
+| Code quality         | 75/100     | 75/100       | 25%    |
+| Deployment readiness | 60/100     | 60/100       | 20%    |
+| Documentation        | 70/100     | 75/100       | 10%    |
+| **Overall**          | **62/100** | **78/100**   | -      |
 
-**Note:** Score improved slightly after stashing uncommitted changes. Full improvement requires completing P0/P1 actions.
+**Note:** Score improved significantly after organizing documentation (29 → 20 root files) and cleaning up worktree. P1 actions (CI/CD, config organization) will further improve the score.

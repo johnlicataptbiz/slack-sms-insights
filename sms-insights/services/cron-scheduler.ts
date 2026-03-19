@@ -298,7 +298,7 @@ const postInboxWatchAlert = async (
         text: {
           type: 'mrkdwn',
           text:
-            `:rotating_light: *Inbox backlog alert*\n` +
+            ':rotating_light: *Inbox backlog alert*\n' +
             `• Critical (L1 + needs reply): *${counts.criticalCount}* (threshold ${thresholds.critical})\n` +
             `• Stale (>48h + needs reply): *${counts.staleCount}* (threshold ${thresholds.stale})\n` +
             `• Unassigned + needs reply: *${counts.unassignedCount}* (threshold ${thresholds.unassigned})\n` +
@@ -374,7 +374,7 @@ const maybeAlertAttributionLag = async (app: App, date: string, hour: number, mi
         text: {
           type: 'mrkdwn',
           text:
-            `:warning: *Booked-call attribution lag detected*\n` +
+            ':warning: *Booked-call attribution lag detected*\n' +
             `• Lag: *${lagStatus.lagHours}h* (threshold ${ATTRIBUTION_LAG_THRESHOLD_HOURS}h)\n` +
             `• Latest booked_calls: \`${lagStatus.maxBookedCallsTs || 'n/a'}\`\n` +
             `• Latest booked_call_attribution: \`${lagStatus.maxAttributionTs || 'n/a'}\``,

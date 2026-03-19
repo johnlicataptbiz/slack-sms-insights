@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 
 export type ChangelogEntryType = 'feature' | 'fix' | 'refactor' | 'style' | 'docs' | 'chore' | 'other';
@@ -40,21 +40,21 @@ const TYPE_KEYWORDS: Record<ChangelogEntryType, string[]> = {
   style: ['style', 'ui', 'design', 'css', 'visual', 'layout', 'format', 'styling'],
   docs: ['docs', 'documentation', 'readme', 'comment', 'guide', 'doc'],
   chore: ['chore', 'deps', 'dependency', 'update', 'bump', 'upgrade', 'maint', 'maintenance'],
-  other: []
+  other: [],
 };
 
 // Category patterns for grouping
 const CATEGORY_PATTERNS: Record<string, string[]> = {
-  'Database': ['database', 'db', 'prisma', 'migration', 'schema', 'table', 'postgres', 'sql'],
-  'Dashboard': ['dashboard', 'v2', 'sequences', 'inbox', 'analytics', 'metrics', 'kpi', 'chart'],
+  Database: ['database', 'db', 'prisma', 'migration', 'schema', 'table', 'postgres', 'sql'],
+  Dashboard: ['dashboard', 'v2', 'sequences', 'inbox', 'analytics', 'metrics', 'kpi', 'chart'],
   'AI & ML': ['ai', 'ml', 'openai', 'gpt', 'draft', 'suggestion', 'inference', 'qualification', 'smart'],
-  'Integrations': ['slack', 'monday', 'aloware', 'integration', 'sync', 'webhook', 'api'],
-  'Authentication': ['auth', 'login', 'password', 'session', 'csrf', 'security', 'verify'],
-  'Performance': ['perf', 'performance', 'cache', 'speed', 'optimize', 'fast', 'slow'],
-  'Infrastructure': ['deploy', 'railway', 'vercel', 'docker', 'infra', 'build', 'ci', 'cd'],
+  Integrations: ['slack', 'monday', 'aloware', 'integration', 'sync', 'webhook', 'api'],
+  Authentication: ['auth', 'login', 'password', 'session', 'csrf', 'security', 'verify'],
+  Performance: ['perf', 'performance', 'cache', 'speed', 'optimize', 'fast', 'slow'],
+  Infrastructure: ['deploy', 'railway', 'vercel', 'docker', 'infra', 'build', 'ci', 'cd'],
   'Bug Fixes': ['fix', 'bug', 'error', 'crash', 'broken', 'issue', 'problem'],
   'UI/UX': ['ui', 'ux', 'design', 'layout', 'style', 'component', 'modal', 'panel', 'button'],
-  'Data Pipeline': ['pipeline', 'ingest', 'backfill', 'etl', 'sync', 'import', 'export']
+  'Data Pipeline': ['pipeline', 'ingest', 'backfill', 'etl', 'sync', 'import', 'export'],
 };
 
 /**
@@ -62,7 +62,7 @@ const CATEGORY_PATTERNS: Record<string, string[]> = {
  */
 function determineType(message: string): ChangelogEntryType {
   const lowerMessage = message.toLowerCase();
-  
+
   for (const [type, keywords] of Object.entries(TYPE_KEYWORDS)) {
     if (type === 'other') continue;
     for (const keyword of keywords) {
@@ -71,7 +71,7 @@ function determineType(message: string): ChangelogEntryType {
       }
     }
   }
-  
+
   return 'other';
 }
 
@@ -80,7 +80,7 @@ function determineType(message: string): ChangelogEntryType {
  */
 function determineCategory(message: string): string {
   const lowerMessage = message.toLowerCase();
-  
+
   for (const [category, patterns] of Object.entries(CATEGORY_PATTERNS)) {
     for (const pattern of patterns) {
       if (lowerMessage.includes(pattern)) {
@@ -88,7 +88,7 @@ function determineCategory(message: string): string {
       }
     }
   }
-  
+
   return 'General';
 }
 
@@ -98,19 +98,19 @@ function determineCategory(message: string): string {
 function formatDescription(message: string): string {
   // Remove conventional commit prefix (e.g., "feat:", "fix:", etc.)
   let cleaned = message.replace(/^[a-z]+(\([^)]+\))?:\s*/i, '');
-  
+
   // Remove issue references
   cleaned = cleaned.replace(/#\d+/g, '');
-  
+
   // Capitalize first letter
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-  
+
   // Trim and limit length
   cleaned = cleaned.trim();
   if (cleaned.length > 120) {
     cleaned = cleaned.substring(0, 117) + '...';
   }
-  
+
   return cleaned;
 }
 
@@ -138,10 +138,10 @@ function getDeploymentInfo(): {
   const sha = getBuildSha();
   const branch = (process.env.RAILWAY_GIT_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || 'main').trim();
   const service = (process.env.RAILWAY_SERVICE_NAME || process.env.VERCEL_PROJECT_NAME || 'ptbizsms-api').trim();
-  
+
   // Use current time as deployment time (best approximation)
   const deployedAt = new Date().toISOString();
-  
+
   return { sha, branch, service, deployedAt };
 }
 
@@ -150,7 +150,7 @@ function getDeploymentInfo(): {
  */
 function generateDeploymentEntry(): ChangelogEntry {
   const info = getDeploymentInfo();
-  
+
   return {
     hash: info.sha.substring(0, 7),
     date: info.deployedAt,
@@ -158,7 +158,7 @@ function generateDeploymentEntry(): ChangelogEntry {
     author: 'Railway Deploy',
     type: 'other',
     category: 'Infrastructure',
-    description: `Current deployment: ${info.sha.substring(0, 7)} on ${info.branch}`
+    description: `Current deployment: ${info.sha.substring(0, 7)} on ${info.branch}`,
   };
 }
 
@@ -171,15 +171,15 @@ function loadChangelogFromJson(): ChangelogEntry[] | null {
     if (!existsSync(jsonPath)) {
       return null;
     }
-    
+
     const content = readFileSync(jsonPath, 'utf-8');
     const data = JSON.parse(content);
-    
+
     if (data.entries && Array.isArray(data.entries)) {
       console.log(`[changelog] Loaded ${data.entries.length} entries from changelog.json`);
       return data.entries as ChangelogEntry[];
     }
-    
+
     return null;
   } catch (error) {
     console.warn('[changelog] Error loading changelog.json:', error);
@@ -190,39 +190,37 @@ function loadChangelogFromJson(): ChangelogEntry[] | null {
 /**
  * Parse git log and generate changelog entries
  */
-export function generateChangelog(days: number = 365): ChangelogTimeline {
+export function generateChangelog(days = 365): ChangelogTimeline {
   // First, try to load from build-time JSON file
   const jsonEntries = loadChangelogFromJson();
   if (jsonEntries) {
     // Filter entries by date range
     const cutoffDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const filteredEntries = jsonEntries.filter(entry => {
+    const filteredEntries = jsonEntries.filter((entry) => {
       const entryDate = new Date(entry.date);
       return entryDate >= cutoffDate;
     });
-    
+
     // Calculate stats
     const stats: ChangelogStats = {
-      features: filteredEntries.filter(e => e.type === 'feature').length,
-      fixes: filteredEntries.filter(e => e.type === 'fix').length,
-      refactors: filteredEntries.filter(e => e.type === 'refactor').length,
-      docs: filteredEntries.filter(e => e.type === 'docs').length,
-      other: filteredEntries.filter(e => 
-        !['feature', 'fix', 'refactor', 'docs'].includes(e.type)
-      ).length
+      features: filteredEntries.filter((e) => e.type === 'feature').length,
+      fixes: filteredEntries.filter((e) => e.type === 'fix').length,
+      refactors: filteredEntries.filter((e) => e.type === 'refactor').length,
+      docs: filteredEntries.filter((e) => e.type === 'docs').length,
+      other: filteredEntries.filter((e) => !['feature', 'fix', 'refactor', 'docs'].includes(e.type)).length,
     };
-    
+
     return {
       entries: filteredEntries,
       totalCount: filteredEntries.length,
       dateRange: {
         from: new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
-        to: new Date().toISOString()
+        to: new Date().toISOString(),
       },
-      stats
+      stats,
     };
   }
-  
+
   // Fallback: Try to read from git directly (for local development)
   try {
     // Try multiple possible locations for git repo
@@ -233,7 +231,7 @@ export function generateChangelog(days: number = 365): ChangelogTimeline {
       '/app', // Railway common path
       '/workspace', // Common container path
     ];
-    
+
     let repoRoot: string | null = null;
     for (const root of possibleRoots) {
       const gitDir = resolve(root, '.git');
@@ -242,42 +240,42 @@ export function generateChangelog(days: number = 365): ChangelogTimeline {
         break;
       }
     }
-    
+
     // If no git repo found, return deployment info as fallback
     if (!repoRoot) {
       console.warn('[changelog] Git repository not found, using deployment info fallback');
-      
+
       const deploymentEntry = generateDeploymentEntry();
       const fromDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      
+
       return {
         entries: [deploymentEntry],
         totalCount: 1,
         dateRange: {
           from: fromDate.toISOString(),
-          to: new Date().toISOString()
+          to: new Date().toISOString(),
         },
         stats: {
           features: 0,
           fixes: 0,
           refactors: 0,
           docs: 0,
-          other: 1
-        }
+          other: 1,
+        },
       };
     }
-    
+
     // Get git log with format: hash|date|author|message
     const format = '%H|%aI|%an|%s';
     const since = days > 0 ? `--since="${days} days ago"` : '';
     const command = `git log ${since} --pretty=format:"${format}" --no-merges`;
-    
+
     const output = execSync(command, {
       cwd: repoRoot,
       encoding: 'utf-8',
-      maxBuffer: 10 * 1024 * 1024 // 10MB buffer for large histories
+      maxBuffer: 10 * 1024 * 1024, // 10MB buffer for large histories
     });
-    
+
     const lines = output.trim().split('\n').filter(Boolean);
     const entries: ChangelogEntry[] = [];
     const stats: ChangelogStats = {
@@ -285,36 +283,42 @@ export function generateChangelog(days: number = 365): ChangelogTimeline {
       fixes: 0,
       refactors: 0,
       docs: 0,
-      other: 0
+      other: 0,
     };
-    
+
     let earliestDate: Date | null = null;
     let latestDate: Date | null = null;
-    
+
     for (const line of lines) {
       const parts = line.split('|');
       if (parts.length < 4) continue;
-      
+
       const [hash, dateStr, author, ...messageParts] = parts;
       const message = messageParts.join('|'); // Rejoin in case message had pipes
-      
+
       const date = new Date(dateStr);
-      
+
       // Track date range
       if (!earliestDate || date < earliestDate) earliestDate = date;
       if (!latestDate || date > latestDate) latestDate = date;
-      
+
       const type = determineType(message);
       const category = determineCategory(message);
       const description = formatDescription(message);
-      
+
       // Update stats
-      const statKey = type === 'feature' ? 'features' : 
-                     type === 'fix' ? 'fixes' : 
-                     type === 'refactor' ? 'refactors' : 
-                     type === 'docs' ? 'docs' : 'other';
+      const statKey =
+        type === 'feature'
+          ? 'features'
+          : type === 'fix'
+            ? 'fixes'
+            : type === 'refactor'
+              ? 'refactors'
+              : type === 'docs'
+                ? 'docs'
+                : 'other';
       stats[statKey]++;
-      
+
       entries.push({
         hash: hash.substring(0, 7),
         date: date.toISOString(),
@@ -322,38 +326,37 @@ export function generateChangelog(days: number = 365): ChangelogTimeline {
         message,
         type,
         category,
-        description
+        description,
       });
     }
-    
+
     return {
       entries,
       totalCount: entries.length,
       dateRange: {
         from: earliestDate?.toISOString() || new Date().toISOString(),
-        to: latestDate?.toISOString() || new Date().toISOString()
+        to: latestDate?.toISOString() || new Date().toISOString(),
       },
-      stats
+      stats,
     };
-    
   } catch (error) {
     console.error('Failed to generate changelog:', error);
-    
+
     // Return empty timeline on error
     return {
       entries: [],
       totalCount: 0,
       dateRange: {
         from: new Date().toISOString(),
-        to: new Date().toISOString()
+        to: new Date().toISOString(),
       },
       stats: {
         features: 0,
         fixes: 0,
         refactors: 0,
         docs: 0,
-        other: 0
-      }
+        other: 0,
+      },
     };
   }
 }
@@ -361,24 +364,24 @@ export function generateChangelog(days: number = 365): ChangelogTimeline {
 /**
  * Get changelog grouped by date
  */
-export function getChangelogGroupedByDate(days: number = 365): Array<{
+export function getChangelogGroupedByDate(days = 365): Array<{
   date: string;
   entries: ChangelogEntry[];
 }> {
   const timeline = generateChangelog(days);
-  
+
   const grouped = new Map<string, ChangelogEntry[]>();
-  
+
   for (const entry of timeline.entries) {
     const dateKey = entry.date.split('T')[0]; // YYYY-MM-DD
-    
+
     if (!grouped.has(dateKey)) {
       grouped.set(dateKey, []);
     }
-    
+
     grouped.get(dateKey)!.push(entry);
   }
-  
+
   // Convert to array and sort by date (newest first)
   return Array.from(grouped.entries())
     .map(([date, entries]) => ({ date, entries }))
@@ -388,9 +391,9 @@ export function getChangelogGroupedByDate(days: number = 365): Array<{
 /**
  * Get changelog filtered by type
  */
-export function getChangelogByType(type: ChangelogEntryType, days: number = 365): ChangelogEntry[] {
+export function getChangelogByType(type: ChangelogEntryType, days = 365): ChangelogEntry[] {
   const timeline = generateChangelog(days);
-  return timeline.entries.filter(entry => entry.type === type);
+  return timeline.entries.filter((entry) => entry.type === type);
 }
 
 /**
@@ -401,16 +404,16 @@ export async function getChangelogByDateRange(params: {
   logger?: Pick<import('@slack/bolt').Logger, 'debug' | 'warn'>;
 }): Promise<ChangelogTimeline> {
   const { days, logger } = params;
-  
+
   logger?.debug?.('[changelog] Generating timeline', { days });
-  
+
   const timeline = generateChangelog(days);
-  
-  logger?.debug?.('[changelog] Generated timeline', { 
+
+  logger?.debug?.('[changelog] Generated timeline', {
     totalCount: timeline.totalCount,
-    dateRange: timeline.dateRange 
+    dateRange: timeline.dateRange,
   });
-  
+
   return timeline;
 }
 
@@ -434,19 +437,17 @@ export function getRecentChangesSummary(): {
   highlights: string[];
 } {
   const timeline = generateChangelog(7);
-  
-  const features = timeline.entries.filter(e => e.type === 'feature');
-  const fixes = timeline.entries.filter(e => e.type === 'fix');
-  
+
+  const features = timeline.entries.filter((e) => e.type === 'feature');
+  const fixes = timeline.entries.filter((e) => e.type === 'fix');
+
   // Get top 3 most significant recent changes
-  const highlights = timeline.entries
-    .slice(0, 5)
-    .map(e => e.description);
-  
+  const highlights = timeline.entries.slice(0, 5).map((e) => e.description);
+
   return {
     total: timeline.entries.length,
     features: features.length,
     fixes: fixes.length,
-    highlights
+    highlights,
   };
 }

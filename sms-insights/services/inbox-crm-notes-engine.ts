@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import type { Logger } from '@slack/bolt';
 import { generateAiResponse } from './ai-response.js';
-import { getPrismaClient } from './prisma.js';
 import type { InboxMessageRow } from './inbox-store.js';
+import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
 

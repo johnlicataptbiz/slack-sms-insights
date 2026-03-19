@@ -110,13 +110,16 @@ export const getInsightsSummary = async (
     },
   });
 
-  const repTotals = new Map<string, {
-    messagesSent: number;
-    uniqueContacted: number;
-    repliesReceived: number;
-    bookedCalls: number;
-    optOuts: number;
-  }>();
+  const repTotals = new Map<
+    string,
+    {
+      messagesSent: number;
+      uniqueContacted: number;
+      repliesReceived: number;
+      bookedCalls: number;
+      optOuts: number;
+    }
+  >();
 
   const ensure = (repId: string) => {
     const key = repId || 'unknown';
@@ -173,13 +176,25 @@ export const getInsightsSummary = async (
 
   const risks: InsightsSummary['risks'] = [];
   if (optOutRatePct >= 3) {
-    risks.push({ key: 'optout', severity: 'critical', message: `Opt-out rate ${optOutRatePct.toFixed(1)}% is above watch threshold.` });
+    risks.push({
+      key: 'optout',
+      severity: 'critical',
+      message: `Opt-out rate ${optOutRatePct.toFixed(1)}% is above watch threshold.`,
+    });
   }
   if (replyRatePct < 5 && kpis.messagesSent >= 50) {
-    risks.push({ key: 'reply', severity: 'warning', message: `Reply rate ${replyRatePct.toFixed(1)}% is low for current volume.` });
+    risks.push({
+      key: 'reply',
+      severity: 'warning',
+      message: `Reply rate ${replyRatePct.toFixed(1)}% is low for current volume.`,
+    });
   }
   if (bookingRatePct < 1 && kpis.uniqueContacted >= 100) {
-    risks.push({ key: 'booking', severity: 'warning', message: `Booking rate ${bookingRatePct.toFixed(1)}% is below target.` });
+    risks.push({
+      key: 'booking',
+      severity: 'warning',
+      message: `Booking rate ${bookingRatePct.toFixed(1)}% is below target.`,
+    });
   }
 
   const boards = new Set(mondayRows.map((row) => row.board_id)).size;
@@ -192,7 +207,9 @@ export const getInsightsSummary = async (
   const avgSetByCoveragePct =
     mondayRows.length > 0 ? mondayRows.reduce((sum, row) => sum + row.set_by_coverage_pct, 0) / mondayRows.length : 0;
   const avgTouchpointsCoveragePct =
-    mondayRows.length > 0 ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length : 0;
+    mondayRows.length > 0
+      ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length
+      : 0;
 
   if (mondayRows.length === 0) {
     logger?.warn?.('insights-summary: no monday health rows in requested window');
@@ -215,8 +232,10 @@ export const getInsightsSummary = async (
       contacted: kpis.uniqueContacted,
       replied: kpis.repliesReceived,
       booked: kpis.bookedCalls,
-      replyDropoffPct: kpis.uniqueContacted > 0 ? ((kpis.uniqueContacted - kpis.repliesReceived) / kpis.uniqueContacted) * 100 : 0,
-      bookingDropoffPct: kpis.repliesReceived > 0 ? ((kpis.repliesReceived - kpis.bookedCalls) / kpis.repliesReceived) * 100 : 0,
+      replyDropoffPct:
+        kpis.uniqueContacted > 0 ? ((kpis.uniqueContacted - kpis.repliesReceived) / kpis.uniqueContacted) * 100 : 0,
+      bookingDropoffPct:
+        kpis.repliesReceived > 0 ? ((kpis.repliesReceived - kpis.bookedCalls) / kpis.repliesReceived) * 100 : 0,
     },
     risks,
     mondayHealth: {

@@ -1,12 +1,12 @@
 import type { Logger } from '@slack/bolt';
 import { lookupAlowareNumberLrn } from './aloware-client.js';
-import { getPrismaClient } from './prisma.js';
 import { upsertInboxContactProfile } from './inbox-contact-profiles.js';
+import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
 
 export type LrnBackfillOptions = {
-// ... (rest of the types same as before)
+  // ... (rest of the types same as before)
   dryRun: boolean;
   limit: number;
   offset: number;

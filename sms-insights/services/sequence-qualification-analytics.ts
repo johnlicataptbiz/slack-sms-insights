@@ -383,7 +383,8 @@ async function fetchSampleQuotesBySequence(
   to: string,
 ): Promise<Map<string, Partial<Record<SampleQuoteMetricKey, string>>>> {
   const prisma = getPrisma();
-  const metricSql = SAMPLE_QUOTE_METRICS.map((metric) => `
+  const metricSql = SAMPLE_QUOTE_METRICS.map(
+    (metric) => `
       SELECT
         qi.sequence_label,
         '${metric.key}' AS metric_key,
@@ -391,9 +392,12 @@ async function fetchSampleQuotesBySequence(
         qi.event_ts
       FROM qualified_inbound qi
       WHERE qi.${metric.column} = '${metric.value}'
-    `).join('\nUNION ALL\n');
+    `,
+  ).join('\nUNION ALL\n');
 
-  const results = await prisma.$queryRawUnsafe<Array<{ sequence_label: string; metric_key: SampleQuoteMetricKey; body: string }>>(
+  const results = await prisma.$queryRawUnsafe<
+    Array<{ sequence_label: string; metric_key: SampleQuoteMetricKey; body: string }>
+  >(
     `
     WITH sequence_first_touch AS (
       SELECT DISTINCT ON (conversation_id)
@@ -456,12 +460,11 @@ async function fetchSampleQuotesBySequence(
 /**
  * Fetch top niches mentioned for a sequence.
  */
-async function fetchTopNichesBySequence(
-  from: string,
-  to: string,
-): Promise<Map<string, TopNicheRow[]>> {
+async function fetchTopNichesBySequence(from: string, to: string): Promise<Map<string, TopNicheRow[]>> {
   const prisma = getPrisma();
-  const results = await prisma.$queryRawUnsafe<Array<{ sequence_label: string; niche: string; count: number; total: number }>>(
+  const results = await prisma.$queryRawUnsafe<
+    Array<{ sequence_label: string; niche: string; count: number; total: number }>
+  >(
     `
     WITH sequence_first_touch AS (
       SELECT DISTINCT ON (conversation_id)

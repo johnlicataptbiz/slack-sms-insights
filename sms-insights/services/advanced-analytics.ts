@@ -37,14 +37,16 @@ export const getLinePerformanceAnalytics = async (params: {
   const fromIso = params.from.toISOString();
   const toIso = params.to.toISOString();
 
-  const rows = await prisma.$queryRawUnsafe<{
-    line: string;
-    messages_sent: number | bigint;
-    replies_received: number | bigint;
-    opt_outs: number | bigint;
-    booking_signals: number | bigint;
-    unique_contacts: number | bigint;
-  }[]>(
+  const rows = await prisma.$queryRawUnsafe<
+    {
+      line: string;
+      messages_sent: number | bigint;
+      replies_received: number | bigint;
+      opt_outs: number | bigint;
+      booking_signals: number | bigint;
+      unique_contacts: number | bigint;
+    }[]
+  >(
     `
     WITH outbound_stats AS (
       SELECT
@@ -156,29 +158,31 @@ export type QualificationFunnelAnalytics = {
 export const getQualificationFunnelAnalytics = async (): Promise<QualificationFunnelAnalytics> => {
   const prisma = getPrisma();
 
-  const funnelRows = await prisma.$queryRawUnsafe<{
-    total_conversations: number | bigint;
-    qualified_conversations: number | bigint;
-    full_time: number | bigint;
-    part_time: number | bigint;
-    employment_unknown: number | bigint;
-    mostly_cash: number | bigint;
-    mostly_insurance: number | bigint;
-    balanced: number | bigint;
-    revenue_unknown: number | bigint;
-    high_interest: number | bigint;
-    medium_interest: number | bigint;
-    low_interest: number | bigint;
-    interest_unknown: number | bigint;
-    level_1: number | bigint;
-    level_2: number | bigint;
-    level_3: number | bigint;
-    level_4: number | bigint;
-    cadence_idle: number | bigint;
-    cadence_podcast_sent: number | bigint;
-    cadence_call_offered: number | bigint;
-    cadence_nurture_pool: number | bigint;
-  }[]>(`
+  const funnelRows = await prisma.$queryRawUnsafe<
+    {
+      total_conversations: number | bigint;
+      qualified_conversations: number | bigint;
+      full_time: number | bigint;
+      part_time: number | bigint;
+      employment_unknown: number | bigint;
+      mostly_cash: number | bigint;
+      mostly_insurance: number | bigint;
+      balanced: number | bigint;
+      revenue_unknown: number | bigint;
+      high_interest: number | bigint;
+      medium_interest: number | bigint;
+      low_interest: number | bigint;
+      interest_unknown: number | bigint;
+      level_1: number | bigint;
+      level_2: number | bigint;
+      level_3: number | bigint;
+      level_4: number | bigint;
+      cadence_idle: number | bigint;
+      cadence_podcast_sent: number | bigint;
+      cadence_call_offered: number | bigint;
+      cadence_nurture_pool: number | bigint;
+    }[]
+  >(`
     SELECT
       COUNT(DISTINCT c.id) AS total_conversations,
       COUNT(DISTINCT cs.conversation_id) AS qualified_conversations,
@@ -210,11 +214,13 @@ export const getQualificationFunnelAnalytics = async (): Promise<QualificationFu
   const qualifiedConversations = Number(row.qualified_conversations);
 
   // Calculate conversion rates by interest level
-  const conversionRows = await prisma.$queryRawUnsafe<{
-    coaching_interest: string;
-    total: number | bigint;
-    booked: number | bigint;
-  }[]>(`
+  const conversionRows = await prisma.$queryRawUnsafe<
+    {
+      coaching_interest: string;
+      total: number | bigint;
+      booked: number | bigint;
+    }[]
+  >(`
     SELECT
       cs.qualification_coaching_interest AS coaching_interest,
       COUNT(*) AS total,
@@ -320,15 +326,17 @@ export const getDraftAIPerformanceAnalytics = async (params: {
   const toIso = params.to.toISOString();
 
   // Overall stats
-  const overallRows = await prisma.$queryRawUnsafe<{
-    total_drafts: number | bigint;
-    accepted_drafts: number | bigint;
-    edited_drafts: number | bigint;
-    generic_tone_drafts: number | bigint;
-    setter_anchored_drafts: number | bigint;
-    avg_lint_score: number | string;
-    avg_structural_score: number | string;
-  }[]>(
+  const overallRows = await prisma.$queryRawUnsafe<
+    {
+      total_drafts: number | bigint;
+      accepted_drafts: number | bigint;
+      edited_drafts: number | bigint;
+      generic_tone_drafts: number | bigint;
+      setter_anchored_drafts: number | bigint;
+      avg_lint_score: number | string;
+      avg_structural_score: number | string;
+    }[]
+  >(
     `
     SELECT
       COUNT(*) AS total_drafts,
@@ -365,11 +373,13 @@ export const getDraftAIPerformanceAnalytics = async (params: {
   const setterLikeDrafts = Math.max(0, setterAnchoredDrafts - genericToneDrafts);
 
   // Score by outcome
-  const outcomeRows = await prisma.$queryRawUnsafe<{
-    outcome: string;
-    avg_lint: number | string;
-    avg_structural: number | string;
-  }[]>(
+  const outcomeRows = await prisma.$queryRawUnsafe<
+    {
+      outcome: string;
+      avg_lint: number | string;
+      avg_structural: number | string;
+    }[]
+  >(
     `
     SELECT
       CASE
@@ -403,13 +413,15 @@ export const getDraftAIPerformanceAnalytics = async (params: {
   }
 
   // Trend by day
-  const trendRows = await prisma.$queryRawUnsafe<{
-    day: string;
-    total: number | bigint;
-    accepted: number | bigint;
-    edited: number | bigint;
-    avg_lint_score: number | string;
-  }[]>(
+  const trendRows = await prisma.$queryRawUnsafe<
+    {
+      day: string;
+      total: number | bigint;
+      accepted: number | bigint;
+      edited: number | bigint;
+      avg_lint_score: number | string;
+    }[]
+  >(
     `
     SELECT
       TO_CHAR(created_at AT TIME ZONE 'America/New_York', 'YYYY-MM-DD') AS day,
@@ -486,13 +498,15 @@ export const getFollowUpSLAAnalytics = async (params: { from: Date; to: Date }):
   const toIso = params.to.toISOString();
 
   // Overall SLA stats
-  const overallRows = await prisma.$queryRawUnsafe<{
-    total_work_items: number | bigint;
-    resolved_on_time: number | bigint;
-    resolved_late: number | bigint;
-    pending: number | bigint;
-    avg_resolution_minutes: number | string;
-  }[]>(
+  const overallRows = await prisma.$queryRawUnsafe<
+    {
+      total_work_items: number | bigint;
+      resolved_on_time: number | bigint;
+      resolved_late: number | bigint;
+      pending: number | bigint;
+      avg_resolution_minutes: number | string;
+    }[]
+  >(
     `
     SELECT
       COUNT(*) AS total_work_items,
@@ -515,13 +529,15 @@ export const getFollowUpSLAAnalytics = async (params: { from: Date; to: Date }):
   const resolved = resolvedOnTime + resolvedLate;
 
   // By rep
-  const repRows = await prisma.$queryRawUnsafe<{
-    rep_id: string;
-    total: number | bigint;
-    on_time: number | bigint;
-    late: number | bigint;
-    pending: number | bigint;
-  }[]>(
+  const repRows = await prisma.$queryRawUnsafe<
+    {
+      rep_id: string;
+      total: number | bigint;
+      on_time: number | bigint;
+      late: number | bigint;
+      pending: number | bigint;
+    }[]
+  >(
     `
     SELECT
       COALESCE(rep_id, 'Unassigned') AS rep_id,
@@ -554,13 +570,15 @@ export const getFollowUpSLAAnalytics = async (params: { from: Date; to: Date }):
   });
 
   // By type
-  const typeRows = await prisma.$queryRawUnsafe<{
-    type: string;
-    total: number | bigint;
-    on_time: number | bigint;
-    late: number | bigint;
-    avg_resolution_minutes: number | string;
-  }[]>(
+  const typeRows = await prisma.$queryRawUnsafe<
+    {
+      type: string;
+      total: number | bigint;
+      on_time: number | bigint;
+      late: number | bigint;
+      avg_resolution_minutes: number | string;
+    }[]
+  >(
     `
     SELECT
       type,

@@ -138,10 +138,7 @@ export const listAttributionMethodDaily = async (params: {
   });
 };
 
-export const listRepResponseDaily = async (params: {
-  from: Date;
-  to: Date;
-}): Promise<RepResponseDailyRow[]> => {
+export const listRepResponseDaily = async (params: { from: Date; to: Date }): Promise<RepResponseDailyRow[]> => {
   const prisma = getPrisma();
   const rows = await prisma.fact_rep_response_daily.findMany({
     where: { day: { gte: params.from, lte: params.to } },

@@ -1,5 +1,9 @@
 import type { Logger } from '@slack/bolt';
-import { getBookedCallAttributionSources, getBookedCallSmsReplyLinks, getBookedCallSequenceFromSmsEvents } from './booked-calls.js';
+import {
+  getBookedCallAttributionSources,
+  getBookedCallSequenceFromSmsEvents,
+  getBookedCallSmsReplyLinks,
+} from './booked-calls.js';
 import { getPrismaClient } from './prisma.js';
 import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
 
@@ -56,7 +60,8 @@ const isBookingSignal = (direction: string, body: string): boolean => {
   return direction === 'inbound' && HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) && !CANCELLATION_PATTERN.test(body);
 };
 
-const isOptOutSignal = (direction: string, body: string): boolean => direction === 'inbound' && CANCELLATION_PATTERN.test(body);
+const isOptOutSignal = (direction: string, body: string): boolean =>
+  direction === 'inbound' && CANCELLATION_PATTERN.test(body);
 const resolveSocialMondayBackfillLabel = (source: string | null | undefined): string => {
   const normalized = (source || '').trim().toLowerCase();
   if (!normalized) return SOCIAL_MEDIA_BACKFILL_LABEL;
@@ -121,59 +126,64 @@ export const refreshKpiFacts = async (
     },
     select: { id: true },
   });
-  const [socialInstagramBackfill, socialFacebookAdsBackfill, socialFacebookGroupBackfill, socialLinkedInBackfill, socialOrganicBackfill] =
-    await Promise.all([
-      prisma.sequence_registry.upsert({
-        where: { normalized_label: 'social media instagram monday backfill' },
-        update: { is_manual_bucket: false },
-        create: {
-          label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
-          normalized_label: 'social media instagram monday backfill',
-          is_manual_bucket: false,
-        },
-        select: { id: true },
-      }),
-      prisma.sequence_registry.upsert({
-        where: { normalized_label: 'social media facebook ads monday backfill' },
-        update: { is_manual_bucket: false },
-        create: {
-          label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
-          normalized_label: 'social media facebook ads monday backfill',
-          is_manual_bucket: false,
-        },
-        select: { id: true },
-      }),
-      prisma.sequence_registry.upsert({
-        where: { normalized_label: 'social media facebook group monday backfill' },
-        update: { is_manual_bucket: false },
-        create: {
-          label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
-          normalized_label: 'social media facebook group monday backfill',
-          is_manual_bucket: false,
-        },
-        select: { id: true },
-      }),
-      prisma.sequence_registry.upsert({
-        where: { normalized_label: 'social media linkedin monday backfill' },
-        update: { is_manual_bucket: false },
-        create: {
-          label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
-          normalized_label: 'social media linkedin monday backfill',
-          is_manual_bucket: false,
-        },
-        select: { id: true },
-      }),
-      prisma.sequence_registry.upsert({
-        where: { normalized_label: 'social media organic monday backfill' },
-        update: { is_manual_bucket: false },
-        create: {
-          label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
-          normalized_label: 'social media organic monday backfill',
-          is_manual_bucket: false,
-        },
-        select: { id: true },
-      }),
-    ]);
+  const [
+    socialInstagramBackfill,
+    socialFacebookAdsBackfill,
+    socialFacebookGroupBackfill,
+    socialLinkedInBackfill,
+    socialOrganicBackfill,
+  ] = await Promise.all([
+    prisma.sequence_registry.upsert({
+      where: { normalized_label: 'social media instagram monday backfill' },
+      update: { is_manual_bucket: false },
+      create: {
+        label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
+        normalized_label: 'social media instagram monday backfill',
+        is_manual_bucket: false,
+      },
+      select: { id: true },
+    }),
+    prisma.sequence_registry.upsert({
+      where: { normalized_label: 'social media facebook ads monday backfill' },
+      update: { is_manual_bucket: false },
+      create: {
+        label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
+        normalized_label: 'social media facebook ads monday backfill',
+        is_manual_bucket: false,
+      },
+      select: { id: true },
+    }),
+    prisma.sequence_registry.upsert({
+      where: { normalized_label: 'social media facebook group monday backfill' },
+      update: { is_manual_bucket: false },
+      create: {
+        label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
+        normalized_label: 'social media facebook group monday backfill',
+        is_manual_bucket: false,
+      },
+      select: { id: true },
+    }),
+    prisma.sequence_registry.upsert({
+      where: { normalized_label: 'social media linkedin monday backfill' },
+      update: { is_manual_bucket: false },
+      create: {
+        label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
+        normalized_label: 'social media linkedin monday backfill',
+        is_manual_bucket: false,
+      },
+      select: { id: true },
+    }),
+    prisma.sequence_registry.upsert({
+      where: { normalized_label: 'social media organic monday backfill' },
+      update: { is_manual_bucket: false },
+      create: {
+        label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
+        normalized_label: 'social media organic monday backfill',
+        is_manual_bucket: false,
+      },
+      select: { id: true },
+    }),
+  ]);
 
   const rangeFrom = new Date(params.from);
   const rangeTo = new Date(params.to);
@@ -218,18 +228,21 @@ export const refreshKpiFacts = async (
     eventsByContact.set(event._contactKey, list);
   }
 
-  const smsMap = new Map<string, {
-    day: string;
-    sequenceId: string;
-    repId: string;
-    messagesSent: number;
-    repliesReceived: number;
-    optOuts: number;
-    bookingSignalsSms: number;
-    uniqueContactedSet: Set<string>;
-    repliedSet: Set<string>;
-    optOutSet: Set<string>;
-  }>();
+  const smsMap = new Map<
+    string,
+    {
+      day: string;
+      sequenceId: string;
+      repId: string;
+      messagesSent: number;
+      repliesReceived: number;
+      optOuts: number;
+      bookingSignalsSms: number;
+      uniqueContactedSet: Set<string>;
+      repliedSet: Set<string>;
+      optOutSet: Set<string>;
+    }
+  >();
 
   const ensure = (day: string, sequenceId: string, repId: string) => {
     const key = `${day}|${sequenceId}|${repId}`;
@@ -252,7 +265,8 @@ export const refreshKpiFacts = async (
     return row;
   };
 
-  const inRangeDay = (day: string): boolean => day >= dayKey(rangeFrom, params.timeZone) && day <= dayKey(rangeTo, params.timeZone);
+  const inRangeDay = (day: string): boolean =>
+    day >= dayKey(rangeFrom, params.timeZone) && day <= dayKey(rangeTo, params.timeZone);
 
   for (const event of events) {
     if (!inRangeDay(event._day)) continue;
@@ -322,7 +336,10 @@ export const refreshKpiFacts = async (
   });
   const messagesSentBySequenceId = new Map<string, number>();
   for (const row of smsRows) {
-    messagesSentBySequenceId.set(row.sequenceId, (messagesSentBySequenceId.get(row.sequenceId) || 0) + row.messagesSent);
+    messagesSentBySequenceId.set(
+      row.sequenceId,
+      (messagesSentBySequenceId.get(row.sequenceId) || 0) + row.messagesSent,
+    );
   }
 
   const sequenceRowsForAttribution = sequenceRows.map((row) => ({
@@ -351,16 +368,19 @@ export const refreshKpiFacts = async (
     smsSequenceLookup,
   );
 
-  const bookingRowsMap = new Map<string, {
-    day_key: string;
-    sequence_key: string;
-    setter: string;
-    booked_total: number;
-    booked_jack: number;
-    booked_brandon: number;
-    booked_self: number;
-    booked_after_sms_reply: number;
-  }>();
+  const bookingRowsMap = new Map<
+    string,
+    {
+      day_key: string;
+      sequence_key: string;
+      setter: string;
+      booked_total: number;
+      booked_jack: number;
+      booked_brandon: number;
+      booked_self: number;
+      booked_after_sms_reply: number;
+    }
+  >();
 
   const bumpBookingRow = (input: {
     eventTs: string;
@@ -401,9 +421,7 @@ export const refreshKpiFacts = async (
   }
   for (const missing of sequenceAttribution.unattributedAuditRows) {
     const fallbackSequenceLabel =
-      missing.bucket === 'jack' || missing.bucket === 'brandon'
-        ? SOCIAL_MEDIA_BACKFILL_LABEL
-        : MANUAL_LABEL;
+      missing.bucket === 'jack' || missing.bucket === 'brandon' ? SOCIAL_MEDIA_BACKFILL_LABEL : MANUAL_LABEL;
     bumpBookingRow({
       eventTs: missing.eventTs,
       sequenceLabel: fallbackSequenceLabel,
@@ -414,10 +432,12 @@ export const refreshKpiFacts = async (
 
   const bookingRows = Array.from(bookingRowsMap.values());
 
-  const rawBookedFallbackRows = await prisma.$queryRawUnsafe<Array<{
-    day_key: string;
-    booked_total: number;
-  }>>(
+  const rawBookedFallbackRows = await prisma.$queryRawUnsafe<
+    Array<{
+      day_key: string;
+      booked_total: number;
+    }>
+  >(
     `SELECT
        to_char(date_trunc('day', event_ts AT TIME ZONE $3), 'YYYY-MM-DD') AS day_key,
        COUNT(*)::int AS booked_total
@@ -430,13 +450,15 @@ export const refreshKpiFacts = async (
     params.timeZone,
   );
 
-  const mondayFallbackRows = await prisma.$queryRawUnsafe<Array<{
-    day_key: string;
-    sequence_key: string;
-    source_key: string | null;
-    setter: string | null;
-    booked_total: number;
-  }>>(
+  const mondayFallbackRows = await prisma.$queryRawUnsafe<
+    Array<{
+      day_key: string;
+      sequence_key: string;
+      source_key: string | null;
+      setter: string | null;
+      booked_total: number;
+    }>
+  >(
     `
     SELECT
       to_char(date_trunc('day', lo.call_date::timestamp AT TIME ZONE $3), 'YYYY-MM-DD') AS day_key,
@@ -502,12 +524,15 @@ export const refreshKpiFacts = async (
   for (const row of bookingRows) {
     fallbackDayTotals.set(row.day_key, Math.max(0, (fallbackDayTotals.get(row.day_key) || 0) - row.booked_total));
   }
-  const mondayRowsByDay = new Map<string, Array<{
-    sequence_key: string;
-    source_key: string | null;
-    setter: string;
-    remaining: number;
-  }>>();
+  const mondayRowsByDay = new Map<
+    string,
+    Array<{
+      sequence_key: string;
+      source_key: string | null;
+      setter: string;
+      remaining: number;
+    }>
+  >();
   for (const row of mondayFallbackRows) {
     const list = mondayRowsByDay.get(row.day_key) || [];
     list.push({
@@ -539,7 +564,9 @@ export const refreshKpiFacts = async (
       const isSocialSource = /social|instagram|facebook|linkedin/i.test(candidate.source_key || '');
       const mondayResolvedSequenceKey =
         candidate.sequence_key === MANUAL_LABEL
-          ? (isSocialSource ? resolveSocialMondayBackfillLabel(candidate.source_key) : MONDAY_BACKFILL_LABEL)
+          ? isSocialSource
+            ? resolveSocialMondayBackfillLabel(candidate.source_key)
+            : MONDAY_BACKFILL_LABEL
           : candidate.sequence_key;
       bookingRows.push({
         day_key: dayKey,
@@ -573,16 +600,19 @@ export const refreshKpiFacts = async (
     }
   }
 
-  const mergedBookingRowsMap = new Map<string, {
-    day_key: string;
-    sequence_key: string;
-    setter: string;
-    booked_total: number;
-    booked_jack: number;
-    booked_brandon: number;
-    booked_self: number;
-    booked_after_sms_reply: number;
-  }>();
+  const mergedBookingRowsMap = new Map<
+    string,
+    {
+      day_key: string;
+      sequence_key: string;
+      setter: string;
+      booked_total: number;
+      booked_jack: number;
+      booked_brandon: number;
+      booked_self: number;
+      booked_after_sms_reply: number;
+    }
+  >();
   for (const row of bookingRows) {
     const mergeKey = `${row.day_key}|${row.sequence_key}|${row.setter}`;
     const existing = mergedBookingRowsMap.get(mergeKey);
@@ -640,28 +670,30 @@ export const refreshKpiFacts = async (
     };
   });
 
-  const leadRows = await prisma.$queryRawUnsafe<Array<{
-    day_key: string;
-    sequence_id: string;
-    rep_id: string;
-    leads_count: number;
-    p0: number;
-    p1: number;
-    p2: number;
-    p3: number;
-    p4: number;
-    rm_cash: number;
-    rm_ins: number;
-    rm_bal: number;
-    rm_unknown: number;
-    emp_full: number;
-    emp_part: number;
-    emp_unknown: number;
-    ci_high: number;
-    ci_med: number;
-    ci_low: number;
-    ci_unknown: number;
-  }>>(
+  const leadRows = await prisma.$queryRawUnsafe<
+    Array<{
+      day_key: string;
+      sequence_id: string;
+      rep_id: string;
+      leads_count: number;
+      p0: number;
+      p1: number;
+      p2: number;
+      p3: number;
+      p4: number;
+      rm_cash: number;
+      rm_ins: number;
+      rm_bal: number;
+      rm_unknown: number;
+      emp_full: number;
+      emp_part: number;
+      emp_unknown: number;
+      ci_high: number;
+      ci_med: number;
+      ci_low: number;
+      ci_unknown: number;
+    }>
+  >(
     `WITH latest_touch AS (
        SELECT
          c.id AS conversation_id,
@@ -734,16 +766,19 @@ export const refreshKpiFacts = async (
     source_bucket_known: 0,
   }));
 
-  const funnelFactRowsMap = new Map<string, {
-    day: Date;
-    sequence_id: string;
-    rep_id: string;
-    new_leads_contacted: number;
-    leads_replied: number;
-    qualified_leads: number;
-    booked_calls: number;
-    opt_outs: number;
-  }>();
+  const funnelFactRowsMap = new Map<
+    string,
+    {
+      day: Date;
+      sequence_id: string;
+      rep_id: string;
+      new_leads_contacted: number;
+      leads_replied: number;
+      qualified_leads: number;
+      booked_calls: number;
+      opt_outs: number;
+    }
+  >();
 
   const ensureFunnelRow = (day: string, sequenceId: string, repId: string) => {
     const key = `${day}|${sequenceId}|${repId}`;
@@ -1009,18 +1044,20 @@ export const refreshKpiFacts = async (
     rangeTo.toISOString(),
   );
 
-  const mondayRows = await prisma.$queryRawUnsafe<Array<{
-    board_id: string;
-    board_class: string;
-    sync_status: string | null;
-    source_coverage_pct: number;
-    campaign_coverage_pct: number;
-    set_by_coverage_pct: number;
-    touchpoints_coverage_pct: number;
-    snapshot_count: number;
-    lead_attribution_count: number;
-    metric_fact_count: number;
-  }>>(
+  const mondayRows = await prisma.$queryRawUnsafe<
+    Array<{
+      board_id: string;
+      board_class: string;
+      sync_status: string | null;
+      source_coverage_pct: number;
+      campaign_coverage_pct: number;
+      set_by_coverage_pct: number;
+      touchpoints_coverage_pct: number;
+      snapshot_count: number;
+      lead_attribution_count: number;
+      metric_fact_count: number;
+    }>
+  >(
     `SELECT
        board_id,
        board_class,
@@ -1058,7 +1095,7 @@ export const refreshKpiFacts = async (
       rangeTo.toISOString(),
     ),
     conversationJourneyInsert,
-    prisma.$executeRawUnsafe(`DELETE FROM fact_sms_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    prisma.$executeRawUnsafe('DELETE FROM fact_sms_daily WHERE day >= $1::date AND day <= $2::date', fromDay, toDay),
     ...(smsRows.length > 0
       ? [
           prisma.fact_sms_daily.createMany({
@@ -1077,7 +1114,11 @@ export const refreshKpiFacts = async (
           }),
         ]
       : []),
-    prisma.$executeRawUnsafe(`DELETE FROM fact_booking_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      'DELETE FROM fact_booking_daily WHERE day >= $1::date AND day <= $2::date',
+      fromDay,
+      toDay,
+    ),
     ...(bookingFactRows.length > 0
       ? [
           prisma.fact_booking_daily.createMany({
@@ -1085,7 +1126,11 @@ export const refreshKpiFacts = async (
           }),
         ]
       : []),
-    prisma.$executeRawUnsafe(`DELETE FROM fact_lead_quality_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      'DELETE FROM fact_lead_quality_daily WHERE day >= $1::date AND day <= $2::date',
+      fromDay,
+      toDay,
+    ),
     ...(leadFactRows.length > 0
       ? [
           prisma.fact_lead_quality_daily.createMany({
@@ -1093,7 +1138,11 @@ export const refreshKpiFacts = async (
           }),
         ]
       : []),
-    prisma.$executeRawUnsafe(`DELETE FROM fact_sequence_funnel_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      'DELETE FROM fact_sequence_funnel_daily WHERE day >= $1::date AND day <= $2::date',
+      fromDay,
+      toDay,
+    ),
     ...(funnelFactRows.length > 0
       ? [
           prisma.fact_sequence_funnel_daily.createMany({
@@ -1101,11 +1150,23 @@ export const refreshKpiFacts = async (
           }),
         ]
       : []),
-    prisma.$executeRawUnsafe(`DELETE FROM fact_attribution_method_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      'DELETE FROM fact_attribution_method_daily WHERE day >= $1::date AND day <= $2::date',
+      fromDay,
+      toDay,
+    ),
     attributionMethodInsert,
-    prisma.$executeRawUnsafe(`DELETE FROM fact_rep_response_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      'DELETE FROM fact_rep_response_daily WHERE day >= $1::date AND day <= $2::date',
+      fromDay,
+      toDay,
+    ),
     repResponseInsert,
-    prisma.$executeRawUnsafe(`DELETE FROM fact_monday_health_daily WHERE day >= $1::date AND day <= $2::date`, fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      'DELETE FROM fact_monday_health_daily WHERE day >= $1::date AND day <= $2::date',
+      fromDay,
+      toDay,
+    ),
     ...(mondayFactRows.length > 0
       ? [
           prisma.fact_monday_health_daily.createMany({

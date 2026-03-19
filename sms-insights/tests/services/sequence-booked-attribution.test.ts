@@ -1,10 +1,10 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
+import { resolveBestSequenceLookupCandidate } from '../../services/booked-calls.js';
 import {
   attributeSlackBookedCallsToSequences,
   MANUAL_SEQUENCE_LABEL,
 } from '../../services/sequence-booked-attribution.js';
-import { resolveBestSequenceLookupCandidate } from '../../services/booked-calls.js';
 
 describe('sequence booked-call attribution', () => {
   it('maps HubSpot first-conversion text to the closest sequence label and keeps bucket credit', () => {

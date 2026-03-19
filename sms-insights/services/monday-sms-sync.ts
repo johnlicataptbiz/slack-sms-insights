@@ -190,7 +190,7 @@ export const syncMondaySmsBoard = async (
 
     let cursor = state?.cursor || null;
     let fetchedItems = 0;
-    let upsertedItems = 0;
+    const upsertedItems = 0;
     let pageCount = 0;
 
     while (pageCount < mondaySmsConfig.maxPagesPerRun) {

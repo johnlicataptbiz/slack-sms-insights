@@ -225,19 +225,17 @@ const resolveSequenceLabel = (
     // prefer the versioned sequence with the highest message volume (e.g., v1.2, v1.1)
     if (bestLabel.toLowerCase().includes('hiring guide') && !/\bv\d+\.\d+/i.test(bestLabel)) {
       const versionedHiringGuide = candidates
-        .filter(c => 
-          c.label.toLowerCase().includes('hiring guide') && 
-          /\bv\d+\.\d+/i.test(c.label) &&
-          c.messagesSent > 0
+        .filter(
+          (c) => c.label.toLowerCase().includes('hiring guide') && /\bv\d+\.\d+/i.test(c.label) && c.messagesSent > 0,
         )
         .sort((a, b) => b.messagesSent - a.messagesSent)[0];
-      
+
       if (versionedHiringGuide) {
         bestLabel = versionedHiringGuide.label;
         bestMessagesSent = versionedHiringGuide.messagesSent;
       }
     }
-    
+
     return { label: bestLabel, manual: bestLabel === MANUAL_SEQUENCE_LABEL, bestScore, bestCandidate: bestLabel };
   }
 

@@ -95,7 +95,6 @@ export const getDailyRuns = async (
   const prisma = getPrisma();
 
   try {
-
     if (options.raw) {
       const where: any = {};
       if (options.channelId) where.channel_id = options.channelId;
@@ -233,7 +232,7 @@ export const getChannelsWithRuns = async (logger?: Pick<Logger, 'warn'>): Promis
       },
     });
 
-    return result.map(r => ({
+    return result.map((r) => ({
       channel_id: r.channel_id,
       channel_name: r.channel_name,
       run_count: String(r._count._all),

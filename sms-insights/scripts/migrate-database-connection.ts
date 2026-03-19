@@ -6,8 +6,8 @@
  * and validates the connection works correctly.
  * 
  * Usage:
- *   npx tsx scripts/migrate-database-connection.ts
- *   DRY_RUN=true npx tsx scripts/migrate-database-connection.ts
+ *   NEW_DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require npx tsx scripts/migrate-database-connection.ts
+ *   DRY_RUN=true NEW_DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require npx tsx scripts/migrate-database-connection.ts
  */
 
 import { execSync } from 'child_process';
@@ -15,7 +15,7 @@ import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 
 // Target database connection string (new ptbizsms DB)
-const NEW_DB_URL = 'postgres://07b4c267f59513292ecea7f09217f913053ddd9972c3f21eec56bf65e9bde0a3:sk_TeOuHW6axVcjkvKBJr03a@db.prisma.io:5432/postgres?sslmode=require';
+const NEW_DB_URL = process.env.NEW_DATABASE_URL?.trim() || '';
 
 // Backup file path
 const BACKUP_DIR = resolve(__dirname, '../.env.backups');
@@ -229,6 +229,10 @@ async function runMigration(): Promise<MigrationResult> {
   console.log('═══════════════════════════════════════════════════════════════');
   console.log('  Database Connection Migration');
   console.log('═══════════════════════════════════════════════════════════════\n');
+
+  if (!NEW_DB_URL) {
+    throw new Error('NEW_DATABASE_URL is required to run this migration script.');
+  }
 
   if (DRY_RUN) {
     console.log('🔍 DRY RUN MODE - No changes will be made\n');

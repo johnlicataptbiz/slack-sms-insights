@@ -40,7 +40,7 @@ Migrate the SMS Insights production deployment from the outdated Prisma database
 
 3. **Database Connection**: Currently connected to old/outdated Prisma database
    - Target database (ptbizsms) is more complete and robust
-   - Connection string: `postgresql://07b4c267f59513292ecea7f09217f913053ddd9972c3f21eec56bf65e9bde0a3:sk_TeOuHW6axVcjkvKBJr03a@db.prisma.io:5432/postgres?sslmode=require`
+   - Connection string: `postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require`
 
 4. **Health Status**: Service is running but on outdated code
    - Health checks pass: `/api/health` returns `ok=true`
@@ -61,7 +61,7 @@ Migrate the SMS Insights production deployment from the outdated Prisma database
 **Actions**:
 1. Update `DATABASE_URL` environment variable in Railway:
    ```
-   postgresql://07b4c267f59513292ecea7f09217f913053ddd9972c3f21eec56bf65e9bde0a3:sk_TeOuHW6axVcjkvKBJr03a@db.prisma.io:5432/postgres?sslmode=require
+   postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require
    ```
 
 2. Update `PRISMA_ACCELERATE_URL` environment variable:
@@ -101,9 +101,9 @@ Migrate the SMS Insights production deployment from the outdated Prisma database
 **Actions**:
 1. Test changelog API with authentication:
    ```bash
-   curl -X POST https://ptbizsms.com/api/auth/password \
-     -H "Content-Type: application/json" \
-     -d '{"password": "bigbizin26"}'
+    curl -X POST https://ptbizsms.com/api/auth/password \
+      -H "Content-Type: application/json" \
+      -d '{"password": "<dashboard-password>"}'
    
    curl https://ptbizsms.com/api/v2/changelog?days=7 \
      -H "Cookie: [session-cookie]" \
@@ -146,7 +146,7 @@ Migrate the SMS Insights production deployment from the outdated Prisma database
 - Issues: JSON type mismatches, incomplete data
 
 ### Target Database (ptbizsms - Intended)
-- **Connection String**: `postgresql://07b4c267f59513292ecea7f09217f913053ddd9972c3f21eec56bf65e9bde0a3:sk_TeOuHW6axVcjkvKBJr03a@db.prisma.io:5432/postgres?sslmode=require`
+- **Connection String**: `postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require`
 - **Project**: ptbizsms on Prisma
 - **Status**: More complete, robust, intended production database
 - **Schema**: Fully compatible with current application
@@ -234,13 +234,13 @@ interface ChangelogTimeline {
 
 ### Railway (Backend) - To Be Updated
 ```env
-DATABASE_URL=postgresql://07b4c267f59513292ecea7f09217f913053ddd9972c3f21eec56bf65e9bde0a3:sk_TeOuHW6axVcjkvKBJr03a@db.prisma.io:5432/postgres?sslmode=require
+DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require
 PRISMA_ACCELERATE_URL=prisma+postgres://accelerate.prisma-data.net/?api_key=[ptbizsms-key]
 SLACK_BOT_TOKEN=<slack-bot-token>
 SLACK_SIGNING_SECRET=...
 ALOWARE_API_KEY=...
 MONDAY_API_KEY=...
-DASHBOARD_PASSWORD=bigbizin26
+DASHBOARD_PASSWORD=<dashboard-password>
 ```
 
 ### Vercel (Frontend)

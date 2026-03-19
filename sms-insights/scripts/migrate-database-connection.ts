@@ -6,8 +6,13 @@
  * and validates the connection works correctly.
  * 
  * Usage:
+ *   # Bash/zsh inline env form
  *   NEW_DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require npx tsx scripts/migrate-database-connection.ts
  *   DRY_RUN=true NEW_DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require npx tsx scripts/migrate-database-connection.ts
+ *   # Cross-shell alternative
+ *   export NEW_DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require
+ *   npx tsx scripts/migrate-database-connection.ts
+ *   DRY_RUN=true npx tsx scripts/migrate-database-connection.ts
  */
 
 import { execSync } from 'child_process';

@@ -31,7 +31,10 @@ jobs:
         run: npm run lint || true
 
       - name: Run tests
-        run: npm test
+        run: npm run build && node --import tsx --test "tests/**/*.test.ts"
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+          SKIP_FRONTEND_BUILD: "true"
 
   test-frontend:
     name: Test Frontend

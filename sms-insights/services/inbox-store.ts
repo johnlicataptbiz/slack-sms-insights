@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import type {
   CoachingInterest,
@@ -7,6 +8,62 @@ import type {
   RevenueMixCategory,
 } from './inbox-contact-profiles.js';
 import { getPrismaClient } from './prisma.js';
+
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput =>
+  value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue);
+
+const applyConversationStateInput = (
+  target: Prisma.conversation_stateUpdateInput | Prisma.conversation_stateUncheckedCreateInput,
+  input: UpdateConversationStateInput,
+): void => {
+  if (input.fullOrPartTime !== undefined) target.qualification_full_or_part_time = input.fullOrPartTime;
+  if (input.niche !== undefined) target.qualification_niche = input.niche;
+  if (input.revenueMix !== undefined) target.qualification_revenue_mix = input.revenueMix;
+  if (input.deliveryModel !== undefined) target.qualification_delivery_model = input.deliveryModel;
+  if (input.coachingInterest !== undefined) target.qualification_coaching_interest = input.coachingInterest;
+  if (input.progressStep !== undefined) target.qualification_progress_step = input.progressStep;
+  if (input.objectionTags !== undefined) target.objection_tags = input.objectionTags;
+  if (input.escalationLevel !== undefined) target.escalation_level = input.escalationLevel;
+  if (input.escalationReason !== undefined) target.escalation_reason = input.escalationReason;
+  if (input.escalationOverridden !== undefined) target.escalation_overridden = input.escalationOverridden;
+  if (input.lastPodcastSentAt !== undefined) {
+    target.last_podcast_sent_at = input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null;
+  }
+  if (input.nextFollowupDueAt !== undefined) {
+    target.next_followup_due_at = input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null;
+  }
+  if (input.cadenceStatus !== undefined) target.cadence_status = input.cadenceStatus;
+};
+
+type InboxMondayTrailRow = {
+  board_id: string;
+  item_id: string;
+  item_name: string | null;
+  stage: string | null;
+  call_date: string | null;
+  disposition: string | null;
+  is_booked: boolean;
+  updated_at: Date | string;
+};
+
+type SendAttemptVolumeCountsRow = {
+  sent_last_hour: string;
+  sent_last_day: string;
+  conversation_sent_last_hour: string;
+};
+
+type GuardrailOverrideRow = {
+  conversation_id: string;
+  guardrail_override_count: number;
+};
+
+type ConversionExampleListRow = ConversionExampleRow & {
+  outbound_body: string | null;
+  outbound_user: string | null;
+  source_inbound_body: string | null;
+  source_conversation_id: string | null;
+  source_outbound_ts: string | null;
+};
 
 export type CadenceStatus = 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
 
@@ -332,32 +389,20 @@ export const updateConversationState = async (
   const prisma = getPrisma();
 
   try {
-    const updateData: any = {
+    const updateData: Prisma.conversation_stateUpdateInput = {
       updated_at: new Date(),
     };
-    if (input.fullOrPartTime !== undefined) updateData.qualification_full_or_part_time = input.fullOrPartTime;
-    if (input.niche !== undefined) updateData.qualification_niche = input.niche;
-    if (input.revenueMix !== undefined) updateData.qualification_revenue_mix = input.revenueMix;
-    if (input.deliveryModel !== undefined) updateData.qualification_delivery_model = input.deliveryModel;
-    if (input.coachingInterest !== undefined) updateData.qualification_coaching_interest = input.coachingInterest;
-    if (input.progressStep !== undefined) updateData.qualification_progress_step = input.progressStep;
-    if (input.objectionTags !== undefined) updateData.objection_tags = input.objectionTags;
-    if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
-    if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
-    if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;
-    if (input.lastPodcastSentAt !== undefined)
-      updateData.last_podcast_sent_at = input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null;
-    if (input.nextFollowupDueAt !== undefined)
-      updateData.next_followup_due_at = input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null;
-    if (input.cadenceStatus !== undefined) updateData.cadence_status = input.cadenceStatus;
+    const createData: Prisma.conversation_stateUncheckedCreateInput = {
+      conversation_id: conversationId,
+      updated_at: new Date(),
+    };
+    applyConversationStateInput(updateData, input);
+    applyConversationStateInput(createData, input);
 
     const result = await prisma.conversation_state.upsert({
       where: { conversation_id: conversationId },
       update: updateData,
-      create: {
-        conversation_id: conversationId,
-        ...updateData,
-      },
+      create: createData,
     });
 
     return result as unknown as ConversationStateRow;
@@ -383,7 +428,7 @@ export const listInboxConversations = async (
   const prisma = getPrisma();
   try {
     const where: string[] = [];
-    const values: Array<any> = [];
+    const values: Array<string | number | boolean | null> = [];
     let index = 1;
 
     if (params.status) {
@@ -691,7 +736,7 @@ export const listMondayTrailForContactKey = async (
   try {
     const normalizedLimit = Math.max(1, Math.min(limit, 50));
 
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    const result = await prisma.$queryRawUnsafe<InboxMondayTrailRow[]>(
       `
       SELECT
         m.board_id,
@@ -729,7 +774,7 @@ export const listMondayTrailForContactKey = async (
       callDate: row.call_date,
       disposition: row.disposition,
       isBooked: row.is_booked,
-      updatedAt: row.updated_at,
+      updatedAt: row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at,
     }));
   } catch (err) {
     logger?.error('listMondayTrailForContactKey failed', err);
@@ -759,7 +804,7 @@ export const insertSendAttempt = async (
 ): Promise<SendAttemptRow> => {
   const prisma = getPrisma();
   try {
-    const data = {
+    const data: Prisma.send_attemptsUncheckedCreateInput = {
       conversation_id: input.conversationId,
       message_body: input.messageBody,
       sender_identity: input.senderIdentity ?? null,
@@ -770,13 +815,13 @@ export const insertSendAttempt = async (
       idempotency_key: input.idempotencyKey ?? null,
       status: input.status,
       retry_count: input.retryCount ?? 0,
-      request_payload: (input.requestPayload as any) ?? null,
-      response_payload: (input.responsePayload as any) ?? null,
+      request_payload: toNullableJson(input.requestPayload),
+      response_payload: toNullableJson(input.responsePayload),
       error_message: input.errorMessage ?? null,
     };
 
     if (input.idempotencyKey) {
-      const result = await prisma.send_attempts.upsert({
+      await prisma.send_attempts.upsert({
         where: {
           conversation_id_idempotency_key: {
             conversation_id: input.conversationId,
@@ -784,7 +829,10 @@ export const insertSendAttempt = async (
           },
         },
         update: {
-          response_payload: (input.responsePayload as any) ?? undefined,
+          response_payload:
+            input.responsePayload === undefined || input.responsePayload === null
+              ? undefined
+              : toNullableJson(input.responsePayload),
           status: input.status,
           retry_count: {
             increment: 0, // We need to replicate GREATEST. Prisma doesn't have GREATEST in fluent API easily.
@@ -915,7 +963,7 @@ export const getSendAttemptVolumeCounts = async (
 ): Promise<SendAttemptVolumeCounts> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    const result = await prisma.$queryRawUnsafe<SendAttemptVolumeCountsRow[]>(
       `
       SELECT
         COUNT(*) FILTER (
@@ -969,12 +1017,12 @@ export const insertDraftSuggestion = async (
       data: {
         conversation_id: input.conversationId,
         prompt_snapshot_hash: input.promptSnapshotHash,
-        retrieved_exemplar_ids: (input.retrievedExemplarIds as any) ?? null,
+        retrieved_exemplar_ids: toNullableJson(input.retrievedExemplarIds),
         generated_text: input.generatedText,
         lint_score: input.lintScore,
         structural_score: input.structuralScore,
-        lint_issues: (input.lintIssues as any) ?? null,
-        raw: (input.raw as any) ?? null,
+        lint_issues: toNullableJson(input.lintIssues),
+        raw: toNullableJson(input.raw),
       },
     });
 
@@ -1031,7 +1079,7 @@ export const updateDraftSuggestionFeedback = async (
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
-    const updateData: any = {
+    const updateData: Prisma.draft_suggestionsUncheckedUpdateInput = {
       updated_at: new Date(),
     };
     if (typeof params.accepted === 'boolean') updateData.accepted = params.accepted;
@@ -1063,7 +1111,10 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? undefined,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? undefined,
-        qualifier_snapshot: (input.qualifierSnapshot as any) ?? undefined,
+        qualifier_snapshot:
+          input.qualifierSnapshot === undefined || input.qualifierSnapshot === null
+            ? undefined
+            : toNullableJson(input.qualifierSnapshot),
         channel_marker: input.channelMarker ?? undefined,
       },
       create: {
@@ -1072,7 +1123,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? null,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? null,
-        qualifier_snapshot: (input.qualifierSnapshot as any) ?? null,
+        qualifier_snapshot: toNullableJson(input.qualifierSnapshot),
         channel_marker: input.channelMarker || 'sms',
       },
     });
@@ -1356,7 +1407,7 @@ export const incrementGuardrailOverride = async (
     // However, Prisma doesn't support relative increments in create.
     // So we first find or create, then update, or just use raw if it's cleaner.
     // Let's use raw to be safe and efficient for increments.
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    const result = await prisma.$queryRawUnsafe<GuardrailOverrideRow[]>(
       `
       INSERT INTO conversation_state (conversation_id, guardrail_override_count)
       VALUES ($1::uuid, 1)
@@ -1514,17 +1565,7 @@ export const listConversionExamples = async (
     limit: number;
   },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<
-  Array<
-    ConversionExampleRow & {
-      outbound_body: string | null;
-      outbound_user: string | null;
-      source_inbound_body: string | null;
-      source_conversation_id: string | null;
-      source_outbound_ts: string | null;
-    }
-  >
-> => {
+): Promise<Array<ConversionExampleListRow>> => {
   const prisma = getPrisma();
   try {
     const where: string[] = [];
@@ -1548,7 +1589,7 @@ export const listConversionExamples = async (
     const limitPlaceholder = `$${i++}`;
     values.push(limit);
 
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    const result = await prisma.$queryRawUnsafe<ConversionExampleListRow[]>(
       `
       SELECT
         ce.*,

@@ -91,6 +91,11 @@ type RepRow = {
   optOuts: number;
 };
 
+type FirstSeenRow = {
+  label: string;
+  first_seen_at: string | null;
+};
+
 const DATE_PATTERN = /^Date:\s*(.+)$/im;
 const REP_PATTERN = /^\*Rep:\s*(.+)\*/i;
 const OUTBOUND_CONV_PATTERN = /- Outbound Conversations:\s*(\d+)/i;
@@ -769,7 +774,7 @@ export const getSalesMetricsSummary = async (
   // Best-effort sequence provenance: first outbound timestamp observed in PTBizSMS history for each label.
   if (seqMap.size > 0) {
     const labels = [...seqMap.keys()];
-    const firstSeenRows = await prisma.$queryRawUnsafe<any[]>(
+    const firstSeenRows = await prisma.$queryRawUnsafe<FirstSeenRow[]>(
       `
       SELECT
         COALESCE(NULLIF(TRIM(sequence), ''), $2::text) AS label,

@@ -4,6 +4,22 @@ import { publishRealtimeEvent } from './realtime.js';
 
 const getPrisma = () => getPrismaClient();
 
+type DailyRunPool = {
+  query: (sql: string, params?: Array<string | number>) => Promise<{ rows: DailyRunRow[] }>;
+};
+
+let dailyRunPoolForTests: DailyRunPool | null = null;
+
+export const __setGetPoolForTests = (getPool: (() => DailyRunPool) | null): void => {
+  dailyRunPoolForTests = getPool ? getPool() : null;
+};
+
+export const __resetGetPoolForTests = (): void => {
+  dailyRunPoolForTests = null;
+};
+
+const getDailyRunPool = (): DailyRunPool | null => dailyRunPoolForTests;
+
 export type DailyRunInput = {
   channelId: string;
   channelName?: string;
@@ -92,106 +108,121 @@ export const getDailyRuns = async (
   } = {},
   logger?: Pick<Logger, 'warn'>,
 ): Promise<DailyRunRow[]> => {
-  const prisma = getPrisma();
+  const pool = getDailyRunPool();
 
-  try {
+  const buildQuery = (): { sql: string; params: Array<string | number> } => {
     if (options.raw) {
-      const where: any = {};
-      if (options.channelId) where.channel_id = options.channelId;
+      const params: Array<string | number> = [];
+      let where = 'WHERE 1=1';
+      if (options.channelId) {
+        params.push(options.channelId);
+        where += ` AND channel_id = $${params.length}`;
+      }
       if (options.daysBack) {
-        where.timestamp = {
-          gt: new Date(Date.now() - options.daysBack * 24 * 60 * 60 * 1000),
-        };
+        where += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
       }
       const legacyMode = options.legacyMode || 'exclude';
-      if (legacyMode === 'exclude') where.is_legacy = false;
-      else if (legacyMode === 'only') where.is_legacy = true;
+      if (legacyMode === 'exclude') {
+        where += ' AND COALESCE(is_legacy, FALSE) = FALSE';
+      } else if (legacyMode === 'only') {
+        where += ' AND COALESCE(is_legacy, FALSE) = TRUE';
+      }
 
-      const results = await prisma.daily_runs.findMany({
-        where,
-        orderBy: { timestamp: 'desc' },
-        take: options.limit,
-        skip: options.offset,
-      });
-      return results as unknown as DailyRunRow[];
+      const limit = options.limit ? `LIMIT ${options.limit}` : '';
+      const offset = options.offset ? `OFFSET ${options.offset}` : '';
+      return {
+        sql: `SELECT * FROM daily_runs ${where} ORDER BY timestamp DESC ${limit} ${offset}`.trim(),
+        params,
+      };
     }
 
-    // Use $queryRaw for complex window function
-    // We'll build the WHERE clause manually for $queryRaw
-    let rawWhere = 'WHERE 1=1';
-    const rawParams: any[] = [];
+    const params: Array<string | number> = [];
+    let where = 'WHERE 1=1';
     if (options.channelId) {
-      rawParams.push(options.channelId);
-      rawWhere += ` AND channel_id = $${rawParams.length}`;
+      params.push(options.channelId);
+      where += ` AND channel_id = $${params.length}`;
     }
     if (options.daysBack) {
-      rawWhere += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
+      where += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
     }
     const legacyMode = options.legacyMode || 'exclude';
     if (legacyMode === 'exclude') {
-      rawWhere += ' AND COALESCE(is_legacy, FALSE) = FALSE';
+      where += ' AND COALESCE(is_legacy, FALSE) = FALSE';
     } else if (legacyMode === 'only') {
-      rawWhere += ' AND COALESCE(is_legacy, FALSE) = TRUE';
+      where += ' AND COALESCE(is_legacy, FALSE) = TRUE';
     }
 
-    const query = `
-      WITH ranked AS (
+    const limit = options.limit ? `LIMIT ${options.limit}` : '';
+    const offset = options.offset ? `OFFSET ${options.offset}` : '';
+    return {
+      sql: `
+WITH ranked AS (
+          SELECT
+            *,
+            COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date) AS canonical_day,
+            CASE
+              WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
+              WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
+              ELSE 0
+            END AS is_placeholder,
+            CASE status
+              WHEN 'success' THEN 0
+              WHEN 'pending' THEN 1
+              WHEN 'error' THEN 2
+              ELSE 3
+            END AS status_rank,
+            ROW_NUMBER() OVER (
+              PARTITION BY channel_id, report_type, COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date)
+              ORDER BY
+                CASE
+                  WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
+                  WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
+                  ELSE 0
+                END ASC,
+                CASE status
+                  WHEN 'success' THEN 0
+                  WHEN 'pending' THEN 1
+                  WHEN 'error' THEN 2
+                  ELSE 3
+                END ASC,
+                timestamp DESC,
+                id DESC
+            ) AS rn
+          FROM daily_runs
+          ${where}
+        )
         SELECT
-          *,
-          COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date) AS canonical_day,
-          CASE
-            WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
-            WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
-            ELSE 0
-          END AS is_placeholder,
-          CASE status
-            WHEN 'success' THEN 0
-            WHEN 'pending' THEN 1
-            WHEN 'error' THEN 2
-            ELSE 3
-          END AS status_rank,
-          ROW_NUMBER() OVER (
-            PARTITION BY channel_id, report_type, COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date)
-            ORDER BY
-              CASE
-                WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
-                WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
-                ELSE 0
-              END ASC,
-              CASE status
-                WHEN 'success' THEN 0
-                WHEN 'pending' THEN 1
-                WHEN 'error' THEN 2
-                ELSE 3
-              END ASC,
-              timestamp DESC,
-              id DESC
-          ) AS rn
-        FROM daily_runs
-        ${rawWhere}
-      )
-      SELECT
-        id,
-        timestamp,
-        channel_id,
-        channel_name,
-        report_date,
-        report_type,
-        status,
-        error_message,
-        summary_text,
-        full_report,
-        duration_ms,
-        is_legacy,
-        created_at
-      FROM ranked
-      WHERE rn = 1
-      ORDER BY timestamp DESC
-      ${options.limit ? `LIMIT ${options.limit}` : ''}
-      ${options.offset ? `OFFSET ${options.offset}` : ''}
-    `;
+          id,
+          timestamp,
+          channel_id,
+          channel_name,
+          report_date,
+          report_type,
+          status,
+          error_message,
+          summary_text,
+          full_report,
+          duration_ms,
+          is_legacy,
+          created_at
+        FROM ranked
+        WHERE rn = 1
+        ORDER BY timestamp DESC
+        ${limit}
+        ${offset}
+      `.trim(),
+      params,
+    };
+  };
 
-    const result = await prisma.$queryRawUnsafe<DailyRunRow[]>(query, ...rawParams);
+  try {
+    const { sql, params } = buildQuery();
+    if (pool) {
+      const result = await pool.query(sql, params);
+      return result.rows;
+    }
+    const prisma = getPrisma();
+    const result = await prisma.$queryRawUnsafe<DailyRunRow[]>(sql, ...params);
     return result;
   } catch (error) {
     logger?.warn('Failed to fetch daily runs:', error);

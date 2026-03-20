@@ -1,7 +1,10 @@
+import { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput =>
+  value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue);
 
 export type BookedCallRow = {
   id: string;
@@ -46,7 +49,7 @@ export const upsertBookedCall = async (
       update: {
         event_ts: input.eventTs,
         text: input.text,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableJson(input.raw),
       },
       create: {
         slack_team_id: input.slackTeamId,
@@ -54,7 +57,7 @@ export const upsertBookedCall = async (
         slack_message_ts: input.slackMessageTs,
         event_ts: input.eventTs,
         text: input.text,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableJson(input.raw),
       },
     });
 
@@ -86,14 +89,14 @@ export const upsertBookedCallReaction = async (
       },
       update: {
         reaction_count: input.reactionCount,
-        users: (input.users ?? null) as any,
+        users: toNullableJson(input.users),
         updated_at: new Date(),
       },
       create: {
         booked_call_id: input.bookedCallId,
         reaction_name: input.reactionName,
         reaction_count: input.reactionCount,
-        users: (input.users ?? null) as any,
+        users: toNullableJson(input.users),
       },
     });
 
@@ -117,7 +120,7 @@ export const listBookedCallsInRange = async (
   const prisma = getPrisma();
 
   try {
-    const where: any = {
+    const where: Prisma.booked_callsWhereInput = {
       event_ts: {
         gte: params.from,
         lte: params.to,
@@ -128,7 +131,15 @@ export const listBookedCallsInRange = async (
 
     const rows = await prisma.booked_calls.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        slack_team_id: true,
+        slack_channel_id: true,
+        slack_message_ts: true,
+        event_ts: true,
+        text: true,
+        raw: true,
+        created_at: true,
         booked_call_reactions: {
           select: {
             reaction_name: true,

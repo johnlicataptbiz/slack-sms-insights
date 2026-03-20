@@ -1,7 +1,14 @@
+import { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
+
+const toJsonValue = (value: unknown, fallback: Prisma.InputJsonValue): Prisma.InputJsonValue =>
+  value === null || value === undefined ? fallback : (value as Prisma.InputJsonValue);
+
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput =>
+  value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue);
 
 export type MondaySyncStatus = 'idle' | 'running' | 'success' | 'error';
 export type MondayBoardClass =
@@ -468,12 +475,12 @@ export const saveMondayColumnMapping = async (
     await prisma.monday_column_mappings.upsert({
       where: { board_id: boardId },
       update: {
-        mapping_json: (mapping ?? {}) as any,
+        mapping_json: toJsonValue(mapping, {}),
         updated_at: new Date(),
       },
       create: {
         board_id: boardId,
-        mapping_json: (mapping ?? {}) as any,
+        mapping_json: toJsonValue(mapping, {}),
         updated_at: new Date(),
       },
     });
@@ -511,7 +518,7 @@ export const deleteMondayCallSnapshots = async (
       where: {
         board_id: boardId,
         item_id: { in: itemIds },
-      } as any,
+      } satisfies Prisma.monday_call_snapshotsWhereInput,
     });
   } catch (error) {
     logger?.warn?.('Failed to delete monday call snapshots', error);
@@ -540,7 +547,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableJson(input.raw),
         synced_at: new Date(),
       },
       create: {
@@ -554,7 +561,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableJson(input.raw),
         synced_at: new Date(),
       },
     });
@@ -1085,7 +1092,7 @@ export const listMondayCallSnapshotsInRange = async (
 ): Promise<MondayCallSnapshotRow[]> => {
   const prisma = getPrisma();
   try {
-    const where: any = {
+    const where: Prisma.monday_call_snapshotsWhereInput = {
       updated_at: {
         gte: params.from,
         lte: params.to,
@@ -1158,14 +1165,14 @@ export const upsertMondayWeeklyReport = async (
       where: { week_start: new Date(params.weekStart) },
       update: {
         source_board_id: params.sourceBoardId ?? null,
-        summary_json: (params.summaryJson ?? {}) as any,
+        summary_json: toJsonValue(params.summaryJson, {}),
         monday_item_id: params.mondayItemId ?? null,
         synced_at: params.syncedAt ?? new Date(),
       },
       create: {
         week_start: new Date(params.weekStart),
         source_board_id: params.sourceBoardId ?? null,
-        summary_json: (params.summaryJson ?? {}) as any,
+        summary_json: toJsonValue(params.summaryJson, {}),
         monday_item_id: params.mondayItemId ?? null,
         synced_at: params.syncedAt ?? new Date(),
       },
@@ -1247,7 +1254,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: (params.payloadJson ?? {}) as any,
+        payload_json: toNullableJson(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },
@@ -1259,7 +1266,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: (params.payloadJson ?? {}) as any,
+        payload_json: toNullableJson(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },

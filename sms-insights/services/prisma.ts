@@ -4,6 +4,7 @@ import { withAccelerate } from '@prisma/extension-accelerate';
 type PrismaMode = 'accelerate' | 'direct';
 
 type PrismaRuntimeClient = PrismaClient;
+type PrismaClientAccelerateCtor = new (options: { accelerateUrl: string }) => PrismaClient;
 
 let prismaAccelerate: PrismaRuntimeClient | undefined;
 let prismaDirect: PrismaRuntimeClient | undefined;
@@ -44,7 +45,8 @@ const resolvePrismaConfig = (): {
 
 const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   if (config.mode === 'accelerate') {
-    return (new PrismaClient({ accelerateUrl: config.url }) as any).$extends(
+    const AcceleratePrismaClient = PrismaClient as unknown as PrismaClientAccelerateCtor;
+    return new AcceleratePrismaClient({ accelerateUrl: config.url }).$extends(
       withAccelerate(),
     ) as unknown as PrismaClient;
   }
@@ -55,7 +57,8 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   if (config.url.startsWith('postgresql://')) {
     // Convert to accelerate format for Prisma 7 compatibility
     const accelerateUrl = config.url.replace('postgresql://', 'prisma+postgres://');
-    return (new PrismaClient({ accelerateUrl }) as any).$extends(withAccelerate()) as unknown as PrismaClient;
+    const AcceleratePrismaClient = PrismaClient as unknown as PrismaClientAccelerateCtor;
+    return new AcceleratePrismaClient({ accelerateUrl }).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
   // Fallback: try direct connection with minimal config

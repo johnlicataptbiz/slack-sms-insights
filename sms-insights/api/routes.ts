@@ -28,7 +28,7 @@ import {
   getBookedCallSmsReplyLinks,
   getBookedCallsSummary,
 } from '../services/booked-calls.js';
-import { getChangelogByDateRange, getChangelogTimeline } from '../services/changelog-service.js';
+import { getChangelogByDateRange } from '../services/changelog-service.js';
 import {
   autoAssignWorkItems,
   bulkInferQualification,
@@ -226,8 +226,8 @@ const cleanupRateLimitState = (): void => {
   }
 };
 
-// Start periodic cleanup
-setInterval(cleanupRateLimitState, RATE_LIMIT_CLEANUP_INTERVAL_MS);
+// Start periodic cleanup without keeping test or idle processes alive.
+setInterval(cleanupRateLimitState, RATE_LIMIT_CLEANUP_INTERVAL_MS).unref();
 
 const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
   if (!value) return fallback;
@@ -1260,7 +1260,7 @@ const handleGetSequenceKpisV2: RequestHandler = async (req, res, logger, origin)
   }
 };
 
-const handleGetAttributionHealthV2: RequestHandler = async (req, res, logger, origin) => {
+const handleGetAttributionHealthV2: RequestHandler = async (_req, res, logger, origin) => {
   try {
     const status = await getAttributionLagStatus();
     sendJson(
@@ -2469,19 +2469,6 @@ const toInboxConversationV2 = (row: {
     mondayBooked: row.monday_booked === true,
   };
 };
-
-const toInboxMessageV2 = (row: InboxMessageRow) => ({
-  id: row.id,
-  conversation_id: row.conversation_id,
-  event_ts: row.event_ts instanceof Date ? row.event_ts.toISOString() : row.event_ts,
-  direction: row.direction,
-  body: row.body,
-  sequence: row.sequence,
-  line: row.line,
-  aloware_user: row.aloware_user,
-  slack_channel_id: row.slack_channel_id,
-  slack_message_ts: row.slack_message_ts,
-});
 
 const getConversationIdFromPath = (req: IncomingMessage): string | null => {
   const url = new URL(req.url || '', `http://${req.headers.host}`);
@@ -4561,7 +4548,7 @@ const handleGetOutcomeKeywordAnalyticsV2: RequestHandler = async (req, res, logg
   }
 };
 
-const handleGetMondaySmsSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+const handleGetMondaySmsSyncBoardIds: RequestHandler = async (_req, res, _logger, origin) => {
   const boardIds = listMondaySmsSyncBoardIds();
   sendJson(res, 200, { boardIds }, origin);
 };
@@ -4592,7 +4579,7 @@ const handlePostMondaySmsSync: RequestHandler = async (req, res, logger, origin)
   }
 };
 
-const handleGetMondaySmsSequencesSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+const handleGetMondaySmsSequencesSyncBoardIds: RequestHandler = async (_req, res, _logger, origin) => {
   const boardIds = listMondaySmsSequencesSyncBoardIds();
   sendJson(res, 200, { boardIds }, origin);
 };
@@ -4623,7 +4610,7 @@ const handlePostMondaySmsSequencesSync: RequestHandler = async (req, res, logger
   }
 };
 
-const handleGetMondaySmsReportsSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+const handleGetMondaySmsReportsSyncBoardIds: RequestHandler = async (_req, res, _logger, origin) => {
   const boardIds = listMondaySmsReportsSyncBoardIds();
   sendJson(res, 200, { boardIds }, origin);
 };

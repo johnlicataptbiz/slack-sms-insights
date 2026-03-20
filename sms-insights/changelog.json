@@ -1,8 +1,26 @@
 {
-  "generatedAt": "2026-03-20T21:37:42.383Z",
+  "generatedAt": "2026-03-20T22:21:52.039Z",
   "daysIncluded": 365,
-  "totalCount": 423,
+  "totalCount": 425,
   "entries": [
+    {
+      "hash": "88c36c3",
+      "date": "2026-03-20T16:42:34-05:00",
+      "message": "fix(ci): resolve frontend npm peer dependency conflict with --legacy-peer-deps",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Resolve frontend npm peer dependency conflict with --legacy-peer-deps"
+    },
+    {
+      "hash": "a090514",
+      "date": "2026-03-20T16:38:10-05:00",
+      "message": "chore: add nvmrc and update changelog",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add nvmrc and update changelog"
+    },
     {
       "hash": "469a436",
       "date": "2026-03-20T16:27:44-05:00",

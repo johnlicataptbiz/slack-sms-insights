@@ -1,8 +1,35 @@
 {
-  "generatedAt": "2026-03-20T19:07:34.752Z",
+  "generatedAt": "2026-03-20T21:37:42.383Z",
   "daysIncluded": 365,
-  "totalCount": 420,
+  "totalCount": 423,
   "entries": [
+    {
+      "hash": "469a436",
+      "date": "2026-03-20T16:27:44-05:00",
+      "message": "feat: monday sync complete - prod ready",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Monday sync complete - prod ready"
+    },
+    {
+      "hash": "079f67d",
+      "date": "2026-03-20T15:43:37-05:00",
+      "message": "feat: update deployment configs and backend services",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Update deployment configs and backend services"
+    },
+    {
+      "hash": "f56f9c3",
+      "date": "2026-03-20T15:38:57-05:00",
+      "message": "Fix deployment dependencies and update vercel config",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix deployment dependencies and update vercel config"
+    },
     {
       "hash": "9caa50a",
       "date": "2026-03-20T13:48:19-05:00",

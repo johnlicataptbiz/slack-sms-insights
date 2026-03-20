@@ -1,54 +1,40 @@
-import type { Logger } from "@slack/bolt";
+import type { Logger } from '@slack/bolt';
 import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
-} from "./booked-calls.js";
-import { getPrismaClient } from "./prisma.js";
-import {
-  attributeSlackBookedCallsToSequences,
-  type UnattributedAuditRow,
-} from "./sequence-booked-attribution.js";
+} from './booked-calls.js';
+import { getPrismaClient } from './prisma.js';
+import { attributeSlackBookedCallsToSequences, type UnattributedAuditRow } from './sequence-booked-attribution.js';
 
 const getPrisma = () => getPrismaClient();
-const DEFAULT_SALES_TEAM_BOARD_ID = "5077164868";
-const isMondayBackfillLabel = (label: string): boolean =>
-  label.toLowerCase().includes("monday backfill");
+const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
+const isMondayBackfillLabel = (label: string): boolean => label.toLowerCase().includes('monday backfill');
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
-const BOOKED_CONFIRMATION_LINK_PATTERN =
-  /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
-const CANCELLATION_PATTERN =
-  /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
+const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
+const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
 
-const contactKeyFor = (event: {
-  contact_id: string | null;
-  contact_phone: string | null;
-}): string | null => {
+const contactKeyFor = (event: { contact_id: string | null; contact_phone: string | null }): string | null => {
   if (event.contact_id) return `contact:${event.contact_id}`;
-  if (event.contact_phone)
-    return `phone:${event.contact_phone.replace(/\D/g, "")}`;
+  if (event.contact_phone) return `phone:${event.contact_phone.replace(/\D/g, '')}`;
   return null;
 };
 
 const isBookingSignal = (direction: string, body: string): boolean => {
   if (!body) return false;
   if (BOOKED_CONFIRMATION_LINK_PATTERN.test(body)) return true;
-  return (
-    direction === "inbound" &&
-    HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) &&
-    !CANCELLATION_PATTERN.test(body)
-  );
+  return direction === 'inbound' && HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) && !CANCELLATION_PATTERN.test(body);
 };
 
 const isOptOutSignal = (direction: string, body: string): boolean =>
-  direction === "inbound" && CANCELLATION_PATTERN.test(body);
+  direction === 'inbound' && CANCELLATION_PATTERN.test(body);
 
 export type SequenceDeepParams = {
   from: Date;
   to: Date;
   timeZone: string;
-  status?: "active" | "inactive" | null;
+  status?: 'active' | 'inactive' | null;
 };
 
 export type SequenceDeepPayload = {
@@ -60,7 +46,7 @@ export type SequenceDeepPayload = {
     label: string;
     leadMagnet: string;
     versionTag: string;
-    status: "active" | "inactive";
+    status: 'active' | 'inactive';
     ownerRep: string | null;
     isManualBucket: boolean;
     messagesSent: number;
@@ -115,12 +101,10 @@ export type SequenceDeepPayload = {
 
 export const getSequencesDeep = async (
   params: SequenceDeepParams,
-  logger?: Pick<Logger, "warn">,
+  logger?: Pick<Logger, 'warn'>,
 ): Promise<SequenceDeepPayload> => {
   const prisma = getPrisma();
-  const salesTeamBoardId = (
-    process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID
-  ).trim();
+  const salesTeamBoardId = (process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID).trim();
   const fromDay = params.from.toISOString().slice(0, 10);
   const toDay = params.to.toISOString().slice(0, 10);
   const scanFrom = new Date(params.from.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -182,7 +166,7 @@ export const getSequencesDeep = async (
         status: true,
         is_manual_bucket: true,
       },
-      orderBy: { label: "asc" },
+      orderBy: { label: 'asc' },
     }),
     prisma.fact_monday_health_daily.findMany({
       where: {
@@ -205,9 +189,7 @@ export const getSequencesDeep = async (
       where: { is_manual_bucket: true },
       select: { id: true },
     }),
-    prisma.$queryRawUnsafe<
-      Array<{ total: number; mapped_conversation: number }>
-    >(
+    prisma.$queryRawUnsafe<Array<{ total: number; mapped_conversation: number }>>(
       `
       SELECT
         COUNT(*)::int AS total,
@@ -264,9 +246,9 @@ export const getSequencesDeep = async (
     prisma.sms_events.findMany({
       where: {
         event_ts: { gte: scanFrom, lte: params.to },
-        direction: { in: ["inbound", "outbound"] },
+        direction: { in: ['inbound', 'outbound'] },
       },
-      orderBy: { event_ts: "asc" },
+      orderBy: { event_ts: 'asc' },
       select: {
         event_ts: true,
         direction: true,
@@ -278,17 +260,12 @@ export const getSequencesDeep = async (
     }),
   ]);
 
-  const manualSequenceId =
-    sequenceRows.find((row) => row.is_manual_bucket)?.id || null;
+  const manualSequenceId = sequenceRows.find((row) => row.is_manual_bucket)?.id || null;
   const backfillSequenceIds = new Set(
-    sequenceRows
-      .filter((row) => isMondayBackfillLabel(row.label))
-      .map((row) => row.id),
+    sequenceRows.filter((row) => isMondayBackfillLabel(row.label)).map((row) => row.id),
   );
   const resolveSequenceId = (sequenceId: string): string =>
-    manualSequenceId && backfillSequenceIds.has(sequenceId)
-      ? manualSequenceId
-      : sequenceId;
+    manualSequenceId && backfillSequenceIds.has(sequenceId) ? manualSequenceId : sequenceId;
 
   type Event = (typeof rawEventRows)[number] & {
     _contactKey: string;
@@ -368,7 +345,7 @@ export const getSequencesDeep = async (
 
   for (const event of events) {
     if (event.event_ts < params.from) continue;
-    if (event.direction !== "outbound") continue;
+    if (event.direction !== 'outbound') continue;
     const stat = ensure(event._seqId);
     stat.messagesSent += 1;
     stat.uniqueContactedSet.add(event._contactKey);
@@ -376,15 +353,14 @@ export const getSequencesDeep = async (
 
   for (const contactEvents of eventsByContact.values()) {
     for (const inbound of contactEvents) {
-      if (inbound.event_ts < params.from || inbound.direction !== "inbound")
-        continue;
+      if (inbound.event_ts < params.from || inbound.direction !== 'inbound') continue;
 
       const inboundTs = inbound.event_ts.getTime();
       let latestAny: Event | null = null;
       let latestSequenced: Event | null = null;
 
       for (const candidate of contactEvents) {
-        if (candidate.direction !== "outbound") continue;
+        if (candidate.direction !== 'outbound') continue;
         const ts = candidate.event_ts.getTime();
         if (ts > inboundTs) break;
         if (inboundTs - ts > 14 * 24 * 60 * 60 * 1000) continue;
@@ -403,11 +379,8 @@ export const getSequencesDeep = async (
         stat.repliesReceived += 1;
       }
 
-      const body = (inbound.body || "").trim();
-      if (
-        isOptOutSignal(inbound.direction, body) &&
-        !stat.optOutSet.has(inbound._contactKey)
-      ) {
+      const body = (inbound.body || '').trim();
+      if (isOptOutSignal(inbound.direction, body) && !stat.optOutSet.has(inbound._contactKey)) {
         stat.optOutSet.add(inbound._contactKey);
         stat.optOuts += 1;
       }
@@ -438,14 +411,13 @@ export const getSequencesDeep = async (
   }
 
   const normalizedLabelMap = new Map<string, string>();
-  const normalizeLabel = (value: string): string =>
-    value.trim().toLowerCase().replace(/\s+/g, " ");
+  const normalizeLabel = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, ' ');
   for (const row of sequenceRows) {
     normalizedLabelMap.set(normalizeLabel(row.label), row.id);
   }
 
   for (const row of attributedByLabelRows) {
-    const rawLabel = (row.sequence_label || "").trim();
+    const rawLabel = (row.sequence_label || '').trim();
     if (!rawLabel) continue;
     const matchedSequenceId = normalizedLabelMap.get(normalizeLabel(rawLabel));
     if (!matchedSequenceId) continue;
@@ -476,7 +448,7 @@ export const getSequencesDeep = async (
         sequenceId: row.id,
         label: row.label,
         leadMagnet: row.lead_magnet || row.label,
-        versionTag: row.version_tag || "",
+        versionTag: row.version_tag || '',
         status: row.status,
         ownerRep: row.owner_rep,
         isManualBucket: row.is_manual_bucket,
@@ -484,11 +456,9 @@ export const getSequencesDeep = async (
         uniqueContacted,
         inboundTexts,
         repliesReceived,
-        replyRatePct:
-          uniqueContacted > 0 ? (repliesReceived / uniqueContacted) * 100 : 0,
+        replyRatePct: uniqueContacted > 0 ? (repliesReceived / uniqueContacted) * 100 : 0,
         bookedCalls,
-        bookingRatePct:
-          uniqueContacted > 0 ? (bookedCalls / uniqueContacted) * 100 : 0,
+        bookingRatePct: uniqueContacted > 0 ? (bookedCalls / uniqueContacted) * 100 : 0,
         optOuts,
         optOutRatePct: messagesSent > 0 ? (optOuts / messagesSent) * 100 : 0,
         bookedBreakdown: {
@@ -500,68 +470,35 @@ export const getSequencesDeep = async (
         },
         leadQuality: {
           leadsCount: qualityLeads,
-          highInterestPct:
-            qualityLeads > 0
-              ? ((stat?.qualityHighInterest || 0) / qualityLeads) * 100
-              : 0,
-          fullTimePct:
-            qualityLeads > 0
-              ? ((stat?.qualityFullTime || 0) / qualityLeads) * 100
-              : 0,
-          mostlyCashPct:
-            qualityLeads > 0
-              ? ((stat?.qualityMostlyCash || 0) / qualityLeads) * 100
-              : 0,
-          progressedToStep3Or4Pct:
-            qualityLeads > 0
-              ? ((stat?.qualityStep34 || 0) / qualityLeads) * 100
-              : 0,
+          highInterestPct: qualityLeads > 0 ? ((stat?.qualityHighInterest || 0) / qualityLeads) * 100 : 0,
+          fullTimePct: qualityLeads > 0 ? ((stat?.qualityFullTime || 0) / qualityLeads) * 100 : 0,
+          mostlyCashPct: qualityLeads > 0 ? ((stat?.qualityMostlyCash || 0) / qualityLeads) * 100 : 0,
+          progressedToStep3Or4Pct: qualityLeads > 0 ? ((stat?.qualityStep34 || 0) / qualityLeads) * 100 : 0,
         },
       };
     })
-    .filter(
-      (row) =>
-        row.messagesSent > 0 ||
-        row.bookedCalls > 0 ||
-        row.leadQuality.leadsCount > 0,
-    )
-    .sort(
-      (a, b) =>
-        b.bookedCalls - a.bookedCalls || b.messagesSent - a.messagesSent,
-    );
+    .filter((row) => row.messagesSent > 0 || row.bookedCalls > 0 || row.leadQuality.leadsCount > 0)
+    .sort((a, b) => b.bookedCalls - a.bookedCalls || b.messagesSent - a.messagesSent);
 
   const boards = new Set(mondayRows.map((row) => row.board_id)).size;
   const staleBoards = mondayRows.filter((row) => row.is_stale).length;
-  const erroredBoards = mondayRows.filter(
-    (row) => row.sync_status === "error",
-  ).length;
+  const erroredBoards = mondayRows.filter((row) => row.sync_status === 'error').length;
   const manualBucketIds = new Set(manualBucketRows.map((row) => row.id));
-  const slackBookedTotal = bookingRows.reduce(
-    (sum, row) => sum + row.booked_total,
-    0,
-  );
+  const slackBookedTotal = bookingRows.reduce((sum, row) => sum + row.booked_total, 0);
   const manualDirectBooked = bookingRows
-    .filter(
-      (row) =>
-        (row.sequence_id && manualBucketIds.has(row.sequence_id)) || false,
-    )
+    .filter((row) => (row.sequence_id && manualBucketIds.has(row.sequence_id)) || false)
     .reduce((sum, row) => sum + row.booked_total, 0);
 
   const stats = attributionStats?.[0] || { total: 0, mapped_conversation: 0 };
   const attributionTotal = stats.total || 0;
   const attributionMappedConversation = stats.mapped_conversation || 0;
-  const mondayBookedTotal =
-    mondayBookedTotalRows?.[0]?.monday_booked_total || 0;
+  const mondayBookedTotal = mondayBookedTotalRows?.[0]?.monday_booked_total || 0;
   const bookedCallSources = await getBookedCallAttributionSources({
     from: params.from,
     to: params.to,
   });
   const smsReplyLinks = await getBookedCallSmsReplyLinks(bookedCallSources);
-  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(
-    bookedCallSources,
-    undefined,
-    smsReplyLinks,
-  );
+  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(bookedCallSources, undefined, smsReplyLinks);
   const sequenceAttribution = attributeSlackBookedCallsToSequences(
     sequences.map((row) => ({
       label: row.label,
@@ -580,7 +517,7 @@ export const getSequencesDeep = async (
   );
 
   if (mondayRows.length === 0) {
-    logger?.warn?.("sequences-deep: no monday health rows in requested window");
+    logger?.warn?.('sequences-deep: no monday health rows in requested window');
   }
 
   return {
@@ -597,27 +534,19 @@ export const getSequencesDeep = async (
       erroredBoards,
       avgSourceCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce((sum, row) => sum + row.source_coverage_pct, 0) /
-            mondayRows.length
+          ? mondayRows.reduce((sum, row) => sum + row.source_coverage_pct, 0) / mondayRows.length
           : 0,
       avgCampaignCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce(
-              (sum, row) => sum + row.campaign_coverage_pct,
-              0,
-            ) / mondayRows.length
+          ? mondayRows.reduce((sum, row) => sum + row.campaign_coverage_pct, 0) / mondayRows.length
           : 0,
       avgSetByCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce((sum, row) => sum + row.set_by_coverage_pct, 0) /
-            mondayRows.length
+          ? mondayRows.reduce((sum, row) => sum + row.set_by_coverage_pct, 0) / mondayRows.length
           : 0,
       avgTouchpointsCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce(
-              (sum, row) => sum + row.touchpoints_coverage_pct,
-              0,
-            ) / mondayRows.length
+          ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length
           : 0,
     },
     verification: {
@@ -631,15 +560,10 @@ export const getSequencesDeep = async (
       smsPhoneMatchedCalls: sequenceAttribution.totals.smsPhoneMatchedCalls,
       fuzzyTextMatchedCalls: sequenceAttribution.totals.fuzzyTextMatchedCalls,
       manualDirectBooked,
-      manualDirectSharePct:
-        slackBookedTotal > 0
-          ? (manualDirectBooked / slackBookedTotal) * 100
-          : 0,
+      manualDirectSharePct: slackBookedTotal > 0 ? (manualDirectBooked / slackBookedTotal) * 100 : 0,
       attributionConversationMapped: attributionMappedConversation,
       attributionConversationMappedPct:
-        attributionTotal > 0
-          ? (attributionMappedConversation / attributionTotal) * 100
-          : 0,
+        attributionTotal > 0 ? (attributionMappedConversation / attributionTotal) * 100 : 0,
     },
   };
 };

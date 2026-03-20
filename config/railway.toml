@@ -1,1 +1,3 @@
+[build]
 builder = "nixpacks"
+postBuild = "npm run migrate:deploy"

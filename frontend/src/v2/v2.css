@@ -1,8 +1,8 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sohne:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&display=swap");
 
 :root {
-  --v2-font-display: "Space Grotesk", "Avenir Next", sans-serif;
-  --v2-font-ui: "Manrope", "Inter", sans-serif;
+  --v2-font-display: "Poppins", "Sohne", sans-serif;
+  --v2-font-ui: "Sohne", "Inter", sans-serif;
   --v2-font-mono:
     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 
@@ -18,25 +18,26 @@
   --v2-radius-lg: 1.2rem;
   --v2-radius-xl: 1.8rem;
 
-  --v2-shadow-1: 0 8px 24px rgba(8, 12, 29, 0.12);
-  --v2-shadow-2: 0 18px 45px rgba(8, 12, 29, 0.22);
+  --v2-shadow-1: 0 8px 24px rgba(8, 12, 29, 0.08);
+  --v2-shadow-2: 0 18px 45px rgba(8, 12, 29, 0.12);
+  --v2-shadow-elevated: 0 20px 50px rgba(8, 12, 29, 0.18);
 
   --v2-base-900: #050913;
   --v2-base-800: #0a1528;
   --v2-base-700: #13223c;
-  --v2-surface: #f2f7fb;
+  --v2-surface: #f8fafc;
   --v2-surface-elev: #ffffff;
-  --v2-surface-2: rgba(255, 255, 255, 0.9);
-  --v2-text: #0c1429;
-  --v2-muted: #56607a;
-  --v2-text-muted: #56607a;
-  --v2-border: rgba(7, 19, 36, 0.14);
+  --v2-surface-2: rgba(255, 255, 255, 0.95);
+  --v2-text: #0f1419;
+  --v2-muted: #626d7a;
+  --v2-text-muted: #626d7a;
+  --v2-border: rgba(15, 20, 25, 0.08);
 
-  --v2-accent: #11b8d6;
-  --v2-accent-strong: #0f9fb8;
-  --v2-accent-soft: #91edf8;
-  --v2-positive: #13b981;
-  --v2-critical: #ef4c62;
+  --v2-accent: #0ea5e9;
+  --v2-accent-strong: #0284c7;
+  --v2-accent-soft: #38bdf8;
+  --v2-positive: #16a34a;
+  --v2-critical: #e11d48;
   --v2-warning: #f59d0d;
   --v2-topbar-height: 92px;
   --v2-topbar-height-mobile: 68px;
@@ -52,7 +53,7 @@
   overflow-x: clip;
   color: var(--v2-text);
   font-family: var(--v2-font-ui);
-  background: linear-gradient(180deg, #f7fbfe 0%, #eef5fa 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
   display: flex;
 }
 
@@ -69,10 +70,8 @@
   height: 100vh;
   width: 220px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(8, 12, 29, 0.08);
-  background:
-    linear-gradient(180deg, rgba(10, 21, 40, 0.98), rgba(12, 22, 37, 0.96)),
-    radial-gradient(circle at 50% 0%, rgba(17, 184, 214, 0.14), transparent 24%);
+  border-right: 1px solid rgba(15, 20, 25, 0.06);
+  background: linear-gradient(180deg, #0f1419 0%, #1a2535 100%);
   padding: var(--v2-space-5);
   display: flex;
   flex-direction: column;
@@ -96,10 +95,8 @@
 
 .V2Shell__sidebar {
   position: relative;
-  border-right: 1px solid rgba(8, 12, 29, 0.08);
-  background:
-    linear-gradient(180deg, rgba(10, 21, 40, 0.98), rgba(12, 22, 37, 0.96)),
-    radial-gradient(circle at 50% 0%, rgba(17, 184, 214, 0.14), transparent 24%);
+  border-right: 1px solid rgba(15, 20, 25, 0.06);
+  background: linear-gradient(180deg, #0f1419 0%, #1a2535 100%);
   padding: var(--v2-space-5);
   display: flex;
   flex-direction: column;
@@ -110,7 +107,7 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  margin: 0 0 1rem;
+  margin: 0 0 1.5rem;
   padding: 0;
 }
 
@@ -119,32 +116,34 @@
   justify-items: center;
   gap: 0.22rem;
   width: 100%;
-  padding: 0.95rem 0.85rem;
-  border: 1px solid rgba(145, 237, 248, 0.16);
+  padding: 1rem 0.9rem;
+  border: 1px solid rgba(14, 165, 233, 0.2);
   border-radius: var(--v2-radius-lg);
   background: linear-gradient(
     135deg,
-    rgba(17, 184, 214, 0.08),
-    rgba(255, 255, 255, 0.02)
+    rgba(14, 165, 233, 0.06),
+    rgba(56, 189, 248, 0.03)
   );
+  backdrop-filter: blur(4px);
 }
 
 .V2Shell__sidebarWordmarkLine {
   display: block;
-  color: #f7fbff;
+  color: #ffffff;
   font-family: var(--v2-font-display);
-  font-size: 1.08rem;
+  font-size: 1.1rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
 }
 
 .V2Shell__sidebarWordmarkSubline {
   display: block;
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .V2Shell__nav {
@@ -159,31 +158,29 @@
   align-items: center;
   gap: 0.75rem;
   text-decoration: none;
-  color: rgba(235, 244, 255, 0.8);
-  border-radius: var(--v2-radius-sm);
-  padding: 0.84rem 0.9rem;
+  color: rgba(240, 244, 248, 0.8);
+  border-radius: var(--v2-radius-md);
+  padding: 0.88rem 1rem;
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.02);
-  transition:
-    transform 0.25s ease,
-    border-color 0.25s ease,
-    background 0.25s ease;
-  font-size: 0.9rem;
+  transition: all 0.28s cubic-bezier(0.23, 1, 0.32, 1);
+  font-size: 0.88rem;
+  font-weight: 500;
 }
 
 .V2Shell__navItem:hover {
-  transform: none;
-  border-color: rgba(145, 237, 248, 0.28);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(14, 165, 233, 0.25);
+  background: rgba(14, 165, 233, 0.08);
+  color: #ffffff;
 }
 
 .V2Shell__navItem.is-active {
   color: #ffffff;
-  border-color: rgba(145, 237, 248, 0.45);
+  border-color: rgba(56, 189, 248, 0.4);
   background: linear-gradient(
     90deg,
-    rgba(17, 184, 214, 0.34),
-    rgba(17, 184, 214, 0.08)
+    rgba(14, 165, 233, 0.2),
+    rgba(14, 165, 233, 0.08)
   );
 }
 
@@ -191,12 +188,13 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.25);
+  transition: all 0.28s ease;
 }
 
 .V2Shell__navItem.is-active .V2Shell__navBullet {
-  background: var(--v2-accent);
-  box-shadow: 0 0 0 6px rgba(17, 184, 214, 0.08);
+  background: var(--v2-accent-soft);
+  box-shadow: 0 0 0 8px rgba(56, 189, 248, 0.1);
 }
 
 .V2Shell__navIcon {
@@ -205,9 +203,15 @@
   border-radius: 0.6rem;
   display: grid;
   place-content: center;
-  color: #f7fbff;
+  color: rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.28s ease;
+}
+
+.V2Shell__navItem:hover .V2Shell__navIcon {
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.2);
 }
 
 .V2Shell__navLabelWrap {
@@ -218,13 +222,15 @@
 
 .V2Shell__navLabel {
   font-weight: 700;
+  font-size: 0.9rem;
 }
 
 .V2Shell__navLabelShort {
   color: rgba(255, 255, 255, 0.56);
-  font-size: 0.68rem;
-  letter-spacing: 0.12em;
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .V2Shell__content {
@@ -258,16 +264,20 @@
 }
 
 .V2PageHeader h1 {
-  margin: 0.2rem 0;
+  margin: 0;
   font-family: var(--v2-font-display);
-  font-size: clamp(1.8rem, 2.8vw, 2.7rem);
-  line-height: 1.1;
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .V2PageHeader__subtitle {
-  margin: 0;
+  margin: 0.5rem 0 0 0;
   max-width: 780px;
   color: var(--v2-muted);
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 .V2ControlsRow {
@@ -282,50 +292,39 @@
   border-radius: 999px;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(245, 249, 252, 0.94)
+    rgba(255, 255, 255, 0.99),
+    rgba(248, 250, 252, 0.96)
   );
   color: var(--v2-text);
-  font: 700 0.8rem/1.1 var(--v2-font-ui);
-  letter-spacing: 0.04em;
+  font: 700 0.75rem/1.1 var(--v2-font-ui);
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  padding: 0.52rem 0.88rem;
+  padding: 0.6rem 1rem;
   cursor: pointer;
-  transition:
-    transform 140ms ease,
-    border-color 140ms ease,
-    box-shadow 140ms ease,
-    background 140ms ease,
-    color 140ms ease;
+  transition: all 0.24s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .V2Btn:hover {
-  transform: translateY(-1px);
-  border-color: rgba(17, 184, 214, 0.6);
-  border-color: color-mix(in srgb, var(--v2-accent) 58%, var(--v2-border) 42%);
+  transform: translateY(-2px);
+  border-color: var(--v2-accent);
   box-shadow: var(--v2-shadow-1);
 }
 
 .V2Btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px rgba(145, 237, 248, 0.4);
-  box-shadow: 0 0 0 4px
-    color-mix(in srgb, var(--v2-accent-soft) 50%, transparent 50%);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.25);
 }
 
 .V2Btn[aria-pressed="true"] {
-  border-color: rgba(17, 184, 214, 0.7);
-  border-color: color-mix(in srgb, var(--v2-accent) 68%, var(--v2-border) 32%);
-  background: rgba(145, 237, 248, 0.6);
+  border-color: var(--v2-accent);
   background: linear-gradient(
     180deg,
-    color-mix(in srgb, var(--v2-accent-soft) 55%, white 45%),
-    rgba(255, 255, 255, 0.92)
+    rgba(56, 189, 248, 0.15),
+    rgba(14, 165, 233, 0.08)
   );
-  color: var(--v2-base-900);
-  box-shadow: 0 0 0 1px rgba(17, 184, 214, 0.35) inset;
-  box-shadow: 0 0 0 1px
-    color-mix(in srgb, var(--v2-accent) 35%, transparent 65%) inset;
+  color: var(--v2-accent-strong);
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.2) inset;
+  font-weight: 800;
 }
 
 .V2Control {

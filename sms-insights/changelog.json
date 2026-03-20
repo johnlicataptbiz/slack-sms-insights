@@ -1,8 +1,35 @@
 {
-  "generatedAt": "2026-03-20T14:38:09.060Z",
+  "generatedAt": "2026-03-20T17:11:23.044Z",
   "daysIncluded": 365,
-  "totalCount": 418,
+  "totalCount": 421,
   "entries": [
+    {
+      "hash": "d48e3db",
+      "date": "2026-03-20T16:24:10Z",
+      "message": "docs: add production deployment ready guide",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add production deployment ready guide"
+    },
+    {
+      "hash": "2a0d6b6",
+      "date": "2026-03-20T16:21:10Z",
+      "message": "chore: add railway production migration deployment script and alignment guide",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add railway production migration deployment script and alignment guide"
+    },
+    {
+      "hash": "d47708f",
+      "date": "2026-03-20T14:42:51Z",
+      "message": "feat(messages): filter non-Aloware app/bot posts from ingest",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Filter non-Aloware app/bot posts from ingest"
+    },
     {
       "hash": "48a1d87",
       "date": "2026-03-19T18:58:12-05:00",

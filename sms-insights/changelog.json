@@ -1,8 +1,26 @@
 {
-  "generatedAt": "2026-03-20T14:38:09.060Z",
+  "generatedAt": "2026-03-20T19:07:34.752Z",
   "daysIncluded": 365,
-  "totalCount": 418,
+  "totalCount": 420,
   "entries": [
+    {
+      "hash": "9caa50a",
+      "date": "2026-03-20T13:48:19-05:00",
+      "message": "fix: disable noAssignInExpressions lint rule (test pattern safe)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Disable noAssignInExpressions lint rule (test pattern safe)"
+    },
+    {
+      "hash": "d47708f",
+      "date": "2026-03-20T14:42:51Z",
+      "message": "feat(messages): filter non-Aloware app/bot posts from ingest",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Filter non-Aloware app/bot posts from ingest"
+    },
     {
       "hash": "48a1d87",
       "date": "2026-03-19T18:58:12-05:00",

@@ -30,7 +30,22 @@
     "start": "node ./dist/app.js",
     "lint": "npx @biomejs/biome check *.ts listeners services tests api",
     "lint:fix": "npx @biomejs/biome check --write *.ts listeners services tests api",
-    "test": "npm run build && npm run lint && node --import tsx --test tests/**/*.test.ts"
+    "test": "npm run build && npm run lint && npm run test:vitest && npm run test:node",
+    "test:vitest": "vitest run",
+    "test:node": "node --import tsx --test tests/**/*.test.ts",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:html": "vitest run --coverage --coverage.reporter=html",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:unit": "vitest run --config vitest.unit.config.ts",
+    "railway:deploy": "railway up --detach",
+    "railway:deploy:ci": "railway up --ci",
+    "railway:deploy:watch": "railway up --ci",
+    "railway:link": "railway link",
+    "railway:status": "railway service",
+    "railway:logs": "railway logs --follow",
+    "railway:logs:build": "railway logs --build --lines 50"
   },
   "author": "Slack Technologies, LLC",
   "license": "MIT",
@@ -72,7 +87,9 @@
     "@types/compression": "^1.8.1",
     "@types/node": "^25.3.0",
     "@types/pg": "^8.11.6",
+    "@vitest/coverage-v8": "^4.1.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0"
   }
 }

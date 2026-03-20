@@ -1,6 +1,6 @@
 import type { Logger } from '@slack/bolt';
 
-type SkipReason = 'unknown_direction' | 'missing_contact' | 'missing_channel_or_ts';
+type SkipReason = 'unknown_direction' | 'missing_contact' | 'missing_channel_or_ts' | 'other_app_post';
 
 type SkipSample = {
   at: string;
@@ -33,6 +33,7 @@ const state: MonitorState = {
     unknown_direction: 0,
     missing_contact: 0,
     missing_channel_or_ts: 0,
+    other_app_post: 0,
   },
   recentSamples: [],
   totalSkipped: 0,

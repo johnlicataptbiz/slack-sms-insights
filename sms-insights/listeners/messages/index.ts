@@ -30,14 +30,40 @@ const register = (app: App) => {
     const channelId = (message as any).channel as string | undefined;
     if (!isAlowareChannel(channelId)) return;
 
-    // Ignore bot messages to avoid loops (Aloware integration messages are typically bot/app messages,
-    // but we still want them. So only ignore *this* app's bot messages if present.)
-    // Bolt message has subtype sometimes; keep permissive for now.
+    // Ignore messages from other Slack apps/bots to avoid processing unrelated content
+    // Allow: 1) Aloware bot messages (will be parsed), 2) Daily snapshots, 3) Human messages (no bot_id)
+    // biome-ignore lint/suspicious/noExplicitAny: Slack message event payload is a union; we narrow via runtime checks.
+    const botId = (message as any).bot_id as string | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: Slack message event payload is a union; we narrow via runtime checks.
     const text = (message as any).text as string | undefined;
     // biome-ignore lint/suspicious/noExplicitAny: Slack message event payload is a union; we narrow via runtime checks.
     const attachments = (message as any).attachments as any[] | undefined;
     const firstAttachmentTitle = attachments?.[0]?.title as string | undefined;
+
+    // If message is from a bot, check if we should skip it
+    if (botId) {
+      const isDailySnapshot =
+        (text?.toLowerCase().includes('daily snapshot') ||
+          firstAttachmentTitle?.toLowerCase().includes('daily snapshot')) &&
+        (text?.toLowerCase().includes('aloware') || firstAttachmentTitle?.toLowerCase().includes('aloware'));
+
+      if (!isDailySnapshot) {
+        // Skip non-Aloware bot messages; they'll be filtered by parse stage anyway but this saves processing
+        logger.debug('Skipping message from other app/bot (not Aloware daily snapshot).', { botId });
+        recordAlowareIngestSkip({
+          reason: 'other_app_post',
+          channelId,
+          text: `(from bot: ${botId})`,
+          attachmentTitle: firstAttachmentTitle,
+        });
+        maybeLogAlowareIngestWarnings(logger);
+        return;
+      }
+    }
+
+    // Ignore bot messages to avoid loops (Aloware integration messages are typically bot/app messages,
+    // but we still want them. So only ignore *this* app's bot messages if present.)
+    // Bolt message has subtype sometimes; keep permissive for now.
     recordAlowareIngestSeen();
 
     const parsed = parseAlowareMessage(text || '', attachments);

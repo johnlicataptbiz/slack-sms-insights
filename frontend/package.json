@@ -9,7 +9,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "typecheck:v2": "tsc -p tsconfig.v2.json --noEmit"
+    "typecheck:v2": "tsc -p tsconfig.v2.json --noEmit",
+    "generate-tokens": "tsx frontend/scripts/generate-design-tokens.ts",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "install:legacy": "npm install --legacy-peer-deps"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.18",
@@ -57,6 +61,7 @@
     "framer-motion": "^12.34.3",
     "libphonenumber-js": "^1.12.38",
     "linkify-react": "^4.3.2",
+    "linkifyjs": "^4.3.2",
     "lucide-react": "^0.575.0",
     "react": "^19.2.4",
     "react-day-picker": "^9.14.0",
@@ -64,6 +69,7 @@
     "react-dom": "^19.2.4",
     "react-hook-form": "^7.71.2",
     "react-hotkeys-hook": "^5.2.4",
+    "react-is": "^19.2.4",
     "react-resizable-panels": "^4.7.0",
     "react-router-dom": "^7.13.0",
     "react-textarea-autosize": "^8.5.9",
@@ -77,6 +83,10 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@storybook/addon-designs": "^8.0.0",
+    "@storybook/addon-essentials": "^8.0.0",
+    "@storybook/react": "^8.0.0",
+    "@storybook/react-vite": "^8.0.0",
     "@tailwindcss/vite": "^4.2.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -90,6 +100,7 @@
     "jsdom": "^28.1.0",
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
+    "storybook": "^8.0.0",
     "tailwindcss": "^4.2.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",

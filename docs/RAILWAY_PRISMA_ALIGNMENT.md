@@ -53,7 +53,7 @@ PG_STATEMENT_TIMEOUT_MS=60000
 
 ### Current Build Pipeline
 
-```
+```bash
 npm run build
 ├── npm run clean (delete dist/)
 ├── npm run prebuild (generate changelog)
@@ -62,19 +62,21 @@ npm run build
 └── npm run build:frontend (compile React app)
 ```
 
-### ⚠️ MISSING: Migration Deployment
+### ✅ Migration Deployment Configured
 
-The build process does **NOT** include `prisma migrate deploy`.  
-**Solution:** Railway needs a post-build hook.
+The build process includes migration deployment via post-build hook.
 
-### Recommended Railroad Configuration
+### Railway Configuration (ACTIVE)
 
-Create or update Railway deployment:
+Both `railway.toml` files are configured with the post-build hook:
 
 ```toml
-# railway.toml or Railway dashboard post-build hook
+[build]
+builder = "nixpacks"
 postBuild = "npm run migrate:deploy"
 ```
+
+This ensures migrations run automatically after build succeeds, before app starts.
 
 ---
 

@@ -1,4 +1,6 @@
+[build]
 builder = "nixpacks"
+postBuild = "npm run migrate:deploy"
 
 [build.nixpacks]
 # Match the backend package and .nvmrc pin

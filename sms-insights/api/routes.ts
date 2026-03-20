@@ -656,7 +656,7 @@ const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => 
     sendJson(res, 503, { error: 'Password auth is not configured on the server' }, origin);
     return;
   }
-  if (!expected || !timingSafeStringEqual(password, expected)) {
+  if (!timingSafeStringEqual(password, expected)) {
     sendJson(res, 401, { error: 'Invalid password' }, origin);
     return;
   }

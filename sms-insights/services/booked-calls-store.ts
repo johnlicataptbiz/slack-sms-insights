@@ -1,5 +1,5 @@
-import type { Logger } from '@slack/bolt';
-import { getPrismaClient } from './prisma.js';
+import type { Logger } from "@slack/bolt";
+import { getPrismaClient } from "./prisma.js";
 
 const getPrisma = () => getPrismaClient();
 
@@ -31,7 +31,7 @@ export const upsertBookedCall = async (
     text: string | null;
     raw: unknown;
   },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<BookedCallRow | null> => {
   const prisma = getPrisma();
 
@@ -60,7 +60,7 @@ export const upsertBookedCall = async (
 
     return result as unknown as BookedCallRow;
   } catch (err) {
-    logger?.error?.('Failed to upsert booked call', err);
+    logger?.error?.("Failed to upsert booked call", err);
     return null;
   }
 };
@@ -72,7 +72,7 @@ export const upsertBookedCallReaction = async (
     reactionCount: number;
     users: string[] | null;
   },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<BookedCallReactionRow | null> => {
   const prisma = getPrisma();
 
@@ -99,18 +99,23 @@ export const upsertBookedCallReaction = async (
 
     return result as unknown as BookedCallReactionRow;
   } catch (err) {
-    logger?.error?.('Failed to upsert booked call reaction', err);
+    logger?.error?.("Failed to upsert booked call reaction", err);
     return null;
   }
 };
 
 export const listBookedCallsInRange = async (
   params: { from: Date; to: Date; channelId?: string; slackMessageTs?: string },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<
   Array<
     BookedCallRow & {
-      reactions: Array<Pick<BookedCallReactionRow, 'reaction_name' | 'reaction_count' | 'users'>>;
+      reactions: Array<
+        Pick<
+          BookedCallReactionRow,
+          "reaction_name" | "reaction_count" | "users"
+        >
+      >;
     }
   >
 > => {
@@ -128,7 +133,15 @@ export const listBookedCallsInRange = async (
 
     const rows = await prisma.booked_calls.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        slack_team_id: true,
+        slack_channel_id: true,
+        slack_message_ts: true,
+        event_ts: true,
+        text: true,
+        raw: true,
+        created_at: true,
         booked_call_reactions: {
           select: {
             reaction_name: true,
@@ -137,7 +150,7 @@ export const listBookedCallsInRange = async (
           },
         },
       },
-      orderBy: { event_ts: 'asc' },
+      orderBy: { event_ts: "asc" },
     });
 
     return rows.map((r) => ({
@@ -156,11 +169,16 @@ export const listBookedCallsInRange = async (
       })),
     })) as unknown as Array<
       BookedCallRow & {
-        reactions: Array<Pick<BookedCallReactionRow, 'reaction_name' | 'reaction_count' | 'users'>>;
+        reactions: Array<
+          Pick<
+            BookedCallReactionRow,
+            "reaction_name" | "reaction_count" | "users"
+          >
+        >;
       }
     >;
   } catch (err) {
-    logger?.error?.('Failed to list booked calls in range', err);
+    logger?.error?.("Failed to list booked calls in range", err);
     return [];
   }
 };

@@ -16,6 +16,21 @@ export const getConversationById = async (
   try {
     const result = await prisma.conversation.findUnique({
       where: { id },
+      select: {
+        id: true,
+        contactKey: true,
+        contact_id: true,
+        contact_phone: true,
+        current_rep_id: true,
+        status: true,
+        last_inbound_at: true,
+        last_outbound_at: true,
+        last_touch_at: true,
+        unreplied_inbound_count: true,
+        nextFollowupAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     if (!result) {

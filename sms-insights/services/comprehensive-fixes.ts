@@ -529,7 +529,7 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
       inferredState.revenueMix = cashHits >= insuranceHits ? 'mostly_cash' : 'mostly_insurance';
     }
 
-    // ── Delivery model inference (LENIENT: new field) ─────────────────────────
+    // ── Delivery model inference (LENIENT: new field) ─────────────���───────────
     const brickMortarSignals = [
       'clinic',
       'office',
@@ -1215,7 +1215,7 @@ export const getAuditLogs = async (params: {
     resourceType: row.resource_type,
     resourceId: row.resource_id,
     userId: row.user_id,
-    details: row.details as Record<string, unknown>,
+    details: (row.details ?? {}) as Record<string, unknown>,
     ipAddress: row.ip_address,
     timestamp: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
   }));

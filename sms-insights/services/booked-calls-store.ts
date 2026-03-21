@@ -46,7 +46,7 @@ export const upsertBookedCall = async (
       update: {
         event_ts: input.eventTs,
         text: input.text,
-        raw: (input.raw ?? null) as any,
+        raw: input.raw ? JSON.stringify(input.raw) : null,
       },
       create: {
         slack_team_id: input.slackTeamId,
@@ -54,7 +54,7 @@ export const upsertBookedCall = async (
         slack_message_ts: input.slackMessageTs,
         event_ts: input.eventTs,
         text: input.text,
-        raw: (input.raw ?? null) as any,
+        raw: input.raw ? JSON.stringify(input.raw) : null,
       },
     });
 
@@ -86,14 +86,14 @@ export const upsertBookedCallReaction = async (
       },
       update: {
         reaction_count: input.reactionCount,
-        users: (input.users ?? null) as any,
+        users: input.users ? JSON.stringify(input.users) : null,
         updated_at: new Date(),
       },
       create: {
         booked_call_id: input.bookedCallId,
         reaction_name: input.reactionName,
         reaction_count: input.reactionCount,
-        users: (input.users ?? null) as any,
+        users: input.users ? JSON.stringify(input.users) : null,
       },
     });
 
@@ -122,7 +122,14 @@ export const listBookedCallsInRange = async (
   const prisma = getPrisma();
 
   try {
-    const where: any = {
+    const where: {
+      event_ts: {
+        gte: Date;
+        lte: Date;
+      };
+      slack_channel_id?: string;
+      slack_message_ts?: string;
+    } = {
       event_ts: {
         gte: params.from,
         lte: params.to,

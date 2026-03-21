@@ -1,8 +1,89 @@
 {
-  "generatedAt": "2026-03-20T19:07:34.752Z",
+  "generatedAt": "2026-03-21T13:06:21.940Z",
   "daysIncluded": 365,
-  "totalCount": 420,
+  "totalCount": 436,
   "entries": [
+    {
+      "hash": "2e1c0ac",
+      "date": "2026-03-21T07:03:40-05:00",
+      "message": "fix: linting errors in recovered services - node imports, any types, non-null assertion",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Linting errors in recovered services - node imports, any types, non-null assertion"
+    },
+    {
+      "hash": "86cfde1",
+      "date": "2026-03-21T07:00:28-05:00",
+      "message": "feat: restore all important dangling commits - type-motion, Monday integration, CI secret scan, docs fixes, and additional work",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Restore all important dangling commits - type-motion, Monday integration, CI secret scan, docs fi..."
+    },
+    {
+      "hash": "103fa38",
+      "date": "2026-03-20T18:16:24-05:00",
+      "message": "chore(test): clean node suite and lint backlog",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "UI/UX",
+      "description": "Clean node suite and lint backlog"
+    },
+    {
+      "hash": "5900a14",
+      "date": "2026-03-20T17:23:25-05:00",
+      "message": "fix: resolve peer dependency conflicts and update dependencies",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Resolve peer dependency conflicts and update dependencies"
+    },
+    {
+      "hash": "88c36c3",
+      "date": "2026-03-20T16:42:34-05:00",
+      "message": "fix(ci): resolve frontend npm peer dependency conflict with --legacy-peer-deps",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Resolve frontend npm peer dependency conflict with --legacy-peer-deps"
+    },
+    {
+      "hash": "a090514",
+      "date": "2026-03-20T16:38:10-05:00",
+      "message": "chore: add nvmrc and update changelog",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add nvmrc and update changelog"
+    },
+    {
+      "hash": "469a436",
+      "date": "2026-03-20T16:27:44-05:00",
+      "message": "feat: monday sync complete - prod ready",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Monday sync complete - prod ready"
+    },
+    {
+      "hash": "079f67d",
+      "date": "2026-03-20T15:43:37-05:00",
+      "message": "feat: update deployment configs and backend services",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Update deployment configs and backend services"
+    },
+    {
+      "hash": "f56f9c3",
+      "date": "2026-03-20T15:38:57-05:00",
+      "message": "Fix deployment dependencies and update vercel config",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix deployment dependencies and update vercel config"
+    },
     {
       "hash": "9caa50a",
       "date": "2026-03-20T13:48:19-05:00",
@@ -11,6 +92,24 @@
       "type": "fix",
       "category": "Bug Fixes",
       "description": "Disable noAssignInExpressions lint rule (test pattern safe)"
+    },
+    {
+      "hash": "ebee146",
+      "date": "2026-03-20T13:42:41-05:00",
+      "message": "index on main: 48a1d87 feat(phase4): SELECT query optimization + Zod validation schemas",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Index on main: 48a1d87 feat(phase4): SELECT query optimization + Zod validation schemas"
+    },
+    {
+      "hash": "1a567ac",
+      "date": "2026-03-20T13:42:41-05:00",
+      "message": "untracked files on main: 48a1d87 feat(phase4): SELECT query optimization + Zod validation schemas",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Untracked files on main: 48a1d87 feat(phase4): SELECT query optimization + Zod validation schemas"
     },
     {
       "hash": "d47708f",
@@ -94,6 +193,15 @@
       "description": "Fix Node version, script names, and deploy gates"
     },
     {
+      "hash": "02eb5a8",
+      "date": "2026-03-19T12:25:46-05:00",
+      "message": "docs: fix markdown linting in secrets checklist",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix markdown linting in secrets checklist"
+    },
+    {
       "hash": "29beac1",
       "date": "2026-03-19T12:24:12-05:00",
       "message": "fix(ci): fix Node version, script names, and deploy gates",
@@ -121,6 +229,15 @@
       "description": "Fix workflow issues and consolidate deploy config"
     },
     {
+      "hash": "5654828",
+      "date": "2026-03-19T11:31:02-05:00",
+      "message": "ci: fix secret-scan by adding fetch-depth: 0 for gitleaks",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Fix secret-scan by adding fetch-depth: 0 for gitleaks"
+    },
+    {
       "hash": "8944536",
       "date": "2026-03-19T15:36:43Z",
       "message": "docs: clarify migration script usage",
@@ -146,6 +263,15 @@
       "type": "other",
       "category": "General",
       "description": "Initial plan"
+    },
+    {
+      "hash": "fc97afc",
+      "date": "2026-03-19T10:10:24-05:00",
+      "message": "feat(v2): complete motion, notifications, UI upgrades from stash",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Complete motion, notifications, UI upgrades from stash"
     },
     {
       "hash": "4174308",
@@ -184,6 +310,15 @@
       "description": "Organize documentation and clean up root directory"
     },
     {
+      "hash": "5aa9187",
+      "date": "2026-03-19T07:59:15-05:00",
+      "message": "index on main: 99ed4de build(frontend): update vercel dependencies in package-lock.json",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "AI & ML",
+      "description": "Index on main: 99ed4de build(frontend): update vercel dependencies in package-lock.json"
+    },
+    {
       "hash": "6a3d0f7",
       "date": "2026-03-19T02:07:29Z",
       "message": "Fix: Redundant null check in password validation logic causes dead code",
@@ -191,6 +326,15 @@
       "type": "fix",
       "category": "Authentication",
       "description": "Redundant null check in password validation logic causes dead code"
+    },
+    {
+      "hash": "a894f91",
+      "date": "2026-03-19T02:06:06Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
     },
     {
       "hash": "99ed4de",

@@ -9,12 +9,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test": "vitest --config vitest.config.ts",
     "typecheck:v2": "tsc -p tsconfig.v2.json --noEmit",
     "generate-tokens": "tsx frontend/scripts/generate-design-tokens.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "install:legacy": "npm install --legacy-peer-deps",
-    "test": "vitest",
     "test:run": "vitest run"
   },
   "dependencies": {

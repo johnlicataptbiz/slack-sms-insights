@@ -8,6 +8,11 @@ import type {
 } from './inbox-contact-profiles.js';
 import { getPrismaClient } from './prisma.js';
 
+const toNullableText = (value: unknown): string | null => {
+  if (value == null) return null;
+  return typeof value === 'string' ? value : JSON.stringify(value);
+};
+
 export type CadenceStatus = 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
 
 export type ConversationStateRow = {
@@ -262,26 +267,6 @@ export const getConversationState = async (
   try {
     const result = await prisma.conversation_state.findUnique({
       where: { conversation_id: conversationId },
-      select: {
-        conversation_id: true,
-        qualification_full_or_part_time: true,
-        qualification_niche: true,
-        qualification_revenue_mix: true,
-        qualification_delivery_model: true,
-        qualification_coaching_interest: true,
-        qualification_progress_step: true,
-        escalation_level: true,
-        escalation_reason: true,
-        escalation_overridden: true,
-        last_podcast_sent_at: true,
-        next_followup_due_at: true,
-        cadence_status: true,
-        objection_tags: true,
-        guardrail_override_count: true,
-        call_outcome: true,
-        created_at: true,
-        updated_at: true,
-      },
     });
     return result as unknown as ConversationStateRow | null;
   } catch (err) {
@@ -332,7 +317,24 @@ export const updateConversationState = async (
   const prisma = getPrisma();
 
   try {
-    const updateData: any = {
+    type ConversationStateUpdateData = {
+      updated_at: Date;
+      qualification_full_or_part_time?: EmploymentStatus;
+      qualification_niche?: string | null;
+      qualification_revenue_mix?: RevenueMixCategory;
+      qualification_delivery_model?: DeliveryModel;
+      qualification_coaching_interest?: CoachingInterest;
+      qualification_progress_step?: number;
+      objection_tags?: string;
+      escalation_level?: 1 | 2 | 3 | 4;
+      escalation_reason?: string | null;
+      escalation_overridden?: boolean;
+      last_podcast_sent_at?: Date | null;
+      next_followup_due_at?: Date | null;
+      cadence_status?: CadenceStatus;
+      call_outcome?: string | null;
+    };
+    const updateData: ConversationStateUpdateData = {
       updated_at: new Date(),
     };
     if (input.fullOrPartTime !== undefined) updateData.qualification_full_or_part_time = input.fullOrPartTime;
@@ -341,7 +343,7 @@ export const updateConversationState = async (
     if (input.deliveryModel !== undefined) updateData.qualification_delivery_model = input.deliveryModel;
     if (input.coachingInterest !== undefined) updateData.qualification_coaching_interest = input.coachingInterest;
     if (input.progressStep !== undefined) updateData.qualification_progress_step = input.progressStep;
-    if (input.objectionTags !== undefined) updateData.objection_tags = input.objectionTags;
+    if (input.objectionTags !== undefined) updateData.objection_tags = JSON.stringify(input.objectionTags);
     if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
     if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
     if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;
@@ -383,7 +385,7 @@ export const listInboxConversations = async (
   const prisma = getPrisma();
   try {
     const where: string[] = [];
-    const values: Array<any> = [];
+    const values: Array<string | number | boolean | null> = [];
     let index = 1;
 
     if (params.status) {
@@ -691,7 +693,17 @@ export const listMondayTrailForContactKey = async (
   try {
     const normalizedLimit = Math.max(1, Math.min(limit, 50));
 
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type MondayTrailRow = {
+      board_id: string;
+      item_id: string;
+      item_name: string | null;
+      stage: string | null;
+      call_date: Date | null;
+      disposition: string | null;
+      is_booked: boolean;
+      updated_at: Date;
+    };
+    const result = await prisma.$queryRawUnsafe<MondayTrailRow[]>(
       `
       SELECT
         m.board_id,
@@ -726,10 +738,10 @@ export const listMondayTrailForContactKey = async (
       itemId: row.item_id,
       itemName: row.item_name,
       stage: row.stage,
-      callDate: row.call_date,
+      callDate: row.call_date ? row.call_date.toISOString() : null,
       disposition: row.disposition,
       isBooked: row.is_booked,
-      updatedAt: row.updated_at,
+      updatedAt: row.updated_at.toISOString(),
     }));
   } catch (err) {
     logger?.error('listMondayTrailForContactKey failed', err);
@@ -770,34 +782,13 @@ export const insertSendAttempt = async (
       idempotency_key: input.idempotencyKey ?? null,
       status: input.status,
       retry_count: input.retryCount ?? 0,
-      request_payload: (input.requestPayload as any) ?? null,
-      response_payload: (input.responsePayload as any) ?? null,
+      request_payload: toNullableText(input.requestPayload),
+      response_payload: toNullableText(input.responsePayload),
       error_message: input.errorMessage ?? null,
     };
 
     if (input.idempotencyKey) {
-      const result = await prisma.send_attempts.upsert({
-        where: {
-          conversation_id_idempotency_key: {
-            conversation_id: input.conversationId,
-            idempotency_key: input.idempotencyKey,
-          },
-        },
-        update: {
-          response_payload: (input.responsePayload as any) ?? undefined,
-          status: input.status,
-          retry_count: {
-            increment: 0, // We need to replicate GREATEST. Prisma doesn't have GREATEST in fluent API easily.
-          },
-          error_message: input.errorMessage ?? undefined,
-        },
-        create: data,
-      });
-
-      // Special handling for retry_count GREATEST via $executeRaw if needed,
-      // but usually retry_count is managed by the caller.
-      // The original SQL: retry_count = GREATEST(send_attempts.retry_count, EXCLUDED.retry_count)
-      // Let's use $queryRawUnsafe to perfectly match the original behavior for upsert.
+      // Use raw SQL for upsert to handle the composite unique key and GREATEST logic
       const upsertSql = `
         INSERT INTO send_attempts (
           conversation_id, message_body, sender_identity, line_id, from_number,
@@ -888,15 +879,15 @@ export const getSendAttemptByIdempotency = async (
 ): Promise<SendAttemptRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.send_attempts.findUnique({
-      where: {
-        conversation_id_idempotency_key: {
-          conversation_id: conversationId,
-          idempotency_key: idempotencyKey,
-        },
-      },
-    });
-    return result as unknown as SendAttemptRow | null;
+    // Use raw SQL to query by composite unique key
+    const result = await prisma.$queryRawUnsafe<SendAttemptRow[]>(
+      `SELECT * FROM send_attempts 
+       WHERE conversation_id = $1::uuid AND idempotency_key = $2 
+       LIMIT 1`,
+      conversationId,
+      idempotencyKey,
+    );
+    return result[0] ?? null;
   } catch (err) {
     logger?.error('getSendAttemptByIdempotency failed', err);
     throw err;
@@ -915,7 +906,12 @@ export const getSendAttemptVolumeCounts = async (
 ): Promise<SendAttemptVolumeCounts> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type SendAttemptVolumeRow = {
+      sent_last_hour: string | null;
+      sent_last_day: string | null;
+      conversation_sent_last_hour: string | null;
+    };
+    const result = await prisma.$queryRawUnsafe<SendAttemptVolumeRow[]>(
       `
       SELECT
         COUNT(*) FILTER (
@@ -969,12 +965,12 @@ export const insertDraftSuggestion = async (
       data: {
         conversation_id: input.conversationId,
         prompt_snapshot_hash: input.promptSnapshotHash,
-        retrieved_exemplar_ids: (input.retrievedExemplarIds as any) ?? null,
+        retrieved_exemplar_ids: toNullableText(input.retrievedExemplarIds),
         generated_text: input.generatedText,
         lint_score: input.lintScore,
         structural_score: input.structuralScore,
-        lint_issues: (input.lintIssues as any) ?? null,
-        raw: (input.raw as any) ?? null,
+        lint_issues: toNullableText(input.lintIssues),
+        raw: toNullableText(input.raw),
       },
     });
 
@@ -1031,7 +1027,12 @@ export const updateDraftSuggestionFeedback = async (
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
-    const updateData: any = {
+    const updateData: {
+      updated_at: Date;
+      accepted?: boolean;
+      edited?: boolean;
+      send_linked_event_id?: string | null;
+    } = {
       updated_at: new Date(),
     };
     if (typeof params.accepted === 'boolean') updateData.accepted = params.accepted;
@@ -1063,7 +1064,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? undefined,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? undefined,
-        qualifier_snapshot: (input.qualifierSnapshot as any) ?? undefined,
+        qualifier_snapshot: toNullableText(input.qualifierSnapshot) ?? undefined,
         channel_marker: input.channelMarker ?? undefined,
       },
       create: {
@@ -1072,7 +1073,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? null,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? null,
-        qualifier_snapshot: (input.qualifierSnapshot as any) ?? null,
+        qualifier_snapshot: toNullableText(input.qualifierSnapshot),
         channel_marker: input.channelMarker || 'sms',
       },
     });
@@ -1288,22 +1289,25 @@ export const updateObjectionTags = async (
 ): Promise<{ conversation_id: string; objection_tags: string[] }> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation_state.upsert({
-      where: { conversation_id: conversationId },
-      update: {
-        objection_tags: tags,
-        updated_at: new Date(),
-      },
-      create: {
-        conversation_id: conversationId,
-        objection_tags: tags,
-      },
-      select: {
-        conversation_id: true,
-        objection_tags: true,
-      },
-    });
-    return result;
+    // Use raw SQL to handle the string[] array type properly
+    type ObjectionTagsRow = { conversation_id: string; objection_tags: string[] };
+    const result = await prisma.$queryRawUnsafe<ObjectionTagsRow[]>(
+      `
+      INSERT INTO conversation_state (conversation_id, objection_tags, updated_at)
+      VALUES ($1::uuid, $2::text[], NOW())
+      ON CONFLICT (conversation_id)
+      DO UPDATE SET
+        objection_tags = EXCLUDED.objection_tags,
+        updated_at = NOW()
+      RETURNING conversation_id, objection_tags;
+      `,
+      conversationId,
+      tags,
+    );
+    return {
+      conversation_id: result[0].conversation_id,
+      objection_tags: result[0].objection_tags as string[],
+    };
   } catch (err) {
     logger?.error('updateObjectionTags failed', err);
     throw err;
@@ -1356,7 +1360,8 @@ export const incrementGuardrailOverride = async (
     // However, Prisma doesn't support relative increments in create.
     // So we first find or create, then update, or just use raw if it's cleaner.
     // Let's use raw to be safe and efficient for increments.
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type GuardrailOverrideRow = { conversation_id: string; guardrail_override_count: number };
+    const result = await prisma.$queryRawUnsafe<GuardrailOverrideRow[]>(
       `
       INSERT INTO conversation_state (conversation_id, guardrail_override_count)
       VALUES ($1::uuid, 1)
@@ -1548,7 +1553,14 @@ export const listConversionExamples = async (
     const limitPlaceholder = `$${i++}`;
     values.push(limit);
 
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type ConversionExampleQueryRow = ConversionExampleRow & {
+      outbound_body: string | null;
+      outbound_user: string | null;
+      source_inbound_body: string | null;
+      source_conversation_id: string | null;
+      source_outbound_ts: string | null;
+    };
+    const result = await prisma.$queryRawUnsafe<ConversionExampleQueryRow[]>(
       `
       SELECT
         ce.*,

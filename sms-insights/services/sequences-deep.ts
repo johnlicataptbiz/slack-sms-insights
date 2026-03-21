@@ -5,7 +5,8 @@ import {
   getBookedCallSmsReplyLinks,
 } from './booked-calls.js';
 import { getPrismaClient } from './prisma.js';
-import { attributeSlackBookedCallsToSequences, type UnattributedAuditRow } from './sequence-booked-attribution.js';
+import type { UnattributedAuditRow } from './sequence-booked-attribution.js';
+import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
 
 const getPrisma = () => getPrismaClient();
 const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';

@@ -28,7 +28,7 @@ import {
   getBookedCallSmsReplyLinks,
   getBookedCallsSummary,
 } from '../services/booked-calls.js';
-import { getChangelogByDateRange, getChangelogTimeline } from '../services/changelog-service.js';
+import { getChangelogByDateRange } from '../services/changelog-service.js';
 import {
   autoAssignWorkItems,
   bulkInferQualification,
@@ -329,7 +329,11 @@ const parseCookies = (rawCookies: string | undefined): Record<string, string> =>
 const buildCookie = (
   name: string,
   value: string,
-  options: { maxAgeSeconds: number; httpOnly?: boolean; sameSite?: 'Lax' | 'Strict' | 'None' },
+  options: {
+    maxAgeSeconds: number;
+    httpOnly?: boolean;
+    sameSite?: 'Lax' | 'Strict' | 'None';
+  },
 ): string => {
   const parts = [
     `${name}=${encodeURIComponent(value)}`,
@@ -624,7 +628,10 @@ const handleAuthVerify: RequestHandler = async (req, res, _logger, origin) => {
 const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => {
   let body: { password?: string; stayLoggedIn?: boolean } = {};
   try {
-    body = (await parseJsonBody(req)) as { password?: string; stayLoggedIn?: boolean };
+    body = (await parseJsonBody(req)) as {
+      password?: string;
+      stayLoggedIn?: boolean;
+    };
   } catch (error) {
     sendBodyParseError(res, origin, error);
     return;
@@ -656,7 +663,7 @@ const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => 
     sendJson(res, 503, { error: 'Password auth is not configured on the server' }, origin);
     return;
   }
-  if (!timingSafeStringEqual(password, expected)) {
+  if (!expected || !timingSafeStringEqual(password, expected)) {
     sendJson(res, 401, { error: 'Invalid password' }, origin);
     return;
   }
@@ -675,7 +682,9 @@ const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => 
     destroyDashboardSession(existingSession);
   }
 
-  const session = createDashboardSession(sessionUser, { ttlSeconds: sessionTtlSeconds });
+  const session = createDashboardSession(sessionUser, {
+    ttlSeconds: sessionTtlSeconds,
+  });
 
   sendJson(
     res,
@@ -713,7 +722,10 @@ const handleAuthLogout: RequestHandler = async (req, res, _logger, origin) => {
   sendJson(res, 200, { ok: true }, origin, {
     'Cache-Control': 'no-store',
     'Set-Cookie': [
-      buildCookie(SESSION_COOKIE_NAME, '', { maxAgeSeconds: 0, httpOnly: true }),
+      buildCookie(SESSION_COOKIE_NAME, '', {
+        maxAgeSeconds: 0,
+        httpOnly: true,
+      }),
       buildCookie(CSRF_COOKIE_NAME, '', { maxAgeSeconds: 0, httpOnly: false }),
       buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
     ],
@@ -850,7 +862,9 @@ const handleOauthStart: RequestHandler = async (_req, res, logger) => {
       Warning: '299 - "Dashboard Slack OAuth is deprecated; use password login"',
       'X-PTBizSMS-Deprecated': 'dashboard-slack-oauth',
       'Cache-Control': 'no-store',
-      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
+      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', {
+        maxAgeSeconds: 0,
+      }),
     });
     res.end();
     logger?.warn('Dashboard OAuth start requested while Slack OAuth is disabled');
@@ -877,7 +891,9 @@ const handleOauthStart: RequestHandler = async (_req, res, logger) => {
 
   const headers: Record<string, string> = {
     Location: authorizeUrl.toString(),
-    'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, state, { maxAgeSeconds: 600 }),
+    'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, state, {
+      maxAgeSeconds: 600,
+    }),
   };
   res.writeHead(302, headers);
   res.end();
@@ -891,7 +907,9 @@ const handleOauthCallback: RequestHandler = async (req, res, logger) => {
       Warning: '299 - "Dashboard Slack OAuth is deprecated; use password login"',
       'X-PTBizSMS-Deprecated': 'dashboard-slack-oauth',
       'Cache-Control': 'no-store',
-      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
+      'Set-Cookie': buildCookie(OAUTH_STATE_COOKIE_NAME, '', {
+        maxAgeSeconds: 0,
+      }),
     });
     res.end();
     logger?.warn('Dashboard OAuth callback requested while Slack OAuth is disabled');
@@ -940,7 +958,9 @@ const handleOauthCallback: RequestHandler = async (req, res, logger) => {
 
     const token = response.authed_user?.access_token || response.access_token;
     if (!token) {
-      sendJson(res, 500, { error: 'OAuth succeeded but no user token was returned' });
+      sendJson(res, 500, {
+        error: 'OAuth succeeded but no user token was returned',
+      });
       return;
     }
     const auth = await slack.auth.test({ token });
@@ -961,8 +981,14 @@ const handleOauthCallback: RequestHandler = async (req, res, logger) => {
       Location: successUrl,
       'Set-Cookie': [
         buildCookie(OAUTH_STATE_COOKIE_NAME, '', { maxAgeSeconds: 0 }),
-        buildCookie(SESSION_COOKIE_NAME, session.id, { maxAgeSeconds: sessionTtlSeconds, httpOnly: true }),
-        buildCookie(CSRF_COOKIE_NAME, session.csrfToken, { maxAgeSeconds: sessionTtlSeconds, httpOnly: false }),
+        buildCookie(SESSION_COOKIE_NAME, session.id, {
+          maxAgeSeconds: sessionTtlSeconds,
+          httpOnly: true,
+        }),
+        buildCookie(CSRF_COOKIE_NAME, session.csrfToken, {
+          maxAgeSeconds: sessionTtlSeconds,
+          httpOnly: false,
+        }),
       ],
       'Cache-Control': 'no-store',
     });
@@ -992,7 +1018,10 @@ const handleGetRuns: RequestHandler = async (req, res, logger, origin) => {
     sendJson(
       res,
       400,
-      { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) },
+      {
+        error: 'Invalid query parameters',
+        details: formatValidationErrors(validation.error),
+      },
       origin,
     );
     return;
@@ -1021,7 +1050,15 @@ const handleGetRunById: RequestHandler = async (req, res, logger, origin) => {
 
   const validation = validateQuery(getRunSchema, { id: id || '' });
   if (!validation.success) {
-    sendJson(res, 400, { error: 'Invalid run ID', details: formatValidationErrors(validation.error) }, origin);
+    sendJson(
+      res,
+      400,
+      {
+        error: 'Invalid run ID',
+        details: formatValidationErrors(validation.error),
+      },
+      origin,
+    );
     return;
   }
 
@@ -1054,7 +1091,15 @@ const handlePostRun: RequestHandler = async (req, res, logger, origin) => {
 
   const validation = validateBody(createRunSchema, rawBody);
   if (!validation.success) {
-    sendJson(res, 400, { error: 'Invalid request body', details: formatValidationErrors(validation.error) }, origin);
+    sendJson(
+      res,
+      400,
+      {
+        error: 'Invalid request body',
+        details: formatValidationErrors(validation.error),
+      },
+      origin,
+    );
     return;
   }
 
@@ -1122,7 +1167,16 @@ const handleGetRunsV2: RequestHandler = async (req, res, logger, origin) => {
     res,
     200,
     toEnvelope({
-      data: toRunsListV2({ rows, limit, offset, daysBack, channelId, legacyMode, includeFullReport, outliers }),
+      data: toRunsListV2({
+        rows,
+        limit,
+        offset,
+        daysBack,
+        channelId,
+        legacyMode,
+        includeFullReport,
+        outliers,
+      }),
       timeZone: DEFAULT_BUSINESS_TIMEZONE,
     }),
     origin,
@@ -1196,7 +1250,10 @@ const handleGetSequenceQualificationV2: RequestHandler = async (req, res, logger
       res,
       200,
       toEnvelope({
-        data: { items, window: { from: from.toISOString(), to: to.toISOString(), timeZone } },
+        data: {
+          items,
+          window: { from: from.toISOString(), to: to.toISOString(), timeZone },
+        },
         timeZone,
       }),
       origin,
@@ -1254,13 +1311,16 @@ const handleGetSequenceKpisV2: RequestHandler = async (req, res, logger, origin)
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch sequence KPIs', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch sequence KPIs',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
 };
 
-const handleGetAttributionHealthV2: RequestHandler = async (req, res, logger, origin) => {
+const handleGetAttributionHealthV2: RequestHandler = async (_req, res, logger, origin) => {
   try {
     const status = await getAttributionLagStatus();
     sendJson(
@@ -1278,7 +1338,10 @@ const handleGetAttributionHealthV2: RequestHandler = async (req, res, logger, or
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch attribution health', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch attribution health',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -1371,14 +1434,20 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
 
   try {
     if (shouldRefreshFactsOnRead()) {
-      await refreshKpiFacts(
-        {
-          from: resolved.from,
-          to: resolved.to,
-          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
-        },
-        logger,
-      );
+      try {
+        await refreshKpiFacts(
+          {
+            from: resolved.from,
+            to: resolved.to,
+            timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+          },
+          logger,
+        );
+      } catch (error) {
+        logger?.warn?.(
+          `Insights summary fact refresh failed; serving cached facts instead: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     const data = await getInsightsSummary(
@@ -1391,13 +1460,25 @@ const handleGetInsightsSummaryV2: RequestHandler = async (req, res, logger, orig
       logger,
     );
 
-    sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: data.window.timeZone,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
   } catch (error) {
     logger?.error('Failed to fetch insights summary:', error);
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch insights summary', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch insights summary',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -1529,7 +1610,10 @@ const handleGetRepResponseV2: RequestHandler = async (req, res, logger, origin) 
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch rep response data', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch rep response data',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -1555,14 +1639,20 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
 
   try {
     if (shouldRefreshFactsOnRead()) {
-      await refreshKpiFacts(
-        {
-          from: resolved.from,
-          to: resolved.to,
-          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
-        },
-        logger,
-      );
+      try {
+        await refreshKpiFacts(
+          {
+            from: resolved.from,
+            to: resolved.to,
+            timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+          },
+          logger,
+        );
+      } catch (error) {
+        logger?.warn?.(
+          `Sequences deep fact refresh failed; serving cached facts instead: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
     }
 
     const data = await getSequencesDeep(
@@ -1575,7 +1665,16 @@ const handleGetSequencesDeepV2: RequestHandler = async (req, res, logger, origin
       logger,
     );
 
-    sendJson(res, 200, toEnvelope({ data, timeZone: data.window.timeZone, requestedMode: resolved.mode }), origin);
+    sendJson(
+      res,
+      200,
+      toEnvelope({
+        data,
+        timeZone: data.window.timeZone,
+        requestedMode: resolved.mode,
+      }),
+      origin,
+    );
   } catch (error) {
     logger?.error('Failed to fetch sequences deep analytics:', error);
     sendJson(
@@ -1737,7 +1836,11 @@ const handleGetConversationById: RequestHandler = async (req, res, logger, origi
 
   // Fetch recent events to satisfy the frontend Conversation detail view
   const events = await listSmsEventsForConversation(
-    { id: conversation.id, contact_id: conversation.contact_id, contact_phone: conversation.contact_phone },
+    {
+      id: conversation.id,
+      contact_id: conversation.contact_id,
+      contact_phone: conversation.contact_phone,
+    },
     50,
     logger,
   );
@@ -1785,7 +1888,11 @@ const handleGetConversationEvents: RequestHandler = async (req, res, logger, ori
   }
 
   const events = await listSmsEventsForConversation(
-    { id: conversation.id, contact_id: conversation.contact_id, contact_phone: conversation.contact_phone },
+    {
+      id: conversation.id,
+      contact_id: conversation.contact_id,
+      contact_phone: conversation.contact_phone,
+    },
     limit,
     logger,
   );
@@ -1825,7 +1932,10 @@ const handleGetMetrics: RequestHandler = async (req, res, logger, origin) => {
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch metrics', details: err instanceof Error ? err.message : String(err) },
+      {
+        error: 'Failed to fetch metrics',
+        details: err instanceof Error ? err.message : String(err),
+      },
       origin,
     );
     return [null, null, null, null] as const;
@@ -1886,7 +1996,12 @@ const buildSalesMetricsPayload = async (params: {
   const [summary, bookedCalls, bookedAttributionSources] = await Promise.all([
     getSalesMetricsSummary({ from: params.from, to: params.to, timeZone: params.timeZone }, params.logger),
     getBookedCallsSummary(
-      { from: params.from, to: params.to, channelId: process.env.BOOKED_CALLS_CHANNEL_ID, timeZone: params.timeZone },
+      {
+        from: params.from,
+        to: params.to,
+        channelId: process.env.BOOKED_CALLS_CHANNEL_ID,
+        timeZone: params.timeZone,
+      },
       params.logger,
     ),
     getBookedCallAttributionSources({
@@ -1986,7 +2101,10 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
     sendJson(
       res,
       400,
-      { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) },
+      {
+        error: 'Invalid query parameters',
+        details: formatValidationErrors(validation.error),
+      },
       origin,
     );
     return;
@@ -2013,7 +2131,10 @@ const handleGetSalesMetrics: RequestHandler = async (req, res, logger, origin) =
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch sales metrics', details: err instanceof Error ? err.message : String(err) },
+      {
+        error: 'Failed to fetch sales metrics',
+        details: err instanceof Error ? err.message : String(err),
+      },
       origin,
     );
   }
@@ -2059,7 +2180,10 @@ const handleGetSalesMetricsV2: RequestHandler = async (req, res, logger, origin)
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch v2 sales metrics', details: err instanceof Error ? err.message : String(err) },
+      {
+        error: 'Failed to fetch v2 sales metrics',
+        details: err instanceof Error ? err.message : String(err),
+      },
       origin,
     );
   }
@@ -2149,7 +2273,15 @@ const handleGetStreamToken: RequestHandler = async (req, res, _logger, origin) =
     token = mintStreamToken({ subject: userId, ttlSeconds: ttl });
   } catch (error) {
     _logger?.error('Failed to mint stream token', error);
-    sendJson(res, 503, { error: 'Realtime token service is not configured', code: 'stream_token_unavailable' }, origin);
+    sendJson(
+      res,
+      503,
+      {
+        error: 'Realtime token service is not configured',
+        code: 'stream_token_unavailable',
+      },
+      origin,
+    );
     return;
   }
 
@@ -2235,7 +2367,10 @@ const handleGetWorkItems: RequestHandler = async (req, res, logger, origin) => {
     sendJson(
       res,
       400,
-      { error: 'Invalid query parameters', details: formatValidationErrors(validation.error) },
+      {
+        error: 'Invalid query parameters',
+        details: formatValidationErrors(validation.error),
+      },
       origin,
     );
     return;
@@ -2470,7 +2605,7 @@ const toInboxConversationV2 = (row: {
   };
 };
 
-const toInboxMessageV2 = (row: InboxMessageRow) => ({
+const _toInboxMessageV2 = (row: InboxMessageRow) => ({
   id: row.id,
   conversation_id: row.conversation_id,
   event_ts: row.event_ts instanceof Date ? row.event_ts.toISOString() : row.event_ts,
@@ -3413,7 +3548,14 @@ const handlePostInboxSendV2: RequestHandler = async (req, res, logger, origin) =
       const unchangedFromDraft = linkedDraft.generated_text.trim() === messageBody;
       const lintFailed = linkedDraft.lint_score < 80;
       if (unchangedFromDraft && lintFailed) {
-        return sendJson(res, 400, { error: 'Draft failed strict lint. Edit the message before sending.' }, origin);
+        return sendJson(
+          res,
+          400,
+          {
+            error: 'Draft failed strict lint. Edit the message before sending.',
+          },
+          origin,
+        );
       }
     }
   }
@@ -3598,7 +3740,10 @@ const handlePostInboxQualificationV2: RequestHandler = async (req, res, logger, 
   );
 
   const profileForSync = await getInboxContactProfileByKey(conversation.contact_key, logger);
-  let alowareQualificationSync: { status: 'synced' | 'skipped'; reason: string } | null = null;
+  let alowareQualificationSync: {
+    status: 'synced' | 'skipped';
+    reason: string;
+  } | null = null;
   try {
     alowareQualificationSync = await syncQualificationToAloware(
       {
@@ -3721,7 +3866,10 @@ const handlePostInboxStatusV2: RequestHandler = async (req, res, logger, origin)
     return sendJson(res, 404, { error: 'Conversation not found' }, origin);
   }
 
-  let alowareSequenceSync: { status: 'synced' | 'skipped'; reason: string } | null = null;
+  let alowareSequenceSync: {
+    status: 'synced' | 'skipped';
+    reason: string;
+  } | null = null;
   if (status === 'dnc') {
     const profile = await getInboxContactProfileByKey(conversation.contact_key, logger);
     try {
@@ -3961,7 +4109,14 @@ const handleGetInboxNotesV2: RequestHandler = async (req, res, logger, origin) =
     res,
     200,
     toEnvelope({
-      data: { notes: notes.map((n) => ({ id: n.id, author: n.author, text: n.text, createdAt: n.created_at })) },
+      data: {
+        notes: notes.map((n) => ({
+          id: n.id,
+          author: n.author,
+          text: n.text,
+          createdAt: n.created_at,
+        })),
+      },
       timeZone: DEFAULT_BUSINESS_TIMEZONE,
     }),
     origin,
@@ -3991,7 +4146,12 @@ const handlePostInboxNoteV2: RequestHandler = async (req, res, logger, origin) =
     res,
     201,
     toEnvelope({
-      data: { id: note.id, author: note.author, text: note.text, createdAt: note.created_at },
+      data: {
+        id: note.id,
+        author: note.author,
+        text: note.text,
+        createdAt: note.created_at,
+      },
       timeZone: DEFAULT_BUSINESS_TIMEZONE,
     }),
     origin,
@@ -4157,7 +4317,10 @@ const handlePostObjectionTagsV2: RequestHandler = async (req, res, logger, origi
       res,
       200,
       toEnvelope({
-        data: { conversationId: result.conversation_id, objectionTags: result.objection_tags },
+        data: {
+          conversationId: result.conversation_id,
+          objectionTags: result.objection_tags,
+        },
         timeZone: DEFAULT_BUSINESS_TIMEZONE,
       }),
       origin,
@@ -4186,7 +4349,14 @@ const handlePostCallOutcomeV2: RequestHandler = async (req, res, logger, origin)
   }
   const { outcome } = body;
   if (outcome !== null && outcome !== undefined && !VALID_CALL_OUTCOMES.includes(outcome as never)) {
-    return sendJson(res, 400, { error: `outcome must be one of: ${VALID_CALL_OUTCOMES.join(', ')} or null` }, origin);
+    return sendJson(
+      res,
+      400,
+      {
+        error: `outcome must be one of: ${VALID_CALL_OUTCOMES.join(', ')} or null`,
+      },
+      origin,
+    );
   }
   try {
     const result = await updateCallOutcome(conversationId, (outcome as string | null) ?? null, logger);
@@ -4194,7 +4364,10 @@ const handlePostCallOutcomeV2: RequestHandler = async (req, res, logger, origin)
       res,
       200,
       toEnvelope({
-        data: { conversationId: result.conversation_id, callOutcome: result.call_outcome },
+        data: {
+          conversationId: result.conversation_id,
+          callOutcome: result.call_outcome,
+        },
         timeZone: DEFAULT_BUSINESS_TIMEZONE,
       }),
       origin,
@@ -4220,7 +4393,10 @@ const handlePostGuardrailOverrideV2: RequestHandler = async (req, res, logger, o
       res,
       200,
       toEnvelope({
-        data: { conversationId: result.conversation_id, guardrailOverrideCount: result.guardrail_override_count },
+        data: {
+          conversationId: result.conversation_id,
+          guardrailOverrideCount: result.guardrail_override_count,
+        },
         timeZone: DEFAULT_BUSINESS_TIMEZONE,
       }),
       origin,
@@ -4561,7 +4737,7 @@ const handleGetOutcomeKeywordAnalyticsV2: RequestHandler = async (req, res, logg
   }
 };
 
-const handleGetMondaySmsSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+const handleGetMondaySmsSyncBoardIds: RequestHandler = async (_req, res, _logger, origin) => {
   const boardIds = listMondaySmsSyncBoardIds();
   sendJson(res, 200, { boardIds }, origin);
 };
@@ -4592,7 +4768,7 @@ const handlePostMondaySmsSync: RequestHandler = async (req, res, logger, origin)
   }
 };
 
-const handleGetMondaySmsSequencesSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+const handleGetMondaySmsSequencesSyncBoardIds: RequestHandler = async (_req, res, _logger, origin) => {
   const boardIds = listMondaySmsSequencesSyncBoardIds();
   sendJson(res, 200, { boardIds }, origin);
 };
@@ -4607,7 +4783,9 @@ const handlePostMondaySmsSequencesSync: RequestHandler = async (req, res, logger
   }
 
   try {
-    const result = await syncMondaySmsSequencesBoard(boardId, logger, { force });
+    const result = await syncMondaySmsSequencesBoard(boardId, logger, {
+      force,
+    });
     sendJson(res, 200, { result }, origin);
   } catch (error) {
     logger?.error('Failed to sync Monday SMS Sequences board:', error);
@@ -4623,7 +4801,7 @@ const handlePostMondaySmsSequencesSync: RequestHandler = async (req, res, logger
   }
 };
 
-const handleGetMondaySmsReportsSyncBoardIds: RequestHandler = async (req, res, logger, origin) => {
+const handleGetMondaySmsReportsSyncBoardIds: RequestHandler = async (_req, res, _logger, origin) => {
   const boardIds = listMondaySmsReportsSyncBoardIds();
   sendJson(res, 200, { boardIds }, origin);
 };
@@ -4696,7 +4874,10 @@ const handlePostManualBookedCallV2: RequestHandler = async (req, res, logger, or
     sendJson(
       res,
       200,
-      toEnvelope({ data: { status: 'synced', itemId: result.itemId }, timeZone: DEFAULT_BUSINESS_TIMEZONE }),
+      toEnvelope({
+        data: { status: 'synced', itemId: result.itemId },
+        timeZone: DEFAULT_BUSINESS_TIMEZONE,
+      }),
       origin,
     );
   } catch (error) {
@@ -4826,7 +5007,10 @@ const handleGetMondayScorecardsV2: RequestHandler = async (req, res, logger, ori
     sendJson(
       res,
       500,
-      { error: 'Failed to fetch monday scorecards', details: error instanceof Error ? error.message : String(error) },
+      {
+        error: 'Failed to fetch monday scorecards',
+        details: error instanceof Error ? error.message : String(error),
+      },
       origin,
     );
   }
@@ -4850,7 +5034,10 @@ const handleDeleteInboxTemplateV2: RequestHandler = async (req, res, logger, ori
   sendJson(
     res,
     200,
-    toEnvelope({ data: { id: templateId, deleted: true }, timeZone: DEFAULT_BUSINESS_TIMEZONE }),
+    toEnvelope({
+      data: { id: templateId, deleted: true },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
     origin,
   );
 };
@@ -4865,7 +5052,9 @@ const handleGetDailyReportV2: RequestHandler = async (req, res, logger, origin) 
     sendJson(
       res,
       400,
-      { error: "Invalid 'compare' parameter. Must be one of 'prev_day', 'prev_week', 'prev_month'." },
+      {
+        error: "Invalid 'compare' parameter. Must be one of 'prev_day', 'prev_week', 'prev_month'.",
+      },
       origin,
     );
     return;
@@ -4904,7 +5093,14 @@ const handleGetDailyReportRangeV2: RequestHandler = async (req, res, logger, ori
 
   const dateRe = /^\d{4}-\d{2}-\d{2}$/;
   if (!dateRe.test(from) || !dateRe.test(to)) {
-    sendJson(res, 400, { error: 'Invalid date format. Expected YYYY-MM-DD for both from and to' }, origin);
+    sendJson(
+      res,
+      400,
+      {
+        error: 'Invalid date format. Expected YYYY-MM-DD for both from and to',
+      },
+      origin,
+    );
     return;
   }
 
@@ -4940,13 +5136,46 @@ const routeMatches = (pathname: string, pattern: string): boolean => {
 };
 
 const apiRoutes: ApiRoute[] = [
-  { method: 'GET', path: '/api/health', public: true, handler: handleApiHealth },
-  { method: 'GET', path: '/api/runtime-status', public: true, handler: handleGetRuntimeStatus },
-  { method: 'GET', path: '/api/oauth/start', public: true, handler: handleOauthStart },
-  { method: 'GET', path: '/api/oauth/callback', public: true, handler: handleOauthCallback },
-  { method: 'POST', path: '/api/runs', public: true, csrf: false, rateLimitBucket: 'mutation', handler: handlePostRun },
+  {
+    method: 'GET',
+    path: '/api/health',
+    public: true,
+    handler: handleApiHealth,
+  },
+  {
+    method: 'GET',
+    path: '/api/runtime-status',
+    public: true,
+    handler: handleGetRuntimeStatus,
+  },
+  {
+    method: 'GET',
+    path: '/api/oauth/start',
+    public: true,
+    handler: handleOauthStart,
+  },
+  {
+    method: 'GET',
+    path: '/api/oauth/callback',
+    public: true,
+    handler: handleOauthCallback,
+  },
+  {
+    method: 'POST',
+    path: '/api/runs',
+    public: true,
+    csrf: false,
+    rateLimitBucket: 'mutation',
+    handler: handlePostRun,
+  },
 
-  { method: 'POST', path: '/api/auth/password', public: true, csrf: false, handler: handleAuthPassword },
+  {
+    method: 'POST',
+    path: '/api/auth/password',
+    public: true,
+    csrf: false,
+    handler: handleAuthPassword,
+  },
   { method: 'GET', path: '/api/auth/verify', handler: handleAuthVerify },
   { method: 'POST', path: '/api/auth/logout', handler: handleAuthLogout },
 
@@ -4955,29 +5184,101 @@ const apiRoutes: ApiRoute[] = [
   { method: 'GET', path: '/api/runs', handler: handleGetRuns },
   { method: 'GET', path: '/api/runs/:id', handler: handleGetRunById },
   { method: 'GET', path: '/api/channels', handler: handleGetChannels },
-  { method: 'GET', path: '/api/v2/sales-metrics', handler: handleGetSalesMetricsV2 },
-  { method: 'GET', path: '/api/v2/sales-metrics/batch', handler: handleGetSalesMetricsBatchV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/sales-metrics',
+    handler: handleGetSalesMetricsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/sales-metrics/batch',
+    handler: handleGetSalesMetricsBatchV2,
+  },
   { method: 'GET', path: '/api/v2/runs', handler: handleGetRunsV2 },
   { method: 'GET', path: '/api/v2/runs/:id', handler: handleGetRunByIdV2 },
   { method: 'GET', path: '/api/v2/channels', handler: handleGetChannelsV2 },
-  { method: 'GET', path: '/api/v2/weekly-summary', handler: handleGetWeeklySummaryV2 },
-  { method: 'GET', path: '/api/v2/insights/summary', handler: handleGetInsightsSummaryV2 },
-  { method: 'GET', path: '/api/v2/attribution/health', handler: handleGetAttributionHealthV2 },
-  { method: 'GET', path: '/api/v2/attribution/review-queue', handler: handleGetAttributionReviewQueueV2 },
-  { method: 'GET', path: '/api/v2/attribution/unresolved', handler: handleGetUnresolvedAttributionV2 },
-  { method: 'GET', path: '/api/v2/attribution/methods', handler: handleGetAttributionMethodV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/weekly-summary',
+    handler: handleGetWeeklySummaryV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/insights/summary',
+    handler: handleGetInsightsSummaryV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/attribution/health',
+    handler: handleGetAttributionHealthV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/attribution/review-queue',
+    handler: handleGetAttributionReviewQueueV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/attribution/unresolved',
+    handler: handleGetUnresolvedAttributionV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/attribution/methods',
+    handler: handleGetAttributionMethodV2,
+  },
   { method: 'GET', path: '/api/v2/scoreboard', handler: handleGetScoreboardV2 },
-  { method: 'GET', path: '/api/v2/sequences/kpis', handler: handleGetSequenceKpisV2 },
-  { method: 'GET', path: '/api/v2/sequences/deep', handler: handleGetSequencesDeepV2 },
-  { method: 'GET', path: '/api/v2/sequences/funnel', handler: handleGetSequenceFunnelV2 },
-  { method: 'GET', path: '/api/v2/reps/response', handler: handleGetRepResponseV2 },
-  { method: 'GET', path: '/api/v2/sequences/qualification', handler: handleGetSequenceQualificationV2 },
-  { method: 'GET', path: '/api/v2/sequences/version-history', handler: handleGetSequenceVersionHistoryV2 },
-  { method: 'POST', path: '/api/v2/sequences/version-decisions', handler: handlePostSequenceVersionDecisionV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/sequences/kpis',
+    handler: handleGetSequenceKpisV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/sequences/deep',
+    handler: handleGetSequencesDeepV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/sequences/funnel',
+    handler: handleGetSequenceFunnelV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/reps/response',
+    handler: handleGetRepResponseV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/sequences/qualification',
+    handler: handleGetSequenceQualificationV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/sequences/version-history',
+    handler: handleGetSequenceVersionHistoryV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/sequences/version-decisions',
+    handler: handlePostSequenceVersionDecisionV2,
+  },
   { method: 'GET', path: '/api/v2/changelog', handler: handleGetChangelogV2 },
-  { method: 'GET', path: '/api/v2/inbox/send-config', handler: handleGetInboxSendConfigV2 },
-  { method: 'POST', path: '/api/v2/inbox/send-config/default', handler: handlePostInboxSendDefaultV2 },
-  { method: 'GET', path: '/api/v2/inbox/conversations', handler: handleGetInboxConversationsV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/send-config',
+    handler: handleGetInboxSendConfigV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/send-config/default',
+    handler: handlePostInboxSendDefaultV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/conversations',
+    handler: handleGetInboxConversationsV2,
+  },
   {
     method: 'GET',
     path: '/api/v2/inbox/conversations/:id',
@@ -5049,9 +5350,21 @@ const apiRoutes: ApiRoute[] = [
     path: '/api/v2/inbox/conversations/:id/assign',
     handler: handlePostInboxAssignV2,
   },
-  { method: 'GET', path: '/api/v2/inbox/templates', handler: handleGetInboxTemplatesV2 },
-  { method: 'POST', path: '/api/v2/inbox/templates', handler: handlePostInboxTemplateV2 },
-  { method: 'DELETE', path: '/api/v2/inbox/templates/:id', handler: handleDeleteInboxTemplateV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/templates',
+    handler: handleGetInboxTemplatesV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/inbox/templates',
+    handler: handlePostInboxTemplateV2,
+  },
+  {
+    method: 'DELETE',
+    path: '/api/v2/inbox/templates/:id',
+    handler: handleDeleteInboxTemplateV2,
+  },
   {
     method: 'POST',
     path: '/api/v2/inbox/conversations/:id/objection-tags',
@@ -5067,62 +5380,206 @@ const apiRoutes: ApiRoute[] = [
     path: '/api/v2/inbox/conversations/:id/guardrail-override',
     handler: handlePostGuardrailOverrideV2,
   },
-  { method: 'GET', path: '/api/v2/inbox/analytics/stage-conversion', handler: handleGetStageConversionV2 },
-  { method: 'GET', path: '/api/v2/inbox/analytics/objection-frequency', handler: handleGetObjectionFrequencyV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/analytics/stage-conversion',
+    handler: handleGetStageConversionV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/inbox/analytics/objection-frequency',
+    handler: handleGetObjectionFrequencyV2,
+  },
   {
     method: 'GET',
     path: '/api/v2/inbox/analytics/setter-assist-performance',
     handler: handleGetSetterAssistPerformanceV2,
   },
-  { method: 'GET', path: '/api/v2/analytics/line-performance', handler: handleGetLinePerformanceV2 },
-  { method: 'GET', path: '/api/v2/analytics/qualification-funnel', handler: handleGetQualificationFunnelV2 },
-  { method: 'GET', path: '/api/v2/analytics/draft-ai-performance', handler: handleGetDraftAIPerformanceV2 },
-  { method: 'GET', path: '/api/v2/analytics/followup-sla', handler: handleGetFollowupSLAV2 },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/line-performance',
+    handler: handleGetLinePerformanceV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/qualification-funnel',
+    handler: handleGetQualificationFunnelV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/draft-ai-performance',
+    handler: handleGetDraftAIPerformanceV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/followup-sla',
+    handler: handleGetFollowupSLAV2,
+  },
   { method: 'GET', path: '/api/v2/analytics/goals', handler: handleGetGoalsV2 },
-  { method: 'GET', path: '/api/v2/analytics/trend-alerts', handler: handleGetTrendAlertsV2 },
-  { method: 'GET', path: '/api/v2/analytics/time-to-booking', handler: handleGetTimeToBookingV2 },
-  { method: 'GET', path: '/api/v2/analytics/response-time', handler: handleGetResponseTimeV2 },
-  { method: 'GET', path: '/api/v2/analytics/line-balance', handler: handleGetLineBalanceV2 },
-  { method: 'GET', path: '/api/v2/analytics/sales-metrics', handler: handleGetSalesMetricsDashboardV2 },
-  { method: 'GET', path: '/api/v2/analytics/daily-report', handler: handleGetDailyReportV2 },
-  { method: 'GET', path: '/api/v2/analytics/daily-report/range', handler: handleGetDailyReportRangeV2 },
-  { method: 'POST', path: '/api/v2/admin/auto-assign', handler: handlePostAutoAssignV2 },
-  { method: 'POST', path: '/api/v2/admin/bulk-infer-qualification', handler: handlePostBulkInferQualificationV2 },
-  { method: 'POST', path: '/api/v2/admin/deduplicate-lines', handler: handlePostDeduplicateLinesV2 },
-  { method: 'GET', path: '/api/v2/admin/audit-logs', handler: handleGetAuditLogsV2 },
-  { method: 'GET', path: '/api/v2/admin/cron-status', handler: handleGetCronStatus },
-  { method: 'GET', path: '/api/v2/admin/analytics/outcome-keywords', handler: handleGetOutcomeKeywordAnalyticsV2 },
-  { method: 'GET', path: '/api/v2/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
-  { method: 'GET', path: '/api/v2/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
-  { method: 'GET', path: '/api/v2/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
-  { method: 'POST', path: '/api/v2/monday/manual-booked-call', handler: handlePostManualBookedCallV2 },
-  { method: 'GET', path: '/api/admin/cron-status', handler: handleGetCronStatus },
-  { method: 'GET', path: '/api/admin/analytics/outcome-keywords', handler: handleGetOutcomeKeywordAnalyticsV2 },
-  { method: 'GET', path: '/api/admin/monday/board-catalog', handler: handleGetMondayBoardCatalogV2 },
-  { method: 'GET', path: '/api/admin/monday/scorecards', handler: handleGetMondayScorecardsV2 },
-  { method: 'GET', path: '/api/admin/monday/lead-insights', handler: handleGetMondayLeadInsightsV2 },
-  { method: 'GET', path: '/api/admin/monday/sms/sync-board-ids', handler: handleGetMondaySmsSyncBoardIds },
-  { method: 'POST', path: '/api/admin/monday/sms/sync', handler: handlePostMondaySmsSync },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/trend-alerts',
+    handler: handleGetTrendAlertsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/time-to-booking',
+    handler: handleGetTimeToBookingV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/response-time',
+    handler: handleGetResponseTimeV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/line-balance',
+    handler: handleGetLineBalanceV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/sales-metrics',
+    handler: handleGetSalesMetricsDashboardV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/daily-report',
+    handler: handleGetDailyReportV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/analytics/daily-report/range',
+    handler: handleGetDailyReportRangeV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/admin/auto-assign',
+    handler: handlePostAutoAssignV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/admin/bulk-infer-qualification',
+    handler: handlePostBulkInferQualificationV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/admin/deduplicate-lines',
+    handler: handlePostDeduplicateLinesV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/admin/audit-logs',
+    handler: handleGetAuditLogsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/admin/cron-status',
+    handler: handleGetCronStatus,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/admin/analytics/outcome-keywords',
+    handler: handleGetOutcomeKeywordAnalyticsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/admin/monday/board-catalog',
+    handler: handleGetMondayBoardCatalogV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/admin/monday/scorecards',
+    handler: handleGetMondayScorecardsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/v2/admin/monday/lead-insights',
+    handler: handleGetMondayLeadInsightsV2,
+  },
+  {
+    method: 'POST',
+    path: '/api/v2/monday/manual-booked-call',
+    handler: handlePostManualBookedCallV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/cron-status',
+    handler: handleGetCronStatus,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/analytics/outcome-keywords',
+    handler: handleGetOutcomeKeywordAnalyticsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/monday/board-catalog',
+    handler: handleGetMondayBoardCatalogV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/monday/scorecards',
+    handler: handleGetMondayScorecardsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/monday/lead-insights',
+    handler: handleGetMondayLeadInsightsV2,
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/monday/sms/sync-board-ids',
+    handler: handleGetMondaySmsSyncBoardIds,
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/monday/sms/sync',
+    handler: handlePostMondaySmsSync,
+  },
   {
     method: 'GET',
     path: '/api/admin/monday/sms-sequences/sync-board-ids',
     handler: handleGetMondaySmsSequencesSyncBoardIds,
   },
-  { method: 'POST', path: '/api/admin/monday/sms-sequences/sync', handler: handlePostMondaySmsSequencesSync },
+  {
+    method: 'POST',
+    path: '/api/admin/monday/sms-sequences/sync',
+    handler: handlePostMondaySmsSequencesSync,
+  },
   {
     method: 'GET',
     path: '/api/admin/monday/sms-reports/sync-board-ids',
     handler: handleGetMondaySmsReportsSyncBoardIds,
   },
-  { method: 'POST', path: '/api/admin/monday/sms-reports/sync', handler: handlePostMondaySmsReportsSync },
+  {
+    method: 'POST',
+    path: '/api/admin/monday/sms-reports/sync',
+    handler: handlePostMondaySmsReportsSync,
+  },
 
-  { method: 'GET', path: '/api/conversations/:id', handler: handleGetConversationById },
-  { method: 'GET', path: '/api/conversations/:id/events', handler: handleGetConversationEvents },
+  {
+    method: 'GET',
+    path: '/api/conversations/:id',
+    handler: handleGetConversationById,
+  },
+  {
+    method: 'GET',
+    path: '/api/conversations/:id/events',
+    handler: handleGetConversationEvents,
+  },
   { method: 'GET', path: '/api/stream-token', handler: handleGetStreamToken },
   { method: 'GET', path: '/api/stream', handler: handleGetStream },
   { method: 'GET', path: '/api/work-items', handler: handleGetWorkItems },
-  { method: 'POST', path: '/api/work-items/:id/resolve', handler: handleResolveWorkItem },
-  { method: 'POST', path: '/api/work-items/:id/assign', handler: handleAssignWorkItem },
+  {
+    method: 'POST',
+    path: '/api/work-items/:id/resolve',
+    handler: handleResolveWorkItem,
+  },
+  {
+    method: 'POST',
+    path: '/api/work-items/:id/assign',
+    handler: handleAssignWorkItem,
+  },
 ];
 
 export const handleApiRoute = async (

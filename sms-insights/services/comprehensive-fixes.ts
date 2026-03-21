@@ -1,13 +1,19 @@
+import type { Prisma } from '@prisma/client';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
+
+const toJsonString = (value: Record<string, unknown> | undefined): string => JSON.stringify(value ?? {});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPREHENSIVE FIXES FOR ALL IDENTIFIED ISSUES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Issue #1, #2, #3: Auto-assign unassigned work items ────────────────────────
-export const autoAssignWorkItems = async (): Promise<{ assigned: number; errors: string[] }> => {
+export const autoAssignWorkItems = async (): Promise<{
+  assigned: number;
+  errors: string[];
+}> => {
   const prisma = getPrisma();
   const errors: string[] = [];
   const syncedConversationIds = new Set<string>();
@@ -155,7 +161,12 @@ export const getDraftRejectionStats = async (): Promise<{
 
 // ─── Issue #5: Track line activity balance and alert on imbalance ────────────────
 export const getLineActivityBalance = async (): Promise<{
-  lines: Array<{ line: string; messagesSent: number; share: number; isImbalanced: boolean }>;
+  lines: Array<{
+    line: string;
+    messagesSent: number;
+    share: number;
+    isImbalanced: boolean;
+  }>;
   alert: string | null;
 }> => {
   const prisma = getPrisma();
@@ -689,7 +700,9 @@ export const deduplicateLines = async (): Promise<{ updated: number }> => {
       AND line != 'Brandon''s Personal Line (+1 678-820-3770)'
   `);
 
-  return { updated: (Number(jackUpdated) || 0) + (Number(brandonUpdated) || 0) };
+  return {
+    updated: (Number(jackUpdated) || 0) + (Number(brandonUpdated) || 0),
+  };
 };
 
 // ─── Issue #23: Time-to-booking metric ────────────────────────────────────────────
@@ -1174,7 +1187,7 @@ export const logAuditEvent = async (params: {
       resource_type: params.resourceType,
       resource_id: params.resourceId,
       user_id: params.userId || null,
-      details: (params.details as any) || {},
+      details: toJsonString(params.details),
       ip_address: params.ipAddress || null,
     },
   });
@@ -1190,7 +1203,7 @@ export const getAuditLogs = async (params: {
 }): Promise<AuditLogEntry[]> => {
   const prisma = getPrisma();
 
-  const where: any = {};
+  const where: Prisma.audit_logsWhereInput = {};
   if (params.from || params.to) {
     where.created_at = {};
     if (params.from) where.created_at.gte = params.from;
@@ -1214,7 +1227,7 @@ export const getAuditLogs = async (params: {
     resourceType: row.resource_type,
     resourceId: row.resource_id,
     userId: row.user_id,
-    details: row.details as Record<string, unknown>,
+    details: (typeof row.details === 'string' ? JSON.parse(row.details) : {}) as Record<string, unknown>,
     ipAddress: row.ip_address,
     timestamp: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
   }));

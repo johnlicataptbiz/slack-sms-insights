@@ -1,4 +1,5 @@
 import type { Logger } from '@slack/bolt';
+import { Prisma } from '@prisma/client';
 import { getPrismaClient } from './prisma.js';
 import { resolveSequenceId } from './sequence-registry.js';
 
@@ -68,7 +69,7 @@ export const insertSmsEvent = async (
       sequence: event.sequence ?? null,
       sequence_id: sequenceId,
       conversation_id: event.conversationId ?? null,
-      raw: (event.raw as any) ?? null,
+      raw: event.raw != null ? (event.raw as Prisma.InputJsonValue) : Prisma.DbNull,
     };
 
     const result = await prisma.sms_events.upsert({

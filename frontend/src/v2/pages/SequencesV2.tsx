@@ -144,13 +144,23 @@ export default function SequencesV2() {
 
     const startX = event.clientX;
     const startWidth = columnWidths[key];
+    let animationFrameId: number | null = null;
 
     const onMove = (moveEvent: PointerEvent) => {
-      const nextWidth = Math.max(120, Math.min(420, startWidth + (moveEvent.clientX - startX)));
-      setColumnWidths((current) => (current[key] === nextWidth ? current : { ...current, [key]: nextWidth }));
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+
+      animationFrameId = requestAnimationFrame(() => {
+        const nextWidth = Math.max(120, Math.min(420, startWidth + (moveEvent.clientX - startX)));
+        setColumnWidths((current) => (current[key] === nextWidth ? current : { ...current, [key]: nextWidth }));
+      });
     };
 
     const onUp = () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);

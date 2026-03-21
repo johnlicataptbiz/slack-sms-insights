@@ -1,8 +1,17 @@
 {
-  "generatedAt": "2026-03-21T21:14:20.179Z",
+  "generatedAt": "2026-03-21T21:23:57.447Z",
   "daysIncluded": 365,
-  "totalCount": 425,
+  "totalCount": 426,
   "entries": [
+    {
+      "hash": "299e1d1",
+      "date": "2026-03-21T21:15:35Z",
+      "message": "fix(routes): rename _logger to logger in handlePostMondaySmsReportsSync to fix TS2552 build error",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Rename _logger to logger in handlePostMondaySmsReportsSync to fix TS2552 build error"
+    },
     {
       "hash": "8c573c4",
       "date": "2026-03-21T21:10:25Z",

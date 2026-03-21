@@ -17,7 +17,28 @@ export const getConversationById = async (
     const result = await prisma.conversation.findUnique({
       where: { id },
     });
-    return result as unknown as ConversationRow | null;
+
+    if (!result) {
+      return null;
+    }
+
+    const mapped: ConversationRow = {
+      id: result.id,
+      contact_key: result.contactKey,
+      contact_id: result.contact_id,
+      contact_phone: result.contact_phone,
+      current_rep_id: result.current_rep_id,
+      status: result.status as ConversationRow['status'],
+      last_inbound_at: result.last_inbound_at,
+      last_outbound_at: result.last_outbound_at,
+      last_touch_at: result.last_touch_at,
+      unreplied_inbound_count: result.unreplied_inbound_count,
+      next_followup_due_at: result.nextFollowupAt,
+      created_at: result.createdAt,
+      updated_at: result.updatedAt,
+    };
+
+    return mapped;
   } catch (err) {
     logger?.error('getConversationById failed', err);
     throw err;

@@ -5,8 +5,8 @@ import { resolveSequenceId } from './sequence-registry.js';
 
 const getPrisma = () => getPrismaClient();
 
-const toNullableJson = (value: unknown): Prisma.InputJsonValue | Prisma.JsonNullValueInput => {
-  if (value == null) return Prisma.JsonNull;
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput => {
+  if (value == null) return Prisma.DbNull;
   return value as Prisma.InputJsonValue;
 };
 

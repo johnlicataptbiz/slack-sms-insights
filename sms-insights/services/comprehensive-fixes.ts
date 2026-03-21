@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
@@ -1175,7 +1175,7 @@ export const logAuditEvent = async (params: {
       resource_type: params.resourceType,
       resource_id: params.resourceId,
       user_id: params.userId || null,
-      details: (params.details ?? Prisma.DbNull) as Prisma.InputJsonValue | Prisma.NullableJsonNullValueInput,
+      details: (params.details ?? {}) as Prisma.InputJsonValue,
       ip_address: params.ipAddress || null,
     },
   });

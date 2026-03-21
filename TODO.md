@@ -1,0 +1,1 @@
+# CI/CD React Module Fix Progress&#10;&#10;**Status: In Progress**&#10;&#10;- [x] 1. Add test scripts to frontend/package.json&#10;- [ ] 2. Update .github/workflows/ci-cd.yml: Add test step to test-frontend job&#10;- [ ] 3. Update .github/workflows/main.yml: Add test step to frontend-build job&#10;- [ ] 4. Improve caching in workflows&#10;- [ ] 5. Commit changes & verify CI&#10;

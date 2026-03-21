@@ -1,7 +1,7 @@
-import type { Logger } from "@slack/bolt";
-import type { ConversationRow } from "./conversation-projector.js";
-import { getPrismaClient } from "./prisma.js";
-import type { SmsEventRow } from "./sms-event-store.js";
+import type { Logger } from '@slack/bolt';
+import type { ConversationRow } from './conversation-projector.js';
+import { getPrismaClient } from './prisma.js';
+import type { SmsEventRow } from './sms-event-store.js';
 
 const getPrisma = () => getPrismaClient();
 
@@ -9,51 +9,26 @@ const getPrisma = () => getPrismaClient();
 
 export const getConversationById = async (
   id: string,
-  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationRow | null> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.conversation.findUnique({
       where: { id },
-      select: {
-        id: true,
-        contactKey: true,
-        contact_id: true,
-        contact_phone: true,
-        current_rep_id: true,
-        status: true,
-        last_inbound_at: true,
-        last_outbound_at: true,
-        last_touch_at: true,
-        unreplied_inbound_count: true,
-        nextFollowupAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
     });
     return result as unknown as ConversationRow | null;
   } catch (err) {
-    logger?.error("getConversationById failed", err);
+    logger?.error('getConversationById failed', err);
     throw err;
   }
 };
 
 export const listSmsEventsForConversation = async (
-  conversation: Pick<ConversationRow, "id" | "contact_id" | "contact_phone">,
+  conversation: Pick<ConversationRow, 'id' | 'contact_id' | 'contact_phone'>,
   limit: number,
-  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
+  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<
-  Array<
-    Pick<
-      SmsEventRow,
-      | "id"
-      | "direction"
-      | "body"
-      | "event_ts"
-      | "slack_channel_id"
-      | "slack_message_ts"
-    >
-  >
+  Array<Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>>
 > => {
   const prisma = getPrisma();
   try {
@@ -64,9 +39,7 @@ export const listSmsEventsForConversation = async (
           {
             conversation_id: null,
             OR: [
-              conversation.contact_id
-                ? { contact_id: conversation.contact_id }
-                : {},
+              conversation.contact_id ? { contact_id: conversation.contact_id } : {},
               !conversation.contact_id && conversation.contact_phone
                 ? { contact_phone: conversation.contact_phone }
                 : {},
@@ -74,7 +47,7 @@ export const listSmsEventsForConversation = async (
           },
         ],
       },
-      orderBy: { event_ts: "desc" },
+      orderBy: { event_ts: 'desc' },
       take: limit,
       select: {
         id: true,
@@ -87,18 +60,10 @@ export const listSmsEventsForConversation = async (
     });
 
     return results as unknown as Array<
-      Pick<
-        SmsEventRow,
-        | "id"
-        | "direction"
-        | "body"
-        | "event_ts"
-        | "slack_channel_id"
-        | "slack_message_ts"
-      >
+      Pick<SmsEventRow, 'id' | 'direction' | 'body' | 'event_ts' | 'slack_channel_id' | 'slack_message_ts'>
     >;
   } catch (err) {
-    logger?.error("listSmsEventsForConversation failed", err);
+    logger?.error('listSmsEventsForConversation failed', err);
     throw err;
   }
 };

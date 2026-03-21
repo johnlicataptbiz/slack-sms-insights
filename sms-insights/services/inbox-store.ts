@@ -269,26 +269,6 @@ export const getConversationState = async (
   try {
     const result = await prisma.conversation_state.findUnique({
       where: { conversation_id: conversationId },
-      select: {
-        conversation_id: true,
-        qualification_full_or_part_time: true,
-        qualification_niche: true,
-        qualification_revenue_mix: true,
-        qualification_delivery_model: true,
-        qualification_coaching_interest: true,
-        qualification_progress_step: true,
-        escalation_level: true,
-        escalation_reason: true,
-        escalation_overridden: true,
-        last_podcast_sent_at: true,
-        next_followup_due_at: true,
-        cadence_status: true,
-        objection_tags: true,
-        guardrail_override_count: true,
-        call_outcome: true,
-        created_at: true,
-        updated_at: true,
-      },
     });
     return result as unknown as ConversationStateRow | null;
   } catch (err) {
@@ -800,28 +780,7 @@ export const insertSendAttempt = async (
     };
 
     if (input.idempotencyKey) {
-      const result = await prisma.send_attempts.upsert({
-        where: {
-          conversation_id_idempotency_key: {
-            conversation_id: input.conversationId,
-            idempotency_key: input.idempotencyKey,
-          },
-        },
-        update: {
-          response_payload: (input.responsePayload as any) ?? undefined,
-          status: input.status,
-          retry_count: {
-            increment: 0, // We need to replicate GREATEST. Prisma doesn't have GREATEST in fluent API easily.
-          },
-          error_message: input.errorMessage ?? undefined,
-        },
-        create: data,
-      });
-
-      // Special handling for retry_count GREATEST via $executeRaw if needed,
-      // but usually retry_count is managed by the caller.
-      // The original SQL: retry_count = GREATEST(send_attempts.retry_count, EXCLUDED.retry_count)
-      // Let's use $queryRawUnsafe to perfectly match the original behavior for upsert.
+      // Use raw SQL for upsert to handle the composite unique key and GREATEST logic
       const upsertSql = `
         INSERT INTO send_attempts (
           conversation_id, message_body, sender_identity, line_id, from_number,
@@ -915,15 +874,15 @@ export const getSendAttemptByIdempotency = async (
 ): Promise<SendAttemptRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.send_attempts.findUnique({
-      where: {
-        conversation_id_idempotency_key: {
-          conversation_id: conversationId,
-          idempotency_key: idempotencyKey,
-        },
-      },
-    });
-    return result as unknown as SendAttemptRow | null;
+    // Use raw SQL to query by composite unique key
+    const result = await prisma.$queryRawUnsafe<SendAttemptRow[]>(
+      `SELECT * FROM send_attempts 
+       WHERE conversation_id = $1::uuid AND idempotency_key = $2 
+       LIMIT 1`,
+      conversationId,
+      idempotencyKey,
+    );
+    return result[0] ?? null;
   } catch (err) {
     logger?.error("getSendAttemptByIdempotency failed", err);
     throw err;
@@ -1318,22 +1277,24 @@ export const updateObjectionTags = async (
 ): Promise<{ conversation_id: string; objection_tags: string[] }> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation_state.upsert({
-      where: { conversation_id: conversationId },
-      update: {
-        objection_tags: tags,
-        updated_at: new Date(),
-      },
-      create: {
-        conversation_id: conversationId,
-        objection_tags: tags,
-      },
-      select: {
-        conversation_id: true,
-        objection_tags: true,
-      },
-    });
-    return result;
+    // Use raw SQL to handle the string[] array type properly
+    const result = await prisma.$queryRawUnsafe<any[]>(
+      `
+      INSERT INTO conversation_state (conversation_id, objection_tags, updated_at)
+      VALUES ($1::uuid, $2::text[], NOW())
+      ON CONFLICT (conversation_id)
+      DO UPDATE SET
+        objection_tags = EXCLUDED.objection_tags,
+        updated_at = NOW()
+      RETURNING conversation_id, objection_tags;
+      `,
+      conversationId,
+      tags,
+    );
+    return {
+      conversation_id: result[0].conversation_id,
+      objection_tags: result[0].objection_tags as string[],
+    };
   } catch (err) {
     logger?.error("updateObjectionTags failed", err);
     throw err;

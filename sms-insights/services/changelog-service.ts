@@ -1,6 +1,6 @@
-import { execSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { execSync } from 'child_process';
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 
 export type ChangelogEntryType = 'feature' | 'fix' | 'refactor' | 'style' | 'docs' | 'chore' | 'other';
 
@@ -108,7 +108,7 @@ function formatDescription(message: string): string {
   // Trim and limit length
   cleaned = cleaned.trim();
   if (cleaned.length > 120) {
-    cleaned = `${cleaned.substring(0, 117)}...`;
+    cleaned = cleaned.substring(0, 117) + '...';
   }
 
   return cleaned;
@@ -379,10 +379,7 @@ export function getChangelogGroupedByDate(days = 365): Array<{
       grouped.set(dateKey, []);
     }
 
-    const entries = grouped.get(dateKey);
-    if (entries) {
-      entries.push(entry);
-    }
+    grouped.get(dateKey)!.push(entry);
   }
 
   // Convert to array and sort by date (newest first)

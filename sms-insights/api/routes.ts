@@ -5909,7 +5909,7 @@ const handleGetMondaySmsReportsSyncBoardIds: RequestHandler = async (
 const handlePostMondaySmsReportsSync: RequestHandler = async (
   req,
   res,
-  _logger,
+  logger,
   origin,
 ) => {
   const url = new URL(req.url || "", `http://${req.headers.host}`);

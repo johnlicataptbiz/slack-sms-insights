@@ -108,7 +108,7 @@ function formatDescription(message: string): string {
   // Trim and limit length
   cleaned = cleaned.trim();
   if (cleaned.length > 120) {
-    cleaned = cleaned.substring(0, 117) + '...';
+    cleaned = `${cleaned.substring(0, 117)}...`;
   }
 
   return cleaned;
@@ -379,7 +379,7 @@ export function getChangelogGroupedByDate(days = 365): Array<{
       grouped.set(dateKey, []);
     }
 
-    grouped.get(dateKey)!.push(entry);
+    (grouped.get(dateKey) || []).push(entry);
   }
 
   // Convert to array and sort by date (newest first)

@@ -30,10 +30,6 @@ jobs:
     - name: Run linter
       run: npm run lint || true
 
-    - name: Install frontend production deps
-      working-directory: ../frontend
-      run: npm ci --production --ignore-scripts
-
     - name: Run backend tests
       run: npm run build && npm run test:vitest && npm run test:node
       env:

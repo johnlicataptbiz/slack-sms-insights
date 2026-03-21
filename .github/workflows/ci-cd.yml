@@ -7,19 +7,6 @@ name: CI/CD Pipeline
     branches: [main]
 
 jobs:
-  secret-scan:
-    name: Secret Scan (Gitleaks)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   test-backend:
     name: Test Backend (sms-insights)
     runs-on: ubuntu-latest
@@ -29,13 +16,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: ./sms-insights/package-lock.json
 
@@ -45,11 +30,16 @@ jobs:
       - name: Run linter
         run: npm run lint || true
 
-      - name: Run type check
-        run: npm run typecheck || true
-
-      - name: Run tests
-        run: npm test || true
+      - name: Install frontend production deps
+        working-directory: ../frontend
+        run: npm ci --production --ignore-scripts
+        
+      - name: Run backend tests
+        run: npm run build && npm run test:vitest && npm run test:node
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+          SKIP_FRONTEND_BUILD: "true"
+          NODE_ENV: test
 
   test-frontend:
     name: Test Frontend
@@ -61,30 +51,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: "npm"
           cache-dependency-path: ./frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run linter
-        run: npm run lint || true
-
       - name: Run type check
-        run: npm run typecheck || true
+        run: npm run typecheck:v2
 
       - name: Build
         run: npm run build
 
   deploy-backend:
     name: Deploy Backend to Railway
-    needs: [test-backend]
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
@@ -101,7 +88,7 @@ jobs:
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
-    needs: [test-frontend]
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 

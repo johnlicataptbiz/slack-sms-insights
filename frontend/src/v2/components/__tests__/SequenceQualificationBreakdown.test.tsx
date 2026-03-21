@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { describe, it, expect } from 'vitest';
 import { SequenceQualificationBreakdown } from '../SequenceQualificationBreakdown';
@@ -55,20 +56,52 @@ describe('SequenceQualificationBreakdown', () => {
     expect(screen.getByText(/No qualification data.*time period/i)).toBeInTheDocument();
   });
 
-  it('renders sequence data and handles expansion', () => {
+  it('renders sequence label in collapsed state without details', () => {
     render(<SequenceQualificationBreakdown items={mockItems} isLoading={false} />);
-    
-    // Header should be visible
-    // Header validation skipped - dynamic rendering
+
     expect(screen.getByText('Test Sequence')).toBeInTheDocument();
-    
-    // Details should not be visible initially
     expect(screen.queryByText('Employment Status')).not.toBeInTheDocument();
-    
-    // Click to expand
-    // Skip expansion test - dynamic chevron/button interaction
-    
-    // Expansion/details validation skipped - dynamic content
-    // Sample quote validation skipped - mock data not rendering expanded state
+  });
+
+  it('expands a sequence card when clicked and shows qualification details', async () => {
+    const user = userEvent.setup();
+    render(<SequenceQualificationBreakdown items={mockItems} isLoading={false} />);
+
+    const header = screen.getByText('Test Sequence');
+    await user.click(header);
+
+    expect(screen.getByText('Employment Status')).toBeInTheDocument();
+    expect(screen.getByText('Revenue Model')).toBeInTheDocument();
+    expect(screen.getByText('Coaching Interest')).toBeInTheDocument();
+  });
+
+  it('collapses an expanded card when clicked a second time', async () => {
+    const user = userEvent.setup();
+    render(<SequenceQualificationBreakdown items={mockItems} isLoading={false} />);
+
+    const header = screen.getByText('Test Sequence');
+    await user.click(header);
+    expect(screen.getByText('Employment Status')).toBeInTheDocument();
+
+    await user.click(header);
+    expect(screen.queryByText('Employment Status')).not.toBeInTheDocument();
+  });
+
+  it('shows sample quote tooltip on hover over a badge with a sample quote', async () => {
+    const user = userEvent.setup();
+    render(<SequenceQualificationBreakdown items={mockItems} isLoading={false} />);
+
+    // Expand the card first
+    await user.click(screen.getByText('Test Sequence'));
+
+    // Hover over the Full-time badge label (which has sampleQuote: 'I work full time')
+    // onMouseEnter on the badge fires when any child is entered
+    const fullTimeLabel = screen.getByText('Full-time');
+    await user.hover(fullTimeLabel);
+
+    expect(screen.getByText(/I work full time/)).toBeInTheDocument();
+
+    await user.unhover(fullTimeLabel);
+    expect(screen.queryByText(/I work full time/)).not.toBeInTheDocument();
   });
 });

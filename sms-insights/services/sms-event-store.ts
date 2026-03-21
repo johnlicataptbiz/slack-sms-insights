@@ -1,13 +1,12 @@
-import { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 import { resolveSequenceId } from './sequence-registry.js';
 
 const getPrisma = () => getPrismaClient();
 
-const toNullableJson = (value: unknown): Prisma.InputJsonValue | Prisma.JsonNullValueInput => {
-  if (value == null) return Prisma.JsonNull;
-  return value as Prisma.InputJsonValue;
+const toNullableString = (value: unknown): string | null => {
+  if (value == null) return null;
+  return typeof value === 'string' ? value : JSON.stringify(value);
 };
 
 export type SmsEventDirection = 'inbound' | 'outbound' | 'unknown';
@@ -74,7 +73,7 @@ export const insertSmsEvent = async (
       sequence: event.sequence ?? null,
       sequence_id: sequenceId,
       conversation_id: event.conversationId ?? null,
-      raw: toNullableJson(event.raw),
+      raw: toNullableString(event.raw),
     };
 
     const result = await prisma.sms_events.upsert({

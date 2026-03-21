@@ -55,20 +55,20 @@ describe('SequenceQualificationBreakdown', () => {
     expect(screen.getByText(/No qualification data.*time period/i)).toBeInTheDocument();
   });
 
-  it('renders sequence data and handles expansion', () => {
+  it('renders sequence name and expands details on click', () => {
     render(<SequenceQualificationBreakdown items={mockItems} isLoading={false} />);
     
-    // Header should be visible
-    // Header validation skipped - dynamic rendering
+    // Sequence name should be visible
     expect(screen.getByText('Test Sequence')).toBeInTheDocument();
     
     // Details should not be visible initially
     expect(screen.queryByText('Employment Status')).not.toBeInTheDocument();
     
-    // Click to expand
-    // Skip expansion test - dynamic chevron/button interaction
+    // Click the header div to expand
+    fireEvent.click(screen.getByText('Test Sequence').closest('.SequenceCard__header')!);
     
-    // Expansion/details validation skipped - dynamic content
-    // Sample quote validation skipped - mock data not rendering expanded state
+    // Expanded section headers should now be visible
+    expect(screen.getByText('Employment Status')).toBeInTheDocument();
+    expect(screen.getByText('Coaching Interest')).toBeInTheDocument();
   });
 });

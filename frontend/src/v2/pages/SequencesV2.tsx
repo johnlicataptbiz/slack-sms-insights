@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import { MessageSquare, Users, Reply, Phone, ChevronUp, ChevronDown } from 'lucide-react';
 
 import {
@@ -95,6 +95,54 @@ const normalizeSequenceColumnWidths = (value: unknown): SequenceColumnWidths | n
   return next as SequenceColumnWidths;
 };
 
+const RESIZE_MIN = 120;
+const RESIZE_MAX = 420;
+const RESIZE_KEY_STEP = 10;
+
+function ResizeHandle({
+  columnKey,
+  label,
+  valuenow,
+  onPointerStart,
+  onKeyResize,
+}: {
+  columnKey: SequenceColumnKey;
+  label: string;
+  valuenow: number;
+  onPointerStart: (key: SequenceColumnKey, event: ReactPointerEvent<HTMLSpanElement>) => void;
+  onKeyResize: (key: SequenceColumnKey, delta: number) => void;
+}) {
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLSpanElement>) => {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      onKeyResize(columnKey, RESIZE_KEY_STEP);
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+      event.preventDefault();
+      onKeyResize(columnKey, -RESIZE_KEY_STEP);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      onKeyResize(columnKey, -RESIZE_MAX);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      onKeyResize(columnKey, RESIZE_MAX);
+    }
+  };
+  return (
+    <span
+      className="SequencesTable__resizeHandle"
+      role="separator"
+      aria-label={label}
+      aria-orientation="vertical"
+      aria-valuenow={valuenow}
+      aria-valuemin={RESIZE_MIN}
+      aria-valuemax={RESIZE_MAX}
+      tabIndex={0}
+      onPointerDown={(event) => onPointerStart(columnKey, event)}
+      onKeyDown={handleKeyDown}
+    />
+  );
+}
+
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('30d');
   const [status, setStatus] = useState<'active' | 'inactive' | ''>('active');
@@ -115,6 +163,14 @@ export default function SequencesV2() {
     return DEFAULT_SEQUENCE_COLUMN_WIDTHS;
   });
   const tableRef = useRef<HTMLDivElement | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+
+  // Clean up any active resize pointer listeners on unmount
+  useEffect(() => {
+    return () => {
+      resizeCleanupRef.current?.();
+    };
+  }, []);
 
   const onSort = useCallback((key: SortKey) => {
     if (sortKey === key) {
@@ -132,12 +188,6 @@ export default function SequencesV2() {
       : <ChevronDown size={10} style={{ marginLeft: '3px', display: 'inline' }} />;
   };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(SEQUENCE_COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
-    }
-  }, [columnWidths]);
-
   const startResize = useCallback((key: SequenceColumnKey, event: ReactPointerEvent<HTMLSpanElement>) => {
     event.preventDefault();
     event.stopPropagation();
@@ -146,7 +196,7 @@ export default function SequencesV2() {
     const startWidth = columnWidths[key];
 
     const onMove = (moveEvent: PointerEvent) => {
-      const nextWidth = Math.max(120, Math.min(420, startWidth + (moveEvent.clientX - startX)));
+      const nextWidth = Math.max(RESIZE_MIN, Math.min(RESIZE_MAX, startWidth + (moveEvent.clientX - startX)));
       setColumnWidths((current) => (current[key] === nextWidth ? current : { ...current, [key]: nextWidth }));
     };
 
@@ -154,12 +204,37 @@ export default function SequencesV2() {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
+      resizeCleanupRef.current = null;
+      // Persist to localStorage only when resize ends, not on every move
+      setColumnWidths((current) => {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(SEQUENCE_COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(current));
+        }
+        return current;
+      });
     };
 
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
+
+    resizeCleanupRef.current = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
   }, [columnWidths]);
+
+  const handleKeyResize = useCallback((key: SequenceColumnKey, delta: number) => {
+    setColumnWidths((current) => {
+      const nextWidth = Math.max(RESIZE_MIN, Math.min(RESIZE_MAX, current[key] + delta));
+      const updated = { ...current, [key]: nextWidth };
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(SEQUENCE_COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(updated));
+      }
+      return updated;
+    });
+  }, []);
 
   const query = useV2SequencesDeep({
     range: mode,
@@ -341,98 +416,53 @@ export default function SequencesV2() {
                         <button type="button" className="V2SortButton" onClick={() => onSort('label')}>
                           Sequence{sortIndicator('label')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Sequence column"
-                          onPointerDown={(event) => startResize('label', event)}
-                        />
+                        <ResizeHandle columnKey="label" label="Resize Sequence column" valuenow={columnWidths.label} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.uniqueContacted}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('uniqueContacted')}>
                           New leads contacted{sortIndicator('uniqueContacted')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize New leads contacted column"
-                          onPointerDown={(event) => startResize('uniqueContacted', event)}
-                        />
+                        <ResizeHandle columnKey="uniqueContacted" label="Resize New leads contacted column" valuenow={columnWidths.uniqueContacted} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.repliesReceived}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('repliesReceived')}>
                           Leads who replied{sortIndicator('repliesReceived')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Leads who replied column"
-                          onPointerDown={(event) => startResize('repliesReceived', event)}
-                        />
+                        <ResizeHandle columnKey="repliesReceived" label="Resize Leads who replied column" valuenow={columnWidths.repliesReceived} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.replyRatePct}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('replyRatePct')}>
                           Reply rate{sortIndicator('replyRatePct')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Reply rate column"
-                          onPointerDown={(event) => startResize('replyRatePct', event)}
-                        />
+                        <ResizeHandle columnKey="replyRatePct" label="Resize Reply rate column" valuenow={columnWidths.replyRatePct} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.bookedCalls}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('bookedCalls')}>
                           Calls booked{sortIndicator('bookedCalls')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Calls booked column"
-                          onPointerDown={(event) => startResize('bookedCalls', event)}
-                        />
+                        <ResizeHandle columnKey="bookedCalls" label="Resize Calls booked column" valuenow={columnWidths.bookedCalls} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.bookingRatePct}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('bookingRatePct')}>
                           Booking rate{sortIndicator('bookingRatePct')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Booking rate column"
-                          onPointerDown={(event) => startResize('bookingRatePct', event)}
-                        />
+                        <ResizeHandle columnKey="bookingRatePct" label="Resize Booking rate column" valuenow={columnWidths.bookingRatePct} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.optOuts}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('optOuts')}>
                           Opt-outs{sortIndicator('optOuts')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Opt-outs column"
-                          onPointerDown={(event) => startResize('optOuts', event)}
-                        />
+                        <ResizeHandle columnKey="optOuts" label="Resize Opt-outs column" valuenow={columnWidths.optOuts} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.optOutRatePct}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('optOutRatePct')}>
                           Opt-out rate{sortIndicator('optOutRatePct')}
                         </button>
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Opt-out rate column"
-                          onPointerDown={(event) => startResize('optOutRatePct', event)}
-                        />
+                        <ResizeHandle columnKey="optOutRatePct" label="Resize Opt-out rate column" valuenow={columnWidths.optOutRatePct} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                       <th className="is-right" style={{ width: `${columnWidths.bookedSplit}px` }} title="Booked split as Jack / Brandon / Self">
                         J / B / Self
-                        <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize booked split column"
-                          onPointerDown={(event) => startResize('bookedSplit', event)}
-                        />
+                        <ResizeHandle columnKey="bookedSplit" label="Resize booked split column" valuenow={columnWidths.bookedSplit} onPointerStart={startResize} onKeyResize={handleKeyResize} />
                       </th>
                     </tr>
                   </thead>

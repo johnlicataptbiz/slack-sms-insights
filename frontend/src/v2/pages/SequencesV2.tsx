@@ -145,14 +145,16 @@ export default function SequencesV2() {
     const startX = event.clientX;
     const startWidth = columnWidths[key];
     let animationFrameId: number | null = null;
+    let lastClientX = startX;
 
     const onMove = (moveEvent: PointerEvent) => {
+      lastClientX = moveEvent.clientX;
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
 
       animationFrameId = requestAnimationFrame(() => {
-        const nextWidth = Math.max(120, Math.min(420, startWidth + (moveEvent.clientX - startX)));
+        const nextWidth = Math.max(120, Math.min(420, startWidth + (lastClientX - startX)));
         setColumnWidths((current) => (current[key] === nextWidth ? current : { ...current, [key]: nextWidth }));
       });
     };
@@ -160,6 +162,8 @@ export default function SequencesV2() {
     const onUp = () => {
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
+        const nextWidth = Math.max(120, Math.min(420, startWidth + (lastClientX - startX)));
+        setColumnWidths((current) => (current[key] === nextWidth ? current : { ...current, [key]: nextWidth }));
       }
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);

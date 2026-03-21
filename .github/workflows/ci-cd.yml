@@ -53,8 +53,16 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+<<<<<<< HEAD
     - name: Run frontend tests
       run: npm run --workspace=ptbizsms-dashboard-unified test
+=======
+      - name: Run frontend tests
+        run: npm run test:run
+
+      - name: Run type check
+        run: npm run typecheck:v2
+>>>>>>> abeb1cae (fix(tests+ci): fix failing frontend tests, add test scripts, .nvmrc, and CI frontend test step)
 
     - name: Run type check
       run: npm run --workspace=ptbizsms-dashboard-unified typecheck

@@ -13,7 +13,9 @@
     "generate-tokens": "tsx frontend/scripts/generate-design-tokens.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-"install:legacy":"npm install --legacy-peer-deps","test":"vitest","test:run":"vitest run"
+    "install:legacy": "npm install --legacy-peer-deps",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@floating-ui/react": "^0.27.18",
@@ -88,8 +90,10 @@
     "@storybook/react": "^8.0.0",
     "@storybook/react-vite": "^8.0.0",
     "@tailwindcss/vite": "^4.2.0",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

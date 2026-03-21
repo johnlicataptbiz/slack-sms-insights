@@ -1,4 +1,3 @@
-import type { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import type { ConversationRow } from './conversation-projector.js';
 import { getPrismaClient } from './prisma.js';
@@ -69,19 +68,19 @@ export const listSmsEventsForConversation = async (
 > => {
   const prisma = getPrisma();
   try {
-    const contactFilters: Prisma.sms_eventsWhereInput[] = [];
-    if (conversation.contact_id) {
-      contactFilters.push({ contact_id: conversation.contact_id });
-    }
-    if (!conversation.contact_id && conversation.contact_phone) {
-      contactFilters.push({ contact_phone: conversation.contact_phone });
-    }
-
     const results = await prisma.sms_events.findMany({
       where: {
         OR: [
           { conversation_id: conversation.id },
-          ...(contactFilters.length > 0 ? [{ conversation_id: null, OR: contactFilters }] : []),
+          {
+            conversation_id: null,
+            OR: [
+              conversation.contact_id ? { contact_id: conversation.contact_id } : {},
+              !conversation.contact_id && conversation.contact_phone
+                ? { contact_phone: conversation.contact_phone }
+                : {},
+            ].filter((obj) => Object.keys(obj).length > 0) as any,
+          },
         ],
       },
       orderBy: { event_ts: 'desc' },

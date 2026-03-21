@@ -379,10 +379,7 @@ export function getChangelogGroupedByDate(days = 365): Array<{
       grouped.set(dateKey, []);
     }
 
-    const entries = grouped.get(dateKey);
-    if (entries) {
-      entries.push(entry);
-    }
+    (grouped.get(dateKey) || []).push(entry);
   }
 
   // Convert to array and sort by date (newest first)

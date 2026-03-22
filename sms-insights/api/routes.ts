@@ -3081,7 +3081,7 @@ const toInboxConversationV2 = (row: {
   };
 };
 
-const toInboxMessageV2 = (row: InboxMessageRow) => ({
+const _toInboxMessageV2 = (row: InboxMessageRow) => ({
   id: row.id,
   conversation_id: row.conversation_id,
   event_ts:

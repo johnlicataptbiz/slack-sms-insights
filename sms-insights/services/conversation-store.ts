@@ -39,11 +39,11 @@ export const listSmsEventsForConversation = async (
           {
             conversation_id: null,
             OR: [
-              conversation.contact_id ? { contact_id: conversation.contact_id } : {},
-              !conversation.contact_id && conversation.contact_phone
-                ? { contact_phone: conversation.contact_phone }
-                : {},
-            ].filter((obj) => Object.keys(obj).length > 0) as any,
+              ...(conversation.contact_id ? [{ contact_id: conversation.contact_id }] : []),
+              ...(!conversation.contact_id && conversation.contact_phone
+                ? [{ contact_phone: conversation.contact_phone }]
+                : []),
+            ],
           },
         ],
       },

@@ -96,7 +96,11 @@ export const getDailyRuns = async (
 
   try {
     if (options.raw) {
-      const where: any = {};
+      const where: {
+        channel_id?: string;
+        timestamp?: { gt: Date };
+        is_legacy?: boolean;
+      } = {};
       if (options.channelId) where.channel_id = options.channelId;
       if (options.daysBack) {
         where.timestamp = {
@@ -119,7 +123,7 @@ export const getDailyRuns = async (
     // Use $queryRaw for complex window function
     // We'll build the WHERE clause manually for $queryRaw
     let rawWhere = 'WHERE 1=1';
-    const rawParams: any[] = [];
+    const rawParams: Array<string | number | boolean | null> = [];
     if (options.channelId) {
       rawParams.push(options.channelId);
       rawWhere += ` AND channel_id = $${rawParams.length}`;

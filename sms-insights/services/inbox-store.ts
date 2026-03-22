@@ -319,7 +319,24 @@ export const updateConversationState = async (
   const prisma = getPrisma();
 
   try {
-    const updateData: any = {
+    type ConversationStateUpdateData = {
+      updated_at: Date;
+      qualification_full_or_part_time?: EmploymentStatus;
+      qualification_niche?: string | null;
+      qualification_revenue_mix?: RevenueMixCategory;
+      qualification_delivery_model?: DeliveryModel;
+      qualification_coaching_interest?: CoachingInterest;
+      qualification_progress_step?: number;
+      objection_tags?: string;
+      escalation_level?: 1 | 2 | 3 | 4;
+      escalation_reason?: string | null;
+      escalation_overridden?: boolean;
+      last_podcast_sent_at?: Date | null;
+      next_followup_due_at?: Date | null;
+      cadence_status?: CadenceStatus;
+      call_outcome?: string | null;
+    };
+    const updateData: ConversationStateUpdateData = {
       updated_at: new Date(),
     };
     if (input.fullOrPartTime !== undefined)
@@ -384,7 +401,7 @@ export const listInboxConversations = async (
   const prisma = getPrisma();
   try {
     const where: string[] = [];
-    const values: Array<any> = [];
+    const values: Array<string | number | boolean | null> = [];
     let index = 1;
 
     if (params.status) {
@@ -695,7 +712,17 @@ export const listMondayTrailForContactKey = async (
   try {
     const normalizedLimit = Math.max(1, Math.min(limit, 50));
 
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type MondayTrailRow = {
+      board_id: string;
+      item_id: string;
+      item_name: string | null;
+      stage: string | null;
+      call_date: Date | null;
+      disposition: string | null;
+      is_booked: boolean;
+      updated_at: Date;
+    };
+    const result = await prisma.$queryRawUnsafe<MondayTrailRow[]>(
       `
       SELECT
         m.board_id,
@@ -730,10 +757,10 @@ export const listMondayTrailForContactKey = async (
       itemId: row.item_id,
       itemName: row.item_name,
       stage: row.stage,
-      callDate: row.call_date,
+      callDate: row.call_date ? row.call_date.toISOString() : null,
       disposition: row.disposition,
       isBooked: row.is_booked,
-      updatedAt: row.updated_at,
+      updatedAt: row.updated_at.toISOString(),
     }));
   } catch (err) {
     logger?.error("listMondayTrailForContactKey failed", err);
@@ -774,8 +801,8 @@ export const insertSendAttempt = async (
       idempotency_key: input.idempotencyKey ?? null,
       status: input.status,
       retry_count: input.retryCount ?? 0,
-      request_payload: (input.requestPayload as any) ?? null,
-      response_payload: (input.responsePayload as any) ?? null,
+      request_payload: toNullableText(input.requestPayload),
+      response_payload: toNullableText(input.responsePayload),
       error_message: input.errorMessage ?? null,
     };
 
@@ -901,7 +928,12 @@ export const getSendAttemptVolumeCounts = async (
 ): Promise<SendAttemptVolumeCounts> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type SendAttemptVolumeRow = {
+      sent_last_hour: string | null;
+      sent_last_day: string | null;
+      conversation_sent_last_hour: string | null;
+    };
+    const result = await prisma.$queryRawUnsafe<SendAttemptVolumeRow[]>(
       `
       SELECT
         COUNT(*) FILTER (
@@ -956,12 +988,12 @@ export const insertDraftSuggestion = async (
       data: {
         conversation_id: input.conversationId,
         prompt_snapshot_hash: input.promptSnapshotHash,
-        retrieved_exemplar_ids: (input.retrievedExemplarIds as any) ?? null,
+        retrieved_exemplar_ids: toNullableText(input.retrievedExemplarIds),
         generated_text: input.generatedText,
         lint_score: input.lintScore,
         structural_score: input.structuralScore,
-        lint_issues: (input.lintIssues as any) ?? null,
-        raw: (input.raw as any) ?? null,
+        lint_issues: toNullableText(input.lintIssues),
+        raw: toNullableText(input.raw),
       },
     });
 
@@ -1018,7 +1050,12 @@ export const updateDraftSuggestionFeedback = async (
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
-    const updateData: any = {
+    const updateData: {
+      updated_at: Date;
+      accepted?: boolean;
+      edited?: boolean;
+      send_linked_event_id?: string | null;
+    } = {
       updated_at: new Date(),
     };
     if (typeof params.accepted === "boolean")
@@ -1052,7 +1089,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? undefined,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? undefined,
-        qualifier_snapshot: (input.qualifierSnapshot as any) ?? undefined,
+        qualifier_snapshot: toNullableText(input.qualifierSnapshot) ?? undefined,
         channel_marker: input.channelMarker ?? undefined,
       },
       create: {
@@ -1353,7 +1390,8 @@ export const incrementGuardrailOverride = async (
     // However, Prisma doesn't support relative increments in create.
     // So we first find or create, then update, or just use raw if it's cleaner.
     // Let's use raw to be safe and efficient for increments.
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type GuardrailOverrideRow = { conversation_id: string; guardrail_override_count: number };
+    const result = await prisma.$queryRawUnsafe<GuardrailOverrideRow[]>(
       `
       INSERT INTO conversation_state (conversation_id, guardrail_override_count)
       VALUES ($1::uuid, 1)
@@ -1548,7 +1586,14 @@ export const listConversionExamples = async (
     const limitPlaceholder = `$${i++}`;
     values.push(limit);
 
-    const result = await prisma.$queryRawUnsafe<any[]>(
+    type ConversionExampleQueryRow = ConversionExampleRow & {
+      outbound_body: string | null;
+      outbound_user: string | null;
+      source_inbound_body: string | null;
+      source_conversation_id: string | null;
+      source_outbound_ts: string | null;
+    };
+    const result = await prisma.$queryRawUnsafe<ConversionExampleQueryRow[]>(
       `
       SELECT
         ce.*,

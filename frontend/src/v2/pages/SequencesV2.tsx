@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { MessageSquare, Users, Reply, Phone, ChevronUp, ChevronDown } from 'lucide-react';
 
 import {
@@ -44,6 +45,18 @@ type SortKey =
   | 'optOuts'
   | 'optOutRatePct';
 type SortDirection = 'asc' | 'desc';
+type SequenceColumnKey =
+  | 'label'
+  | 'uniqueContacted'
+  | 'repliesReceived'
+  | 'replyRatePct'
+  | 'bookedCalls'
+  | 'bookingRatePct'
+  | 'optOuts'
+  | 'optOutRatePct'
+  | 'bookedSplit';
+
+type SequenceColumnWidths = Record<SequenceColumnKey, number>;
 
 const MODE_LABELS: Record<Mode, string> = {
   '7d': 'Last 7 days',
@@ -57,12 +70,50 @@ const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtSplit = (jack: number, brandon: number, selfBooked: number) => `${fmtInt(jack)} / ${fmtInt(brandon)} / ${fmtInt(selfBooked)}`;
 
+const SEQUENCE_COLUMN_WIDTH_STORAGE_KEY = 'v2-sequences-column-widths';
+const DEFAULT_SEQUENCE_COLUMN_WIDTHS: SequenceColumnWidths = {
+  label: 280,
+  uniqueContacted: 150,
+  repliesReceived: 145,
+  replyRatePct: 140,
+  bookedCalls: 140,
+  bookingRatePct: 140,
+  optOuts: 130,
+  optOutRatePct: 140,
+  bookedSplit: 150,
+};
+
+const normalizeSequenceColumnWidths = (value: unknown): SequenceColumnWidths | null => {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<Record<SequenceColumnKey, unknown>>;
+  const next: Partial<SequenceColumnWidths> = {};
+  for (const key of Object.keys(DEFAULT_SEQUENCE_COLUMN_WIDTHS) as SequenceColumnKey[]) {
+    const raw = candidate[key];
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+    next[key] = Math.max(120, Math.min(420, Math.round(raw)));
+  }
+  return next as SequenceColumnWidths;
+};
+
 export default function SequencesV2() {
   const [mode, setMode] = useState<Mode>('30d');
   const [status, setStatus] = useState<'active' | 'inactive' | ''>('active');
   const [minSendsThreshold, setMinSendsThreshold] = useState<number>(15);
   const [sortKey, setSortKey] = useState<SortKey>('messagesSent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [columnWidths, setColumnWidths] = useState<SequenceColumnWidths>(() => {
+    if (typeof window === 'undefined') return DEFAULT_SEQUENCE_COLUMN_WIDTHS;
+    try {
+      const saved = localStorage.getItem(SEQUENCE_COLUMN_WIDTH_STORAGE_KEY);
+      if (saved) {
+        const parsed = normalizeSequenceColumnWidths(JSON.parse(saved));
+        if (parsed) return parsed;
+      }
+    } catch {
+      // Ignore parse errors and fall back to defaults.
+    }
+    return DEFAULT_SEQUENCE_COLUMN_WIDTHS;
+  });
   const tableRef = useRef<HTMLDivElement | null>(null);
 
   const onSort = useCallback((key: SortKey) => {
@@ -80,6 +131,35 @@ export default function SequencesV2() {
       ? <ChevronUp size={10} style={{ marginLeft: '3px', display: 'inline' }} />
       : <ChevronDown size={10} style={{ marginLeft: '3px', display: 'inline' }} />;
   };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(SEQUENCE_COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
+    }
+  }, [columnWidths]);
+
+  const startResize = useCallback((key: SequenceColumnKey, event: ReactPointerEvent<HTMLSpanElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startWidth = columnWidths[key];
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const nextWidth = Math.max(120, Math.min(420, startWidth + (moveEvent.clientX - startX)));
+      setColumnWidths((current) => (current[key] === nextWidth ? current : { ...current, [key]: nextWidth }));
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  }, [columnWidths]);
 
   const query = useV2SequencesDeep({
     range: mode,
@@ -243,50 +323,117 @@ export default function SequencesV2() {
               caption="Outbound, response, and booked-call performance for each sequence."
             >
               <div className="V2TableWrap V2TableWrap--sequences">
-                <table className="V2Table V2Table--sequences">
+                <table className="V2Table V2Table--sequences SequencesTable--resizable">
+                  <colgroup>
+                    <col style={{ width: `${columnWidths.label}px` }} />
+                    <col style={{ width: `${columnWidths.uniqueContacted}px` }} />
+                    <col style={{ width: `${columnWidths.repliesReceived}px` }} />
+                    <col style={{ width: `${columnWidths.replyRatePct}px` }} />
+                    <col style={{ width: `${columnWidths.bookedCalls}px` }} />
+                    <col style={{ width: `${columnWidths.bookingRatePct}px` }} />
+                    <col style={{ width: `${columnWidths.optOuts}px` }} />
+                    <col style={{ width: `${columnWidths.optOutRatePct}px` }} />
+                    <col style={{ width: `${columnWidths.bookedSplit}px` }} />
+                  </colgroup>
                   <thead>
                     <tr>
-                      <th>
+                      <th style={{ width: `${columnWidths.label}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('label')}>
                           Sequence{sortIndicator('label')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize Sequence column"
+                          onPointerDown={(event) => startResize('label', event)}
+                        />
                       </th>
-                      <th className="is-right">
+                      <th className="is-right" style={{ width: `${columnWidths.uniqueContacted}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('uniqueContacted')}>
                           New leads contacted{sortIndicator('uniqueContacted')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize New leads contacted column"
+                          onPointerDown={(event) => startResize('uniqueContacted', event)}
+                        />
                       </th>
-                      <th className="is-right">
+                      <th className="is-right" style={{ width: `${columnWidths.repliesReceived}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('repliesReceived')}>
                           Leads who replied{sortIndicator('repliesReceived')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize Leads who replied column"
+                          onPointerDown={(event) => startResize('repliesReceived', event)}
+                        />
                       </th>
-                      <th className="is-right">
+                      <th className="is-right" style={{ width: `${columnWidths.replyRatePct}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('replyRatePct')}>
                           Reply rate{sortIndicator('replyRatePct')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize Reply rate column"
+                          onPointerDown={(event) => startResize('replyRatePct', event)}
+                        />
                       </th>
-                      <th className="is-right">
+                      <th className="is-right" style={{ width: `${columnWidths.bookedCalls}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('bookedCalls')}>
                           Calls booked{sortIndicator('bookedCalls')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize Calls booked column"
+                          onPointerDown={(event) => startResize('bookedCalls', event)}
+                        />
                       </th>
-                      <th className="is-right">
+                      <th className="is-right" style={{ width: `${columnWidths.bookingRatePct}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('bookingRatePct')}>
                           Booking rate{sortIndicator('bookingRatePct')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize Booking rate column"
+                          onPointerDown={(event) => startResize('bookingRatePct', event)}
+                        />
                       </th>
-                      <th className="is-right">
+                      <th className="is-right" style={{ width: `${columnWidths.optOuts}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('optOuts')}>
                           Opt-outs{sortIndicator('optOuts')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize Opt-outs column"
+                          onPointerDown={(event) => startResize('optOuts', event)}
+                        />
                       </th>
-                      <th className="is-right">
+                      <th className="is-right" style={{ width: `${columnWidths.optOutRatePct}px` }}>
                         <button type="button" className="V2SortButton" onClick={() => onSort('optOutRatePct')}>
                           Opt-out rate{sortIndicator('optOutRatePct')}
                         </button>
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize Opt-out rate column"
+                          onPointerDown={(event) => startResize('optOutRatePct', event)}
+                        />
                       </th>
-                      <th className="is-right" title="Booked split as Jack / Brandon / Self">J / B / Self</th>
+                      <th className="is-right" style={{ width: `${columnWidths.bookedSplit}px` }} title="Booked split as Jack / Brandon / Self">
+                        J / B / Self
+                        <span
+                          className="SequencesTable__resizeHandle"
+                          role="separator"
+                          aria-label="Resize booked split column"
+                          onPointerDown={(event) => startResize('bookedSplit', event)}
+                        />
+                      </th>
                     </tr>
                   </thead>
                   <tbody>

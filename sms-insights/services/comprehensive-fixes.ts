@@ -2,6 +2,8 @@ import { getPrismaClient } from "./prisma.js";
 
 const getPrisma = () => getPrismaClient();
 
+const toJsonString = (value: Record<string, unknown> | undefined): string => JSON.stringify(value ?? {});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPREHENSIVE FIXES FOR ALL IDENTIFIED ISSUES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1250,7 +1252,7 @@ export const logAuditEvent = async (params: {
       resource_type: params.resourceType,
       resource_id: params.resourceId,
       user_id: params.userId || null,
-      details: (params.details as any) || {},
+      details: toJsonString(params.details),
       ip_address: params.ipAddress || null,
     },
   });
@@ -1266,7 +1268,7 @@ export const getAuditLogs = async (params: {
 }): Promise<AuditLogEntry[]> => {
   const prisma = getPrisma();
 
-  const where: any = {};
+  const where: Prisma.audit_logsWhereInput = {};
   if (params.from || params.to) {
     where.created_at = {};
     if (params.from) where.created_at.gte = params.from;

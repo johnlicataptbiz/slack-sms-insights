@@ -1,7 +1,18 @@
+import type { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
+
+const toNullableText = (value: unknown): string | null => {
+  if (value == null) return null;
+  return typeof value === 'string' ? value : JSON.stringify(value);
+};
+
+const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
+  if (value == null) return {};
+  return value as Prisma.InputJsonValue;
+};
 
 export type MondaySyncStatus = 'idle' | 'running' | 'success' | 'error';
 export type MondayBoardClass =
@@ -413,12 +424,12 @@ export const saveMondayColumnMapping = async (
     await prisma.monday_column_mappings.upsert({
       where: { board_id: boardId },
       update: {
-        mapping_json: (mapping ?? {}) as any,
+        mapping_json: toJsonValue(mapping),
         updated_at: new Date(),
       },
       create: {
         board_id: boardId,
-        mapping_json: (mapping ?? {}) as any,
+        mapping_json: toJsonValue(mapping),
         updated_at: new Date(),
       },
     });
@@ -456,7 +467,7 @@ export const deleteMondayCallSnapshots = async (
       where: {
         board_id: boardId,
         item_id: { in: itemIds },
-      } as any,
+      } satisfies Prisma.monday_call_snapshotsWhereInput,
     });
   } catch (error) {
     logger?.warn?.('Failed to delete monday call snapshots', error);
@@ -485,7 +496,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableText(input.raw),
         synced_at: new Date(),
       },
       create: {
@@ -499,7 +510,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableText(input.raw),
         synced_at: new Date(),
       },
     });
@@ -1030,7 +1041,7 @@ export const listMondayCallSnapshotsInRange = async (
 ): Promise<MondayCallSnapshotRow[]> => {
   const prisma = getPrisma();
   try {
-    const where: any = {
+    const where: Prisma.monday_call_snapshotsWhereInput = {
       updated_at: {
         gte: params.from,
         lte: params.to,
@@ -1083,14 +1094,14 @@ export const upsertMondayWeeklyReport = async (
       where: { week_start: new Date(params.weekStart) },
       update: {
         source_board_id: params.sourceBoardId ?? null,
-        summary_json: (params.summaryJson ?? {}) as any,
+        summary_json: toJsonValue(params.summaryJson),
         monday_item_id: params.mondayItemId ?? null,
         synced_at: params.syncedAt ?? new Date(),
       },
       create: {
         week_start: new Date(params.weekStart),
         source_board_id: params.sourceBoardId ?? null,
-        summary_json: (params.summaryJson ?? {}) as any,
+        summary_json: toJsonValue(params.summaryJson),
         monday_item_id: params.mondayItemId ?? null,
         synced_at: params.syncedAt ?? new Date(),
       },
@@ -1165,7 +1176,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: (params.payloadJson ?? {}) as any,
+        payload_json: toNullableText(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },
@@ -1177,7 +1188,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: (params.payloadJson ?? {}) as any,
+        payload_json: toNullableText(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },

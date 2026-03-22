@@ -366,6 +366,16 @@
   z-index: 1;
 }
 
+.V2Table--sequences {
+  table-layout: fixed;
+}
+
+.V2Table--sequences th {
+  position: relative;
+  vertical-align: top;
+  overflow: visible;
+}
+
 .V2Table th.is-sortable {
   cursor: pointer;
   user-select: none;
@@ -379,6 +389,50 @@
     rgba(17, 184, 214, 0.04) 100%
   );
   color: var(--v2-accent-strong);
+}
+
+.SequencesTable--resizable {
+  min-width: 100%;
+}
+
+.SequencesTable--resizable th {
+  position: sticky;
+  padding-right: 1rem;
+}
+
+.SequencesTable__resizeHandle {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  z-index: 2;
+}
+
+.SequencesTable__resizeHandle::after {
+  content: '';
+  position: absolute;
+  top: 20%;
+  right: 5px;
+  bottom: 20%;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    rgba(17, 184, 214, 0.28) 0%,
+    rgba(15, 159, 184, 0.95) 50%,
+    rgba(17, 184, 214, 0.28) 100%
+  );
+  opacity: 0.75;
+}
+
+.SequencesTable__resizeHandle:hover::after,
+.SequencesTable__resizeHandle:focus-visible::after {
+  opacity: 1;
+  box-shadow: 0 0 0 4px rgba(17, 184, 214, 0.12);
 }
 
 /* ─── Enhanced Risk Alert ────────────────────────────────────────────────── */

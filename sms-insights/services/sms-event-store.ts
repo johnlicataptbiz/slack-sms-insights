@@ -6,8 +6,7 @@ const getPrisma = () => getPrismaClient();
 
 const toNullableString = (value: unknown): string | null => {
   if (value == null) return null;
-  if (typeof value === 'string') return value;
-  return JSON.stringify(value);
+  return typeof value === 'string' ? value : JSON.stringify(value);
 };
 
 export type SmsEventDirection = 'inbound' | 'outbound' | 'unknown';

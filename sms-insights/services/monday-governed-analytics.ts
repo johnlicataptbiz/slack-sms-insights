@@ -265,7 +265,7 @@ export const getMondayScorecards = async (
 }> => {
   const prisma = getPrisma();
 
-  const values: any[] = [params.fromDay, params.toDay];
+  const values: string[] = [params.fromDay, params.toDay];
   const where: string[] = ['metric_date BETWEEN $1::date AND $2::date'];
   if ((params.boardClass || '').trim()) {
     values.push((params.boardClass || '').trim());

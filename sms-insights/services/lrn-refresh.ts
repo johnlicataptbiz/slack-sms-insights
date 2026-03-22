@@ -40,6 +40,12 @@ type CandidateRow = {
   lrn_last_checked_at: string | null;
 };
 
+type CandidateRowRaw = {
+  contact_key: string;
+  phone: string | null;
+  lrn_last_checked_at: string | null;
+};
+
 type LrnLogger = Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>;
 
 const parseIntFlag = (value: string | undefined, fallback: number): number => {
@@ -70,7 +76,7 @@ const sleep = async (ms: number): Promise<void> => {
 const fetchCandidates = async (options: LrnBackfillOptions): Promise<CandidateRow[]> => {
   const prisma = getPrisma();
 
-  const rows = await prisma.$queryRawUnsafe<any[]>(
+  const rows = await prisma.$queryRawUnsafe<CandidateRowRaw[]>(
     `
     SELECT
       contact_key,

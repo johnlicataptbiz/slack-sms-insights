@@ -1,3 +1,4 @@
+import type { Logger } from '@slack/bolt';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BaseController, type RequestContext } from '../../src/controllers/base.controller';
 import { TestUtils } from '../utils/test-helpers';
@@ -7,7 +8,7 @@ const mockLogger = {
   info: vi.fn(),
   error: vi.fn(),
   warn: vi.fn(),
-};
+} satisfies Pick<Logger, 'info' | 'error' | 'warn'>;
 
 // Create a concrete implementation for testing
 class TestController extends BaseController {
@@ -16,15 +17,19 @@ class TestController extends BaseController {
     context.res.writeHead(200, { 'Content-Type': 'application/json' });
     context.res.end(JSON.stringify({ success: true }));
   }
+
+  runHandleRequest(...args: Parameters<BaseController['handleRequest']>): ReturnType<BaseController['handleRequest']> {
+    return this.handleRequest(...args);
+  }
 }
 
 describe('BaseController', () => {
   let controller: TestController;
-  let mockReq: any;
-  let mockRes: any;
+  let mockReq: ReturnType<typeof TestUtils.createMockRequest>;
+  let mockRes: ReturnType<typeof TestUtils.createMockResponse>;
 
   beforeEach(() => {
-    controller = new TestController(mockLogger as any);
+    controller = new TestController(mockLogger as unknown as Logger);
     mockReq = TestUtils.createMockRequest();
     mockRes = {
       ...TestUtils.createMockResponse(),
@@ -42,7 +47,7 @@ describe('BaseController', () => {
 
   describe('handleRequest', () => {
     it('should handle successful requests', async () => {
-      await (controller as any).handleRequest(mockReq, mockRes, {}, {}, {});
+      await controller.runHandleRequest(mockReq, mockRes, {}, {}, {});
 
       expect(mockRes.writeHead).toHaveBeenCalledWith(200, { 'Content-Type': 'application/json' });
       expect(mockRes.end).toHaveBeenCalledWith(JSON.stringify({ success: true }));
@@ -51,14 +56,20 @@ describe('BaseController', () => {
     it('should handle errors gracefully', async () => {
       // Create a controller that throws an error
       class ErrorController extends BaseController {
-        async execute(context: RequestContext): Promise<void> {
+        async execute(_context: RequestContext): Promise<void> {
           throw new Error('Test error');
+        }
+
+        runHandleRequest(
+          ...args: Parameters<BaseController['handleRequest']>
+        ): ReturnType<BaseController['handleRequest']> {
+          return this.handleRequest(...args);
         }
       }
 
-      const errorController = new ErrorController(mockLogger as any);
+      const errorController = new ErrorController(mockLogger as unknown as Logger);
 
-      await (errorController as any).handleRequest(mockReq, mockRes, {}, {}, {});
+      await errorController.runHandleRequest(mockReq, mockRes, {}, {}, {});
 
       expect(mockLogger.error).toHaveBeenCalled();
       expect(mockRes.writeHead).toHaveBeenCalledWith(

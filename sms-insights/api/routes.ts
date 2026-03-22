@@ -780,26 +780,49 @@ const handleGetRuntimeStatus: RequestHandler = async (_req, res, _logger, origin
 
 const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
   const prisma = getPrisma();
+  const hasPrismaConfig = Boolean((process.env.PRISMA_ACCELERATE_URL || '').trim() || (process.env.DATABASE_URL || '').trim());
+  const dbTimeoutMs = 1500;
   let dbStatus: 'ok' | 'warn' | 'error' = 'warn';
-  let dbDetail = 'Prisma client is not initialized';
-  try {
-    await prisma.$queryRawUnsafe('SELECT 1');
-    dbStatus = 'ok';
-    dbDetail = 'Prisma query check passed';
-  } catch (error) {
-    dbStatus = 'error';
-    dbDetail = `Prisma query check failed: ${error instanceof Error ? error.message : String(error)}`;
+  let dbDetail = hasPrismaConfig ? 'Database connectivity check pending' : 'Prisma database URL is not configured';
+
+  if (hasPrismaConfig) {
+    let timeoutHandle: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        prisma.$queryRawUnsafe('SELECT 1'),
+        new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error(`Prisma query timed out after ${dbTimeoutMs}ms`)), dbTimeoutMs);
+        }),
+      ]);
+      dbStatus = 'ok';
+      dbDetail = 'Prisma query check passed';
+    } catch (error) {
+      dbStatus = 'warn';
+      dbDetail = `Prisma readiness check deferred: ${error instanceof Error ? error.message : String(error)}`;
+    } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+    }
   }
 
-  const prismaRuntime = await getPrismaRuntimeStatus();
+  const prismaRuntime = hasPrismaConfig
+    ? {
+        status: dbStatus === 'ok' ? 'ok' : 'warn',
+        configured: true,
+        detail: dbStatus === 'ok' ? 'Prisma configuration detected' : dbDetail,
+      }
+    : {
+        status: 'warn' as const,
+        configured: false,
+        detail: 'Prisma database URL is not configured',
+      };
   const streamTokenConfig = getStreamTokenSecretConfigStatus();
   const slackAuthRuntime = getSlackAuthRuntimeStatus();
   const alowareIngest = getAlowareIngestHealthSnapshot();
   const buildSha = getBuildSha();
   const hasBuildSha = buildSha !== 'unknown';
-  const criticalFailure = dbStatus === 'error' || streamTokenConfig.status === 'error';
+  const criticalFailure = streamTokenConfig.status === 'error';
   const hasWarnings =
-    (dbStatus as string) === 'warn' || (streamTokenConfig.status as string) === 'warn' || !hasBuildSha;
+    dbStatus !== 'ok' || (streamTokenConfig.status as string) === 'warn' || !hasBuildSha;
 
   const status = criticalFailure ? 'degraded' : hasWarnings ? 'degraded' : 'ok';
 

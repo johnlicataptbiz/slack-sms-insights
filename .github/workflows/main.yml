@@ -28,6 +28,8 @@ jobs:
     - run: npm ci --legacy-peer-deps
     - name: Run tests
       run: npm test
+    - name: Type check
+      run: npm run typecheck:v2
     - run: npm run build
 
   backend-build:

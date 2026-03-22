@@ -116,7 +116,9 @@ export const getDailyRuns = async (
       rawWhere += ` AND channel_id = $${rawParams.length}`;
     }
     if (options.daysBack) {
-      rawWhere += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
+      const safeDaysBack = Math.max(1, Math.floor(Number(options.daysBack)));
+      rawParams.push(safeDaysBack);
+      rawWhere += ` AND timestamp > NOW() - INTERVAL '1 day' * $${rawParams.length}`;
     }
     const legacyMode = options.legacyMode || 'exclude';
     if (legacyMode === 'exclude') {
@@ -236,7 +238,9 @@ export const getDailyRuns = async (
       rawWhere += ` AND channel_id = $${rawParams.length}`;
     }
     if (options.daysBack) {
-      rawWhere += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
+      const safeDaysBack = Math.max(1, Math.floor(Number(options.daysBack)));
+      rawParams.push(safeDaysBack);
+      rawWhere += ` AND timestamp > NOW() - INTERVAL '1 day' * $${rawParams.length}`;
     }
     const legacyMode = options.legacyMode || 'exclude';
     if (legacyMode === 'exclude') {

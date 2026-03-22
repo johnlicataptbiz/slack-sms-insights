@@ -780,7 +780,9 @@ const handleGetRuntimeStatus: RequestHandler = async (_req, res, _logger, origin
 
 const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
   const prisma = getPrisma();
-  const hasPrismaConfig = Boolean((process.env.PRISMA_ACCELERATE_URL || '').trim() || (process.env.DATABASE_URL || '').trim());
+  const hasPrismaConfig = Boolean(
+    (process.env.PRISMA_ACCELERATE_URL || '').trim() || (process.env.DATABASE_URL || '').trim(),
+  );
   const dbTimeoutMs = 1500;
   let dbStatus: 'ok' | 'warn' | 'error' = 'warn';
   let dbDetail = hasPrismaConfig ? 'Database connectivity check pending' : 'Prisma database URL is not configured';
@@ -791,7 +793,10 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
       await Promise.race([
         prisma.$queryRawUnsafe('SELECT 1'),
         new Promise<never>((_, reject) => {
-          timeoutHandle = setTimeout(() => reject(new Error(`Prisma query timed out after ${dbTimeoutMs}ms`)), dbTimeoutMs);
+          timeoutHandle = setTimeout(
+            () => reject(new Error(`Prisma query timed out after ${dbTimeoutMs}ms`)),
+            dbTimeoutMs,
+          );
         }),
       ]);
       dbStatus = 'ok';
@@ -821,8 +826,7 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
   const buildSha = getBuildSha();
   const hasBuildSha = buildSha !== 'unknown';
   const criticalFailure = streamTokenConfig.status === 'error';
-  const hasWarnings =
-    dbStatus !== 'ok' || (streamTokenConfig.status as string) === 'warn' || !hasBuildSha;
+  const hasWarnings = dbStatus !== 'ok' || (streamTokenConfig.status as string) === 'warn' || !hasBuildSha;
 
   const status = criticalFailure ? 'degraded' : hasWarnings ? 'degraded' : 'ok';
 

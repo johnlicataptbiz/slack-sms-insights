@@ -1,5 +1,5 @@
-import type { Logger } from '@slack/bolt';
 import { Prisma } from '@prisma/client';
+import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 import { resolveSequenceId } from './sequence-registry.js';
 

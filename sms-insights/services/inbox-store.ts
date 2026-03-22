@@ -1065,7 +1065,9 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? undefined,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? undefined,
-        qualifier_snapshot: toNullableJson(input.qualifierSnapshot),
+        ...(input.qualifierSnapshot !== undefined && {
+          qualifier_snapshot: toNullableJson(input.qualifierSnapshot),
+        }),
         channel_marker: input.channelMarker ?? undefined,
       },
       create: {

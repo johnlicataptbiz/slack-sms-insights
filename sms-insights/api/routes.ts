@@ -808,7 +808,7 @@ const handleApiHealth: RequestHandler = async (_req, res, _logger, origin) => {
     ? {
         status: dbStatus === 'ok' ? 'ok' : 'warn',
         configured: true,
-        detail: dbStatus === 'ok' ? 'Prisma configuration detected' : dbDetail,
+        detail: dbDetail,
       }
     : {
         status: 'warn' as const,

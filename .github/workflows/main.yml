@@ -46,6 +46,8 @@ jobs:
           cache: npm
           cache-dependency-path: sms-insights/package-lock.json
       - run: npm ci
+      - name: Run tests
+        run: npm run test:run
       - run: npm run build
 
   secret-scan:

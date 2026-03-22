@@ -7,6 +7,8 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM deps AS build
+ARG DATABASE_URL
+ENV DATABASE_URL=$DATABASE_URL
 COPY . .
 ENV NODE_ENV=production
 ENV SKIP_FRONTEND_BUILD=true

@@ -76,6 +76,7 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   return new PrismaClient({
     log: ["error", "warn"],
   });
+};
 
 export const getPrismaClient = (): PrismaRuntimeClient => {
   if (prismaMode === "accelerate" && prismaAccelerate) {

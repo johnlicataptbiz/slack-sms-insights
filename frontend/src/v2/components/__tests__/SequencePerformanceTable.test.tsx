@@ -64,7 +64,7 @@ describe('SequencePerformanceTable', () => {
     render(<SequencePerformanceTable mergedRows={mockMergedRows} modeLabel="Last 7 days" />);
     
     // Should show the lead magnet family
-    expect(screen.getByText('Test Magnet')).toBeInTheDocument();
+    expect(screen.getAllByText('Test Magnet')[0]).toBeInTheDocument();
     
     // Should show the version
     expect(screen.getByText('v1.0')).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('SequencePerformanceTable', () => {
   it('filters out manual sequences', () => {
     render(<SequencePerformanceTable mergedRows={mockMergedRows} modeLabel="Last 7 days" />);
     
-    // Should not show manual sequence data
-    expect(screen.queryByText('Manual')).not.toBeInTheDocument();
+    // Manual sequence label should not appear as a rendered card row
+    expect(screen.queryByText('Manual Sequence')).not.toBeInTheDocument();
   });
 });

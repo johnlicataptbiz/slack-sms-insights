@@ -1,8 +1,71 @@
 {
-  "generatedAt": "2026-03-22T20:39:19.586Z",
+  "generatedAt": "2026-03-22T21:42:23.126Z",
   "daysIncluded": 365,
-  "totalCount": 439,
+  "totalCount": 460,
   "entries": [
+    {
+      "hash": "28f4219",
+      "date": "2026-03-22T21:29:47Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
+    },
+    {
+      "hash": "5d4d0f7",
+      "date": "2026-03-22T15:50:28-05:00",
+      "message": "chore(changelog): regenerate changelog.json (439 entries, build artifact)",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Infrastructure",
+      "description": "Regenerate changelog.json (439 entries, build artifact)"
+    },
+    {
+      "hash": "10470bd",
+      "date": "2026-03-22T15:50:11-05:00",
+      "message": "chore: sync prisma schema from Railway + add data-clean hygiene script",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Sync prisma schema from Railway + add data-clean hygiene script"
+    },
+    {
+      "hash": "1fdf791",
+      "date": "2026-03-22T15:50:05-05:00",
+      "message": "ci: align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows"
+    },
+    {
+      "hash": "0629272",
+      "date": "2026-03-22T20:07:02Z",
+      "message": "fix: implement all reviewer suggestions - remove dead code, fix SQL injection, align Node version",
+      "author": "copilot-swe-agent[bot]",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement all reviewer suggestions - remove dead code, fix SQL injection, align Node version"
+    },
+    {
+      "hash": "3311a2b",
+      "date": "2026-03-22T19:58:03Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
+    },
+    {
+      "hash": "698fde4",
+      "date": "2026-03-22T12:11:22-05:00",
+      "message": "fix(railway): restore backend deployment health",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Restore backend deployment health"
+    },
     {
       "hash": "d0738b9",
       "date": "2026-03-22T15:26:46Z",
@@ -11,6 +74,78 @@
       "type": "fix",
       "category": "AI & ML",
       "description": "Reconcile cleaned railway branch and unblock backend tests"
+    },
+    {
+      "hash": "2874cbc",
+      "date": "2026-03-22T10:24:41-05:00",
+      "message": "fix(ci): remove frontend-only dependency from shared page metrics",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Remove frontend-only dependency from shared page metrics"
+    },
+    {
+      "hash": "4f240f1",
+      "date": "2026-03-22T10:20:12-05:00",
+      "message": "fix(ci): use node runner for backend test discovery",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Use node runner for backend test discovery"
+    },
+    {
+      "hash": "3f187bb",
+      "date": "2026-03-22T10:13:55-05:00",
+      "message": "fix(ci): unblock backend node test runner",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Unblock backend node test runner"
+    },
+    {
+      "hash": "9e899f7",
+      "date": "2026-03-22T10:00:47-05:00",
+      "message": "fix(ci): repair node test discovery script",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Repair node test discovery script"
+    },
+    {
+      "hash": "24fa61d",
+      "date": "2026-03-22T09:26:24-05:00",
+      "message": "fix(stores): use Prisma JSON values for backend payload fields",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Use Prisma JSON values for backend payload fields"
+    },
+    {
+      "hash": "5313a0a",
+      "date": "2026-03-22T09:22:12-05:00",
+      "message": "fix(sms-event-store): use Prisma.InputJsonValue and Prisma.DbNull for Json fields",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Use Prisma.InputJsonValue and Prisma.DbNull for Json fields"
+    },
+    {
+      "hash": "79a637c",
+      "date": "2026-03-21T17:33:26Z",
+      "message": "fix: remove invalid frontend install step from test-backend job",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Remove invalid frontend install step from test-backend job"
+    },
+    {
+      "hash": "cad3bf2",
+      "date": "2026-03-22T09:11:59-05:00",
+      "message": "fix(ci): clean up CI and test setup",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Clean up CI and test setup"
     },
     {
       "hash": "6c58fe6",
@@ -31,6 +166,15 @@
       "description": "Merge PR #27: Add DATABASE_URL build arg for Prisma generation"
     },
     {
+      "hash": "b252eea",
+      "date": "2026-03-21T08:10:39-05:00",
+      "message": "fix(ci): unblock vercel and frontend tests",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Unblock vercel and frontend tests"
+    },
+    {
       "hash": "2e1c0ac",
       "date": "2026-03-21T07:03:40-05:00",
       "message": "fix: linting errors in recovered services - node imports, any types, non-null assertion",
@@ -47,6 +191,42 @@
       "type": "feature",
       "category": "Integrations",
       "description": "Restore all important dangling commits - type-motion, Monday integration, CI secret scan, docs fi..."
+    },
+    {
+      "hash": "beca8b2",
+      "date": "2026-03-21T06:15:01-05:00",
+      "message": "fix(ci+tests): backend CI via npm scripts + frontend RTL magnet tests",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Backend CI via npm scripts + frontend RTL magnet tests"
+    },
+    {
+      "hash": "6d06a71",
+      "date": "2026-03-21T05:44:00-05:00",
+      "message": "fix(ci): frontend test step + vitest script",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Frontend test step + vitest script"
+    },
+    {
+      "hash": "873a431",
+      "date": "2026-03-21T05:26:27-05:00",
+      "message": "fix(ci): backend tests exclude frontend",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Backend tests exclude frontend"
+    },
+    {
+      "hash": "fed2b6b",
+      "date": "2026-03-21T05:21:29-05:00",
+      "message": "fix(react): add frontend test steps + vitest scripts",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Add frontend test steps + vitest scripts"
     },
     {
       "hash": "103fa38",
@@ -83,6 +263,15 @@
       "type": "feature",
       "category": "General",
       "description": "Add nvmrc and update changelog"
+    },
+    {
+      "hash": "b0e0187",
+      "date": "2026-03-20T21:32:40Z",
+      "message": "fix: add .nvmrc to pin Node.js 20 for sms-insights",
+      "author": "railway-app[bot]",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Add .nvmrc to pin Node.js 20 for sms-insights"
     },
     {
       "hash": "469a436",

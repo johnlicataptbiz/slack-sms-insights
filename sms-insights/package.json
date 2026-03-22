@@ -45,7 +45,8 @@
     "railway:link": "railway link",
     "railway:status": "railway service",
     "railway:logs": "railway logs --follow",
-    "railway:logs:build": "railway logs --build --lines 50"
+    "railway:logs:build": "railway logs --build --lines 50",
+    "generate:db-report": "node --import tsx generate-live-database-report.ts"
   },
   "author": "Slack Technologies, LLC",
   "license": "MIT",

@@ -226,8 +226,8 @@ const cleanupRateLimitState = (): void => {
   }
 };
 
-// Start periodic cleanup
-setInterval(cleanupRateLimitState, RATE_LIMIT_CLEANUP_INTERVAL_MS);
+// Start periodic cleanup without keeping the process alive in tests/CLI runs.
+setInterval(cleanupRateLimitState, RATE_LIMIT_CLEANUP_INTERVAL_MS).unref();
 
 const parseBooleanFlag = (value: string | undefined, fallback: boolean): boolean => {
   if (!value) return fallback;

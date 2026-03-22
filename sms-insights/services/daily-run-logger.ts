@@ -4,6 +4,20 @@ import { publishRealtimeEvent } from './realtime.js';
 
 const getPrisma = () => getPrismaClient();
 
+type DailyRunQueryPool = {
+  query: (sql: string, params?: Array<string | number>) => Promise<{ rows: DailyRunRow[] }>;
+};
+
+let getPoolForTests: (() => DailyRunQueryPool) | null = null;
+
+export const __setGetPoolForTests = (factory: (() => DailyRunQueryPool) | null): void => {
+  getPoolForTests = factory;
+};
+
+export const __resetGetPoolForTests = (): void => {
+  getPoolForTests = null;
+};
+
 export type DailyRunInput = {
   channelId: string;
   channelName?: string;
@@ -92,6 +106,99 @@ export const getDailyRuns = async (
   } = {},
   logger?: Pick<Logger, 'warn'>,
 ): Promise<DailyRunRow[]> => {
+  if (getPoolForTests) {
+    const pool = getPoolForTests();
+    const rawParams: Array<string | number> = [];
+    let rawWhere = 'WHERE 1=1';
+
+    if (options.channelId) {
+      rawParams.push(options.channelId);
+      rawWhere += ` AND channel_id = $${rawParams.length}`;
+    }
+    if (options.daysBack) {
+      rawWhere += ` AND timestamp > NOW() - INTERVAL '${options.daysBack} days'`;
+    }
+    const legacyMode = options.legacyMode || 'exclude';
+    if (legacyMode === 'exclude') {
+      rawWhere += ' AND COALESCE(is_legacy, FALSE) = FALSE';
+    } else if (legacyMode === 'only') {
+      rawWhere += ' AND COALESCE(is_legacy, FALSE) = TRUE';
+    }
+
+    if (options.raw) {
+      const query = [
+        'SELECT * FROM daily_runs',
+        rawWhere,
+        'ORDER BY timestamp DESC',
+        options.limit ? `LIMIT ${options.limit}` : '',
+        options.offset ? `OFFSET ${options.offset}` : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      const result = await pool.query(query, rawParams);
+      return result.rows;
+    }
+
+    const query = `
+      WITH ranked AS (
+        SELECT
+          *,
+          COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date) AS canonical_day,
+          CASE
+            WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
+            WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
+            ELSE 0
+          END AS is_placeholder,
+          CASE status
+            WHEN 'success' THEN 0
+            WHEN 'pending' THEN 1
+            WHEN 'error' THEN 2
+            ELSE 3
+          END AS status_rank,
+          ROW_NUMBER() OVER (
+            PARTITION BY channel_id, report_type, COALESCE(report_date, (timestamp AT TIME ZONE 'UTC')::date)
+            ORDER BY
+              CASE
+                WHEN COALESCE(summary_text, '') ILIKE 'backfilled placeholder%' THEN 1
+                WHEN COALESCE(full_report, '') ILIKE 'backfilled placeholder%' THEN 1
+                ELSE 0
+              END ASC,
+              CASE status
+                WHEN 'success' THEN 0
+                WHEN 'pending' THEN 1
+                WHEN 'error' THEN 2
+                ELSE 3
+              END ASC,
+              timestamp DESC,
+              id DESC
+          ) AS rn
+        FROM daily_runs
+        ${rawWhere}
+      )
+      SELECT
+        id,
+        timestamp,
+        channel_id,
+        channel_name,
+        report_date,
+        report_type,
+        status,
+        error_message,
+        summary_text,
+        full_report,
+        duration_ms,
+        is_legacy,
+        created_at
+      FROM ranked
+      WHERE rn = 1
+      ORDER BY timestamp DESC
+      ${options.limit ? `LIMIT ${options.limit}` : ''}
+      ${options.offset ? `OFFSET ${options.offset}` : ''}
+    `;
+    const result = await pool.query(query, rawParams);
+    return result.rows;
+  }
+
   const prisma = getPrisma();
 
   try {

@@ -118,6 +118,37 @@ const SAMPLE_QUOTE_METRICS = [
 
 type SampleQuoteMetricKey = (typeof SAMPLE_QUOTE_METRICS)[number]['key'];
 type TopNicheRow = { niche: string; count: number; pct: number };
+type SequenceQualificationRow = {
+  sequence_label: string;
+  total_conversations: number | string;
+  monday_linked_contacts: number | string;
+  monday_total_outcomes: number | string;
+  monday_booked_count: number | string;
+  monday_closed_won_count: number | string;
+  monday_closed_lost_count: number | string;
+  monday_no_show_count: number | string;
+  monday_cancelled_count: number | string;
+  monday_bad_timing_count: number | string;
+  monday_bad_fit_count: number | string;
+  monday_other_count: number | string;
+  monday_unknown_count: number | string;
+  full_time_count: number | string;
+  part_time_count: number | string;
+  unknown_employment_count: number | string;
+  mostly_cash_count: number | string;
+  mostly_insurance_count: number | string;
+  balanced_mix_count: number | string;
+  unknown_revenue_count: number | string;
+  brick_and_mortar_count: number | string;
+  mobile_count: number | string;
+  online_count: number | string;
+  hybrid_count: number | string;
+  unknown_delivery_count: number | string;
+  high_interest_count: number | string;
+  medium_interest_count: number | string;
+  low_interest_count: number | string;
+  unknown_interest_count: number | string;
+};
 
 /**
  * Build qualification breakdown per sequence for a given time window.
@@ -135,7 +166,7 @@ export const buildSequenceQualificationBreakdown = async (params: {
 
   logger?.debug?.('[sequence-qualification] Building breakdown', { from, to, timezone });
 
-  const rows = await prisma.$queryRawUnsafe<any[]>(
+  const rows = await prisma.$queryRawUnsafe<SequenceQualificationRow[]>(
     `
     WITH sequence_first_touch AS (
       -- Find the first outbound message per conversation and its sequence

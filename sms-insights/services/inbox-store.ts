@@ -1,19 +1,18 @@
-import type { Logger } from '@slack/bolt';
+import type { Logger } from "@slack/bolt";
 import type {
   CoachingInterest,
   DeliveryModel,
   EmploymentStatus,
   InboxContactProfileRow,
   RevenueMixCategory,
-} from './inbox-contact-profiles.js';
-import { getPrismaClient } from './prisma.js';
+} from "./inbox-contact-profiles.js";
+import { getPrismaClient } from "./prisma.js";
 
-const toNullableText = (value: unknown): string | null => {
-  if (value == null) return null;
-  return typeof value === 'string' ? value : JSON.stringify(value);
-};
-
-export type CadenceStatus = 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
+export type CadenceStatus =
+  | "idle"
+  | "podcast_sent"
+  | "call_offered"
+  | "nurture_pool";
 
 export type ConversationStateRow = {
   conversation_id: string;
@@ -37,7 +36,7 @@ export type ConversationStateRow = {
   updated_at: Date;
 };
 
-export type SendAttemptStatus = 'blocked' | 'queued' | 'sent' | 'failed';
+export type SendAttemptStatus = "blocked" | "queued" | "sent" | "failed";
 
 export type SendAttemptRow = {
   id: string;
@@ -113,7 +112,7 @@ export type InboxConversationListRow = {
   contact_id: string | null;
   contact_phone: string | null;
   current_rep_id: string | null;
-  status: 'open' | 'closed' | 'dnc';
+  status: "open" | "closed" | "dnc";
   last_inbound_at: Date | null;
   last_outbound_at: Date | null;
   last_touch_at: Date | null;
@@ -148,7 +147,7 @@ export type InboxConversationListRow = {
   open_needs_reply_count: number;
   needs_reply_due_at: Date | null;
   last_message_body: string | null;
-  last_message_direction: 'inbound' | 'outbound' | 'unknown' | null;
+  last_message_direction: "inbound" | "outbound" | "unknown" | null;
   last_message_at: Date | null;
   latest_outbound_user: string | null;
   latest_outbound_line: string | null;
@@ -159,7 +158,7 @@ export type InboxMessageRow = {
   id: string;
   conversation_id: string | null;
   event_ts: Date;
-  direction: 'inbound' | 'outbound' | 'unknown';
+  direction: "inbound" | "outbound" | "unknown";
   body: string | null;
   sequence: string | null;
   line: string | null;
@@ -188,9 +187,12 @@ export type InboxConversationDetail = {
 
 const getPrisma = () => getPrismaClient();
 
-const BOOKED_CALLS_CHANNEL_ID = (process.env.BOOKED_CALLS_CHANNEL_ID || '').trim() || null;
+const BOOKED_CALLS_CHANNEL_ID =
+  (process.env.BOOKED_CALLS_CHANNEL_ID || "").trim() || null;
 
-const buildBookedCallsExistsSql = (bookedCallsChannelPlaceholder: string): string => `
+const buildBookedCallsExistsSql = (
+  bookedCallsChannelPlaceholder: string,
+): string => `
         EXISTS (
           SELECT 1
           FROM booked_calls bc
@@ -261,7 +263,7 @@ const buildBookedCallsExistsSql = (bookedCallsChannelPlaceholder: string): strin
 
 export const getConversationState = async (
   conversationId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ConversationStateRow | null> => {
   const prisma = getPrisma();
   try {
@@ -270,14 +272,14 @@ export const getConversationState = async (
     });
     return result as unknown as ConversationStateRow | null;
   } catch (err) {
-    logger?.error('getConversationState failed', err);
+    logger?.error("getConversationState failed", err);
     throw err;
   }
 };
 
 export const ensureConversationState = async (
   conversationId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ConversationStateRow> => {
   const prisma = getPrisma();
   try {
@@ -288,7 +290,7 @@ export const ensureConversationState = async (
     });
     return result as unknown as ConversationStateRow;
   } catch (err) {
-    logger?.error('ensureConversationState failed', err);
+    logger?.error("ensureConversationState failed", err);
     throw err;
   }
 };
@@ -312,7 +314,7 @@ export type UpdateConversationStateInput = {
 export const updateConversationState = async (
   conversationId: string,
   input: UpdateConversationStateInput,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ConversationStateRow> => {
   const prisma = getPrisma();
 
@@ -337,21 +339,35 @@ export const updateConversationState = async (
     const updateData: ConversationStateUpdateData = {
       updated_at: new Date(),
     };
-    if (input.fullOrPartTime !== undefined) updateData.qualification_full_or_part_time = input.fullOrPartTime;
+    if (input.fullOrPartTime !== undefined)
+      updateData.qualification_full_or_part_time = input.fullOrPartTime;
     if (input.niche !== undefined) updateData.qualification_niche = input.niche;
-    if (input.revenueMix !== undefined) updateData.qualification_revenue_mix = input.revenueMix;
-    if (input.deliveryModel !== undefined) updateData.qualification_delivery_model = input.deliveryModel;
-    if (input.coachingInterest !== undefined) updateData.qualification_coaching_interest = input.coachingInterest;
-    if (input.progressStep !== undefined) updateData.qualification_progress_step = input.progressStep;
-    if (input.objectionTags !== undefined) updateData.objection_tags = JSON.stringify(input.objectionTags);
-    if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
-    if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
-    if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;
+    if (input.revenueMix !== undefined)
+      updateData.qualification_revenue_mix = input.revenueMix;
+    if (input.deliveryModel !== undefined)
+      updateData.qualification_delivery_model = input.deliveryModel;
+    if (input.coachingInterest !== undefined)
+      updateData.qualification_coaching_interest = input.coachingInterest;
+    if (input.progressStep !== undefined)
+      updateData.qualification_progress_step = input.progressStep;
+    if (input.objectionTags !== undefined)
+      updateData.objection_tags = input.objectionTags;
+    if (input.escalationLevel !== undefined)
+      updateData.escalation_level = input.escalationLevel;
+    if (input.escalationReason !== undefined)
+      updateData.escalation_reason = input.escalationReason;
+    if (input.escalationOverridden !== undefined)
+      updateData.escalation_overridden = input.escalationOverridden;
     if (input.lastPodcastSentAt !== undefined)
-      updateData.last_podcast_sent_at = input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null;
+      updateData.last_podcast_sent_at = input.lastPodcastSentAt
+        ? new Date(input.lastPodcastSentAt)
+        : null;
     if (input.nextFollowupDueAt !== undefined)
-      updateData.next_followup_due_at = input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null;
-    if (input.cadenceStatus !== undefined) updateData.cadence_status = input.cadenceStatus;
+      updateData.next_followup_due_at = input.nextFollowupDueAt
+        ? new Date(input.nextFollowupDueAt)
+        : null;
+    if (input.cadenceStatus !== undefined)
+      updateData.cadence_status = input.cadenceStatus;
 
     const result = await prisma.conversation_state.upsert({
       where: { conversation_id: conversationId },
@@ -364,7 +380,7 @@ export const updateConversationState = async (
 
     return result as unknown as ConversationStateRow;
   } catch (err) {
-    logger?.error('updateConversationState failed', err);
+    logger?.error("updateConversationState failed", err);
     throw err;
   }
 };
@@ -372,7 +388,7 @@ export const updateConversationState = async (
 export type ListInboxConversationsParams = {
   limit: number;
   offset: number;
-  status?: 'open' | 'closed' | 'dnc';
+  status?: "open" | "closed" | "dnc";
   repId?: string;
   needsReplyOnly?: boolean;
   search?: string;
@@ -380,7 +396,7 @@ export type ListInboxConversationsParams = {
 
 export const listInboxConversations = async (
   params: ListInboxConversationsParams,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<InboxConversationListRow[]> => {
   const prisma = getPrisma();
   try {
@@ -397,7 +413,7 @@ export const listInboxConversations = async (
       values.push(params.repId);
     }
     if (params.needsReplyOnly) {
-      where.push('COALESCE(open_items.open_needs_reply_count, 0) > 0');
+      where.push("COALESCE(open_items.open_needs_reply_count, 0) > 0");
     }
     if (params.search && params.search.trim().length > 0) {
       where.push(`(
@@ -508,7 +524,7 @@ export const listInboxConversations = async (
         ON latest_message.conversation_id = c.id
       LEFT JOIN latest_outbound
         ON latest_outbound.conversation_id = c.id
-      ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY
         CASE WHEN COALESCE(open_items.open_needs_reply_count, 0) > 0 THEN 0 ELSE 1 END ASC,
         c.last_touch_at DESC NULLS LAST,
@@ -517,17 +533,20 @@ export const listInboxConversations = async (
       OFFSET ${offsetPlaceholder};
     `;
 
-    const result = await prisma.$queryRawUnsafe<InboxConversationListRow[]>(sql, ...values);
+    const result = await prisma.$queryRawUnsafe<InboxConversationListRow[]>(
+      sql,
+      ...values,
+    );
     return result;
   } catch (err) {
-    logger?.error('listInboxConversations failed', err);
+    logger?.error("listInboxConversations failed", err);
     throw err;
   }
 };
 
 export const getInboxConversationById = async (
   conversationId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<InboxConversationListRow | null> => {
   const prisma = getPrisma();
   try {
@@ -606,7 +625,7 @@ export const getInboxConversationById = async (
         latest_message.event_ts AS last_message_at,
         latest_outbound.aloware_user AS latest_outbound_user,
         latest_outbound.line AS latest_outbound_line,
-        ${buildBookedCallsExistsSql('$2')} AS monday_booked
+        ${buildBookedCallsExistsSql("$2")} AS monday_booked
       FROM conversations c
       LEFT JOIN inbox_contact_profiles p
         ON p.contact_key = c.contact_key
@@ -629,7 +648,7 @@ export const getInboxConversationById = async (
     );
     return result[0] ?? null;
   } catch (err) {
-    logger?.error('getInboxConversationById failed', err);
+    logger?.error("getInboxConversationById failed", err);
     throw err;
   }
 };
@@ -637,7 +656,7 @@ export const getInboxConversationById = async (
 export const listMessagesForConversation = async (
   conversationId: string,
   limit: number,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<InboxMessageRow[]> => {
   const prisma = getPrisma();
   try {
@@ -679,7 +698,7 @@ export const listMessagesForConversation = async (
 
     return result;
   } catch (err) {
-    logger?.error('listMessagesForConversation failed', err);
+    logger?.error("listMessagesForConversation failed", err);
     throw err;
   }
 };
@@ -687,8 +706,8 @@ export const listMessagesForConversation = async (
 export const listMondayTrailForContactKey = async (
   contactKey: string,
   limit: number,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<InboxConversationDetail['mondayTrail']> => {
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
+): Promise<InboxConversationDetail["mondayTrail"]> => {
   const prisma = getPrisma();
   try {
     const normalizedLimit = Math.max(1, Math.min(limit, 50));
@@ -744,7 +763,7 @@ export const listMondayTrailForContactKey = async (
       updatedAt: row.updated_at.toISOString(),
     }));
   } catch (err) {
-    logger?.error('listMondayTrailForContactKey failed', err);
+    logger?.error("listMondayTrailForContactKey failed", err);
     throw err;
   }
 };
@@ -767,7 +786,7 @@ export type InsertSendAttemptInput = {
 
 export const insertSendAttempt = async (
   input: InsertSendAttemptInput,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<SendAttemptRow> => {
   const prisma = getPrisma();
   try {
@@ -828,16 +847,19 @@ export const insertSendAttempt = async (
     });
     return result as unknown as SendAttemptRow;
   } catch (err) {
-    logger?.error('insertSendAttempt failed', err);
+    logger?.error("insertSendAttempt failed", err);
     throw err;
   }
 };
 
 export const reserveSendAttemptIdempotency = async (
-  input: Omit<InsertSendAttemptInput, 'status' | 'retryCount' | 'responsePayload' | 'errorMessage'> & {
+  input: Omit<
+    InsertSendAttemptInput,
+    "status" | "retryCount" | "responsePayload" | "errorMessage"
+  > & {
     idempotencyKey: string;
   },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<SendAttemptRow | null> => {
   const prisma = getPrisma();
   try {
@@ -867,7 +889,7 @@ export const reserveSendAttemptIdempotency = async (
     );
     return rows[0] ?? null;
   } catch (err) {
-    logger?.error('reserveSendAttemptIdempotency failed', err);
+    logger?.error("reserveSendAttemptIdempotency failed", err);
     throw err;
   }
 };
@@ -875,7 +897,7 @@ export const reserveSendAttemptIdempotency = async (
 export const getSendAttemptByIdempotency = async (
   conversationId: string,
   idempotencyKey: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<SendAttemptRow | null> => {
   const prisma = getPrisma();
   try {
@@ -889,7 +911,7 @@ export const getSendAttemptByIdempotency = async (
     );
     return result[0] ?? null;
   } catch (err) {
-    logger?.error('getSendAttemptByIdempotency failed', err);
+    logger?.error("getSendAttemptByIdempotency failed", err);
     throw err;
   }
 };
@@ -902,7 +924,7 @@ export type SendAttemptVolumeCounts = {
 
 export const getSendAttemptVolumeCounts = async (
   conversationId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<SendAttemptVolumeCounts> => {
   const prisma = getPrisma();
   try {
@@ -934,12 +956,13 @@ export const getSendAttemptVolumeCounts = async (
 
     const row = result[0];
     return {
-      sentLastHour: Number.parseInt(row?.sent_last_hour || '0', 10) || 0,
-      sentLastDay: Number.parseInt(row?.sent_last_day || '0', 10) || 0,
-      conversationSentLastHour: Number.parseInt(row?.conversation_sent_last_hour || '0', 10) || 0,
+      sentLastHour: Number.parseInt(row?.sent_last_hour || "0", 10) || 0,
+      sentLastDay: Number.parseInt(row?.sent_last_day || "0", 10) || 0,
+      conversationSentLastHour:
+        Number.parseInt(row?.conversation_sent_last_hour || "0", 10) || 0,
     };
   } catch (err) {
-    logger?.error('getSendAttemptVolumeCounts failed', err);
+    logger?.error("getSendAttemptVolumeCounts failed", err);
     throw err;
   }
 };
@@ -957,7 +980,7 @@ export type InsertDraftSuggestionInput = {
 
 export const insertDraftSuggestion = async (
   input: InsertDraftSuggestionInput,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<DraftSuggestionRow> => {
   const prisma = getPrisma();
   try {
@@ -976,7 +999,7 @@ export const insertDraftSuggestion = async (
 
     return result as unknown as DraftSuggestionRow;
   } catch (err) {
-    logger?.error('insertDraftSuggestion failed', err);
+    logger?.error("insertDraftSuggestion failed", err);
     throw err;
   }
 };
@@ -984,25 +1007,25 @@ export const insertDraftSuggestion = async (
 export const listDraftSuggestionsForConversation = async (
   conversationId: string,
   limit: number,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<DraftSuggestionRow[]> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.draft_suggestions.findMany({
       where: { conversation_id: conversationId },
-      orderBy: { created_at: 'desc' },
+      orderBy: { created_at: "desc" },
       take: Math.max(1, Math.min(limit, 50)),
     });
     return result as unknown as DraftSuggestionRow[];
   } catch (err) {
-    logger?.error('listDraftSuggestionsForConversation failed', err);
+    logger?.error("listDraftSuggestionsForConversation failed", err);
     throw err;
   }
 };
 
 export const getDraftSuggestionById = async (
   draftId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
@@ -1011,7 +1034,7 @@ export const getDraftSuggestionById = async (
     });
     return result as unknown as DraftSuggestionRow | null;
   } catch (err) {
-    logger?.error('getDraftSuggestionById failed', err);
+    logger?.error("getDraftSuggestionById failed", err);
     throw err;
   }
 };
@@ -1023,7 +1046,7 @@ export const updateDraftSuggestionFeedback = async (
     edited?: boolean;
     sendLinkedEventId?: string | null;
   },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
@@ -1035,9 +1058,11 @@ export const updateDraftSuggestionFeedback = async (
     } = {
       updated_at: new Date(),
     };
-    if (typeof params.accepted === 'boolean') updateData.accepted = params.accepted;
-    if (typeof params.edited === 'boolean') updateData.edited = params.edited;
-    if (params.sendLinkedEventId !== undefined) updateData.send_linked_event_id = params.sendLinkedEventId;
+    if (typeof params.accepted === "boolean")
+      updateData.accepted = params.accepted;
+    if (typeof params.edited === "boolean") updateData.edited = params.edited;
+    if (params.sendLinkedEventId !== undefined)
+      updateData.send_linked_event_id = params.sendLinkedEventId;
 
     const result = await prisma.draft_suggestions.update({
       where: { id: draftId },
@@ -1046,14 +1071,14 @@ export const updateDraftSuggestionFeedback = async (
 
     return result as unknown as DraftSuggestionRow | null;
   } catch (err) {
-    logger?.error('updateDraftSuggestionFeedback failed', err);
+    logger?.error("updateDraftSuggestionFeedback failed", err);
     throw err;
   }
 };
 
 export const upsertConversionExample = async (
   input: UpsertConversionExampleInput,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ConversionExampleRow> => {
   const prisma = getPrisma();
   try {
@@ -1073,23 +1098,23 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? null,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? null,
-        qualifier_snapshot: toNullableText(input.qualifierSnapshot),
-        channel_marker: input.channelMarker || 'sms',
+        qualifier_snapshot: (input.qualifierSnapshot as any) ?? null,
+        channel_marker: input.channelMarker || "sms",
       },
     });
 
     return result as unknown as ConversionExampleRow;
   } catch (err) {
-    logger?.error('upsertConversionExample failed', err);
+    logger?.error("upsertConversionExample failed", err);
     throw err;
   }
 };
 
 export const updateConversationStatus = async (
   conversationId: string,
-  status: 'open' | 'closed' | 'dnc',
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<{ id: string; status: 'open' | 'closed' | 'dnc' } | null> => {
+  status: "open" | "closed" | "dnc",
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
+): Promise<{ id: string; status: "open" | "closed" | "dnc" } | null> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.conversation.update({
@@ -1103,9 +1128,9 @@ export const updateConversationStatus = async (
         status: true,
       },
     });
-    return result as { id: string; status: 'open' | 'closed' | 'dnc' };
+    return result as { id: string; status: "open" | "closed" | "dnc" };
   } catch (err) {
-    logger?.error('updateConversationStatus failed', err);
+    logger?.error("updateConversationStatus failed", err);
     throw err;
   }
 };
@@ -1124,7 +1149,7 @@ export const insertConversationNote = async (
   conversationId: string,
   author: string,
   text: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ConversationNoteRow> => {
   const prisma = getPrisma();
   try {
@@ -1137,24 +1162,24 @@ export const insertConversationNote = async (
     });
     return result as unknown as ConversationNoteRow;
   } catch (err) {
-    logger?.error('insertConversationNote failed', err);
+    logger?.error("insertConversationNote failed", err);
     throw err;
   }
 };
 
 export const listConversationNotes = async (
   conversationId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ConversationNoteRow[]> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.conversation_notes.findMany({
       where: { conversation_id: conversationId },
-      orderBy: { created_at: 'asc' },
+      orderBy: { created_at: "asc" },
     });
     return result as unknown as ConversationNoteRow[];
   } catch (err) {
-    logger?.error('listConversationNotes failed', err);
+    logger?.error("listConversationNotes failed", err);
     throw err;
   }
 };
@@ -1164,7 +1189,7 @@ export const listConversationNotes = async (
 export const snoozeConversation = async (
   conversationId: string,
   snoozedUntil: string | null,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<{ id: string; next_followup_due_at: Date | null }> => {
   const prisma = getPrisma();
   try {
@@ -1184,7 +1209,7 @@ export const snoozeConversation = async (
       next_followup_due_at: result.nextFollowupAt,
     };
   } catch (err) {
-    logger?.error('snoozeConversation failed', err);
+    logger?.error("snoozeConversation failed", err);
     throw err;
   }
 };
@@ -1194,7 +1219,7 @@ export const snoozeConversation = async (
 export const assignConversation = async (
   conversationId: string,
   ownerLabel: string | null,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<{ id: string; owner_label: string | null }> => {
   const prisma = getPrisma();
   try {
@@ -1211,7 +1236,7 @@ export const assignConversation = async (
     });
     return { id: result.id, owner_label: result.current_rep_id ?? null };
   } catch (err) {
-    logger?.error('assignConversation failed', err);
+    logger?.error("assignConversation failed", err);
     throw err;
   }
 };
@@ -1228,16 +1253,16 @@ export type MessageTemplateRow = {
 };
 
 export const listMessageTemplates = async (
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<MessageTemplateRow[]> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.message_templates.findMany({
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
     return result as unknown as MessageTemplateRow[];
   } catch (err) {
-    logger?.error('listMessageTemplates failed', err);
+    logger?.error("listMessageTemplates failed", err);
     throw err;
   }
 };
@@ -1246,7 +1271,7 @@ export const insertMessageTemplate = async (
   name: string,
   body: string,
   createdBy: string | null,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<MessageTemplateRow> => {
   const prisma = getPrisma();
   try {
@@ -1259,14 +1284,14 @@ export const insertMessageTemplate = async (
     });
     return result as unknown as MessageTemplateRow;
   } catch (err) {
-    logger?.error('insertMessageTemplate failed', err);
+    logger?.error("insertMessageTemplate failed", err);
     throw err;
   }
 };
 
 export const deleteMessageTemplate = async (
   id: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<boolean> => {
   const prisma = getPrisma();
   try {
@@ -1275,7 +1300,7 @@ export const deleteMessageTemplate = async (
     });
     return !!result;
   } catch (err) {
-    logger?.error('deleteMessageTemplate failed', err);
+    logger?.error("deleteMessageTemplate failed", err);
     throw err;
   }
 };
@@ -1285,13 +1310,12 @@ export const deleteMessageTemplate = async (
 export const updateObjectionTags = async (
   conversationId: string,
   tags: string[],
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<{ conversation_id: string; objection_tags: string[] }> => {
   const prisma = getPrisma();
   try {
     // Use raw SQL to handle the string[] array type properly
-    type ObjectionTagsRow = { conversation_id: string; objection_tags: string[] };
-    const result = await prisma.$queryRawUnsafe<ObjectionTagsRow[]>(
+    const result = await prisma.$queryRawUnsafe<any[]>(
       `
       INSERT INTO conversation_state (conversation_id, objection_tags, updated_at)
       VALUES ($1::uuid, $2::text[], NOW())
@@ -1309,20 +1333,26 @@ export const updateObjectionTags = async (
       objection_tags: result[0].objection_tags as string[],
     };
   } catch (err) {
-    logger?.error('updateObjectionTags failed', err);
+    logger?.error("updateObjectionTags failed", err);
     throw err;
   }
 };
 
 // ─── Phase 3: Call Outcome ────────────────────────────────────────────────────
 
-export const VALID_CALL_OUTCOMES = ['not_a_fit', 'too_early', 'budget', 'joined', 'ghosted'] as const;
+export const VALID_CALL_OUTCOMES = [
+  "not_a_fit",
+  "too_early",
+  "budget",
+  "joined",
+  "ghosted",
+] as const;
 export type CallOutcome = (typeof VALID_CALL_OUTCOMES)[number];
 
 export const updateCallOutcome = async (
   conversationId: string,
   outcome: string | null,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<{ conversation_id: string; call_outcome: string | null }> => {
   const prisma = getPrisma();
   try {
@@ -1343,7 +1373,7 @@ export const updateCallOutcome = async (
     });
     return result;
   } catch (err) {
-    logger?.error('updateCallOutcome failed', err);
+    logger?.error("updateCallOutcome failed", err);
     throw err;
   }
 };
@@ -1352,7 +1382,7 @@ export const updateCallOutcome = async (
 
 export const incrementGuardrailOverride = async (
   conversationId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<{ conversation_id: string; guardrail_override_count: number }> => {
   const prisma = getPrisma();
   try {
@@ -1375,7 +1405,7 @@ export const incrementGuardrailOverride = async (
     );
     return result[0];
   } catch (err) {
-    logger?.error('incrementGuardrailOverride failed', err);
+    logger?.error("incrementGuardrailOverride failed", err);
     throw err;
   }
 };
@@ -1391,7 +1421,7 @@ export type StageConversionRow = {
 };
 
 export const getStageConversionAnalytics = async (
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<StageConversionRow[]> => {
   const prisma = getPrisma();
   try {
@@ -1414,7 +1444,7 @@ export const getStageConversionAnalytics = async (
     `);
     return result;
   } catch (err) {
-    logger?.error('getStageConversionAnalytics failed', err);
+    logger?.error("getStageConversionAnalytics failed", err);
     throw err;
   }
 };
@@ -1433,7 +1463,7 @@ export type SetterAssistPerformanceRow = {
 };
 
 export const getObjectionFrequencyAnalytics = async (
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ObjectionFrequencyRow[]> => {
   const prisma = getPrisma();
   try {
@@ -1449,13 +1479,13 @@ export const getObjectionFrequencyAnalytics = async (
     `);
     return result;
   } catch (err) {
-    logger?.error('getObjectionFrequencyAnalytics failed', err);
+    logger?.error("getObjectionFrequencyAnalytics failed", err);
     throw err;
   }
 };
 
 export const getSetterAssistPerformanceAnalytics = async (
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<SetterAssistPerformanceRow[]> => {
   const prisma = getPrisma();
   try {
@@ -1506,7 +1536,7 @@ export const getSetterAssistPerformanceAnalytics = async (
     `);
     return result;
   } catch (err) {
-    logger?.error('getSetterAssistPerformanceAnalytics failed', err);
+    logger?.error("getSetterAssistPerformanceAnalytics failed", err);
     throw err;
   }
 };
@@ -1518,7 +1548,7 @@ export const listConversionExamples = async (
     preferredOwnerLabel?: string | null;
     limit: number;
   },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<
   Array<
     ConversionExampleRow & {
@@ -1544,7 +1574,10 @@ export const listConversionExamples = async (
       where.push(`ce.booked_call_label = $${i++}`);
       values.push(params.bookedCallLabel);
     }
-    if (params.preferredOwnerLabel && params.preferredOwnerLabel.trim().length > 0) {
+    if (
+      params.preferredOwnerLabel &&
+      params.preferredOwnerLabel.trim().length > 0
+    ) {
       where.push(`LOWER(COALESCE(e.aloware_user, '')) LIKE $${i++}`);
       values.push(`%${params.preferredOwnerLabel.trim().toLowerCase()}%`);
     }
@@ -1582,7 +1615,7 @@ export const listConversionExamples = async (
         ORDER BY se.event_ts DESC
         LIMIT 1
       ) inbound ON TRUE
-      ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+      ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""}
       ORDER BY ce.created_at DESC
       LIMIT ${limitPlaceholder};
       `,
@@ -1591,7 +1624,7 @@ export const listConversionExamples = async (
 
     return result;
   } catch (err) {
-    logger?.error('listConversionExamples failed', err);
+    logger?.error("listConversionExamples failed", err);
     throw err;
   }
 };
@@ -1602,7 +1635,7 @@ export const listSetterVoiceExamples = async (
     escalationLevel?: 1 | 2 | 3 | 4;
     limit: number;
   },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<SetterVoiceExampleRow[]> => {
   const prisma = getPrisma();
   try {
@@ -1618,7 +1651,9 @@ export const listSetterVoiceExamples = async (
     ];
 
     if (params.escalationLevel) {
-      where.push(`(ce.escalation_level = $${i++} OR ce.escalation_level IS NULL)`);
+      where.push(
+        `(ce.escalation_level = $${i++} OR ce.escalation_level IS NULL)`,
+      );
       values.push(params.escalationLevel);
     }
 
@@ -1640,7 +1675,7 @@ export const listSetterVoiceExamples = async (
       FROM sms_events e
       LEFT JOIN conversion_examples ce
         ON ce.source_outbound_event_id = e.id
-      WHERE ${where.join(' AND ')}
+      WHERE ${where.join(" AND ")}
       ORDER BY
         CASE WHEN ce.id IS NOT NULL THEN 0 ELSE 1 END,
         e.event_ts DESC
@@ -1651,7 +1686,7 @@ export const listSetterVoiceExamples = async (
 
     return result;
   } catch (err) {
-    logger?.error('listSetterVoiceExamples failed', err);
+    logger?.error("listSetterVoiceExamples failed", err);
     throw err;
   }
 };

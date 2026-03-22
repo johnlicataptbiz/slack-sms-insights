@@ -1,7 +1,4 @@
 {
-  "env": {
-    "NPM_CONFIG_LEGACY_PEER_DEPS": "true"
-  },
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [

@@ -28,7 +28,7 @@ export const hasRecentPersistentFeedback = async ({
     const createdAt = feedback.created_at.getTime();
     const ageMs = Date.now() - createdAt;
     return ageMs < dedupeMinutes * 60_000;
-  } catch (err) {
+  } catch (_err) {
     return false;
   }
 };
@@ -62,7 +62,7 @@ export const insertPersistentFeedback = async ({
         created_at: new Date(),
       },
     });
-  } catch (err) {
+  } catch (_err) {
     // Ignore errors for dedupe tracking
   }
 };

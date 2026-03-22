@@ -1,8 +1,13 @@
+import type { Prisma, WorkItemType } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 import { publishRealtimeEvent } from './realtime.js';
 
 const getPrisma = () => getPrismaClient();
+
+type WorkItemWithConversation = Prisma.work_itemsGetPayload<{
+  include: { conversations: true };
+}>;
 
 export type WorkItemListRow = {
   id: string;
@@ -66,11 +71,11 @@ export const listOpenWorkItems = async (
   const prisma = getPrisma();
   try {
     const limit = Math.max(1, Math.min(params.limit, 200));
-    const where: any = {
+    const where: Prisma.work_itemsWhereInput = {
       resolved_at: null,
     };
 
-    if (params.type) where.type = params.type;
+    if (params.type) where.type = params.type as WorkItemType;
     if (params.repId) where.rep_id = params.repId;
     if (params.severity) where.severity = params.severity;
     if (params.overdueOnly) where.due_at = { lt: new Date() };
@@ -90,10 +95,10 @@ export const listOpenWorkItems = async (
     const hasMore = results.length > limit;
     const itemsRaw = hasMore ? results.slice(0, limit) : results;
 
-    const items: WorkItemListRow[] = itemsRaw.map((wi: any) => ({
+    const items: WorkItemListRow[] = itemsRaw.map((wi: WorkItemWithConversation) => ({
       id: wi.id,
       type: wi.type,
-      severity: wi.severity as any,
+      severity: wi.severity as WorkItemListRow['severity'],
       due_at: wi.due_at.toISOString(),
       created_at: wi.created_at.toISOString(),
       resolved_at: wi.resolved_at ? wi.resolved_at.toISOString() : null,

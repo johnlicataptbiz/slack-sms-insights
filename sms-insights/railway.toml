@@ -1,16 +1,6 @@
 # Railway configuration for SMS Insights Backend
 [build]
-builder = "nixpacks"
-
-[build.nixpacks]
-# Use Node.js 22 LTS
-nodeVersion = "22"
-
-# Build command
-buildCmd = "npm run build"
-
-# Start command
-startCmd = "npm start"
+builder = "DOCKERFILE"
 
 [deploy]
 # Health check configuration

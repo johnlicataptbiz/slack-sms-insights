@@ -4,9 +4,9 @@ import { resolveSequenceId } from './sequence-registry.js';
 
 const getPrisma = () => getPrismaClient();
 
-const toNullableString = (value: unknown): string | null => {
+const toNullableJson = (value: unknown): string | null => {
   if (value == null) return null;
-  return typeof value === 'string' ? value : JSON.stringify(value);
+  return JSON.stringify(value);
 };
 
 export type SmsEventDirection = 'inbound' | 'outbound' | 'unknown';
@@ -73,7 +73,7 @@ export const insertSmsEvent = async (
       sequence: event.sequence ?? null,
       sequence_id: sequenceId,
       conversation_id: event.conversationId ?? null,
-      raw: toNullableString(event.raw),
+      raw: toNullableJson(event.raw),
     };
 
     const result = await prisma.sms_events.upsert({

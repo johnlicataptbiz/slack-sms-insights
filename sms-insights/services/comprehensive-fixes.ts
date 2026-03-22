@@ -1,4 +1,5 @@
-import { getPrismaClient } from "./prisma.js";
+import type { Prisma } from '@prisma/client';
+import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
 
@@ -18,9 +19,7 @@ export const autoAssignWorkItems = async (): Promise<{
   const syncedConversationIds = new Set<string>();
 
   // Get distribution of current workload by rep
-  const workloadRows = await prisma.$queryRawUnsafe<
-    { rep_id: string; count: bigint }[]
-  >(`
+  const workloadRows = await prisma.$queryRawUnsafe<{ rep_id: string; count: bigint }[]>(`
     SELECT rep_id, COUNT(*) AS count
     FROM work_items
     WHERE resolved_at IS NULL AND rep_id IS NOT NULL
@@ -33,9 +32,7 @@ export const autoAssignWorkItems = async (): Promise<{
   }
 
   // Get unassigned work items with their conversation's last outbound line
-  const unassignedRows = await prisma.$queryRawUnsafe<
-    { id: string; conversation_id: string; line: string | null }[]
-  >(`
+  const unassignedRows = await prisma.$queryRawUnsafe<{ id: string; conversation_id: string; line: string | null }[]>(`
     SELECT
       wi.id,
       wi.conversation_id,
@@ -58,24 +55,16 @@ export const autoAssignWorkItems = async (): Promise<{
     let repId: string | null = null;
 
     // Determine rep based on line
-    const line = row.line?.toLowerCase() || "";
-    if (
-      line.includes("jack") ||
-      line.includes("817-580-9950") ||
-      line.includes("8175809950")
-    ) {
-      repId = "jack";
-    } else if (
-      line.includes("brandon") ||
-      line.includes("678-820-3770") ||
-      line.includes("6788203770")
-    ) {
-      repId = "brandon";
+    const line = row.line?.toLowerCase() || '';
+    if (line.includes('jack') || line.includes('817-580-9950') || line.includes('8175809950')) {
+      repId = 'jack';
+    } else if (line.includes('brandon') || line.includes('678-820-3770') || line.includes('6788203770')) {
+      repId = 'brandon';
     } else {
       // Round-robin assignment based on current workload
       const jackLoad = workload.jack || 0;
       const brandonLoad = workload.brandon || 0;
-      repId = jackLoad <= brandonLoad ? "jack" : "brandon";
+      repId = jackLoad <= brandonLoad ? 'jack' : 'brandon';
     }
 
     try {
@@ -114,12 +103,12 @@ export const autoAssignWorkItems = async (): Promise<{
 
 // ─── Issue #4: AI Draft improvements - track why drafts are rejected ────────────
 export type DraftRejectionReason =
-  | "too_long"
-  | "wrong_tone"
-  | "factually_wrong"
-  | "not_relevant"
-  | "prefer_manual"
-  | "other";
+  | 'too_long'
+  | 'wrong_tone'
+  | 'factually_wrong'
+  | 'not_relevant'
+  | 'prefer_manual'
+  | 'other';
 
 export const trackDraftRejection = async (
   draftId: string,
@@ -143,9 +132,7 @@ export const getDraftRejectionStats = async (): Promise<{
   commonFeedback: string[];
 }> => {
   const prisma = getPrisma();
-  const rows = await prisma.$queryRawUnsafe<
-    { reason: string; count: bigint; sample_feedback: string[] | null }[]
-  >(`
+  const rows = await prisma.$queryRawUnsafe<{ reason: string; count: bigint; sample_feedback: string[] | null }[]>(`
     SELECT
       rejection_reason AS reason,
       COUNT(*) AS count,
@@ -214,7 +201,7 @@ export const getLineActivityBalance = async (): Promise<{
   if (imbalanced.length > 0) {
     const lowLines = imbalanced.filter((l) => l.share < 10).map((l) => l.line);
     if (lowLines.length > 0) {
-      alert = `Line activity imbalance: ${lowLines.join(", ")} has <10% of volume in the last 7 days`;
+      alert = `Line activity imbalance: ${lowLines.join(', ')} has <10% of volume in the last 7 days`;
     }
   }
 
@@ -222,15 +209,11 @@ export const getLineActivityBalance = async (): Promise<{
 };
 
 // ─── Issue #6, #7: Auto-infer qualification from conversation text ────────────────
-export const bulkInferQualification = async (
-  limit = 100,
-): Promise<{ processed: number; updated: number }> => {
+export const bulkInferQualification = async (limit = 100): Promise<{ processed: number; updated: number }> => {
   const prisma = getPrisma();
 
   // Get conversations with unknown qualification but recent activity
-  const rows = await prisma.$queryRawUnsafe<
-    { conversation_id: string; contact_phone: string }[]
-  >(
+  const rows = await prisma.$queryRawUnsafe<{ conversation_id: string; contact_phone: string }[]>(
     `
     SELECT DISTINCT c.id AS conversation_id, c.contact_phone
     FROM conversations c
@@ -253,9 +236,7 @@ export const bulkInferQualification = async (
 
   for (const row of rows) {
     // Get conversation text
-    const messages = await prisma.$queryRawUnsafe<
-      { body: string; direction: string }[]
-    >(
+    const messages = await prisma.$queryRawUnsafe<{ body: string; direction: string }[]>(
       `
       SELECT body, direction
       FROM sms_events
@@ -267,420 +248,393 @@ export const bulkInferQualification = async (
     );
 
     const inboundText = messages
-      .filter((m) => m.direction === "inbound" && m.body)
+      .filter((m) => m.direction === 'inbound' && m.body)
       .map((m) => m.body)
-      .join(" ");
+      .join(' ');
 
     if (!inboundText || inboundText.length < 20) continue;
 
     // Simple keyword-based inference (can be enhanced with AI)
     const inferredState: {
-      employment?: "full_time" | "part_time" | "unknown";
-      interest?: "high" | "medium" | "low" | "unknown";
-      revenueMix?: "mostly_cash" | "mostly_insurance" | "balanced" | "unknown";
-      deliveryModel?:
-        | "brick_and_mortar"
-        | "mobile"
-        | "online"
-        | "hybrid"
-        | "unknown";
+      employment?: 'full_time' | 'part_time' | 'unknown';
+      interest?: 'high' | 'medium' | 'low' | 'unknown';
+      revenueMix?: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
+      deliveryModel?: 'brick_and_mortar' | 'mobile' | 'online' | 'hybrid' | 'unknown';
     } = {};
 
     const lowerText = inboundText.toLowerCase();
 
     // ── Employment inference (LENIENT: err on over-classifying) ──────────────
     const fullTimeSignals = [
-      "full time",
-      "full-time",
-      "fulltime",
-      "my practice",
-      "own practice",
-      "own a practice",
-      "own my practice",
-      "my clinic",
-      "own a clinic",
-      "own my clinic",
-      "clinic owner",
-      "practice owner",
-      "i own",
-      "we own",
-      "opened my own",
-      "running my own",
-      "went out on my own",
-      "on my own",
-      "solo practice",
-      "independent practice",
-      "private practice",
-      "left my job",
-      "left the hospital",
-      "left the clinic",
-      "quit my job",
-      "left employment",
-      "left my position",
-      "left outpatient",
-      "left my pt job",
-      "left my chiro job",
-      "left my at job",
-      "high volume",
-      "high-volume",
-      "insurance mill",
-      "insurance-based clinic",
-      "working at a clinic",
-      "work at a clinic",
-      "employed at",
-      "salary",
-      "w2",
-      "on payroll",
-      "getting paid by",
+      'full time',
+      'full-time',
+      'fulltime',
+      'my practice',
+      'own practice',
+      'own a practice',
+      'own my practice',
+      'my clinic',
+      'own a clinic',
+      'own my clinic',
+      'clinic owner',
+      'practice owner',
+      'i own',
+      'we own',
+      'opened my own',
+      'running my own',
+      'went out on my own',
+      'on my own',
+      'solo practice',
+      'independent practice',
+      'private practice',
+      'left my job',
+      'left the hospital',
+      'left the clinic',
+      'quit my job',
+      'left employment',
+      'left my position',
+      'left outpatient',
+      'left my pt job',
+      'left my chiro job',
+      'left my at job',
+      'high volume',
+      'high-volume',
+      'insurance mill',
+      'insurance-based clinic',
+      'working at a clinic',
+      'work at a clinic',
+      'employed at',
+      'salary',
+      'w2',
+      'on payroll',
+      'getting paid by',
     ];
     const partTimeSignals = [
-      "part time",
-      "part-time",
-      "parttime",
-      "side gig",
-      "side hustle",
-      "side-gig",
-      "side-hustle",
-      "moonlighting",
-      "on the side",
-      "building on the side",
-      "still employed",
-      "still working",
-      "still at my job",
-      "still at the hospital",
-      "still at the clinic",
-      "still have my job",
-      "while i still work",
-      "while working",
-      "while still employed",
-      "evenings and weekends",
-      "after hours",
-      "extra income",
-      "supplementing",
-      "building while",
-      "planning to leave",
-      "thinking about leaving",
-      "want to leave",
-      "want to quit",
+      'part time',
+      'part-time',
+      'parttime',
+      'side gig',
+      'side hustle',
+      'side-gig',
+      'side-hustle',
+      'moonlighting',
+      'on the side',
+      'building on the side',
+      'still employed',
+      'still working',
+      'still at my job',
+      'still at the hospital',
+      'still at the clinic',
+      'still have my job',
+      'while i still work',
+      'while working',
+      'while still employed',
+      'evenings and weekends',
+      'after hours',
+      'extra income',
+      'supplementing',
+      'building while',
+      'planning to leave',
+      'thinking about leaving',
+      'want to leave',
+      'want to quit',
     ];
-    const fullTimeHits = fullTimeSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
-    const partTimeHits = partTimeSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
+    const fullTimeHits = fullTimeSignals.filter((s) => lowerText.includes(s)).length;
+    const partTimeHits = partTimeSignals.filter((s) => lowerText.includes(s)).length;
     if (fullTimeHits > 0 || partTimeHits > 0) {
-      inferredState.employment =
-        fullTimeHits >= partTimeHits ? "full_time" : "part_time";
+      inferredState.employment = fullTimeHits >= partTimeHits ? 'full_time' : 'part_time';
     }
 
     // ── Interest inference (LENIENT: err on over-classifying) ─────────────────
     const highInterestSignals = [
-      "very interested",
-      "super interested",
-      "extremely interested",
-      "definitely",
-      "absolutely",
-      "for sure",
-      "100%",
-      "love to",
+      'very interested',
+      'super interested',
+      'extremely interested',
+      'definitely',
+      'absolutely',
+      'for sure',
+      '100%',
+      'love to',
       "let's do it",
-      "lets do it",
-      "count me in",
-      "ready to go",
-      "ready to start",
-      "sign me up",
-      "book the call",
-      "sounds great",
-      "sounds amazing",
-      "sounds perfect",
-      "yes please",
-      "im in",
+      'lets do it',
+      'count me in',
+      'ready to go',
+      'ready to start',
+      'sign me up',
+      'book the call',
+      'sounds great',
+      'sounds amazing',
+      'sounds perfect',
+      'yes please',
+      'im in',
       "i'm in",
-      "hit me up",
-      "reach out to me",
-      "when can we",
-      "how do i get started",
-      "how do i sign up",
-      "i want to",
-      "i need this",
-      "this is exactly what i need",
-      "this is perfect",
-      "this is amazing",
-      "this is great",
-      "excited",
-      "pumped",
-      "stoked",
-      "fired up",
-      "lets talk",
+      'hit me up',
+      'reach out to me',
+      'when can we',
+      'how do i get started',
+      'how do i sign up',
+      'i want to',
+      'i need this',
+      'this is exactly what i need',
+      'this is perfect',
+      'this is amazing',
+      'this is great',
+      'excited',
+      'pumped',
+      'stoked',
+      'fired up',
+      'lets talk',
       "let's talk",
-      "set up a call",
-      "schedule a call",
+      'set up a call',
+      'schedule a call',
     ];
     const mediumInterestSignals = [
-      "interested",
-      "could be",
-      "might be",
-      "maybe",
-      "possibly",
-      "tell me more",
-      "what does",
-      "how would",
-      "explain",
-      "learn more",
-      "more info",
-      "more information",
-      "sounds interesting",
-      "considering",
-      "thinking about",
-      "looking into",
-      "exploring",
-      "curious",
-      "want to learn",
-      "want to know",
-      "want to hear",
-      "still deciding",
-      "on the fence",
-      "not sure yet",
+      'interested',
+      'could be',
+      'might be',
+      'maybe',
+      'possibly',
+      'tell me more',
+      'what does',
+      'how would',
+      'explain',
+      'learn more',
+      'more info',
+      'more information',
+      'sounds interesting',
+      'considering',
+      'thinking about',
+      'looking into',
+      'exploring',
+      'curious',
+      'want to learn',
+      'want to know',
+      'want to hear',
+      'still deciding',
+      'on the fence',
+      'not sure yet',
       "haven't decided",
-      "havent decided",
-      "open to it",
-      "open to",
-      "what would",
-      "how much",
-      "what is the cost",
-      "what does it cost",
-      "what are the details",
-      "tell me about",
-      "what is this",
+      'havent decided',
+      'open to it',
+      'open to',
+      'what would',
+      'how much',
+      'what is the cost',
+      'what does it cost',
+      'what are the details',
+      'tell me about',
+      'what is this',
     ];
     const lowInterestSignals = [
-      "not interested",
-      "no thanks",
-      "not for me",
-      "stop contacting",
-      "stop messaging",
-      "remove me",
-      "take me off",
-      "unsubscribe",
-      "do not contact",
-      "leave me alone",
-      "not the right time",
-      "not right now",
-      "not at this time",
-      "not ready",
-      "not convinced",
-      "not a good fit",
-      "not a fit",
+      'not interested',
+      'no thanks',
+      'not for me',
+      'stop contacting',
+      'stop messaging',
+      'remove me',
+      'take me off',
+      'unsubscribe',
+      'do not contact',
+      'leave me alone',
+      'not the right time',
+      'not right now',
+      'not at this time',
+      'not ready',
+      'not convinced',
+      'not a good fit',
+      'not a fit',
       "doesn't fit",
       "doesn't work",
       "doesn't apply",
-      "too busy",
-      "no time for this",
+      'too busy',
+      'no time for this',
       "don't have time",
     ];
-    const highHits = highInterestSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
-    const mediumHits = mediumInterestSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
-    const lowHits = lowInterestSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
+    const highHits = highInterestSignals.filter((s) => lowerText.includes(s)).length;
+    const mediumHits = mediumInterestSignals.filter((s) => lowerText.includes(s)).length;
+    const lowHits = lowInterestSignals.filter((s) => lowerText.includes(s)).length;
     if (highHits > 0 || mediumHits > 0 || lowHits > 0) {
       if (lowHits > highHits && lowHits > mediumHits) {
-        inferredState.interest = "low";
+        inferredState.interest = 'low';
       } else if (highHits >= mediumHits) {
-        inferredState.interest = "high";
+        inferredState.interest = 'high';
       } else {
-        inferredState.interest = "medium";
+        inferredState.interest = 'medium';
       }
     }
 
     // ── Revenue mix inference (LENIENT: err on over-classifying) ─────────────
     const cashSignals = [
-      "cash",
-      "cash pay",
-      "cash patient",
-      "cash patients",
-      "cash based",
-      "cash-based",
-      "out of pocket",
-      "self-pay",
-      "self pay",
-      "private pay",
-      "membership",
-      "membership model",
-      "direct primary care",
-      "dpc",
-      "retainer",
-      "fee for service",
-      "fee-for-service",
-      "no insurance",
-      "without insurance",
+      'cash',
+      'cash pay',
+      'cash patient',
+      'cash patients',
+      'cash based',
+      'cash-based',
+      'out of pocket',
+      'self-pay',
+      'self pay',
+      'private pay',
+      'membership',
+      'membership model',
+      'direct primary care',
+      'dpc',
+      'retainer',
+      'fee for service',
+      'fee-for-service',
+      'no insurance',
+      'without insurance',
       "don't bill insurance",
-      "dont bill insurance",
-      "dropped insurance",
-      "dropped out of network",
-      "out of network",
-      "out-of-network",
-      "concierge",
-      "direct access",
-      "direct care",
-      "direct pay",
-      "cash flow",
-      "cash model",
-      "cash practice",
+      'dont bill insurance',
+      'dropped insurance',
+      'dropped out of network',
+      'out of network',
+      'out-of-network',
+      'concierge',
+      'direct access',
+      'direct care',
+      'direct pay',
+      'cash flow',
+      'cash model',
+      'cash practice',
     ];
     const insuranceSignals = [
-      "insurance",
-      "in-network",
-      "in network",
-      "billing",
-      "billed",
-      "submit claim",
-      "claims",
-      "copay",
-      "deductible",
-      "coverage",
-      "covered",
-      "blue cross",
-      "bcbs",
-      "aetna",
-      "cigna",
-      "united health",
-      "humana",
-      "medicare",
-      "medicaid",
-      "tricare",
-      "eob",
-      "explanation of benefits",
-      "prior auth",
-      "prior authorization",
-      "insurance based",
-      "insurance-based",
-      "insurance dependent",
-      "insurance reliant",
-      "insurance heavy",
-      "mostly insurance",
-      "mainly insurance",
-      "primarily insurance",
+      'insurance',
+      'in-network',
+      'in network',
+      'billing',
+      'billed',
+      'submit claim',
+      'claims',
+      'copay',
+      'deductible',
+      'coverage',
+      'covered',
+      'blue cross',
+      'bcbs',
+      'aetna',
+      'cigna',
+      'united health',
+      'humana',
+      'medicare',
+      'medicaid',
+      'tricare',
+      'eob',
+      'explanation of benefits',
+      'prior auth',
+      'prior authorization',
+      'insurance based',
+      'insurance-based',
+      'insurance dependent',
+      'insurance reliant',
+      'insurance heavy',
+      'mostly insurance',
+      'mainly insurance',
+      'primarily insurance',
     ];
     const cashHits = cashSignals.filter((s) => lowerText.includes(s)).length;
-    const insuranceHits = insuranceSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
+    const insuranceHits = insuranceSignals.filter((s) => lowerText.includes(s)).length;
     if (cashHits > 0 || insuranceHits > 0) {
       // If both present, lean cash (cash-based is the target market)
-      inferredState.revenueMix =
-        cashHits >= insuranceHits ? "mostly_cash" : "mostly_insurance";
+      inferredState.revenueMix = cashHits >= insuranceHits ? 'mostly_cash' : 'mostly_insurance';
     }
 
     // ── Delivery model inference (LENIENT: new field) ─────────────────────────
     const brickMortarSignals = [
-      "clinic",
-      "office",
-      "storefront",
-      "physical location",
-      "brick and mortar",
-      "brick & mortar",
-      "building",
-      "facility",
-      "treatment room",
-      "treatment space",
-      "in person",
-      "in-person",
-      "face to face",
-      "face-to-face",
-      "my space",
-      "my suite",
-      "my studio",
-      "my office",
-      "my clinic",
-      "my location",
-      "patients come to me",
-      "patients come in",
-      "come to my",
+      'clinic',
+      'office',
+      'storefront',
+      'physical location',
+      'brick and mortar',
+      'brick & mortar',
+      'building',
+      'facility',
+      'treatment room',
+      'treatment space',
+      'in person',
+      'in-person',
+      'face to face',
+      'face-to-face',
+      'my space',
+      'my suite',
+      'my studio',
+      'my office',
+      'my clinic',
+      'my location',
+      'patients come to me',
+      'patients come in',
+      'come to my',
     ];
     const mobileSignals = [
-      "mobile",
-      "mobile pt",
-      "mobile physio",
-      "mobile chiro",
-      "drive to",
-      "driving to",
-      "travel to",
-      "i travel",
-      "i go to them",
-      "patient homes",
-      "home based",
-      "home-based",
-      "home visits",
-      "house calls",
-      "in-home",
-      "in home",
-      "at-home",
-      "at home",
-      "concierge mobile",
-      "mobile clinic",
-      "mobile service",
-      "mobile practice",
+      'mobile',
+      'mobile pt',
+      'mobile physio',
+      'mobile chiro',
+      'drive to',
+      'driving to',
+      'travel to',
+      'i travel',
+      'i go to them',
+      'patient homes',
+      'home based',
+      'home-based',
+      'home visits',
+      'house calls',
+      'in-home',
+      'in home',
+      'at-home',
+      'at home',
+      'concierge mobile',
+      'mobile clinic',
+      'mobile service',
+      'mobile practice',
     ];
     const onlineSignals = [
-      "online",
-      "telehealth",
-      "tele health",
-      "virtual",
-      "video call",
-      "zoom",
-      "facetime",
-      "phone only",
-      "remote",
-      "remote pt",
-      "tele-pt",
-      "digital",
-      "app based",
-      "software platform",
-      "no in person",
-      "not in person",
-      "never meet in person",
+      'online',
+      'telehealth',
+      'tele health',
+      'virtual',
+      'video call',
+      'zoom',
+      'facetime',
+      'phone only',
+      'remote',
+      'remote pt',
+      'tele-pt',
+      'digital',
+      'app based',
+      'software platform',
+      'no in person',
+      'not in person',
+      'never meet in person',
     ];
     const hybridSignals = [
-      "hybrid",
-      "mix of",
-      "combination of",
-      "both in person",
-      "some virtual",
-      "sometimes virtual",
-      "mix virtual and",
-      "in person and online",
-      "online and in person",
-      "in clinic and online",
-      "online and in clinic",
+      'hybrid',
+      'mix of',
+      'combination of',
+      'both in person',
+      'some virtual',
+      'sometimes virtual',
+      'mix virtual and',
+      'in person and online',
+      'online and in person',
+      'in clinic and online',
+      'online and in clinic',
     ];
-    const brickHits = brickMortarSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
-    const mobileHits = mobileSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
-    const onlineHits = onlineSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
-    const hybridHits = hybridSignals.filter((s) =>
-      lowerText.includes(s),
-    ).length;
+    const brickHits = brickMortarSignals.filter((s) => lowerText.includes(s)).length;
+    const mobileHits = mobileSignals.filter((s) => lowerText.includes(s)).length;
+    const onlineHits = onlineSignals.filter((s) => lowerText.includes(s)).length;
+    const hybridHits = hybridSignals.filter((s) => lowerText.includes(s)).length;
     if (brickHits > 0 || mobileHits > 0 || onlineHits > 0 || hybridHits > 0) {
       const maxHits = Math.max(brickHits, mobileHits, onlineHits, hybridHits);
       if (hybridHits === maxHits && hybridHits > 0) {
-        inferredState.deliveryModel = "hybrid";
+        inferredState.deliveryModel = 'hybrid';
       } else if (onlineHits === maxHits && onlineHits > 0) {
-        inferredState.deliveryModel = "online";
+        inferredState.deliveryModel = 'online';
       } else if (mobileHits === maxHits && mobileHits > 0) {
-        inferredState.deliveryModel = "mobile";
+        inferredState.deliveryModel = 'mobile';
       } else {
-        inferredState.deliveryModel = "brick_and_mortar";
+        inferredState.deliveryModel = 'brick_and_mortar';
       }
     }
 
@@ -705,31 +659,23 @@ export const bulkInferQualification = async (
 
 // ─── Issue #8: Deduplicate line names ────────────────────────────────────────────
 export const normalizeLineName = (line: string): string => {
-  if (!line) return "Unknown Line";
+  if (!line) return 'Unknown Line';
 
   const lower = line.toLowerCase().trim();
 
   // Jack's line variations
-  if (
-    lower.includes("817-580-9950") ||
-    lower.includes("8175809950") ||
-    lower.includes("jack's")
-  ) {
+  if (lower.includes('817-580-9950') || lower.includes('8175809950') || lower.includes("jack's")) {
     return "Jack's Personal Line (+1 817-580-9950)";
   }
 
   // Brandon's line variations
-  if (
-    lower.includes("678-820-3770") ||
-    lower.includes("6788203770") ||
-    lower.includes("brandon's")
-  ) {
+  if (lower.includes('678-820-3770') || lower.includes('6788203770') || lower.includes("brandon's")) {
     return "Brandon's Personal Line (+1 678-820-3770)";
   }
 
   // Main line
-  if (lower === "main" || lower.includes("main line")) {
-    return "Main Line";
+  if (lower === 'main' || lower.includes('main line')) {
+    return 'Main Line';
   }
 
   return line;
@@ -878,10 +824,7 @@ export type ResponseTimeStats = {
   }>;
 };
 
-export const getResponseTimeStats = async (params: {
-  from: Date;
-  to: Date;
-}): Promise<ResponseTimeStats> => {
+export const getResponseTimeStats = async (params: { from: Date; to: Date }): Promise<ResponseTimeStats> => {
   const prisma = getPrisma();
   const rows = await prisma.$queryRawUnsafe<
     {
@@ -1028,7 +971,7 @@ export type Goal = {
   target: number;
   current: number;
   unit: string;
-  period: "daily" | "weekly" | "monthly";
+  period: 'daily' | 'weekly' | 'monthly';
   progressPct: number;
   isOnTrack: boolean;
 };
@@ -1041,21 +984,21 @@ export const getGoals = async (): Promise<Goal[]> => {
     name: string;
     target: number;
     unit: string;
-    period: "daily" | "weekly" | "monthly";
+    period: 'daily' | 'weekly' | 'monthly';
     query: string;
   }> = [
     {
-      name: "Daily Bookings",
+      name: 'Daily Bookings',
       target: 3,
-      unit: "bookings",
-      period: "daily",
+      unit: 'bookings',
+      period: 'daily',
       query: `SELECT COUNT(*) AS value FROM booked_calls WHERE event_time >= CURRENT_DATE AT TIME ZONE 'America/Chicago'`,
     },
     {
-      name: "Weekly Reply Rate",
+      name: 'Weekly Reply Rate',
       target: 10,
-      unit: "%",
-      period: "weekly",
+      unit: '%',
+      period: 'weekly',
       query: `
         SELECT COALESCE(
           (COUNT(DISTINCT CASE WHEN direction = 'inbound' THEN contact_phone END)::float /
@@ -1066,10 +1009,10 @@ export const getGoals = async (): Promise<Goal[]> => {
       `,
     },
     {
-      name: "Weekly Opt-out Rate",
+      name: 'Weekly Opt-out Rate',
       target: 3,
-      unit: "% (max)",
-      period: "weekly",
+      unit: '% (max)',
+      period: 'weekly',
       query: `
         SELECT COALESCE(
           (COUNT(DISTINCT CASE WHEN direction = 'inbound' AND LOWER(body) ~ '(stop|unsubscribe|cancel)' THEN contact_phone END)::float /
@@ -1080,10 +1023,10 @@ export const getGoals = async (): Promise<Goal[]> => {
       `,
     },
     {
-      name: "Monthly Bookings",
+      name: 'Monthly Bookings',
       target: 60,
-      unit: "bookings",
-      period: "monthly",
+      unit: 'bookings',
+      period: 'monthly',
       query: `SELECT COUNT(*) AS value FROM booked_calls WHERE event_time >= DATE_TRUNC('month', CURRENT_DATE)`,
     },
   ];
@@ -1091,23 +1034,19 @@ export const getGoals = async (): Promise<Goal[]> => {
   const results: Goal[] = [];
 
   for (const goal of goals) {
-    const rows = await prisma.$queryRawUnsafe<{ value: number | bigint }[]>(
-      goal.query,
-    );
+    const rows = await prisma.$queryRawUnsafe<{ value: number | bigint }[]>(goal.query);
     const current = Number(rows[0]?.value || 0);
 
     // For "max" targets like opt-out rate, invert the logic
-    const isMaxTarget = goal.unit.includes("max");
+    const isMaxTarget = goal.unit.includes('max');
     const progressPct = isMaxTarget
       ? Math.max(0, 100 - (current / goal.target) * 100)
       : Math.min(100, (current / goal.target) * 100);
 
-    const isOnTrack = isMaxTarget
-      ? current <= goal.target
-      : current >= goal.target * 0.8;
+    const isOnTrack = isMaxTarget ? current <= goal.target : current >= goal.target * 0.8;
 
     results.push({
-      id: goal.name.toLowerCase().replace(/\s+/g, "-"),
+      id: goal.name.toLowerCase().replace(/\s+/g, '-'),
       name: goal.name,
       target: goal.target,
       current: Math.round(current * 100) / 100,
@@ -1124,7 +1063,7 @@ export const getGoals = async (): Promise<Goal[]> => {
 // ─── Issue #28: Trend alerts (anomaly detection) ────────────────────────────────
 export type TrendAlert = {
   id: string;
-  severity: "info" | "warning" | "critical";
+  severity: 'info' | 'warning' | 'critical';
   metric: string;
   message: string;
   value: number;
@@ -1139,9 +1078,7 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
   const now = new Date().toISOString();
 
   // Check reply rate drop
-  const replyRateRows = await prisma.$queryRawUnsafe<
-    { today: number | null; last_week: number | null }[]
-  >(`
+  const replyRateRows = await prisma.$queryRawUnsafe<{ today: number | null; last_week: number | null }[]>(`
     SELECT
       (SELECT COUNT(DISTINCT CASE WHEN direction = 'inbound' THEN contact_phone END)::float /
        NULLIF(COUNT(DISTINCT CASE WHEN direction = 'outbound' THEN contact_phone END), 0) * 100
@@ -1157,9 +1094,9 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
 
   if (lastWeekReplyRate > 0 && todayReplyRate < lastWeekReplyRate * 0.7) {
     alerts.push({
-      id: "reply-rate-drop",
-      severity: "warning",
-      metric: "Reply Rate",
+      id: 'reply-rate-drop',
+      severity: 'warning',
+      metric: 'Reply Rate',
       message: `Reply rate dropped ${Math.round((1 - todayReplyRate / lastWeekReplyRate) * 100)}% compared to last week`,
       value: todayReplyRate,
       threshold: lastWeekReplyRate * 0.7,
@@ -1168,9 +1105,7 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
   }
 
   // Check opt-out spike
-  const optOutRows = await prisma.$queryRawUnsafe<
-    { today: bigint; avg: number | null }[]
-  >(`
+  const optOutRows = await prisma.$queryRawUnsafe<{ today: bigint; avg: number | null }[]>(`
     SELECT
       (SELECT COUNT(*) FROM sms_events
        WHERE direction = 'inbound'
@@ -1188,9 +1123,9 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
 
   if (avgOptOuts > 0 && todayOptOuts > avgOptOuts * 2) {
     alerts.push({
-      id: "opt-out-spike",
-      severity: "critical",
-      metric: "Opt-outs",
+      id: 'opt-out-spike',
+      severity: 'critical',
+      metric: 'Opt-outs',
       message: `Opt-outs today (${todayOptOuts}) are ${Math.round(todayOptOuts / avgOptOuts)}x the daily average`,
       value: todayOptOuts,
       threshold: avgOptOuts * 2,
@@ -1211,9 +1146,9 @@ export const getTrendAlerts = async (): Promise<TrendAlert[]> => {
   // If after 10am and less than 10 messages, flag it
   if (currentHour >= 10 && todayActivity < 10) {
     alerts.push({
-      id: "low-activity",
-      severity: "info",
-      metric: "Daily Activity",
+      id: 'low-activity',
+      severity: 'info',
+      metric: 'Daily Activity',
       message: `Only ${todayActivity} messages sent today. Is everything running?`,
       value: todayActivity,
       threshold: 10,
@@ -1282,7 +1217,7 @@ export const getAuditLogs = async (params: {
 
   const rows = await prisma.audit_logs.findMany({
     where,
-    orderBy: { created_at: "desc" },
+    orderBy: { created_at: 'desc' },
     take,
   });
 
@@ -1292,12 +1227,8 @@ export const getAuditLogs = async (params: {
     resourceType: row.resource_type,
     resourceId: row.resource_id,
     userId: row.user_id,
-    details: (typeof row.details === "string"
-      ? JSON.parse(row.details)
-      : (row.details ?? {})) as Record<string, unknown>,
+    details: (typeof row.details === 'string' ? JSON.parse(row.details) : {}) as Record<string, unknown>,
     ipAddress: row.ip_address,
-    timestamp: row.created_at
-      ? row.created_at.toISOString()
-      : new Date().toISOString(),
+    timestamp: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
   }));
 };

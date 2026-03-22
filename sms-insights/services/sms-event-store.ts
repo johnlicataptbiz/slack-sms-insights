@@ -69,7 +69,7 @@ export const insertSmsEvent = async (
       contact_phone: event.contactPhone ?? null,
       contact_name: event.contactName ?? null,
       aloware_user: event.alowareUser ?? null,
-      body: event.body ?? null,
+      body: event.body ?? '',
       line: event.line ?? null,
       sequence: event.sequence ?? null,
       sequence_id: sequenceId,

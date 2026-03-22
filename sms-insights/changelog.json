@@ -1,8 +1,35 @@
 {
-  "generatedAt": "2026-03-22T20:39:19.586Z",
+  "generatedAt": "2026-03-22T21:19:28.171Z",
   "daysIncluded": 365,
-  "totalCount": 439,
+  "totalCount": 442,
   "entries": [
+    {
+      "hash": "5d4d0f7",
+      "date": "2026-03-22T15:50:28-05:00",
+      "message": "chore(changelog): regenerate changelog.json (439 entries, build artifact)",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Infrastructure",
+      "description": "Regenerate changelog.json (439 entries, build artifact)"
+    },
+    {
+      "hash": "10470bd",
+      "date": "2026-03-22T15:50:11-05:00",
+      "message": "chore: sync prisma schema from Railway + add data-clean hygiene script",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Sync prisma schema from Railway + add data-clean hygiene script"
+    },
+    {
+      "hash": "1fdf791",
+      "date": "2026-03-22T15:50:05-05:00",
+      "message": "ci: align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows"
+    },
     {
       "hash": "d0738b9",
       "date": "2026-03-22T15:26:46Z",

@@ -40,6 +40,9 @@ const navItems: NavItem[] = [
   },
 ];
 
+const isRouteActive = (pathname: string, to: string) =>
+  pathname === to || pathname.startsWith(`${to}/`);
+
 const getStoredTheme = (): "light" | "dark" => {
   if (typeof window === "undefined") return "light";
   const stored = localStorage.getItem("v2-theme") as "light" | "dark" | null;
@@ -51,6 +54,9 @@ const getStoredTheme = (): "light" | "dark" => {
 
 export default function V2Shell({ children }: { children: ReactNode }) {
   const location = useLocation();
+  const activeNavItem = navItems.find((item) =>
+    isRouteActive(location.pathname, item.to),
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", getStoredTheme());
@@ -122,7 +128,28 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           </nav>
         </motion.aside>
 
-        <main className="V2Shell__content">{children}</main>
+        <main className="V2Shell__content">
+          <header className="V2Shell__contentHeader">
+            <div className="V2Shell__brandBlock">
+              <span className="V2Shell__brandKicker">PT Biz SMS</span>
+              <div className="V2Shell__context">
+                <p className="V2Shell__contextTitle">
+                  {activeNavItem?.label || "Command Center"}
+                </p>
+                <p className="V2Shell__contextSubtitle">
+                  Internal performance shell for insights, inbox, activity, and
+                  sequences.
+                </p>
+              </div>
+            </div>
+            <div className="V2Shell__topbarPills" aria-label="Quick status">
+              <span className="V2Shell__topbarPill">Desktop-first</span>
+              <span className="V2Shell__topbarPill">Live data</span>
+              <span className="V2Shell__topbarPill">No chrome clutter</span>
+            </div>
+          </header>
+          {children}
+        </main>
       </div>
     </div>
   );

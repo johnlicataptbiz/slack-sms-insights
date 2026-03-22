@@ -100,14 +100,6 @@ type SlackBookedCallHint = {
   apptTime: string | null;
 };
 
-type SlackBookedCallHintRow = {
-  event_ts: string;
-  text: string | null;
-  raw: unknown;
-  slack_channel_id: string;
-  slack_message_ts: string;
-};
-
 export type CrmNotesGenerationResult = {
   conversationId: string;
   text: string;
@@ -201,7 +193,7 @@ const listSlackBookedCallHints = async (
   if (!phoneKey && !nameKey) return [];
 
   try {
-    const rows = await prisma.$queryRawUnsafe<SlackBookedCallHintRow[]>(
+    const rows = await prisma.$queryRawUnsafe<any[]>(
       `
       SELECT
         bc.event_ts::text,

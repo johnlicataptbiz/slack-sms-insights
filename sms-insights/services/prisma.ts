@@ -1,7 +1,7 @@
-import { PrismaClient } from '@prisma/client';
-import { withAccelerate } from '@prisma/extension-accelerate';
+import { PrismaClient } from "@prisma/client";
+import { withAccelerate } from "@prisma/extension-accelerate";
 
-type PrismaMode = 'accelerate' | 'direct';
+type PrismaMode = "accelerate" | "direct";
 
 type PrismaRuntimeClient = PrismaClient;
 
@@ -15,36 +15,43 @@ const resolvePrismaConfig = (): {
   mode: PrismaMode;
   detail?: string;
 } => {
-  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || '').trim();
-  const databaseUrl = (process.env.DATABASE_URL || '').trim();
+  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || "").trim();
+  const databaseUrl = (process.env.DATABASE_URL || "").trim();
 
   if (accelerateUrl) {
-    if (accelerateUrl.startsWith('prisma+postgres://')) {
-      return { url: accelerateUrl, mode: 'accelerate' };
+    if (accelerateUrl.startsWith("prisma+postgres://")) {
+      return { url: accelerateUrl, mode: "accelerate" };
     }
     if (databaseUrl) {
       return {
         url: databaseUrl,
-        mode: databaseUrl.startsWith('prisma+postgres://') ? 'accelerate' : 'direct',
-        detail: 'PRISMA_ACCELERATE_URL ignored (expected prisma+postgres://), using DATABASE_URL',
+        mode: databaseUrl.startsWith("prisma+postgres://")
+          ? "accelerate"
+          : "direct",
+        detail:
+          "PRISMA_ACCELERATE_URL ignored (expected prisma+postgres://), using DATABASE_URL",
       };
     }
-    throw new Error('PRISMA_ACCELERATE_URL must start with prisma+postgres://');
+    throw new Error("PRISMA_ACCELERATE_URL must start with prisma+postgres://");
   }
 
   if (databaseUrl) {
     return {
       url: databaseUrl,
-      mode: databaseUrl.startsWith('prisma+postgres://') ? 'accelerate' : 'direct',
+      mode: databaseUrl.startsWith("prisma+postgres://")
+        ? "accelerate"
+        : "direct",
     };
   }
 
-  throw new Error('Missing PRISMA_ACCELERATE_URL or DATABASE_URL');
+  throw new Error("Missing PRISMA_ACCELERATE_URL or DATABASE_URL");
 };
 
 const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
-  if (config.mode === 'accelerate') {
-    return (new PrismaClient({ accelerateUrl: config.url }) as any).$extends(
+  if (config.mode === "accelerate") {
+    // Use type assertion to bypass TypeScript checking for Prisma 7 options
+    const clientOptions = { datasourceUrl: config.url } as any;
+    return (new PrismaClient(clientOptions) as any).$extends(
       withAccelerate(),
     ) as unknown as PrismaClient;
   }
@@ -52,23 +59,30 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   // Direct connection - For Prisma 7, we need to provide an accelerateUrl even for direct connections
   // or use an adapter. Since we don't have an adapter, we'll tell it to use accelerate mode
   // but with the regular DATABASE_URL
-  if (config.url.startsWith('postgresql://')) {
+  if (config.url.startsWith("postgresql://")) {
     // Convert to accelerate format for Prisma 7 compatibility
-    const accelerateUrl = config.url.replace('postgresql://', 'prisma+postgres://');
-    return (new PrismaClient({ accelerateUrl }) as any).$extends(withAccelerate()) as unknown as PrismaClient;
+    const accelerateUrl = config.url.replace(
+      "postgresql://",
+      "prisma+postgres://",
+    );
+    // Use type assertion to bypass TypeScript checking for Prisma 7 options
+    const clientOptions = { datasourceUrl: accelerateUrl } as any;
+    return (new PrismaClient(clientOptions) as any).$extends(
+      withAccelerate(),
+    ) as unknown as PrismaClient;
   }
 
   // Fallback: try direct connection with minimal config
   return new PrismaClient({
-    log: ['error', 'warn'],
+    log: ["error", "warn"],
   });
 };
 
 export const getPrismaClient = (): PrismaRuntimeClient => {
-  if (prismaMode === 'accelerate' && prismaAccelerate) {
+  if (prismaMode === "accelerate" && prismaAccelerate) {
     return prismaAccelerate;
   }
-  if (prismaMode === 'direct' && prismaDirect) {
+  if (prismaMode === "direct" && prismaDirect) {
     return prismaDirect;
   }
 
@@ -76,7 +90,7 @@ export const getPrismaClient = (): PrismaRuntimeClient => {
   prismaMode = config.mode;
   prismaDetail = config.detail;
   const client = createPrismaClient(config);
-  if (config.mode === 'accelerate') {
+  if (config.mode === "accelerate") {
     prismaAccelerate = client as PrismaRuntimeClient;
     return prismaAccelerate;
   }
@@ -86,28 +100,28 @@ export const getPrismaClient = (): PrismaRuntimeClient => {
 export const getPrisma = getPrismaClient;
 
 export type PrismaStatus = {
-  status: 'ok' | 'warn' | 'error';
+  status: "ok" | "warn" | "error";
   configured: boolean;
   detail: string;
 };
 
 export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
-  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || '').trim();
-  const databaseUrl = (process.env.DATABASE_URL || '').trim();
+  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || "").trim();
+  const databaseUrl = (process.env.DATABASE_URL || "").trim();
   const configured = accelerateUrl || databaseUrl;
 
   if (!configured) {
     return {
-      status: 'warn',
+      status: "warn",
       configured: false,
-      detail: 'Prisma database URL is not configured',
+      detail: "Prisma database URL is not configured",
     };
   }
 
   try {
     const client = getPrismaClient();
     const queryArgs = { select: { id: true }, take: 1 };
-    if (prismaMode === 'accelerate') {
+    if (prismaMode === "accelerate") {
       await client.conversation.findMany({
         ...queryArgs,
         cacheStrategy: { ttl: 60 },
@@ -116,42 +130,45 @@ export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
       await client.conversation.findMany(queryArgs);
     }
     const baseDetail =
-      prismaMode === 'accelerate' ? 'Prisma Accelerate query check passed (cached)' : 'Prisma query check passed';
+      prismaMode === "accelerate"
+        ? "Prisma Accelerate query check passed (cached)"
+        : "Prisma query check passed";
     return {
-      status: 'ok',
+      status: "ok",
       configured: true,
       detail: prismaDetail ? `${baseDetail} · ${prismaDetail}` : baseDetail,
     };
   } catch (error) {
-    console.error('Prisma runtime status check failed:', error);
+    console.error("Prisma runtime status check failed:", error);
     if (error instanceof Error) {
-      if (error.message.includes('prisma+postgres://')) {
+      if (error.message.includes("prisma+postgres://")) {
         return {
-          status: 'warn',
+          status: "warn",
           configured: false,
           detail: error.message,
         };
       }
-      if (error.message.includes('Missing PRISMA_ACCELERATE_URL')) {
+      if (error.message.includes("Missing PRISMA_ACCELERATE_URL")) {
         return {
-          status: 'warn',
+          status: "warn",
           configured: false,
           detail: error.message,
         };
       }
       if (
-        error.message.includes('PrismaClient') &&
-        (error.message.includes('PrismaClientOptions') || error.message.includes('datasourceUrl'))
+        error.message.includes("PrismaClient") &&
+        (error.message.includes("PrismaClientOptions") ||
+          error.message.includes("datasourceUrl"))
       ) {
         return {
-          status: 'warn',
+          status: "warn",
           configured: true,
           detail: `Prisma runtime configuration warning: ${error.message}`,
         };
       }
     }
     return {
-      status: 'error',
+      status: "error",
       configured: true,
       detail: `Prisma query failed: ${error instanceof Error ? error.message : String(error)}`,
     };

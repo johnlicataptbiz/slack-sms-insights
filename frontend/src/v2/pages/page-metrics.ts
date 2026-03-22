@@ -1,5 +1,3 @@
-import { format as formatDateFns, isValid, parseISO } from 'date-fns';
-
 import type { RunV2, SalesMetricsV2 } from '../../api/v2-types.js';
 import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser.js';
 
@@ -15,6 +13,8 @@ const BOOKINGS_ALT_PATTERN = /- Book(?:ings?|ed):\s*([0-9,]+)/i;
 const OPT_OUTS_PATTERN = /Opt-outs:\s*([0-9,]+)/i;
 const OUTBOUND_FROM_SUMMARY_PATTERN = /Outbound conversations:\s*([0-9,]+)/i;
 const SUMMARY_NOISE_PATTERNS = [/^PT BIZ - DAILY SMS SNAPSHOT/i, /^Date:/i, /^Time Range:/i, /^Split By Line/i];
+
+const pad2 = (value: number): string => value.toString().padStart(2, '0');
 
 type RunSequenceInsight = {
   label: string;
@@ -66,10 +66,8 @@ export type InsightsBookedBreakdown = {
 };
 
 const parseDateValue = (value: string): Date | null => {
-  const fromIso = parseISO(value);
-  if (isValid(fromIso)) return fromIso;
-  const fallback = new Date(value);
-  return Number.isNaN(fallback.getTime()) ? null : fallback;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
 const parseNumber = (rawValue: string | undefined): number | null => {
@@ -262,5 +260,5 @@ export const toIsoDay = (value: string | null): string | null => {
 
   const parsed = parseDateValue(trimmed);
   if (!parsed) return null;
-  return formatDateFns(parsed, 'yyyy-MM-dd');
+  return `${parsed.getUTCFullYear()}-${pad2(parsed.getUTCMonth() + 1)}-${pad2(parsed.getUTCDate())}`;
 };

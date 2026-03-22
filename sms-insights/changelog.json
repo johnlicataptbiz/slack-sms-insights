@@ -1,8 +1,17 @@
 {
-  "generatedAt": "2026-03-22T21:19:28.171Z",
+  "generatedAt": "2026-03-22T22:44:42.800Z",
   "daysIncluded": 365,
-  "totalCount": 442,
+  "totalCount": 443,
   "entries": [
+    {
+      "hash": "17867a1",
+      "date": "2026-03-22T16:35:44-05:00",
+      "message": "fix: Prisma 7 adapter, empty body default, remove stale CJS artifacts",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Prisma 7 adapter, empty body default, remove stale CJS artifacts"
+    },
     {
       "hash": "5d4d0f7",
       "date": "2026-03-22T15:50:28-05:00",

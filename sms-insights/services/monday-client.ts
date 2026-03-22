@@ -219,6 +219,7 @@ export const upsertWeeklySummaryItem = async (
   payload: {
     title: string;
     summaryMarkdown: string;
+    columnValues?: Record<string, unknown>;
     existingItemId?: string | null;
   },
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
@@ -253,6 +254,26 @@ export const upsertWeeklySummaryItem = async (
     }
   `;
   await requestGraphQl(updateMutation, { itemId, body: payload.summaryMarkdown }, logger);
+
+  const columnValues = payload.columnValues || null;
+  if (itemId && columnValues && Object.keys(columnValues).length > 0) {
+    const patchColumnsMutation = `
+      mutation PatchWeeklySummaryColumns($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
+        change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $columnValues) {
+          id
+        }
+      }
+    `;
+    await requestGraphQl(
+      patchColumnsMutation,
+      {
+        boardId,
+        itemId,
+        columnValues: JSON.stringify(columnValues),
+      },
+      logger,
+    );
+  }
 
   return { itemId, action };
 };

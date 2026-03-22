@@ -1,9 +1,22 @@
-# CI/CD React Module Fix Progress
+# Railway Deployment Fix - TODO
 
-**Status: Complete**
+## ✅ Completed
+- [x] Create sms-insights/nixpacks.toml (Node.js 22.15.1 forced)
+- [x] Delete conflicting root railway.toml
 
-- [x] 1. Add test scripts to frontend/package.json
-- [x] 2. Update .github/workflows/ci-cd.yml: Add test step to test-frontend job
-- [x] 3. Update .github/workflows/main.yml: Add test step to frontend-build job
-- [x] 4. Improve workflows: --legacy-peer-deps parity + typecheck in main.yml
-- [ ] 5. Commit changes & verify CI
+## ✅ Completed
+- [x] Local test: Node 22 FULL BUILD PASS ✓
+- [ ] Commit changes
+- [ ] Railway deploy
+- [ ] Railway deploy: `railway up`
+- [ ] Validate build logs (check npm ci success)
+
+## Next
+Run these commands locally first:
+```bash
+cd sms-insights
+nvm use 22.12.0
+npm ci
+npm run build
+```
+

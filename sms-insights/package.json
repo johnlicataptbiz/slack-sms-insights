@@ -4,6 +4,10 @@
   "description": "A scaffold template for Slack apps",
   "main": "dist/app.js",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10"
+  },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "prebuild": "node --import tsx ./scripts/generate-changelog-json.ts",

@@ -45,8 +45,8 @@ const resolvePrismaConfig = (): {
 
 const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   if (config.mode === 'accelerate') {
-    // Use type assertion to bypass TypeScript checking for Prisma 7 options
-    const clientOptions = { datasourceUrl: config.url } as unknown as Prisma.PrismaClientOptions;
+    // Prisma 7 client engine expects accelerateUrl rather than the old datasourceUrl option.
+    const clientOptions = { accelerateUrl: config.url } as unknown as Prisma.PrismaClientOptions;
     return (new PrismaClient(clientOptions) as PrismaClient).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
@@ -56,8 +56,7 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   if (config.url.startsWith('postgresql://')) {
     // Convert to accelerate format for Prisma 7 compatibility
     const accelerateUrl = config.url.replace('postgresql://', 'prisma+postgres://');
-    // Use type assertion to bypass TypeScript checking for Prisma 7 options
-    const clientOptions = { datasourceUrl: accelerateUrl } as unknown as Prisma.PrismaClientOptions;
+    const clientOptions = { accelerateUrl } as unknown as Prisma.PrismaClientOptions;
     return (new PrismaClient(clientOptions) as PrismaClient).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 

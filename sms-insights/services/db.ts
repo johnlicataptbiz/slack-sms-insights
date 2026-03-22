@@ -24,6 +24,11 @@ export const initDatabase = async (logger?: Pick<Logger, 'info' | 'error'>): Pro
     return;
   }
 
+  if (databaseUrl.startsWith('file:')) {
+    logger?.info('SQLite database detected; skipping pg pool init');
+    return;
+  }
+
   pool = new Pool({
     connectionString: databaseUrl,
     max: 10,

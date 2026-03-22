@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import type {
   CoachingInterest,
@@ -8,9 +9,9 @@ import type {
 } from './inbox-contact-profiles.js';
 import { getPrismaClient } from './prisma.js';
 
-const toNullableText = (value: unknown): string | null => {
-  if (value == null) return null;
-  return typeof value === 'string' ? value : JSON.stringify(value);
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull => {
+  if (value == null) return Prisma.DbNull;
+  return value as Prisma.InputJsonValue;
 };
 
 export type CadenceStatus = 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
@@ -325,7 +326,7 @@ export const updateConversationState = async (
       qualification_delivery_model?: DeliveryModel;
       qualification_coaching_interest?: CoachingInterest;
       qualification_progress_step?: number;
-      objection_tags?: string;
+      objection_tags?: string[];
       escalation_level?: 1 | 2 | 3 | 4;
       escalation_reason?: string | null;
       escalation_overridden?: boolean;
@@ -343,7 +344,7 @@ export const updateConversationState = async (
     if (input.deliveryModel !== undefined) updateData.qualification_delivery_model = input.deliveryModel;
     if (input.coachingInterest !== undefined) updateData.qualification_coaching_interest = input.coachingInterest;
     if (input.progressStep !== undefined) updateData.qualification_progress_step = input.progressStep;
-    if (input.objectionTags !== undefined) updateData.objection_tags = JSON.stringify(input.objectionTags);
+    if (input.objectionTags !== undefined) updateData.objection_tags = input.objectionTags;
     if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
     if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
     if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;
@@ -782,8 +783,8 @@ export const insertSendAttempt = async (
       idempotency_key: input.idempotencyKey ?? null,
       status: input.status,
       retry_count: input.retryCount ?? 0,
-      request_payload: toNullableText(input.requestPayload),
-      response_payload: toNullableText(input.responsePayload),
+      request_payload: toNullableJson(input.requestPayload),
+      response_payload: toNullableJson(input.responsePayload),
       error_message: input.errorMessage ?? null,
     };
 
@@ -965,12 +966,12 @@ export const insertDraftSuggestion = async (
       data: {
         conversation_id: input.conversationId,
         prompt_snapshot_hash: input.promptSnapshotHash,
-        retrieved_exemplar_ids: toNullableText(input.retrievedExemplarIds),
+        retrieved_exemplar_ids: toNullableJson(input.retrievedExemplarIds),
         generated_text: input.generatedText,
         lint_score: input.lintScore,
         structural_score: input.structuralScore,
-        lint_issues: toNullableText(input.lintIssues),
-        raw: toNullableText(input.raw),
+        lint_issues: toNullableJson(input.lintIssues),
+        raw: toNullableJson(input.raw),
       },
     });
 
@@ -1064,7 +1065,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? undefined,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? undefined,
-        qualifier_snapshot: toNullableText(input.qualifierSnapshot) ?? undefined,
+        qualifier_snapshot: toNullableJson(input.qualifierSnapshot),
         channel_marker: input.channelMarker ?? undefined,
       },
       create: {
@@ -1073,7 +1074,7 @@ export const upsertConversionExample = async (
         closed_won_label: input.closedWonLabel ?? null,
         escalation_level: input.escalationLevel,
         structure_signature: input.structureSignature ?? null,
-        qualifier_snapshot: toNullableText(input.qualifierSnapshot),
+        qualifier_snapshot: toNullableJson(input.qualifierSnapshot),
         channel_marker: input.channelMarker || 'sms',
       },
     });

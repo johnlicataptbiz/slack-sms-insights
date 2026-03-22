@@ -1,12 +1,12 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
 
-const toNullableText = (value: unknown): string | null => {
-  if (value == null) return null;
-  return typeof value === 'string' ? value : JSON.stringify(value);
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull => {
+  if (value == null) return Prisma.DbNull;
+  return value as Prisma.InputJsonValue;
 };
 
 const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
@@ -551,7 +551,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: toNullableText(input.raw),
+        raw: toNullableJson(input.raw),
         synced_at: new Date(),
       },
       create: {
@@ -565,7 +565,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: toNullableText(input.raw),
+        raw: toNullableJson(input.raw),
         synced_at: new Date(),
       },
     });
@@ -1258,7 +1258,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: toNullableText(params.payloadJson),
+        payload_json: toNullableJson(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },
@@ -1270,7 +1270,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: toNullableText(params.payloadJson),
+        payload_json: toNullableJson(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },

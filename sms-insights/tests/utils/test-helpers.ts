@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expect, vi } from 'vitest';
 
 // Test utilities for common patterns
 export class TestUtils {

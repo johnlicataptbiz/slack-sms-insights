@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
@@ -1227,7 +1227,10 @@ export const getAuditLogs = async (params: {
     resourceType: row.resource_type,
     resourceId: row.resource_id,
     userId: row.user_id,
-    details: (typeof row.details === 'string' ? JSON.parse(row.details) : {}) as Record<string, unknown>,
+    details: (typeof row.details === 'string' ? JSON.parse(row.details as string) : (row.details ?? {})) as Record<
+      string,
+      unknown
+    >,
     ipAddress: row.ip_address,
     timestamp: row.created_at ? row.created_at.toISOString() : new Date().toISOString(),
   }));

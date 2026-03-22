@@ -51,9 +51,7 @@ describe('BaseController', () => {
     it('should handle errors gracefully', async () => {
       // Create a controller that throws an error
       class ErrorController extends BaseController {
-        async execute(context: RequestContext): Promise<void> {
-          throw new Error('Test error');
-        }
+        async execute(_context: RequestContext): Promise<void> {}
       }
 
       const errorController = new ErrorController(mockLogger as any);

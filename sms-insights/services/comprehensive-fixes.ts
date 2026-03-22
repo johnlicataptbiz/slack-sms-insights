@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();

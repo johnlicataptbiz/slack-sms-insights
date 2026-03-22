@@ -109,12 +109,6 @@ export const maybeRecordConversionExample = async (
       where: {
         conversation_id: conversationId,
         direction: 'outbound',
-        body: {
-          not: null,
-          // Prisma doesn't have a direct LENGTH filter in where, so we might need a raw query or just fetch and filter.
-          // But actually, we can use a raw query if we really want the length check in DB.
-          // Given it's a small check, let's use a raw query or just accept we fetch it.
-        },
         event_ts: {
           lt: inboundEvent.event_ts,
           gt: fortyEightHoursAgo,

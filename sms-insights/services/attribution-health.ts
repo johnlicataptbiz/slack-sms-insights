@@ -32,7 +32,8 @@ export const getAttributionLagStatus = async (thresholdHours = 24): Promise<Attr
     prisma.attribution_review_queue.count({
       where: { status: { in: ['open', 'pending', 'needs_review'] } },
     }),
-    prisma.analytics_unresolved_attribution_v.count(),
+    prisma.$queryRaw<[{ count: bigint }]>`SELECT COUNT(*) as count FROM analytics_unresolved_attribution_v`
+      .then(([r]) => Number(r?.count ?? 0)),
   ]);
 
   let lagHours: number | null = null;

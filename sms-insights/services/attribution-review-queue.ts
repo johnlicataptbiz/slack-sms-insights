@@ -106,10 +106,13 @@ export const upsertAttributionReviewItem = async (input: {
 
 export const listUnresolvedAttributions = async (take = 100): Promise<UnresolvedAttributionRow[]> => {
   const prisma = getPrisma();
-  return prisma.analytics_unresolved_attribution_v.findMany({
-    orderBy: { booked_event_ts: 'desc' },
-    take,
-  });
+  return prisma.$queryRaw<UnresolvedAttributionRow[]>`
+    SELECT booked_call_id, booked_event_ts, attribution_status, needs_review, review_reason,
+           mapper_version, conversation_id, resolved_sequence_id, resolved_sequence_label, created_at
+    FROM analytics_unresolved_attribution_v
+    ORDER BY booked_event_ts DESC
+    LIMIT ${take}
+  `;
 };
 
 export const listSequenceFunnelDaily = async (params: {

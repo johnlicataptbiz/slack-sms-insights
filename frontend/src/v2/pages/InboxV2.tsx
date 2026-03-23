@@ -848,7 +848,8 @@ export default function InboxV2() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mediaQuery = window.matchMedia("(max-width: 900px)");
-    const onChange = () => updateUIState({ isNarrowComposerViewport: mediaQuery.matches });
+    const onChange = () =>
+      updateUIState({ isNarrowComposerViewport: mediaQuery.matches });
     onChange();
     mediaQuery.addEventListener("change", onChange);
     return () => mediaQuery.removeEventListener("change", onChange);
@@ -885,13 +886,21 @@ export default function InboxV2() {
     ) {
       inboxState.selectConversation(conversations[0]?.id || null);
     }
-  }, [conversations, uiState.selectedConversationId, uiState.isComposerModalOpen]);
+  }, [
+    conversations,
+    uiState.selectedConversationId,
+    uiState.isComposerModalOpen,
+  ]);
 
-  const detailQuery = useV2InboxConversationDetail(uiState.selectedConversationId, {
-    forceSync: uiState.isComposerModalOpen && Boolean(uiState.selectedConversationId),
-    // FIXED: Removed aggressive 7-second polling - was causing message race conditions
-    // Messages now only fetch when explicitly requested or on conversation change
-  });
+  const detailQuery = useV2InboxConversationDetail(
+    uiState.selectedConversationId,
+    {
+      forceSync:
+        uiState.isComposerModalOpen && Boolean(uiState.selectedConversationId),
+      // FIXED: Removed aggressive 7-second polling - was causing message race conditions
+      // Messages now only fetch when explicitly requested or on conversation change
+    },
+  );
 
   const generateDraftMutation = useV2GenerateDraft();
   const generateCrmNotesMutation = useV2GenerateCrmNotes();
@@ -1019,7 +1028,8 @@ export default function InboxV2() {
   const newTemplateName = templateForm.watch("name");
   const newTemplateBody = templateForm.watch("body");
   const selectedLineOption =
-    lineOptions.find((option) => option.key === uiState.selectedLineKey) || null;
+    lineOptions.find((option) => option.key === uiState.selectedLineKey) ||
+    null;
   const lineSelectionRequired =
     Boolean(sendConfig?.requiresSelection) && !selectedLineOption;
   const savedDefaultSummary = sendConfig?.defaultSelection
@@ -1059,10 +1069,16 @@ export default function InboxV2() {
     if (!detailConversation) return;
 
     updateQualification(detailConversation.qualification);
-    updateEscalation({ level: detailConversation.escalation.level, reason: detailConversation.escalation.reason || "" });
+    updateEscalation({
+      level: detailConversation.escalation.level,
+      reason: detailConversation.escalation.reason || "",
+    });
     setSequenceIdInput(detailContactCard?.sequenceId || "");
     assignForm.reset({ ownerLabel: detailConversation.ownerLabel || "" });
-    updateSelectionState({ localObjectionTags: detailConversation.objectionTags ?? [], localCallOutcome: detailConversation.callOutcome ?? null });
+    updateSelectionState({
+      localObjectionTags: detailConversation.objectionTags ?? [],
+      localCallOutcome: detailConversation.callOutcome ?? null,
+    });
   }, [
     assignForm,
     detailConversation?.id,
@@ -1108,9 +1124,18 @@ export default function InboxV2() {
   ]);
 
   useEffect(() => {
-    if (!uiState.isComposerModalOpen || !uiState.selectedConversationId || !detail) return;
+    if (
+      !uiState.isComposerModalOpen ||
+      !uiState.selectedConversationId ||
+      !detail
+    )
+      return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
-  }, [uiState.isComposerModalOpen, uiState.selectedConversationId, detailConversation?.id]);
+  }, [
+    uiState.isComposerModalOpen,
+    uiState.selectedConversationId,
+    detailConversation?.id,
+  ]);
 
   // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
   useEffect(() => {
@@ -1384,7 +1409,8 @@ export default function InboxV2() {
   useHotkeys(
     "mod+shift+a",
     (event) => {
-      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId)
+        return;
       event.preventDefault();
       void onUpdateStatus("closed");
     },
@@ -1395,7 +1421,8 @@ export default function InboxV2() {
   useHotkeys(
     "mod+shift+s",
     (event) => {
-      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId)
+        return;
       event.preventDefault();
       const snoozedUntil = addHours(new Date(), 24).toISOString();
       void snoozeMutation

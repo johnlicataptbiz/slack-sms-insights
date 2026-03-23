@@ -1752,3 +1752,62 @@ export const useV2SequenceKpis = (params: { range: '7d' | '30d' | '90d' | '180d'
     refetchOnWindowFocus: false,
   });
 };
+
+// ── Contact Activities ─────────────────────────────────────────────────────────
+
+export type ContactActivity = {
+  id: string;
+  contactKey: string;
+  activityType: string;
+  referenceId: string | null;
+  referenceType: string | null;
+  repId: string | null;
+  summary: string | null;
+  metadata: Record<string, unknown> | null;
+  occurredAt: string;
+  createdAt: string;
+};
+
+export type ContactActivityStats = {
+  total_activities: number;
+  sms_inbound: number;
+  sms_outbound: number;
+  calls_inbound: number;
+  calls_outbound: number;
+  calls_missed: number;
+  last_activity_at: string | null;
+};
+
+export const useV2ContactActivities = (
+  contactKey: string | null,
+  options?: { limit?: number; offset?: number }
+) => {
+  const params = new URLSearchParams({ contactKey: contactKey ?? "" });
+  if (options?.limit) params.set("limit", String(options.limit));
+  if (options?.offset) params.set("offset", String(options.offset));
+
+  return useQuery({
+    queryKey: ["v2", "contact-activities", contactKey, options],
+    queryFn: async () => {
+      const res = await fetch(`/api/v2/contact-activities?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch contact activities");
+      return res.json() as Promise<{ data: { activities: ContactActivity[]; stats: ContactActivityStats } }>;
+    },
+    enabled: !!contactKey,
+    staleTime: 30 * 1000,
+  });
+};
+
+export const useV2ContactActivityStats = (contactKey: string | null) => {
+  return useQuery({
+    queryKey: ["v2", "contact-activities-stats", contactKey],
+    queryFn: async () => {
+      const params = new URLSearchParams({ contactKey: contactKey ?? "" });
+      const res = await fetch(`/api/v2/contact-activities/stats?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch contact activity stats");
+      return res.json() as Promise<{ data: ContactActivityStats }>;
+    },
+    enabled: !!contactKey,
+    staleTime: 30 * 1000,
+  });
+};

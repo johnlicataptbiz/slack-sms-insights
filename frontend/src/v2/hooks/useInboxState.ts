@@ -7,67 +7,67 @@
  */
 
 import { useState, useCallback } from "react";
+import type { CallOutcomeV2, QualificationStateV2 } from "../../api/v2-types";
 
 // State type definitions
 export interface InboxFilters {
-  statusFilter: "all" | "open" | "closed" | "dnc";
+  statusFilter: "" | "open" | "closed" | "dnc";
   needsReplyOnly: boolean;
-  ownerFilter: string | null;
+  ownerFilter: "all" | "jack" | "brandon" | "unassigned";
   sortMode: "recent" | "oldest" | "urgent" | "needs_reply";
   search: string;
 }
 
-export interface QualificationState {
-  fullOrPartTime: string | null;
-  niche: string | null;
-  revenueMix: string | null;
-  coachingInterest: boolean;
-}
+export type QualificationState = QualificationStateV2;
 
 export interface EscalationState {
-  level: number;
+  level: 1 | 2 | 3 | 4;
   reason: string;
 }
 
 export interface UIState {
+  isComposerModalOpen: boolean;
   selectedConversationId: string | null;
   selectedDraftId: string | null;
-  selectedLineKey: string | null;
+  selectedLineKey: string;
   composerText: string;
   crmNotesText: string;
   flashMessage: string | null;
+  pendingMessageText: string | null;
   showTemplates: boolean;
   manualPanelOpen: boolean;
   isGuardrailModalOpen: boolean;
   showDoublePitchWarning: boolean;
-  sendStatus: "idle" | "sending" | "error";
+  sendStatus: "idle" | "sending" | "sent" | "error";
   isEmojiPickerOpen: boolean;
   isNarrowComposerViewport: boolean;
 }
 
 export interface SelectionState {
   localObjectionTags: string[];
-  localCallOutcome: string | null;
+  localCallOutcome: CallOutcomeV2 | null;
 }
 
 export const useInboxState = () => {
   // Conversation filters
   const [filters, setFilters] = useState<InboxFilters>({
-    statusFilter: "all",
-    needsReplyOnly: false,
-    ownerFilter: null,
+    statusFilter: "open",
+    needsReplyOnly: true,
+    ownerFilter: "all",
     sortMode: "recent",
     search: "",
   });
 
   // UI state
   const [uiState, setUIState] = useState<UIState>({
+    isComposerModalOpen: false,
     selectedConversationId: null,
     selectedDraftId: null,
-    selectedLineKey: null,
+    selectedLineKey: "",
     composerText: "",
     crmNotesText: "",
     flashMessage: null,
+    pendingMessageText: null,
     showTemplates: false,
     manualPanelOpen: false,
     isGuardrailModalOpen: false,
@@ -80,15 +80,17 @@ export const useInboxState = () => {
   // Qualification state
   const [qualificationState, setQualificationState] =
     useState<QualificationState>({
-      fullOrPartTime: null,
+      fullOrPartTime: "unknown",
       niche: null,
-      revenueMix: null,
-      coachingInterest: false,
+      revenueMix: "unknown",
+      deliveryModel: "unknown",
+      coachingInterest: "unknown",
+      progressStep: 0,
     });
 
   // Escalation state
   const [escalationState, setEscalationState] = useState<EscalationState>({
-    level: 0,
+    level: 1,
     reason: "",
   });
 
@@ -131,17 +133,20 @@ export const useInboxState = () => {
       updateUIState({ selectedConversationId: conversationId });
       // Reset composer and qualification when switching conversations
       updateUIState({
+        pendingMessageText: null,
         composerText: "",
         crmNotesText: "",
         selectedDraftId: null,
       });
       setQualificationState({
-        fullOrPartTime: null,
+        fullOrPartTime: "unknown",
         niche: null,
-        revenueMix: null,
-        coachingInterest: false,
+        revenueMix: "unknown",
+        deliveryModel: "unknown",
+        coachingInterest: "unknown",
+        progressStep: 0,
       });
-      setEscalationState({ level: 0, reason: "" });
+      setEscalationState({ level: 1, reason: "" });
       setSelectionState({ localObjectionTags: [], localCallOutcome: null });
     },
     [updateUIState],
@@ -158,8 +163,9 @@ export const useInboxState = () => {
     updateUIState({
       composerText: "",
       crmNotesText: "",
+      pendingMessageText: null,
       selectedDraftId: null,
-      selectedLineKey: null,
+      selectedLineKey: "",
       sendStatus: "idle",
     });
   }, [updateUIState]);

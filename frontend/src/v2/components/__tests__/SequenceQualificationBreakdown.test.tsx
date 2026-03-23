@@ -65,7 +65,7 @@ describe('SequenceQualificationBreakdown', () => {
     expect(screen.queryByText('Employment Status')).not.toBeInTheDocument();
 
     // Click the header div to expand
-    fireEvent.click(screen.getByText('Test Sequence').closest('.SequenceCard__header')!);
+    fireEvent.click(screen.getByTestId('sequence-card-header'));
 
     // Expanded section headers should now be visible
     expect(screen.getByText('Employment Status')).toBeInTheDocument();

@@ -190,7 +190,7 @@ const SequenceCard: React.FC<{
 
   return (
     <div className={`SequenceCard ${isExpanded ? 'SequenceCard--expanded' : ''}`}>
-      <div className="SequenceCard__header" onClick={onToggle}>
+      <div className="SequenceCard__header" onClick={onToggle} data-testid="sequence-card-header">
         <div className="SequenceCard__title">
           <span className="SequenceCard__name">{item.sequenceLabel}</span>
           <span className="SequenceCard__count">{total.toLocaleString()} conversations</span>

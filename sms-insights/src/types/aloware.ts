@@ -10,4 +10,10 @@ export interface SMSMessage {
   line_phone_number?: string;
   sequence_id?: string;
   created_at: string;
+  // Aloware standard webhook fields
+  from?: string;
+  to?: string;
+  message?: string;
+  user_id?: number;
+  line_id?: number;
 }

@@ -576,14 +576,20 @@ export default function InboxV2() {
     qualificationState,
     escalationState,
     selectionState,
+    setFlashMessage,
   } = inboxState;
+  const {
+    selectedConversationId,
+    isComposerModalOpen,
+    composerText,
+    sendStatus,
+  } = uiState;
   const {
     updateFilters,
     updateUIState,
     updateQualification,
     updateEscalation,
     updateSelectionState,
-    setFlashMessage,
   } = inboxState;
 
   // Refs for DOM elements and locks

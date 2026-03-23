@@ -1,16 +1,52 @@
 {
-  "generatedAt": "2026-03-22T23:45:38.974Z",
+  "generatedAt": "2026-03-23T04:37:31.867Z",
   "daysIncluded": 365,
-  "totalCount": 446,
+  "totalCount": 450,
   "entries": [
     {
-      "hash": "6aa72dc",
+      "hash": "ef88eb2",
+      "date": "2026-03-22T23:35:57-05:00",
+      "message": "feat: modernize SMS Insights UI with dark-first design system",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Modernize SMS Insights UI with dark-first design system"
+    },
+    {
+      "hash": "74a5ad5",
+      "date": "2026-03-22T20:23:24-05:00",
+      "message": "feat: live database report + daily automation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Live database report + daily automation"
+    },
+    {
+      "hash": "df51690",
+      "date": "2026-03-22T18:50:47-05:00",
+      "message": "fix(railway): use .node-version 22.15.1 (nixpacks.toml conflict)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Use .node-version 22.15.1 (nixpacks.toml conflict)"
+    },
+    {
+      "hash": "f7223b9",
       "date": "2026-03-22T18:44:07-05:00",
       "message": "fix(railway): force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)",
       "author": "Jack Licata",
       "type": "fix",
       "category": "Database",
       "description": "Force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)"
+    },
+    {
+      "hash": "a3c4a05",
+      "date": "2026-03-23T00:02:44Z",
+      "message": "fix: add .node-version to pin Node.js 22.12.0 for Prisma 7",
+      "author": "railway-app[bot]",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add .node-version to pin Node.js 22.12.0 for Prisma 7"
     },
     {
       "hash": "137327e",

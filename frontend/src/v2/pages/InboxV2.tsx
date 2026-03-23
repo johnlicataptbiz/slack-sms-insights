@@ -1198,31 +1198,31 @@ export default function InboxV2() {
   );
 
   const onGenerateDraft = async () => {
-    if (!selectedConversationId) return;
+    if (!uiState.selectedConversationId) return;
 
-    setFlashMessage(null);
+    inboxState.setFlashMessage(null);
     try {
       const result = await generateDraftMutation.mutateAsync({
-        conversationId: selectedConversationId,
+        conversationId: uiState.selectedConversationId,
       });
-      setComposerText(result.data.text);
-      setSelectedDraftId(result.data.id);
+      updateUIState({ composerText: result.data.text });
+      updateUIState({ selectedDraftId: result.data.id });
       setDraftPrefillDoneForConversation(selectedConversationId);
       if (result.data.generationMode === "contextual_fallback") {
         const firstWarning =
           result.data.generationWarnings[0] || "AI generation unavailable";
-        setFlashMessage(`Draft generated in fallback mode. ${firstWarning}`);
+        inboxState.setFlashMessage(`Draft generated in fallback mode. ${firstWarning}`);
         return;
       }
       if (result.data.lint.passed) {
-        setFlashMessage("Draft generated and passed quality check.");
+        inboxState.setFlashMessage("Draft generated and passed quality check.");
       } else {
-        setFlashMessage(
+        inboxState.setFlashMessage(
           "Draft generated with quality issues. Review before sending.",
         );
       }
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Draft generation failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1243,14 +1243,14 @@ export default function InboxV2() {
   };
 
   const onGenerateCrmNotes = async () => {
-    if (!selectedConversationId) return;
-    setFlashMessage(null);
+    if (!uiState.selectedConversationId) return;
+    inboxState.setFlashMessage(null);
     try {
       const result = await generateCrmNotesMutation.mutateAsync({
-        conversationId: selectedConversationId,
+        conversationId: uiState.selectedConversationId,
       });
       const nextText = result.data.text || "";
-      setCrmNotesText(nextText);
+      updateUIState({ crmNotesText: nextText });
       const copied = await copyCrmNotesToClipboard(nextText);
       setCrmNotesCopied(copied);
       if (copied) {
@@ -1263,13 +1263,13 @@ export default function InboxV2() {
       }
     } catch (error) {
       const message = `CRM notes failed: ${String((error as Error)?.message || error)}`;
-      setFlashMessage(message);
+      inboxState.setFlashMessage(message);
       toast.error(message);
     }
   };
 
   const onCopyCrmNotes = async () => {
-    const copied = await copyCrmNotesToClipboard(crmNotesText);
+    const copied = await copyCrmNotesToClipboard(uiState.crmNotesText);
     setCrmNotesCopied(copied);
     if (copied) {
       toast.success("CRM notes copied.");
@@ -1281,17 +1281,17 @@ export default function InboxV2() {
 
   const onSend = async () => {
     if (sendLockRef.current) return;
-    if (!selectedConversationId || composerText.trim().length === 0) return;
+    if (!uiState.selectedConversationId || uiState.composerText.trim().length === 0) return;
     if (lineSelectionRequired) {
-      setFlashMessage("Select a send line before sending.");
+      inboxState.setFlashMessage("Select a send line before sending.");
       return;
     }
 
-    const messageText = composerText.trim();
+    const messageText = uiState.composerText.trim();
 
     // Phase 2: Stage Gating
-    if (containsCallLink(messageText) && escalationLevel <= 1) {
-      setFlashMessage(
+    if (containsCallLink(messageText) && escalationState.level <= 1) {
+      inboxState.setFlashMessage(
         "Set the escalation stage to L2 or higher before sending a call link.",
       );
       return;
@@ -1321,16 +1321,16 @@ export default function InboxV2() {
           .some((m) => m.direction === "inbound");
         if (!hasReplyAfter) {
           // Show the banner and block send — user must dismiss or it stays visible
-          setShowDoublePitchWarning(true);
+          updateUIState({ showDoublePitchWarning: true });
           return;
         }
       }
     }
 
     // Phase 2: Guardrail Checklist (L3/L4)
-    if (containsCallLink(messageText) && escalationLevel >= 3) {
+    if (containsCallLink(messageText) && escalationState.level >= 3) {
       setPendingMessageText(messageText);
-      setIsGuardrailModalOpen(true);
+      updateUIState({ isGuardrailModalOpen: true });
       return;
     }
 
@@ -1338,10 +1338,8 @@ export default function InboxV2() {
   };
 
   const onAppendEmoji = (emojiData: EmojiClickData) => {
-    setComposerText((prev) => `${prev}${emojiData.emoji}`);
-    setSendStatus((prev) =>
-      prev === "sent" || prev === "error" ? "idle" : prev,
-    );
+    updateUIState({ composerText: `${uiState.composerText}${emojiData.emoji}` });
+    updateUIState({ sendStatus: (uiState.sendStatus === "sent" || uiState.sendStatus === "error" ? "idle" : uiState.sendStatus) });
     pendingIdempotencyRef.current = null;
     window.requestAnimationFrame(() => composerRef.current?.focus());
   };

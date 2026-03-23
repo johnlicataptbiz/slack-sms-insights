@@ -13,6 +13,7 @@ import {
   getMondaySyncState,
   saveMondayColumnMapping,
   upsertMondayBoardRegistry,
+  upsertMondayCallSnapshot,
   upsertMondaySyncState,
 } from './monday-store.js';
 
@@ -180,7 +181,7 @@ export const syncMondaySmsBoard = async (
 
     let cursor = state?.cursor || null;
     let fetchedItems = 0;
-    const upsertedItems = 0;
+    let upsertedItems = 0;
     let pageCount = 0;
 
     while (pageCount < mondaySmsConfig.maxPagesPerRun) {
@@ -207,26 +208,23 @@ export const syncMondaySmsBoard = async (
         if (!force && initialSync && normalized.updatedAt < backfillCutoff) continue;
         if (!force && !initialSync && lastSyncAt && normalized.updatedAt <= lastSyncAt) continue;
 
-        await upsertMondaySyncState(
+        await upsertMondayCallSnapshot(
           {
             boardId,
-            cursor,
-            lastSyncAt: new Date(),
-            status: 'success',
-            error: null,
+            itemId: normalized.itemId,
+            itemName: normalized.itemName,
+            updatedAt: normalized.updatedAt,
+            callDate: normalized.callDate,
+            setter: normalized.setter,
+            stage: normalized.stage,
+            disposition: normalized.disposition,
+            isBooked: normalized.isBooked,
+            contactKey: normalized.contactKey,
+            raw: normalized.raw,
           },
           logger,
         );
-
-        return {
-          status: 'success',
-          boardId,
-          fetchedItems,
-          upsertedItems,
-          nextCursor: cursor,
-          startedAt,
-          finishedAt: new Date().toISOString(),
-        };
+        upsertedItems += 1;
       }
 
       cursor = page.nextCursor;

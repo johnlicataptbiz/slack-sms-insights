@@ -4,7 +4,7 @@ builder = "nixpacks"
 
 [build.nixpacks]
 # Use Node.js 22 LTS
-nodeVersion = "22"
+nodeVersion = "22.12.0"
 
 # Build command
 buildCmd = "npm run build"

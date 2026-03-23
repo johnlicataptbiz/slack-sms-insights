@@ -649,24 +649,28 @@ export default function InboxV2() {
   const escalationProgressPct = Math.round((escalationLevel / 4) * 100);
   const qualificationFields = [
     {
-      key: "full",
-      label: "Full or part time",
-      complete: qualificationState.fullOrPartTime !== "unknown",
-    },
-    {
       key: "niche",
       label: "Niche",
       complete: (qualificationState.niche || "").trim().length > 0,
+      hint: "Who they work with / treat",
     },
     {
       key: "mix",
-      label: "Revenue mix",
+      label: "Payment model",
       complete: qualificationState.revenueMix !== "unknown",
+      hint: "Cash, hybrid, or insurance",
     },
     {
-      key: "coach",
-      label: "Coaching interest",
+      key: "space",
+      label: "Space",
+      complete: qualificationState.fullOrPartTime !== "unknown",
+      hint: "Brick & mortar, gym, or searching",
+    },
+    {
+      key: "owner",
+      label: "Ownership",
       complete: qualificationState.coachingInterest !== "unknown",
+      hint: "Owner, launching, or < 3 months",
     },
   ];
 

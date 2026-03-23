@@ -822,8 +822,8 @@ export default function InboxV2() {
     floatingStyles: templateFloatingStyles,
     context: templateFloatingContext,
   } = useFloating({
-    open: showTemplates,
-    onOpenChange: setShowTemplates,
+    open: uiState.showTemplates,
+    onOpenChange: (open) => updateUIState({ showTemplates: open }),
     placement: "top-end",
     whileElementsMounted: autoUpdate,
     middleware: [
@@ -848,23 +848,23 @@ export default function InboxV2() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mediaQuery = window.matchMedia("(max-width: 900px)");
-    const onChange = () => setIsNarrowComposerViewport(mediaQuery.matches);
+    const onChange = () => updateUIState({ isNarrowComposerViewport: mediaQuery.matches });
     onChange();
     mediaQuery.addEventListener("change", onChange);
     return () => mediaQuery.removeEventListener("change", onChange);
   }, []);
 
   useEffect(() => {
-    if (!isComposerModalOpen && showTemplates) {
-      setShowTemplates(false);
+    if (!uiState.isComposerModalOpen && uiState.showTemplates) {
+      updateUIState({ showTemplates: false });
     }
-  }, [isComposerModalOpen, showTemplates]);
+  }, [uiState.isComposerModalOpen, uiState.showTemplates]);
 
   useEffect(() => {
-    if (!isComposerModalOpen && isEmojiPickerOpen) {
-      setIsEmojiPickerOpen(false);
+    if (!uiState.isComposerModalOpen && uiState.isEmojiPickerOpen) {
+      updateUIState({ isEmojiPickerOpen: false });
     }
-  }, [isComposerModalOpen, isEmojiPickerOpen]);
+  }, [uiState.isComposerModalOpen, uiState.isEmojiPickerOpen]);
 
   useEffect(() => {
     // Do NOT auto-switch while the composer modal is open.
@@ -872,23 +872,23 @@ export default function InboxV2() {
     // the moment you reply to it — without this guard the effect would immediately
     // snap selectedConversationId to conversations[0] (a completely different
     // contact) while the user is still looking at the modal they just sent from.
-    if (isComposerModalOpen) return;
+    if (uiState.isComposerModalOpen) return;
 
-    if (!selectedConversationId && conversations.length > 0) {
-      setSelectedConversationId(conversations[0]?.id || null);
+    if (!uiState.uiState.selectedConversationId && conversations.length > 0) {
+      inboxState.selectConversation(conversations[0]?.id || null);
       return;
     }
 
     if (
-      selectedConversationId &&
-      !conversations.some((row) => row.id === selectedConversationId)
+      uiState.selectedConversationId &&
+      !conversations.some((row) => row.id === uiState.selectedConversationId)
     ) {
-      setSelectedConversationId(conversations[0]?.id || null);
+      inboxState.selectConversation(conversations[0]?.id || null);
     }
-  }, [conversations, selectedConversationId, isComposerModalOpen]);
+  }, [conversations, uiState.selectedConversationId, uiState.isComposerModalOpen]);
 
-  const detailQuery = useV2InboxConversationDetail(selectedConversationId, {
-    forceSync: isComposerModalOpen && Boolean(selectedConversationId),
+  const detailQuery = useV2InboxConversationDetail(uiState.selectedConversationId, {
+    forceSync: uiState.isComposerModalOpen && Boolean(uiState.selectedConversationId),
     // FIXED: Removed aggressive 7-second polling - was causing message race conditions
     // Messages now only fetch when explicitly requested or on conversation change
   });
@@ -905,7 +905,7 @@ export default function InboxV2() {
   const sequenceDisenrollMutation = useV2DisenrollConversationFromSequence();
 
   // Phase 2 hooks
-  const notesQuery = useV2ConversationNotes(selectedConversationId);
+  const notesQuery = useV2ConversationNotes(uiState.selectedConversationId);
   const addNoteMutation = useV2AddConversationNote();
   const snoozeMutation = useV2SnoozeConversation();
   const assignMutation = useV2AssignConversation();
@@ -1019,7 +1019,7 @@ export default function InboxV2() {
   const newTemplateName = templateForm.watch("name");
   const newTemplateBody = templateForm.watch("body");
   const selectedLineOption =
-    lineOptions.find((option) => option.key === selectedLineKey) || null;
+    lineOptions.find((option) => option.key === uiState.selectedLineKey) || null;
   const lineSelectionRequired =
     Boolean(sendConfig?.requiresSelection) && !selectedLineOption;
   const savedDefaultSummary = sendConfig?.defaultSelection
@@ -1040,31 +1040,29 @@ export default function InboxV2() {
         (option) => option.key === sendConfig.defaultSelection?.key,
       )
     ) {
-      setSelectedLineKey(sendConfig.defaultSelection.key);
+      updateUIState({ selectedLineKey: sendConfig.defaultSelection.key });
       return;
     }
 
     if (lineOptions.length === 1) {
       const onlyOption = lineOptions[0];
       if (onlyOption) {
-        setSelectedLineKey(onlyOption.key);
+        updateUIState({ selectedLineKey: onlyOption.key });
       }
       return;
     }
 
-    setSelectedLineKey("");
-  }, [lineOptions, selectedLineKey, sendConfig]);
+    updateUIState({ selectedLineKey: "" });
+  }, [lineOptions, uiState.selectedLineKey, sendConfig]);
 
   useEffect(() => {
     if (!detailConversation) return;
 
-    setQualificationState(detailConversation.qualification);
-    setEscalationLevel(detailConversation.escalation.level);
-    setEscalationReason(detailConversation.escalation.reason || "");
+    updateQualification(detailConversation.qualification);
+    updateEscalation({ level: detailConversation.escalation.level, reason: detailConversation.escalation.reason || "" });
     setSequenceIdInput(detailContactCard?.sequenceId || "");
     assignForm.reset({ ownerLabel: detailConversation.ownerLabel || "" });
-    setLocalObjectionTags(detailConversation.objectionTags ?? []);
-    setLocalCallOutcome(detailConversation.callOutcome ?? null);
+    updateSelectionState({ localObjectionTags: detailConversation.objectionTags ?? [], localCallOutcome: detailConversation.callOutcome ?? null });
   }, [
     assignForm,
     detailConversation?.id,
@@ -1097,7 +1095,7 @@ export default function InboxV2() {
     const latestDraft = detailDrafts[0];
     if (!latestDraft) return;
 
-    if (composerText.trim().length === 0) {
+    if (uiState.composerText.trim().length === 0) {
       setComposerText(latestDraft.text);
       setSelectedDraftId(latestDraft.id);
     }
@@ -1110,9 +1108,9 @@ export default function InboxV2() {
   ]);
 
   useEffect(() => {
-    if (!isComposerModalOpen || !selectedConversationId || !detail) return;
+    if (!uiState.isComposerModalOpen || !uiState.selectedConversationId || !detail) return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
-  }, [isComposerModalOpen, selectedConversationId, detailConversation?.id]);
+  }, [uiState.isComposerModalOpen, uiState.selectedConversationId, detailConversation?.id]);
 
   // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
   useEffect(() => {
@@ -1121,7 +1119,7 @@ export default function InboxV2() {
   }, [detailMessages, justSentMessage]);
 
   useEffect(() => {
-    if (!isComposerModalOpen) return;
+    if (!uiState.isComposerModalOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -1131,7 +1129,7 @@ export default function InboxV2() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isComposerModalOpen]);
+  }, [uiState.isComposerModalOpen]);
 
   const selectConversationAtIndex = (index: number) => {
     const bounded = Math.max(
@@ -1211,7 +1209,9 @@ export default function InboxV2() {
       if (result.data.generationMode === "contextual_fallback") {
         const firstWarning =
           result.data.generationWarnings[0] || "AI generation unavailable";
-        inboxState.setFlashMessage(`Draft generated in fallback mode. ${firstWarning}`);
+        inboxState.setFlashMessage(
+          `Draft generated in fallback mode. ${firstWarning}`,
+        );
         return;
       }
       if (result.data.lint.passed) {
@@ -1281,7 +1281,11 @@ export default function InboxV2() {
 
   const onSend = async () => {
     if (sendLockRef.current) return;
-    if (!uiState.selectedConversationId || uiState.composerText.trim().length === 0) return;
+    if (
+      !uiState.selectedConversationId ||
+      uiState.composerText.trim().length === 0
+    )
+      return;
     if (lineSelectionRequired) {
       inboxState.setFlashMessage("Select a send line before sending.");
       return;
@@ -1338,8 +1342,15 @@ export default function InboxV2() {
   };
 
   const onAppendEmoji = (emojiData: EmojiClickData) => {
-    updateUIState({ composerText: `${uiState.composerText}${emojiData.emoji}` });
-    updateUIState({ sendStatus: (uiState.sendStatus === "sent" || uiState.sendStatus === "error" ? "idle" : uiState.sendStatus) });
+    updateUIState({
+      composerText: `${uiState.composerText}${emojiData.emoji}`,
+    });
+    updateUIState({
+      sendStatus:
+        uiState.sendStatus === "sent" || uiState.sendStatus === "error"
+          ? "idle"
+          : uiState.sendStatus,
+    });
     pendingIdempotencyRef.current = null;
     window.requestAnimationFrame(() => composerRef.current?.focus());
   };
@@ -1347,10 +1358,10 @@ export default function InboxV2() {
   useHotkeys(
     "mod+enter",
     (event) => {
-      if (!isComposerModalOpen) return;
+      if (!uiState.isComposerModalOpen) return;
       if (
         sendMutation.isPending ||
-        composerText.trim().length === 0 ||
+        uiState.composerText.trim().length === 0 ||
         lineSelectionRequired ||
         sendConfigQuery.isLoading
       ) {
@@ -1361,9 +1372,9 @@ export default function InboxV2() {
     },
     { enableOnFormTags: true },
     [
-      isComposerModalOpen,
+      uiState.isComposerModalOpen,
       sendMutation.isPending,
-      composerText,
+      uiState.composerText,
       lineSelectionRequired,
       sendConfigQuery.isLoading,
       onSend,
@@ -1373,18 +1384,18 @@ export default function InboxV2() {
   useHotkeys(
     "mod+shift+a",
     (event) => {
-      if (!isComposerModalOpen || !selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId) return;
       event.preventDefault();
       void onUpdateStatus("closed");
     },
     { enableOnFormTags: true },
-    [isComposerModalOpen, selectedConversationId],
+    [uiState.isComposerModalOpen, uiState.selectedConversationId],
   );
 
   useHotkeys(
     "mod+shift+s",
     (event) => {
-      if (!isComposerModalOpen || !selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId) return;
       event.preventDefault();
       const snoozedUntil = addHours(new Date(), 24).toISOString();
       void snoozeMutation

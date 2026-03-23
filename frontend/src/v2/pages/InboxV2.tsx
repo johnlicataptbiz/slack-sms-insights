@@ -645,8 +645,8 @@ export default function InboxV2() {
   const qualificationProgressPct = Math.round(
     (qualificationProgressLive / 4) * 100,
   );
-  const escalationTone = escalationToneForLevel(escalationLevel);
-  const escalationProgressPct = Math.round((escalationLevel / 4) * 100);
+  const escalationTone = escalationToneForLevel(escalationState.level);
+  const escalationProgressPct = Math.round((escalationState.level / 4) * 100);
   const qualificationFields = [
     {
       key: "niche",
@@ -1614,8 +1614,8 @@ export default function InboxV2() {
     try {
       await escalationMutation.mutateAsync({
         conversationId: selectedConversationId,
-        level: escalationLevel,
-        reason: escalationReason,
+        level: escalationState.level,
+        reason: escalationState.reason,
       });
       // FIXED: Always refetch after save to verify backend accepted the change
       await detailQuery.refetch();
@@ -2617,7 +2617,7 @@ export default function InboxV2() {
                 marginBottom: "1rem",
               }}
             >
-              You&apos;re sending a call link at L{escalationLevel}. Confirm at
+              You&apos;re sending a call link at L{escalationState.level}. Confirm at
               least 2 buying signals before proceeding.
             </AlertDialog.Description>
 
@@ -3678,8 +3678,8 @@ export default function InboxV2() {
                             <p className="V2Panel__title">Escalation Stage</p>
                             <div className="V2Inbox__stateTop">
                               <span className="V2Inbox__stateBadge">
-                                L{escalationLevel} ·{" "}
-                                {escalationLevelSubtitle(escalationLevel)}
+                                L{escalationState.level} ·{" "}
+                                {escalationLevelSubtitle(escalationState.level)}
                               </span>
                               <span className="V2Inbox__stateHint">
                                 {escalationProgressPct}%
@@ -3695,8 +3695,8 @@ export default function InboxV2() {
                                 <button
                                   key={level}
                                   type="button"
-                                  className={`V2Inbox__levelChip ${escalationLevel === level ? "is-active" : ""}`}
-                                  onClick={() => setEscalationLevel(level)}
+                                  className={`V2Inbox__levelChip ${escalationState.level === level ? "is-active" : ""}`}
+                                  onClick={() => updateEscalation({ level })}
                                 >
                                   L{level}
                                 </button>
@@ -3708,9 +3708,9 @@ export default function InboxV2() {
                             >
                               <span>Override Reason</span>
                               <textarea
-                                value={escalationReason}
+                                value={escalationState.reason}
                                 onChange={(e) =>
-                                  setEscalationReason(e.target.value)
+                                  updateEscalation({ reason: e.target.value })
                                 }
                                 rows={2}
                                 placeholder="Why are you overriding? (optional)"

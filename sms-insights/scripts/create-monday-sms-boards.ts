@@ -17,6 +17,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
 
 // Load .env file
 const envPath = path.join(process.cwd(), '.env');
@@ -133,19 +134,7 @@ async function createColumn(
 
 async function setupSmsEventsBoard(boardId: string): Promise<void> {
   console.log('  📋 Setting up columns for SMS Events board...');
-
-  const columns = [
-    { title: 'Event Type', type: 'status', defaults: { labels: { 0: 'Inbound', 1: 'Outbound', 2: 'System' } } },
-    { title: 'Phone Number', type: 'phone' },
-    { title: 'Contact Name', type: 'text' },
-    { title: 'Message', type: 'long_text' },
-    { title: 'Timestamp', type: 'date' },
-    { title: 'Rep/Setter', type: 'text' },
-    { title: 'Slack Thread', type: 'link' },
-    { title: 'Conversation ID', type: 'text' },
-  ];
-
-  for (const col of columns) {
+  for (const col of mondaySmsBoardSchemas.events.columns) {
     await createColumn(boardId, col.title, col.type, col.defaults);
     console.log(`    ✓ Created: ${col.title}`);
   }
@@ -153,21 +142,7 @@ async function setupSmsEventsBoard(boardId: string): Promise<void> {
 
 async function setupSmsSequencesBoard(boardId: string): Promise<void> {
   console.log('  📋 Setting up columns for SMS Sequences board...');
-
-  const columns = [
-    { title: 'Sequence Name', type: 'text' },
-    { title: 'Status', type: 'status', defaults: { labels: { 0: 'Active', 1: 'Paused', 2: 'Completed', 3: 'Draft' } } },
-    { title: 'Total Contacts', type: 'numbers' },
-    { title: 'Messages Sent', type: 'numbers' },
-    { title: 'Responses', type: 'numbers' },
-    { title: 'Response Rate', type: 'numbers' },
-    { title: 'Conversions', type: 'numbers' },
-    { title: 'Start Date', type: 'date' },
-    { title: 'End Date', type: 'date' },
-    { title: 'Owner', type: 'text' },
-  ];
-
-  for (const col of columns) {
+  for (const col of mondaySmsBoardSchemas.sequences.columns) {
     await createColumn(boardId, col.title, col.type, col.defaults);
     console.log(`    ✓ Created: ${col.title}`);
   }
@@ -175,20 +150,7 @@ async function setupSmsSequencesBoard(boardId: string): Promise<void> {
 
 async function setupSmsReportsBoard(boardId: string): Promise<void> {
   console.log('  📋 Setting up columns for SMS Reports board...');
-
-  const columns = [
-    { title: 'Report Date', type: 'date' },
-    { title: 'Total Messages', type: 'numbers' },
-    { title: 'Inbound', type: 'numbers' },
-    { title: 'Outbound', type: 'numbers' },
-    { title: 'Unique Contacts', type: 'numbers' },
-    { title: 'New Conversations', type: 'numbers' },
-    { title: 'Response Rate', type: 'numbers' },
-    { title: 'Top Performer', type: 'text' },
-    { title: 'Slack Report Link', type: 'link' },
-  ];
-
-  for (const col of columns) {
+  for (const col of mondaySmsBoardSchemas.reports.columns) {
     await createColumn(boardId, col.title, col.type, col.defaults);
     console.log(`    ✓ Created: ${col.title}`);
   }
@@ -238,21 +200,21 @@ async function main() {
   try {
     // Create SMS Events Board
     console.log('1️⃣  Creating SMS Events Board...');
-    boardIds.events = await createBoard('SMS Events', 'public');
+    boardIds.events = await createBoard(mondaySmsBoardSchemas.events.boardName, 'public');
     console.log(`  ✅ Created! Board ID: ${boardIds.events}`);
     await setupSmsEventsBoard(boardIds.events);
     console.log('');
 
     // Create SMS Sequences Board
     console.log('2️⃣  Creating SMS Sequences Board...');
-    boardIds.sequences = await createBoard('SMS Sequences', 'public');
+    boardIds.sequences = await createBoard(mondaySmsBoardSchemas.sequences.boardName, 'public');
     console.log(`  ✅ Created! Board ID: ${boardIds.sequences}`);
     await setupSmsSequencesBoard(boardIds.sequences);
     console.log('');
 
     // Create SMS Reports Board
     console.log('3️⃣  Creating SMS Reports Board...');
-    boardIds.reports = await createBoard('SMS Daily Reports', 'public');
+    boardIds.reports = await createBoard(mondaySmsBoardSchemas.reports.boardName, 'public');
     console.log(`  ✅ Created! Board ID: ${boardIds.reports}`);
     await setupSmsReportsBoard(boardIds.reports);
     console.log('');

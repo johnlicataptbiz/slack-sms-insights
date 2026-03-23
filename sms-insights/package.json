@@ -4,6 +4,9 @@
   "description": "A scaffold template for Slack apps",
   "main": "dist/app.js",
   "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "prebuild": "node --import tsx ./scripts/generate-changelog-json.ts",
@@ -11,11 +14,13 @@
     "build:frontend:optional": "cd ../frontend && npm run build",
     "build:watch": "tsc --watch",
     "build:frontend": "sh -c 'if [ \"${SKIP_FRONTEND_BUILD:-}\" = \"true\" ]; then echo \"SKIP_FRONTEND_BUILD=true; skipping frontend build\"; elif [ -d ../frontend ]; then cd ../frontend && npm run build; else echo \"frontend directory not present in build context; skipping frontend build\"; fi'",
+    "generate:db-report": "node --import tsx generate-live-database-report.ts",
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
     "backfill:slack": "node --import tsx ./scripts/backfill-slack-events.ts",
     "backfill:booked-calls": "node --import tsx ./scripts/backfill-booked-calls.ts",
     "backfill:contact-profiles": "node --import tsx ./scripts/backfill-contact-profiles.ts",
     "backfill:contact-profiles-lrn": "node --import tsx ./scripts/backfill-contact-profiles-lrn.ts",
+    "monday:repair-sms-boards": "node --import tsx ./scripts/polish-monday-sms-boards.ts",
     "check:monday:lead-normalization": "node --import tsx ./scripts/check-monday-lead-normalization.ts",
     "rebuild:monday:governed": "node --import tsx ./scripts/rebuild-monday-governed-analytics.ts",
     "sync:monday": "node --import tsx ./scripts/sync-monday.ts",
@@ -46,7 +51,8 @@
     "railway:status": "railway service",
     "railway:logs": "railway logs --follow",
     "railway:logs:build": "railway logs --build --lines 50",
-    "generate:db-report": "node --import tsx generate-live-database-report.ts"
+    "prisma:studio": "prisma studio --config prisma.config.ts",
+    "prisma:studio:prod": "railway run prisma studio --config prisma.config.ts --port 5555"
   },
   "author": "Slack Technologies, LLC",
   "license": "MIT",

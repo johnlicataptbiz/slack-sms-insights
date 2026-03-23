@@ -1,451 +1,156 @@
 #!/usr/bin/env node
 /**
- * Live Database Analysis Report Generator
- * 
- * Executes real SQL queries against Railway PostgreSQL and generates
- * a comprehensive markdown report with live metrics, statistics,
- * and actionable insights.
- * 
- * Usage:
- *   npx tsx generate-live-database-report.ts
- *   npm run generate:db-report
- * 
- * Requirements:
- *   - DATABASE_PUBLIC_URL in .env (Railway PostgreSQL)
- *   - Node.js 22+
- *   - pg package (for raw SQL queries)
+ * Generate Live Database Report - FIXED VERSION
+ * Creates LIVE-DATABASE-REPORT.md using real sms-insights schema/tables
  */
 
-import { Pool } from 'pg';
+import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Logger } from '@slack/bolt';
+import { initDatabase, getPool, closeDatabase } from './services/db.js';
 
-interface DBMetrics {
-  timestamp: string;
-  tableStats: Record<string, number>;
-  conversationStats: {
-    total: number;
-    byStatus: Record<string, number>;
-    avgMessagesPerConversation: number;
-  };
-  messageStats: {
-    total: number;
-    byDirection: Record<string, number>;
-    inboundOutboundRatio: number;
-    avgPerConversation: number;
-  };
-  userStats: {
-    totalUsers: number;
-    avgConversationsPerUser: number;
-  };
-  temporalStats: {
-    last7Days: {
-      messageCount: number;
-      conversationCount: number;
-      callCount: number;
-    };
-    last30Days: {
-      messageCount: number;
-      conversationCount: number;
-      callCount: number;
-    };
-  };
-  callStats: {
-    total: number;
-    byStatus: Record<string, number>;
-  };
-}
+const logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = {
+  debug: console.debug.bind(console),
+  info: console.info.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console),
+};
 
-async function generateReport(): Promise<string> {
-  console.log('🔍 Starting live database analysis...\n');
-
-  const connectionString = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
-  if (!connectionString) {
-    throw new Error('DATABASE_PUBLIC_URL or DATABASE_URL not set in .env');
-  }
-
-  const pool = new Pool({ connectionString });
-  const startTime = Date.now();
+async function generateReport() {
+  console.log('🔍 Starting live database analysis...');
   
-  const metrics: DBMetrics = {
-    timestamp: new Date().toISOString(),
-    tableStats: {},
-    conversationStats: { total: 0, byStatus: {}, avgMessagesPerConversation: 0 },
-    messageStats: { total: 0, byDirection: {}, inboundOutboundRatio: 0, avgPerConversation: 0 },
-    userStats: { totalUsers: 0, avgConversationsPerUser: 0 },
-    temporalStats: {
-      last7Days: { messageCount: 0, conversationCount: 0, callCount: 0 },
-      last30Days: { messageCount: 0, conversationCount: 0, callCount: 0 },
-    },
-    callStats: { total: 0, byStatus: {} },
-  };
-
+  await initDatabase(logger);
+  const pool = getPool();
+  if (!pool) throw new Error('Failed to initialize database pool');
+  
+  const timestamp = new Date().toISOString();
+  const startedAt = Date.now();
+  
   try {
-    // ==========================================
-    // SECTION 1: Table Statistics
-    // ==========================================
+    const queryOne = async <T extends Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T> => {
+      const result = await pool.query(sql, params);
+      return (result.rows[0] ?? {}) as T;
+    };
+
+    // ===== 1. CORE TABLE STATS =====
     console.log('📊 Collecting table statistics...');
     
-    const tableQueries = [
-      'SELECT COUNT(*) as count FROM "Conversation"',
-      'SELECT COUNT(*) as count FROM "SmsMessage"', 
-      'SELECT COUNT(*) as count FROM "Call"',
-      'SELECT COUNT(*) as count FROM "User"',
-      'SELECT COUNT(*) as count FROM "Channel"',
-      'SELECT COUNT(*) as count FROM "SetterFeedback"',
-    ];
-
-    const tableNames = ['Conversations', 'SmsMessages', 'Calls', 'Users', 'Channels', 'SetterFeedback'];
+    const snapshots = await queryOne<{ count: number; latest: string }>(`
+      SELECT 
+        COUNT(*)::int as count, 
+        COALESCE(MAX(updated_at)::text, 'none') as latest 
+      FROM monday_call_snapshots
+    `);
     
-    for (let i = 0; i < tableQueries.length; i++) {
-      const result = await pool.query(tableQueries[i]);
-      metrics.tableStats[tableNames[i]] = parseInt(result.rows[0]?.count || '0', 10);
-    }
-
-    // ==========================================
-    // SECTION 2: Conversation Analytics
-    // ==========================================
-    console.log('💬 Analyzing conversations...');
+    const boards = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM monday_board_registry WHERE active = true');
+    const leads = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM lead_outcomes');
+    const attribs = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM lead_attribution');
+    const sequences = await queryOne<{ count: number }>('SELECT COUNT(*)::int as count FROM sequence_registry WHERE status = $1', ['active']);
     
-    const convCount = await pool.query('SELECT COUNT(*) as count FROM "Conversation"');
-    metrics.conversationStats.total = parseInt(convCount.rows[0]?.count || '0', 10);
-
-    const convByStatus = await pool.query(
-      'SELECT status, COUNT(*) as count FROM "Conversation" GROUP BY status'
-    );
-    convByStatus.rows.forEach((row: any) => {
-      metrics.conversationStats.byStatus[row.status || 'NULL'] = row.count;
-    });
-
-    const avgMsgPerConv = await pool.query(
-      'SELECT AVG(msg_count) as avg FROM (SELECT COUNT(*) as msg_count FROM "SmsMessage" GROUP BY "conversationId") sub'
-    );
-    metrics.conversationStats.avgMessagesPerConversation = 
-      parseFloat(avgMsgPerConv.rows[0]?.avg || '0');
-
-    // ==========================================
-    // SECTION 3: Message Direction Analysis
-    // ==========================================
-    console.log('📨 Analyzing message directions...');
+    // ===== 2. MONDAY SYNC HEALTH =====
+    console.log('🔄 Checking Monday sync status...');
     
-    const msgCount = await pool.query('SELECT COUNT(*) as count FROM "SmsMessage"');
-    metrics.messageStats.total = parseInt(msgCount.rows[0]?.count || '0', 10);
-
-    const msgByDirection = await pool.query(
-      'SELECT direction, COUNT(*) as count FROM "SmsMessage" GROUP BY direction'
-    );
-    msgByDirection.rows.forEach((row: any) => {
-      metrics.messageStats.byDirection[row.direction || 'NULL'] = row.count;
-    });
-
-    const inbound = metrics.messageStats.byDirection['INBOUND'] || 0;
-    const outbound = metrics.messageStats.byDirection['OUTBOUND'] || 0;
-    metrics.messageStats.inboundOutboundRatio = outbound > 0 ? inbound / outbound : 0;
-    metrics.messageStats.avgPerConversation = 
-      metrics.messageStats.total / Math.max(metrics.conversationStats.total, 1);
-
-    // ==========================================
-    // SECTION 4: User Statistics
-    // ==========================================
-    console.log('👥 Analyzing user metrics...');
+    const syncHealth = await queryOne<{ total_boards: number; healthy: number; avg_hours_stale: number | null }>(`
+      SELECT 
+        COUNT(*)::int as total_boards,
+        COUNT(CASE WHEN last_sync_at > NOW() - INTERVAL '1 day' THEN 1 END)::int as healthy,
+        AVG(EXTRACT(EPOCH FROM (NOW() - COALESCE(last_sync_at, '1970-01-01'::timestamptz)) / 3600))::numeric as avg_hours_stale
+      FROM monday_sync_state
+    `);
     
-    const userCount = await pool.query('SELECT COUNT(*) as count FROM "User"');
-    metrics.userStats.totalUsers = parseInt(userCount.rows[0]?.count || '0', 10);
-
-    const avgConvPerUser = await pool.query(
-      'SELECT AVG(conv_count) as avg FROM (SELECT COUNT(*) as conv_count FROM "Conversation" GROUP BY "userId") sub'
-    );
-    metrics.userStats.avgConversationsPerUser = parseFloat(avgConvPerUser.rows[0]?.avg || '0');
-
-    // ==========================================
-    // SECTION 5: Temporal Analysis
-    // ==========================================
-    console.log('📅 Analyzing temporal trends...');
+    // ===== 3. BUSINESS KPIs (7-DAY) =====
+    console.log('📈 Calculating KPIs...');
     
-    const last7Count = await pool.query(
-      'SELECT COUNT(*) as count FROM "SmsMessage" WHERE "createdAt" >= NOW() - INTERVAL \'7 days\''
-    );
-    metrics.temporalStats.last7Days.messageCount = parseInt(last7Count.rows[0]?.count || '0', 10);
-
-    const last7ConvCount = await pool.query(
-      'SELECT COUNT(*) as count FROM "Conversation" WHERE "createdAt" >= NOW() - INTERVAL \'7 days\''
-    );
-    metrics.temporalStats.last7Days.conversationCount = parseInt(last7ConvCount.rows[0]?.count || '0', 10);
-
-    const last7CallCount = await pool.query(
-      'SELECT COUNT(*) as count FROM "Call" WHERE "createdAt" >= NOW() - INTERVAL \'7 days\''
-    );
-    metrics.temporalStats.last7Days.callCount = parseInt(last7CallCount.rows[0]?.count || '0', 10);
-
-    const last30Count = await pool.query(
-      'SELECT COUNT(*) as count FROM "SmsMessage" WHERE "createdAt" >= NOW() - INTERVAL \'30 days\''
-    );
-    metrics.temporalStats.last30Days.messageCount = parseInt(last30Count.rows[0]?.count || '0', 10);
-
-    const last30ConvCount = await pool.query(
-      'SELECT COUNT(*) as count FROM "Conversation" WHERE "createdAt" >= NOW() - INTERVAL \'30 days\''
-    );
-    metrics.temporalStats.last30Days.conversationCount = parseInt(last30ConvCount.rows[0]?.count || '0', 10);
-
-    const last30CallCount = await pool.query(
-      'SELECT COUNT(*) as count FROM "Call" WHERE "createdAt" >= NOW() - INTERVAL \'30 days\''
-    );
-    metrics.temporalStats.last30Days.callCount = parseInt(last30CallCount.rows[0]?.count || '0', 10);
-
-    // ==========================================
-    // SECTION 6: Call Analytics
-    // ==========================================
-    console.log('📞 Analyzing call metrics...');
+    const kpis = await queryOne<{
+      recent_bookings: number;
+      unique_leads_7d: number;
+      fresh_syncs: number;
+      missing_keys: number;
+    }>(`
+      WITH recent AS (SELECT * FROM monday_call_snapshots WHERE updated_at > NOW() - INTERVAL '7 days')
+      SELECT 
+        COUNT(*) FILTER (WHERE is_booked)::int as recent_bookings,
+        COUNT(DISTINCT contact_key) FILTER (WHERE contact_key IS NOT NULL)::int as unique_leads_7d,
+        COUNT(*) FILTER (WHERE synced_at > NOW() - INTERVAL '1 hour')::int as fresh_syncs,
+        COUNT(*) FILTER (WHERE contact_key IS NULL OR contact_key = '')::int as missing_keys
+      FROM recent
+    `);
     
-    const callCount = await pool.query('SELECT COUNT(*) as count FROM "Call"');
-    metrics.callStats.total = parseInt(callCount.rows[0]?.count || '0', 10);
-
-    const callByStatus = await pool.query(
-      'SELECT status, COUNT(*) as count FROM "Call" GROUP BY status'
+    // ===== 4. TREND ANALYSIS (DAILY SNAPSHOTS) =====
+    const trendResult = await pool.query(`
+      SELECT 
+        TO_CHAR(date_trunc('day', updated_at), 'YYYY-MM-DD') as day,
+        COUNT(*)::int as daily_snapshots
+      FROM monday_call_snapshots 
+      WHERE updated_at > NOW() - INTERVAL '7 days'
+      GROUP BY 1 ORDER BY 1 DESC
+    `);
+    const trends = (trendResult.rows as { day: string; daily_snapshots: number }[]).map(t => `${t.day}: ${t.daily_snapshots}`);
+    
+    // ===== 5. HEALTH ANOMALIES =====
+    const anomalyResult = await pool.query(`
+      SELECT board_id, COUNT(*)::int as snapshots,
+        CASE 
+          WHEN COUNT(*) FILTER (WHERE contact_key IS NULL OR contact_key = '') > COUNT(*) * 0.1 THEN '🚨 HIGH_MISSING_KEYS'
+          WHEN AVG(EXTRACT(EPOCH FROM (updated_at - synced_at))/3600) > 2 THEN '⚠️ SYNC_LAG'
+          ELSE '✅ HEALTHY'
+        END as health_flag
+      FROM monday_call_snapshots 
+      GROUP BY board_id HAVING COUNT(*) > 50
+      ORDER BY snapshots DESC
+    `);
+    const anomalies = (anomalyResult.rows as {board_id: string, snapshots: number, health_flag: string}[]).map(a => 
+      `- \`${a.board_id}\`: ${a.snapshots} snaps **${a.health_flag}**`
     );
-    callByStatus.rows.forEach((row: any) => {
-      metrics.callStats.byStatus[row.status || 'NULL'] = row.count;
-    });
+    
+    // ===== GENERATE MARKDOWN =====
+    const report = `# 📊 **LIVE DATABASE REPORT**
+*Generated: ${timestamp}* | *DB: sms_insights* | *Snap: ${snapshots.count.toLocaleString()}*
 
-    // ==========================================
-    // Generate Markdown Report
-    // ==========================================
-    const elapsedMs = Date.now() - startTime;
-    const report = generateMarkdownReport(metrics, elapsedMs);
+## 🗄️ **Table Inventory**
+| Table | Count | Latest |
+|-------|-------|--------|
+| **monday_call_snapshots** | **${snapshots.count.toLocaleString()}** | ${snapshots.latest} |
+| monday_board_registry | ${boards.count} | - |
+| lead_outcomes | ${leads.count} | - |
+| lead_attribution | ${attribs.count} | - |
+| active sequences | ${sequences.count} | - |
 
-    await pool.end();
-    return report;
+## 🔄 **Monday Sync Health** 
+**Boards**: ${syncHealth.total_boards} total | **${syncHealth.healthy} healthy** (24h)  
+**Avg stale**: **${syncHealth.avg_hours_stale != null ? Number(syncHealth.avg_hours_stale).toFixed(1) : 'N/A'}h**
+
+## 📈 **7-Day KPIs**
+| Metric | Value |
+|--------|-------|
+| Recent Bookings | **${kpis.recent_bookings}** |
+| Unique Leads | **${kpis.unique_leads_7d}** |
+| Fresh Syncs (1h) | **${kpis.fresh_syncs}** |
+| Missing Keys | **${kpis.missing_keys}** (${((kpis.missing_keys/snapshots.count)*100).toFixed(1)}%)
+
+## 📉 **Daily Snapshot Trends** (Last 7d)
+\`\`\`
+${trends.join('\n')}
+\`\`\`
+
+## 🚨 **Board Health Flags** (50+ snaps)
+${anomalies.length ? anomalies.join('\n') : '**All healthy!** ✅'}
+
+---
+*Powered by sms-insights* • **Report complete in ${Date.now() - startedAt}ms**
+`;
+
+    fs.writeFileSync(path.resolve('LIVE-DATABASE-REPORT.md'), report);
+    console.log('✅ **LIVE-DATABASE-REPORT.md** generated!');
+    console.log('📁 Check `sms-insights/LIVE-DATABASE-REPORT.md`');
+    
   } catch (error) {
     console.error('❌ Error during analysis:', error);
-    await pool.end();
-    throw error;
-  }
-}
-
-function generateMarkdownReport(metrics: DBMetrics, elapsedMs: number): string {
-  const lastUpdated = new Date(metrics.timestamp).toLocaleString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZoneName: 'short',
-  });
-
-  return `# 📊 SMS Insights Live Database Report
-
-**Generated:** ${lastUpdated}  
-**Analysis Time:** ${elapsedMs}ms  
-**Dataset Freshness:** Real-time (${new Date().toISOString()})
-
----
-
-## 🎯 Executive Summary
-
-This live report captures current database metrics from your Railway PostgreSQL instance. All metrics are calculated in real-time from active data.
-
-### Quick Stats
-- **Total Conversations:** ${metrics.conversationStats.total.toLocaleString()}
-- **Total Messages:** ${metrics.messageStats.total.toLocaleString()}
-- **Total Calls:** ${metrics.callStats.total.toLocaleString()}
-- **Total Users:** ${metrics.userStats.totalUsers.toLocaleString()}
-- **Last 30 Days Activity:** ${metrics.temporalStats.last30Days.messageCount.toLocaleString()} messages, ${metrics.temporalStats.last30Days.conversationCount.toLocaleString()} conversations
-
----
-
-## 📈 Section 1: Database Size & Structure
-
-### Table Statistics
-
-| Table | Record Count | Status |
-|-------|--------------|--------|
-| Conversations | ${metrics.tableStats['Conversations'].toLocaleString()} | ✅ Active |
-| SMS Messages | ${metrics.tableStats['SmsMessages'].toLocaleString()} | ✅ Active |
-| Calls | ${metrics.tableStats['Calls'].toLocaleString()} | ✅ Active |
-| Users | ${metrics.tableStats['Users'].toLocaleString()} | ✅ Active |
-| Channels | ${metrics.tableStats['Channels'].toLocaleString()} | ✅ Active |
-| Setter Feedback | ${metrics.tableStats['SetterFeedback'].toLocaleString()} | ✅ Active |
-
----
-
-## 💬 Section 2: Conversation Analytics
-
-### Conversation Overview
-- **Total Conversations:** ${metrics.conversationStats.total.toLocaleString()}
-- **Average Messages per Conversation:** ${metrics.conversationStats.avgMessagesPerConversation.toFixed(2)}
-
-### Conversation Status Distribution
-
-\`\`\`
-${Object.entries(metrics.conversationStats.byStatus)
-  .map(([status, count]) => `${status}: ${count.toLocaleString()} (${((count / metrics.conversationStats.total) * 100).toFixed(1)}%)`)
-  .join('\n')}
-\`\`\`
-
----
-
-## 📨 Section 3: Message Flow Analysis
-
-### Message Direction Breakdown
-- **Total Messages:** ${metrics.messageStats.total.toLocaleString()}
-- **Inbound/Outbound Ratio:** ${metrics.messageStats.inboundOutboundRatio.toFixed(2)}:1
-- **Average Messages per Conversation:** ${metrics.messageStats.avgPerConversation.toFixed(2)}
-
-### Direction Distribution
-
-| Direction | Count | Percentage |
-|-----------|-------|-----------|
-${Object.entries(metrics.messageStats.byDirection)
-  .map(
-    ([direction, count]) =>
-      `| ${direction} | ${count.toLocaleString()} | ${((count / metrics.messageStats.total) * 100).toFixed(1)}% |`
-  )
-  .join('\n')}
-
-**Insight:** ${metrics.messageStats.inboundOutboundRatio > 1 ? 'More inbound messages indicate customer-driven conversations.' : 'More outbound messages indicate business-driven engagement.'}
-
----
-
-## 👥 Section 4: User & Participant Metrics
-
-### User Overview
-- **Total Users:** ${metrics.userStats.totalUsers.toLocaleString()}
-- **Average Conversations per User:** ${metrics.userStats.avgConversationsPerUser.toFixed(2)}
-
-### Top 10 Active Users
-
-No user ranking available in simplified metrics.
-
----
-
-## 📅 Section 5: Temporal Trends
-
-### Last 7 Days Activity
-- **Messages:** ${metrics.temporalStats.last7Days.messageCount.toLocaleString()}
-- **Conversations:** ${metrics.temporalStats.last7Days.conversationCount.toLocaleString()}
-- **Calls:** ${metrics.temporalStats.last7Days.callCount.toLocaleString()}
-- **Daily Average:** ${(metrics.temporalStats.last7Days.messageCount / 7).toFixed(0)} messages/day
-
-### Last 30 Days Activity
-- **Messages:** ${metrics.temporalStats.last30Days.messageCount.toLocaleString()}
-- **Conversations:** ${metrics.temporalStats.last30Days.conversationCount.toLocaleString()}
-- **Calls:** ${metrics.temporalStats.last30Days.callCount.toLocaleString()}
-- **Daily Average:** ${(metrics.temporalStats.last30Days.messageCount / 30).toFixed(0)} messages/day
-
-### Trend Analysis
-**7-Day vs 30-Day Growth:**
-- Message volume: ${((metrics.temporalStats.last7Days.messageCount / (metrics.temporalStats.last30Days.messageCount / 4.3)) * 100).toFixed(0)}% of 30-day average
-- Conversation velocity: ${((metrics.temporalStats.last7Days.conversationCount / (metrics.temporalStats.last30Days.conversationCount / 4.3)) * 100).toFixed(0)}% of 30-day average
-
----
-
-## 📞 Section 6: Call Analytics
-
-### Call Overview
-- **Total Calls:** ${metrics.callStats.total.toLocaleString()}
-
-### Call Status Distribution
-
-\`\`\`
-${Object.entries(metrics.callStats.byStatus)
-  .map(([status, count]) => `${status}: ${count.toLocaleString()} (${((count / metrics.callStats.total) * 100).toFixed(1)}%)`)
-  .join('\n')}
-\`\`\`
-
----
-
-## 🔍 Section 7: Data Quality Assessment
-
-### Data Integrity
-✅ **Referential Integrity:** Maintained via foreign key constraints  
-✅ **Temporal Consistency:** All records have createdAt/updatedAt timestamps  
-✅ **Status Constraints:** Required fields properly constrained (NOT NULL)  
-
----
-
-## ⚡ Section 8: Performance Snapshot
-
-### Current System Health
-- **Database Connection:** ✅ Active
-- **Query Performance:** ✅ Responsive
-- **Indexing Strategy:** ✅ Applied (per schema)
-- **Replication Status:** ✅ Railway PostgreSQL healthy
-
----
-
-## 📊 Section 9: Business Metrics
-
-### Engagement Scores
-- **Conversation Density:** ${(metrics.conversationStats.total / metrics.userStats.totalUsers).toFixed(2)} conversations per user
-- **Message Velocity:** ${metrics.messageStats.avgPerConversation.toFixed(1)} messages per conversation
-- **Response Efficiency:** ${metrics.messageStats.inboundOutboundRatio.toFixed(2)} inbound per outbound
-
-### Key Performance Indicators
-| KPI | Value | Trend |
-|-----|-------|-------|
-| Avg Messages/Conversation | ${metrics.conversationStats.avgMessagesPerConversation.toFixed(2)} | 📈 |
-| Conversations/User | ${metrics.userStats.avgConversationsPerUser.toFixed(2)} | 📈 |
-| Inbound/Outbound Ratio | ${metrics.messageStats.inboundOutboundRatio.toFixed(2)}:1 | ➡️ |
-| Call Completion Rate | ${metrics.callStats.total > 0 ? ((metrics.callStats.byStatus['COMPLETED'] || 0) / metrics.callStats.total * 100).toFixed(1) + '%' : 'N/A'} | ➡️ |
-
----
-
-## 💡 Section 10: Actionable Recommendations
-
-### Immediate Actions
-1. **Monitor 7-Day Trends** — Track if message volume is increasing/decreasing week-over-week
-2. **Review Top Users** — Engage with high-activity users for feedback
-3. **Validate Call Flow** — Ensure call status distribution aligns with expectations
-
-### Optimization Opportunities
-1. **Index Review** — Verify composite indexes are being used efficiently
-2. **Archive Strategy** — Consider archiving conversations older than 90 days
-3. **User Segmentation** — Create user tiers based on activity patterns
-
-### Data Maintenance
-1. **Backup Validation** — Railway PostgreSQL backups should be automatic
-2. **Connection Pool** — Monitor for connection leaks in production
-3. **Query Optimization** — Profile slow queries in dashboard
-
----
-
-## 📋 Report Metadata
-
-| Property | Value |
-|----------|-------|
-| Generated | ${lastUpdated} |
-| Database | Railway PostgreSQL |
-| Analysis Method | Live Prisma Queries |
-| Query Time | ${elapsedMs}ms |
-| Schema Version | 10 migrations (latest: 20260319_add_temporal_columns) |
-
----
-
-*Report generated by SMS Insights Live Database Analysis Tool*  
-*Data is current as of report generation time*  
-*Next recommended analysis: Daily / Weekly*
-`;
-}
-
-async function main() {
-  try {
-    const report = await generateReport();
-    
-    // Output to console
-    console.log('\n' + '='.repeat(80));
-    console.log(report);
-    console.log('='.repeat(80));
-    
-    // Optionally save to file
-    const fs = await import('fs').then(m => m.promises);
-    const reportPath = './LIVE-DATABASE-REPORT.md';
-    await fs.writeFile(reportPath, report);
-    console.log(`\n✅ Report saved to: ${reportPath}`);
-    
-  } catch (error) {
-    console.error('Fatal error:', error);
     process.exit(1);
+  } finally {
+    await closeDatabase();
   }
 }
 
-main();
+generateReport();

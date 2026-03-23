@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BarChart2, Inbox, Activity, GitBranch } from "lucide-react";
+import { BarChart2, Inbox, Activity, GitBranch, Database } from "lucide-react";
 
 import { v2Copy } from "../copy";
 import { listContainerVariants, listItemVariants } from "../utils/motion";
@@ -39,6 +39,33 @@ const navItems: NavItem[] = [
     icon: <GitBranch size={16} />,
   },
 ];
+
+const PRISMA_STUDIO_URL =
+  import.meta.env.VITE_PRISMA_STUDIO_URL || "http://localhost:5555";
+
+function DbExplorerButton() {
+  return (
+    <motion.a
+      href={PRISMA_STUDIO_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="V2Shell__dbExplorer"
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.97 }}
+      title="Open Prisma Studio — live database explorer"
+    >
+      <span className="V2Shell__dbExplorerIcon">
+        <Database size={15} />
+      </span>
+      <span className="V2Shell__dbExplorerText">
+        <span className="V2Shell__dbExplorerLabel">Database</span>
+        <span className="V2Shell__dbExplorerSub">Prisma Studio</span>
+      </span>
+      <span className="V2Shell__dbExplorerDot" aria-hidden="true" />
+    </motion.a>
+  );
+}
+
 
 const isRouteActive = (pathname: string, to: string) =>
   pathname === to || pathname.startsWith(`${to}/`);
@@ -126,6 +153,11 @@ export default function V2Shell({ children }: { children: ReactNode }) {
               })}
             </motion.div>
           </nav>
+
+          {/* ── DB Explorer ── */}
+          <div className="V2Shell__sidebarFooter">
+            <DbExplorerButton />
+          </div>
         </motion.aside>
 
         <main className="V2Shell__content">

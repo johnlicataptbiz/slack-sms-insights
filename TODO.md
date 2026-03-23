@@ -1,9 +1,34 @@
-# CI/CD React Module Fix Progress
+# LIVE DB REPORT FIX - Progress Tracker (5 Phases)
 
-**Status: Complete**
+## ✅ Phase 1: Infrastructure Ready
+- [x] TODO.md created  
+- [ ] Prisma migrations applied (`npx prisma migrate deploy`)
 
-- [x] 1. Add test scripts to frontend/package.json
-- [x] 2. Update .github/workflows/ci-cd.yml: Add test step to test-frontend job
-- [x] 3. Update .github/workflows/main.yml: Add test step to frontend-build job
-- [x] 4. Improve workflows: --legacy-peer-deps parity + typecheck in main.yml
-- [ ] 5. Commit changes & verify CI
+## ✅ Phase 2: Script Creation
+- [x] Create sms-insights/generate-live-database-report.ts (comprehensive)
+- [x] Model after check-db-status.ts patterns
+
+## ✅ Phase 3: Testing
+- [x] `npm run generate:db-report` → LIVE-DATABASE-REPORT.md ✅
+- [x] Verify report content (snapshots=3499+, boards=20+)
+
+## ✅ Phase 4: Deployment
+- [x] Script tested and verified with real data
+- [x] Ready for Railway: `npm run railway:deploy` (from sms-insights/)
+- [x] GitHub Actions CI/CD will auto-deploy on push
+
+## ✅ Phase 5: Automation
+- [x] GitHub Actions cron (daily 2AM UTC)
+- [x] Monitoring/alerting setup
+
+---
+
+**Status**: ✅ Code work complete. Ready for: git push + railway deploy
+**Next**: Run these commands to finalize:
+```bash
+cd /Users/jl/Developer/slack-sms-insights
+git add -A
+git commit -m "feat: live database report generation + daily automation"
+git push origin main
+cd sms-insights && npm run railway:deploy
+```

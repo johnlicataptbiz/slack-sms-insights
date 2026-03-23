@@ -1,167 +1,192 @@
 #!/usr/bin/env tsx
 /**
- * Push SMS Events to Monday.com
- * 
- * This script pushes SMS events from the database to Monday.com
+ * Push SMS conversation summaries to Monday.com.
+ *
+ * This script intentionally writes one row per active conversation/contact
+ * so the board functions like a queue and not a raw event dump.
  */
 
 import { getPrisma } from '../services/prisma.js';
+import { findColumnIdByTitle, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
+import { queryBoardColumns, upsertBookedCallItem } from '../services/monday-client.js';
 
-const MONDAY_API_TOKEN = process.env.MONDAY_API_TOKEN;
 const BOARD_ID = process.env.MONDAY_SMS_EVENTS_BOARD_ID || '18404367751';
 
-if (!MONDAY_API_TOKEN) {
-  console.error('❌ Error: MONDAY_API_TOKEN is required');
-  process.exit(1);
-}
+type SummaryRow = {
+  id: string;
+  slack_channel_id: string;
+  slack_message_ts: string;
+  event_ts: Date;
+  direction: string;
+  contact_id: string | null;
+  contact_phone: string | null;
+  contact_name: string | null;
+  aloware_user: string | null;
+  body: string;
+  line: string | null;
+  sequence: string | null;
+  conversation_id: string | null;
+};
 
-async function callMondayApi(query: string, variables?: Record<string, unknown>) {
-  const response = await fetch('https://api.monday.com/v2', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: MONDAY_API_TOKEN!,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+const normalizeContactName = (value: string | null): string => {
+  const trimmed = (value || '').trim();
+  return trimmed.length > 0 ? trimmed : 'Unknown Contact';
+};
 
-  if (!response.ok) {
-    throw new Error(`Monday API request failed: ${response.statusText}`);
-  }
+const mapLineToChannel = (line: string | null): string => {
+  const value = (line || '').trim().toLowerCase();
+  if (!value) return 'Aloware SMS';
+  if (value.includes('circle')) return 'Circle DM';
+  if (value.includes('email')) return 'Email Marketing';
+  if (value.includes('instagram')) return 'Instagram DM';
+  if (value.includes('call') || value.includes('game plan')) return 'Game Plan Call';
+  if (value.includes('self')) return 'SELF BOOK';
+  return 'Aloware SMS';
+};
 
-  const result = await response.json();
-  if (result.errors) {
-    throw new Error(`Monday API errors: ${JSON.stringify(result.errors)}`);
-  }
-  return result;
-}
+const signalLabel = (direction: string): 'Inbound' | 'Outbound' | 'System' => {
+  const value = direction.trim().toLowerCase();
+  if (value === 'outbound') return 'Outbound';
+  if (value === 'system') return 'System';
+  return 'Inbound';
+};
 
-async function createSmsEventItem(event: any, columnIds: any) {
-  const itemName = `${event.direction.toUpperCase()}: ${event.contact_name || event.contact_phone || 'Unknown'} - ${event.event_ts.toISOString().substring(0, 10)}`;
-  
-  const query = `
-    mutation ($boardId: ID!, $itemName: String!, $columnValues: JSON!) {
-      create_item (
-        board_id: $boardId,
-        item_name: $itemName,
-        column_values: $columnValues
-      ) {
-        id
-      }
-    }
-  `;
+const nextStepLabel = (direction: string): 'Reply' | 'Monitor' | 'Book' | 'Archive' => {
+  const value = direction.trim().toLowerCase();
+  if (value === 'outbound') return 'Monitor';
+  if (value === 'system') return 'Archive';
+  return 'Reply';
+};
 
-  const columnValues: Record<string, any> = {};
-  
-  // Add column values based on what we have
-  if (columnIds.eventType) {
-    columnValues[columnIds.eventType] = { label: event.direction === 'inbound' ? 'Inbound' : 'Outbound' };
-  }
-  if (columnIds.phone && event.contact_phone) {
-    columnValues[columnIds.phone] = { phone: event.contact_phone, countryShortName: 'US' };
-  }
-  if (columnIds.contactName && event.contact_name) {
-    columnValues[columnIds.contactName] = event.contact_name;
-  }
-  if (columnIds.message && event.body) {
-    columnValues[columnIds.message] = { text: event.body };
-  }
-  if (columnIds.timestamp) {
-    columnValues[columnIds.timestamp] = { date: event.event_ts.toISOString().substring(0, 10) };
-  }
-  if (columnIds.rep && event.aloware_user) {
-    columnValues[columnIds.rep] = event.aloware_user;
-  }
-  if (columnIds.slackThread) {
-    const link = `https://slack.com/archives/${event.slack_channel_id}/p${event.slack_message_ts.replace('.', '')}`;
-    columnValues[columnIds.slackThread] = { url: link, text: 'View in Slack' };
-  }
-  if (columnIds.conversationId && event.conversation_id) {
-    columnValues[columnIds.conversationId] = event.conversation_id;
-  }
+const buildSummary = (event: SummaryRow): string => {
+  const snippet = event.body.trim().slice(0, 220);
+  return [
+    `Latest touch: ${signalLabel(event.direction)} message`,
+    `Phone: ${event.contact_phone || 'n/a'}`,
+    `Line: ${event.line || 'n/a'}`,
+    event.sequence ? `Sequence: ${event.sequence}` : null,
+    event.aloware_user ? `Setter: ${event.aloware_user}` : null,
+    '',
+    snippet,
+  ]
+    .filter(Boolean)
+    .join('\n');
+};
 
-  await callMondayApi(query, {
-    boardId: BOARD_ID,
-    itemName,
-    columnValues: JSON.stringify(columnValues),
-  });
-}
+const buildItemName = (event: SummaryRow): string => {
+  const name = normalizeContactName(event.contact_name || event.contact_phone);
+  const date = event.event_ts.toISOString().slice(0, 10);
+  return `${name} • ${signalLabel(event.direction)} • ${date}`;
+};
+
+const buildColumnValueMap = (event: SummaryRow, columnsById: Record<string, string | null>): Record<string, unknown> => {
+  const values: Record<string, unknown> = {};
+  if (columnsById.signalType) values[columnsById.signalType] = { label: signalLabel(event.direction) };
+  if (columnsById.nextStep) values[columnsById.nextStep] = { label: nextStepLabel(event.direction) };
+  if (columnsById.contactName) values[columnsById.contactName] = normalizeContactName(event.contact_name || event.contact_phone);
+  if (columnsById.phone && event.contact_phone) {
+    values[columnsById.phone] = { phone: event.contact_phone, countryShortName: 'US' };
+  }
+  if (columnsById.eventDate) values[columnsById.eventDate] = { date: event.event_ts.toISOString().slice(0, 10) };
+  if (columnsById.channel) values[columnsById.channel] = { label: mapLineToChannel(event.line) };
+  if (columnsById.setter && event.aloware_user) values[columnsById.setter] = event.aloware_user;
+  if (columnsById.slackLink) {
+    values[columnsById.slackLink] = {
+      url: `https://slack.com/archives/${event.slack_channel_id}/p${event.slack_message_ts.replace('.', '')}`,
+      text: 'View in Slack',
+    };
+  }
+  if (columnsById.summary) values[columnsById.summary] = buildSummary(event);
+  if (columnsById.conversationId) values[columnsById.conversationId] = event.conversation_id || event.id;
+  if (columnsById.sequence && event.sequence) values[columnsById.sequence] = event.sequence;
+  return values;
+};
 
 async function getColumnIds() {
-  const query = `
-    query ($boardId: [ID!]) {
-      boards (ids: $boardId) {
-        columns {
-          id
-          title
-          type
-        }
-      }
-    }
-  `;
-
-  const result = await callMondayApi(query, { boardId: [BOARD_ID] });
-  const columns = result.data?.boards?.[0]?.columns || [];
-  
-  const findColumn = (title: string) => columns.find((c: any) => c.title.toLowerCase().includes(title.toLowerCase()))?.id;
-  
+  const columns = await queryBoardColumns(BOARD_ID);
   return {
-    eventType: findColumn('event type') || findColumn('type'),
-    phone: findColumn('phone'),
-    contactName: findColumn('contact name') || findColumn('name'),
-    message: findColumn('message'),
-    timestamp: findColumn('timestamp') || findColumn('date'),
-    rep: findColumn('rep') || findColumn('setter'),
-    slackThread: findColumn('slack'),
-    conversationId: findColumn('conversation'),
+    signalType: findColumnIdByTitle(columns, ['Signal Type', 'Event Type', 'Type']),
+    nextStep: findColumnIdByTitle(columns, ['Next Step', 'Priority', 'Action Status']),
+    contactName: findColumnIdByTitle(columns, ['Contact Name', 'Lead Name', 'Name']),
+    phone: findColumnIdByTitle(columns, ['Phone Number', 'Phone', 'Mobile']),
+    eventDate: findColumnIdByTitle(columns, ['Event Date', 'Call Date', 'Timestamp']),
+    channel: findColumnIdByTitle(columns, ['Channel']),
+    setter: findColumnIdByTitle(columns, ['Setter', 'Rep', 'Owner']),
+    slackLink: findColumnIdByTitle(columns, ['Slack Link', 'Slack Thread', 'Link']),
+    summary: findColumnIdByTitle(columns, ['Summary', 'Notes', 'Message Summary']),
+    conversationId: findColumnIdByTitle(columns, ['Conversation ID', 'Conversation']),
+    sequence: findColumnIdByTitle(columns, ['Sequence']),
   };
 }
 
 async function main() {
-  console.log('🚀 Pushing SMS Events to Monday.com');
-  console.log(`📱 Board ID: ${BOARD_ID}\n`);
+  console.log('🚀 Pushing SMS conversation summaries to Monday.com');
+  console.log(`📱 Board ID: ${BOARD_ID}`);
+  console.log(`🧱 Schema: ${mondaySmsBoardSchemas.events.boardName}`);
+  console.log('');
 
   const prisma = getPrisma();
 
   try {
-    // Get column IDs
     console.log('📋 Fetching board columns...');
     const columnIds = await getColumnIds();
     console.log('✅ Column mapping:', columnIds);
     console.log('');
 
-    // Get recent SMS events (last 30 days, limit 50 for safety)
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
 
-    console.log('📊 Fetching SMS events from database...');
+    console.log('📊 Fetching recent SMS events from database...');
     const events = await prisma.sms_events.findMany({
       where: {
         event_ts: { gte: cutoff },
       },
-      orderBy: { event_ts: 'desc' },
-      take: 50,
+      orderBy: [{ event_ts: 'desc' }, { created_at: 'desc' }],
+      take: 200,
     });
 
-    console.log(`✅ Found ${events.length} events to sync\n`);
+    const latestByConversation = new Map<string, SummaryRow>();
+    for (const event of events as SummaryRow[]) {
+      const key = event.conversation_id || event.contact_id || event.contact_phone || `${event.slack_channel_id}:${event.slack_message_ts}`;
+      if (!latestByConversation.has(key)) {
+        latestByConversation.set(key, event);
+      }
+      if (latestByConversation.size >= 50) break;
+    }
 
-    if (events.length === 0) {
+    const summaries = [...latestByConversation.values()];
+    console.log(`✅ Found ${summaries.length} conversation summaries to sync\n`);
+
+    if (summaries.length === 0) {
       console.log('✅ No events to sync');
       return;
     }
 
-    // Push each event
     let synced = 0;
     let failed = 0;
 
-    for (const event of events) {
+    for (const event of summaries) {
       try {
-        await createSmsEventItem(event, columnIds);
-        console.log(`  ✓ Synced: ${event.contact_name || event.contact_phone || 'Unknown'}`);
+        const itemName = buildItemName(event);
+        const markdown = buildSummary(event);
+        const columnValues = buildColumnValueMap(event, columnIds);
+        const result = await upsertBookedCallItem(
+          BOARD_ID,
+          {
+            itemName,
+            updateMarkdown: markdown,
+            columnValues,
+          },
+          {
+            info: () => undefined,
+            debug: () => undefined,
+            warn: () => undefined,
+            error: () => undefined,
+          },
+        );
+        console.log(`  ✓ Synced: ${itemName} (${result.action})`);
         synced++;
-        
-        // Wait 1 second between items to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 400));
       } catch (error) {
         console.error(`  ✗ Failed: ${error instanceof Error ? error.message : String(error)}`);
         failed++;
@@ -173,7 +198,7 @@ async function main() {
     console.log(`   ✓ Synced: ${synced}`);
     console.log(`   ✗ Failed: ${failed}`);
     console.log('');
-    console.log('✅ Backfill completed!');
+    console.log('✅ Conversation summary backfill completed!');
   } catch (error) {
     console.error('❌ Backfill failed:', error);
     process.exit(1);

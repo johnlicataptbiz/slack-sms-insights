@@ -257,3 +257,50 @@ test('authenticated mutation routes enforce rate limiting', async () => {
     destroyDashboardSession(session.id);
   }
 });
+
+test('/api/health returns 200 with db.status=warn when no Prisma env vars are set', async () => {
+  const prevAccelerate = process.env.PRISMA_ACCELERATE_URL;
+  const prevDatabase = process.env.DATABASE_URL;
+  delete process.env.PRISMA_ACCELERATE_URL;
+  delete process.env.DATABASE_URL;
+
+  try {
+    const response = await callRoute({ method: 'GET', path: '/api/health' });
+    assert.equal(response.statusCode, 200);
+    const payload = response.json as {
+      ok: boolean;
+      checks: { db: { status: string; detail: string }; prisma_accelerate: { status: string; configured: boolean } };
+    };
+    assert.equal(payload.checks.db.status, 'warn');
+    assert.equal(payload.checks.prisma_accelerate.configured, false);
+    assert.equal(payload.checks.prisma_accelerate.status, 'warn');
+  } finally {
+    if (prevAccelerate != null) process.env.PRISMA_ACCELERATE_URL = prevAccelerate;
+    if (prevDatabase != null) process.env.DATABASE_URL = prevDatabase;
+  }
+});
+
+test('/api/health returns 200 with db.status=warn when Prisma query fails (bounded timeout)', async () => {
+  const prevAccelerate = process.env.PRISMA_ACCELERATE_URL;
+  const prevDatabase = process.env.DATABASE_URL;
+  // Point to a non-existent DB so the query fails fast rather than truly timing out
+  process.env.DATABASE_URL = 'postgresql://invalid-host-unreachable:5432/nonexistent';
+  delete process.env.PRISMA_ACCELERATE_URL;
+
+  try {
+    const response = await callRoute({ method: 'GET', path: '/api/health' });
+    assert.equal(response.statusCode, 200);
+    const payload = response.json as {
+      ok: boolean;
+      checks: { db: { status: string; detail: string }; prisma_accelerate: { status: string; configured: boolean } };
+    };
+    // DB should be warn (not error/500) — endpoint must not throw regardless of DB state
+    assert.equal(payload.checks.db.status, 'warn');
+    assert.equal(payload.checks.prisma_accelerate.configured, true);
+  } finally {
+    if (prevAccelerate != null) process.env.PRISMA_ACCELERATE_URL = prevAccelerate;
+    else delete process.env.PRISMA_ACCELERATE_URL;
+    if (prevDatabase != null) process.env.DATABASE_URL = prevDatabase;
+    else delete process.env.DATABASE_URL;
+  }
+});

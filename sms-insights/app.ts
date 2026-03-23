@@ -214,7 +214,16 @@ app.error(async (error) => {
 
     // Initialize the pg pool after the HTTP server starts listening so Railway
     // health checks are not blocked by cold database connection latency.
-    void initDatabase(app.logger);
+    void (async () => {
+      try {
+        await initDatabase(app.logger);
+      } catch (error) {
+        logger.app.error(
+          `[startup] Database initialization error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        await reportError(app, error, 'Database init failure');
+      }
+    })();
 
     // Start Bolt App
     let slackStarted = false;

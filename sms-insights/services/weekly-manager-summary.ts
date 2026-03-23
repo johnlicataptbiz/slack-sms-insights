@@ -1,6 +1,7 @@
 import type { Logger } from '@slack/bolt';
 import { getBookedCallAttributionSources, getBookedCallsSummary } from './booked-calls.js';
-import { upsertWeeklySummaryItem } from './monday-client.js';
+import { queryBoardColumns, upsertWeeklySummaryItem } from './monday-client.js';
+import { findColumnIdByTitle } from './monday-board-schemas.js';
 import {
   getLatestMondaySyncStatus,
   getMondayWeeklyReport,
@@ -133,6 +134,82 @@ const makeActions = (riskFlags: WeeklyManagerSummary['atRiskFlags']): string[] =
     actions.add('Review at-risk segments in Sequence Performance and assign owner actions in monday.');
   }
   return [...actions].slice(0, 3);
+};
+
+const trendLabelForWeeklySummary = (
+  currentBooked: number,
+  previousBooked: number | null,
+): 'Up' | 'Flat' | 'Down' => {
+  if (!Number.isFinite(currentBooked) || currentBooked <= 0) return 'Flat';
+  if (!Number.isFinite(previousBooked ?? Number.NaN) || (previousBooked ?? 0) <= 0) return 'Flat';
+
+  const ratio = currentBooked / (previousBooked || 1);
+  if (ratio >= 1.1) return 'Up';
+  if (ratio <= 0.9) return 'Down';
+  return 'Flat';
+};
+
+const healthLabelForSummary = (summary: WeeklyManagerSummary): 'Good' | 'Watch' | 'Action' => {
+  if (summary.atRiskFlags.some((flag) => flag.severity === 'high')) return 'Action';
+  if (summary.atRiskFlags.length > 0) return 'Watch';
+  return 'Good';
+};
+
+const buildWeeklySummaryColumnValues = (
+  summary: WeeklyManagerSummary,
+  previousBookedCalls: number | null,
+  columnIds: Record<string, string | null>,
+): Record<string, unknown> => {
+  const jack = summary.setters.jack.canonicalBookedCalls;
+  const brandon = summary.setters.brandon.canonicalBookedCalls;
+  const selfBooked = Math.max(summary.teamTotals.canonicalBookedCalls - jack - brandon, 0);
+  const keyNotes = summary.topWins.length
+    ? summary.topWins
+        .slice(0, 3)
+        .map((row) => `${row.sequence}: ${row.canonicalBookedCalls} booked / ${row.messagesSent} sent / ${row.replyRatePct.toFixed(1)}% reply rate`)
+        .join('\n')
+    : 'No top wins captured this week.';
+  const exceptions = summary.atRiskFlags.length
+    ? summary.atRiskFlags
+        .map((flag) => `[${flag.severity}] ${flag.title} — ${flag.detail}`)
+        .join('\n')
+    : 'None this week.';
+
+  // Compute Total Booked: sum of Jack + Brandon + Self Booked
+  const totalBooked = jack + brandon + selfBooked;
+
+  // Compute vs Last Week: percentage change from previous week
+  let vsLastWeek: number | null = null;
+  if (Number.isFinite(previousBookedCalls) && previousBookedCalls !== null && previousBookedCalls > 0) {
+    vsLastWeek = Math.round(((totalBooked - previousBookedCalls) / previousBookedCalls) * 100);
+  }
+
+  // Compute Health Score: composite of booked calls and reply rate
+  // Score range: 0-100, based on meeting targets
+  const bookedTarget = 10; // reasonable weekly target
+  const replyRateTarget = 15; // percent
+  const bookedScore = Math.min(totalBooked / bookedTarget, 1) * 50;
+  const replyScore = Math.min(summary.teamTotals.replyRatePct / replyRateTarget, 1) * 50;
+  const healthScore = Math.round(bookedScore + replyScore);
+
+  const values: Record<string, unknown> = {};
+  if (columnIds.weekStart) values[columnIds.weekStart] = { date: summary.window.weekStart };
+  if (columnIds.reportingPeriod) values[columnIds.reportingPeriod] = `${summary.window.weekStart} → ${summary.window.weekEnd}`;
+  if (columnIds.bookedTotal) values[columnIds.bookedTotal] = summary.teamTotals.canonicalBookedCalls;
+  if (columnIds.jack) values[columnIds.jack] = jack;
+  if (columnIds.brandon) values[columnIds.brandon] = brandon;
+  if (columnIds.selfBooked) values[columnIds.selfBooked] = selfBooked;
+  if (columnIds.trend) values[columnIds.trend] = { label: trendLabelForWeeklySummary(summary.teamTotals.canonicalBookedCalls, previousBookedCalls) };
+  if (columnIds.health) values[columnIds.health] = { label: healthLabelForSummary(summary) };
+  if (columnIds.keyNotes) values[columnIds.keyNotes] = keyNotes;
+  if (columnIds.actionsNextWeek) values[columnIds.actionsNextWeek] = summary.actionsNextWeek.join('\n');
+  if (columnIds.exceptions) values[columnIds.exceptions] = exceptions;
+  if (columnIds.lastSynced) values[columnIds.lastSynced] = { date: new Date(summary.sources.generatedAt).toISOString().slice(0, 10) };
+  // Computed metrics enrichment
+  if (columnIds.totalBooked) values[columnIds.totalBooked] = totalBooked;
+  if (columnIds.vsLastWeek && vsLastWeek !== null) values[columnIds.vsLastWeek] = vsLastWeek;
+  if (columnIds.healthScore) values[columnIds.healthScore] = healthScore;
+  return values;
 };
 
 export const getWeeklyManagerSummary = async (
@@ -351,6 +428,9 @@ export const syncWeeklySummaryToMonday = async (
   }
 
   const summary = await getWeeklyManagerSummary(params, logger);
+  const previousWeekStart = new Date(`${summary.window.weekStart}T00:00:00.000Z`);
+  previousWeekStart.setUTCDate(previousWeekStart.getUTCDate() - 7);
+  const previousReport = await getMondayWeeklyReport(previousWeekStart.toISOString().slice(0, 10), logger);
   const targetBoardId = mondayConfig.personalBoardId || mondayConfig.myCallsBoardId;
   if (!targetBoardId) {
     return { status: 'skipped', weekStart: summary.window.weekStart, itemId: null };
@@ -359,6 +439,28 @@ export const syncWeeklySummaryToMonday = async (
   const markdown = buildWeeklySummaryMarkdown(summary);
   const title = `PTBizSMS Weekly Summary - ${summary.window.weekStart}`;
   const existingItemId = existing?.source_board_id === targetBoardId ? existing?.monday_item_id || null : null;
+  const previousBookedCalls = previousReport?.summary_json && typeof previousReport.summary_json === 'object'
+    ? Number((previousReport.summary_json as { teamTotals?: { canonicalBookedCalls?: number } }).teamTotals?.canonicalBookedCalls ?? 0)
+    : null;
+  const boardColumns = await queryBoardColumns(targetBoardId, logger);
+  const columnIds = {
+    weekStart: findColumnIdByTitle(boardColumns, ['Week Start']),
+    reportingPeriod: findColumnIdByTitle(boardColumns, ['Reporting Period']),
+    bookedTotal: findColumnIdByTitle(boardColumns, ['Booked Calls Total']),
+    jack: findColumnIdByTitle(boardColumns, ['Jack']),
+    brandon: findColumnIdByTitle(boardColumns, ['Brandon']),
+    selfBooked: findColumnIdByTitle(boardColumns, ['Self Booked']),
+    trend: findColumnIdByTitle(boardColumns, ['Trend']),
+    health: findColumnIdByTitle(boardColumns, ['Health']),
+    keyNotes: findColumnIdByTitle(boardColumns, ['Key Notes']),
+    actionsNextWeek: findColumnIdByTitle(boardColumns, ['Actions Next Week']),
+    exceptions: findColumnIdByTitle(boardColumns, ['Exceptions']),
+    lastSynced: findColumnIdByTitle(boardColumns, ['Last Synced']),
+    // Computed metrics columns
+    totalBooked: findColumnIdByTitle(boardColumns, ['Total Booked']),
+    vsLastWeek: findColumnIdByTitle(boardColumns, ['vs Last Week']),
+    healthScore: findColumnIdByTitle(boardColumns, ['Health Score']),
+  };
 
   const result = await upsertWeeklySummaryItem(
     targetBoardId,
@@ -366,6 +468,7 @@ export const syncWeeklySummaryToMonday = async (
     {
       title,
       summaryMarkdown: markdown,
+      columnValues: buildWeeklySummaryColumnValues(summary, previousBookedCalls, columnIds),
       existingItemId,
     },
     logger,

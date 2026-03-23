@@ -106,17 +106,24 @@ export const upsertAttributionReviewItem = async (input: {
 
 export const listUnresolvedAttributions = async (take = 100): Promise<UnresolvedAttributionRow[]> => {
   const prisma = getPrisma();
-  // Validate take is a safe integer to prevent SQL injection in LIMIT clause
-  if (!Number.isInteger(take) || take <= 0) {
-    throw new Error('Invalid take parameter: must be a positive integer');
-  }
-  return prisma.$queryRaw<UnresolvedAttributionRow[]>`
-    SELECT booked_call_id, booked_event_ts, attribution_status, needs_review, review_reason,
-           mapper_version, conversation_id, resolved_sequence_id, resolved_sequence_label, created_at
-    FROM analytics_unresolved_attribution_v
+  return prisma.$queryRawUnsafe<UnresolvedAttributionRow[]>(
+    `SELECT
+      booked_call_id,
+      booked_event_ts,
+      attribution_status,
+      needs_review,
+      review_reason,
+      mapper_version,
+      conversation_id,
+      resolved_sequence_id,
+      resolved_sequence_label,
+      created_at
+    FROM booked_call_attribution
+    WHERE COALESCE(needs_review, false) = true OR attribution_status IS NULL
     ORDER BY booked_event_ts DESC
-    LIMIT ${take}
-  `;
+    LIMIT $1`,
+    take,
+  );
 };
 
 export const listSequenceFunnelDaily = async (params: {

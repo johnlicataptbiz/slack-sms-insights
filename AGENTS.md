@@ -1,5 +1,7 @@
 # AGENTS.md
 
+This file provides guidance to agents when working with code in this repository.
+
 ## Project Overview
 
 PT Biz SMS Insights is a real-time SMS analytics platform with:
@@ -68,7 +70,7 @@ Use `DATABASE_PUBLIC_URL` in local `.env`. Never hardcode DB URLs in code.
 
 ## Testing Instructions
 
-Backend tests live in `sms-insights/tests/` and use Node’s test runner:
+Backend tests live in `sms-insights/tests/` and use Node's test runner:
 ```bash
 cd sms-insights
 node --import tsx --test tests/**/*.test.ts

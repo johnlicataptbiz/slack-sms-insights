@@ -17,7 +17,12 @@ import type { EmojiClickData } from "emoji-picker-react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import Linkify from "linkify-react";
 import { useHotkeys } from "react-hotkeys-hook";
-import { Group, Panel, Separator, useDefaultLayout } from "react-resizable-panels";
+import {
+  Group,
+  Panel,
+  Separator,
+  useDefaultLayout,
+} from "react-resizable-panels";
 import { z } from "zod";
 import {
   FloatingPortal,
@@ -66,8 +71,18 @@ import { V2Select, type V2SelectOption } from "../components/V2Select";
 import { V2State } from "../components/V2Primitives";
 import { SkeletonText } from "../components/Skeleton";
 import { useToast } from "../hooks/useToast";
+import { useInboxState } from "../hooks/useInboxState";
+import { useInboxMessages } from "../hooks/useInboxMessages";
+import { useInboxMutations } from "../hooks/useInboxMutations";
+import { useInboxSubscription } from "../hooks/useInboxSubscription";
+import { useSetterIntentDetection } from "../hooks/useSetterIntentDetection";
+import { Composer } from "../components/Composer";
+import { MessageThread } from "../components/MessageThread";
+import { ConversationList } from "../components/ConversationList";
 
-const LazyEmojiPicker = lazy(async () => ({ default: (await import("emoji-picker-react")).default }));
+const LazyEmojiPicker = lazy(async () => ({
+  default: (await import("emoji-picker-react")).default,
+}));
 
 const parseDateValue = (value: string): Date | null => {
   const parsed = parseISO(value);
@@ -156,10 +171,16 @@ type SetterIntent =
   | "how_to"
   | "unknown";
 
-const inferSetterIntent = (messageBody: string | null | undefined): SetterIntent => {
+const inferSetterIntent = (
+  messageBody: string | null | undefined,
+): SetterIntent => {
   const text = (messageBody || "").toLowerCase();
   if (!text) return "unknown";
-  if (/\b(book|let's do|lets do|ready|i'm in|im in|sign me up|call me)\b/.test(text)) {
+  if (
+    /\b(book|let's do|lets do|ready|i'm in|im in|sign me up|call me)\b/.test(
+      text,
+    )
+  ) {
     return "ready";
   }
   if (/\b(price|pricing|cost|expensive|afford|budget)\b/.test(text)) {
@@ -383,7 +404,9 @@ const matchMention = (value: string, caret: number) => {
 const filterMentions = (config: MentionConfig, query: string) => {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return config.data;
-  return config.data.filter((item) => item.display.toLowerCase().includes(normalized));
+  return config.data.filter((item) =>
+    item.display.toLowerCase().includes(normalized),
+  );
 };
 
 type MentionTextareaProps = {
@@ -394,14 +417,27 @@ type MentionTextareaProps = {
   inputRef?: (element: HTMLTextAreaElement | null) => void;
 };
 
-const MentionTextarea = ({ value, onChange, placeholder, className, inputRef }: MentionTextareaProps) => {
-  const [active, setActive] = useState<null | { trigger: "@" | "/"; query: string; start: number; end: number }>(null);
+const MentionTextarea = ({
+  value,
+  onChange,
+  placeholder,
+  className,
+  inputRef,
+}: MentionTextareaProps) => {
+  const [active, setActive] = useState<null | {
+    trigger: "@" | "/";
+    query: string;
+    start: number;
+    end: number;
+  }>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const suggestions = useMemo(() => {
     if (!active) return [];
-    const config = mentionConfigs.find((item) => item.trigger === active.trigger);
+    const config = mentionConfigs.find(
+      (item) => item.trigger === active.trigger,
+    );
     if (!config) return [];
     return filterMentions(config, active.query).slice(0, 6);
   }, [active]);
@@ -443,7 +479,9 @@ const MentionTextarea = ({ value, onChange, placeholder, className, inputRef }: 
       setActiveIndex((prev) => (prev + 1) % suggestions.length);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+      setActiveIndex(
+        (prev) => (prev - 1 + suggestions.length) % suggestions.length,
+      );
     } else if (event.key === "Enter" || event.key === "Tab") {
       event.preventDefault();
       const selectedSuggestion = suggestions[activeIndex];
@@ -502,12 +540,24 @@ const snoozeSchema = z.object({
 });
 
 const noteSchema = z.object({
-  text: z.string().trim().min(1, "Note cannot be empty").max(1000, "Note is too long"),
+  text: z
+    .string()
+    .trim()
+    .min(1, "Note cannot be empty")
+    .max(1000, "Note is too long"),
 });
 
 const templateSchema = z.object({
-  name: z.string().trim().min(1, "Template name is required").max(100, "Template name is too long"),
-  body: z.string().trim().min(1, "Template body is required").max(1600, "Template body is too long"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Template name is required")
+    .max(100, "Template name is too long"),
+  body: z
+    .string()
+    .trim()
+    .min(1, "Template body is required")
+    .max(1600, "Template body is too long"),
 });
 
 type AssignFormValues = z.infer<typeof assignSchema>;
@@ -516,39 +566,33 @@ type NoteFormValues = z.infer<typeof noteSchema>;
 type TemplateFormValues = z.infer<typeof templateSchema>;
 
 export default function InboxV2() {
-  const [statusFilter, setStatusFilter] = useState<
-    "open" | "closed" | "dnc" | ""
-  >("open");
-  const [needsReplyOnly, setNeedsReplyOnly] = useState(true);
   const toast = useToast();
-  const [ownerFilter, setOwnerFilter] = useState<
-    "all" | "jack" | "brandon" | "unassigned"
-  >("all");
-  const [sortMode, setSortMode] = useState<
-    "recent" | "oldest" | "urgent" | "needs_reply"
-  >("recent");
-  const [search, setSearch] = useState("");
-  const [selectedConversationId, setSelectedConversationId] = useState<
-    string | null
-  >(null);
-  const [isComposerModalOpen, setIsComposerModalOpen] = useState(false);
-  const [composerText, setComposerText] = useState("");
-  const [crmNotesText, setCrmNotesText] = useState("");
-  const [crmNotesCopied, setCrmNotesCopied] = useState(false);
-  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
-  const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
-    useState<string | null>(null);
-  const [selectedLineKey, setSelectedLineKey] = useState("");
-  const [flashMessage, setFlashMessage] = useState<string | null>(null);
-  const [sendStatus, setSendStatus] = useState<
-    "idle" | "sending" | "sent" | "error"
-  >("idle");
-  const [justSentMessage, setJustSentMessage] = useState<{
-    text: string;
-    timestamp: string;
-    confirmed?: boolean;
-  } | null>(null);
+
+  // Consolidated state management - replaces 40+ useState declarations
+  const inboxState = useInboxState();
+  const {
+    filters,
+    uiState,
+    qualificationState,
+    escalationState,
+    selectionState,
+    setFlashMessage,
+  } = inboxState;
+  const {
+    selectedConversationId,
+    isComposerModalOpen,
+    composerText,
+    sendStatus,
+  } = uiState;
+  const {
+    updateFilters,
+    updateUIState,
+    updateQualification,
+    updateEscalation,
+    updateSelectionState,
+  } = inboxState;
+
+  // Refs for DOM elements and locks
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
   const listParentRef = useRef<HTMLDivElement | null>(null);
@@ -559,29 +603,27 @@ export default function InboxV2() {
     key: string;
   } | null>(null);
 
-  const [qualificationState, setQualificationState] =
-    useState<QualificationStateV2>({
-      fullOrPartTime: "unknown",
-      niche: "",
-      revenueMix: "unknown",
-      deliveryModel: "unknown",
-      coachingInterest: "unknown",
-      progressStep: 0,
-    });
-  const [escalationLevel, setEscalationLevel] = useState<1 | 2 | 3 | 4>(1);
-  const [escalationReason, setEscalationReason] = useState("");
-
-  // Phase 2 — Team Collaboration
-  const [showTemplates, setShowTemplates] = useState(false);
+  // Local state for items not yet consolidated into useInboxState
+  const [crmNotesCopied, setCrmNotesCopied] = useState(false);
+  const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
+    useState<string | null>(null);
+  const [justSentMessage, setJustSentMessage] = useState<{
+    text: string;
+    timestamp: string;
+    confirmed?: boolean;
+  } | null>(null);
   const [sequenceIdInput, setSequenceIdInput] = useState("");
   const [lastSequenceSync, setLastSequenceSync] =
     useState<AlowareSequenceSyncV2 | null>(null);
-  const [manualPanelOpen, setManualPanelOpen] = useState(false);
   const [manualLine, setManualLine] = useState("");
   const [manualNotes, setManualNotes] = useState("");
   const [manualSetter, setManualSetter] = useState<"jack" | "brandon">("jack");
   const [manualContactNameInput, setManualContactNameInput] = useState("");
   const [manualContactPhoneInput, setManualContactPhoneInput] = useState("");
+  const [objectionTagInput, setObjectionTagInput] = useState("");
+  const [guardrailChecks, setGuardrailChecks] = useState<
+    Record<string, boolean>
+  >({});
   const assignForm = useForm<AssignFormValues>({
     resolver: zodResolver(assignSchema),
     defaultValues: { ownerLabel: "" },
@@ -600,28 +642,7 @@ export default function InboxV2() {
   });
   const manualMutation = useManualMondayBookedCall();
 
-  // Phase 3 state
-  const [objectionTagInput, setObjectionTagInput] = useState("");
-  const [localObjectionTags, setLocalObjectionTags] = useState<string[]>([]);
-  const [localCallOutcome, setLocalCallOutcome] =
-    useState<CallOutcomeV2 | null>(null);
-
-  // Phase 2 Guardrail Modal state
-  const [isGuardrailModalOpen, setIsGuardrailModalOpen] = useState(false);
-  const [guardrailChecks, setGuardrailChecks] = useState<
-    Record<string, boolean>
-  >({});
-  const [pendingMessageText, setPendingMessageText] = useState<string | null>(
-    null,
-  );
-  // Double Pitch Protection banner
-  const [showDoublePitchWarning, setShowDoublePitchWarning] = useState(false);
-  const [isNarrowComposerViewport, setIsNarrowComposerViewport] = useState(
-    () =>
-      typeof window !== "undefined"
-        ? window.matchMedia("(max-width: 900px)").matches
-        : false,
-  );
+  // Refs and state dependencies for queries
 
   const qualificationProgressLive =
     computeQualificationProgress(qualificationState);
@@ -631,42 +652,46 @@ export default function InboxV2() {
   const qualificationProgressPct = Math.round(
     (qualificationProgressLive / 4) * 100,
   );
-  const escalationTone = escalationToneForLevel(escalationLevel);
-  const escalationProgressPct = Math.round((escalationLevel / 4) * 100);
+  const escalationTone = escalationToneForLevel(escalationState.level);
+  const escalationProgressPct = Math.round((escalationState.level / 4) * 100);
   const qualificationFields = [
-    {
-      key: "full",
-      label: "Full or part time",
-      complete: qualificationState.fullOrPartTime !== "unknown",
-    },
     {
       key: "niche",
       label: "Niche",
       complete: (qualificationState.niche || "").trim().length > 0,
+      hint: "Who they work with / treat",
     },
     {
       key: "mix",
-      label: "Revenue mix",
+      label: "Payment model",
       complete: qualificationState.revenueMix !== "unknown",
+      hint: "Cash, hybrid, or insurance",
     },
     {
-      key: "coach",
-      label: "Coaching interest",
+      key: "space",
+      label: "Space",
+      complete: qualificationState.fullOrPartTime !== "unknown",
+      hint: "Brick & mortar, gym, or searching",
+    },
+    {
+      key: "owner",
+      label: "Ownership",
       complete: qualificationState.coachingInterest !== "unknown",
+      hint: "Owner, launching, or < 3 months",
     },
   ];
 
   const listQuery = useV2InboxConversationsInfinite({
-    ...(statusFilter ? { status: statusFilter } : {}),
-    needsReplyOnly,
-    search,
+    ...(filters.statusFilter ? { status: filters.statusFilter } : {}),
+    needsReplyOnly: filters.needsReplyOnly,
+    search: filters.search,
     pageSize: 75,
   });
 
   const conversationsRaw = useMemo(() => {
     const pages = listQuery.data?.pages || [];
     const seen = new Set<string>();
-    const merged: typeof pages[number]["data"]["items"] = [];
+    const merged: (typeof pages)[number]["data"]["items"] = [];
     for (const page of pages) {
       for (const item of page.data.items) {
         if (seen.has(item.id)) continue;
@@ -677,11 +702,11 @@ export default function InboxV2() {
     return merged;
   }, [listQuery.data]);
   const conversations = conversationsRaw.filter((conversation) => {
-    if (ownerFilter === "all") return true;
+    if (filters.ownerFilter === "all") return true;
     const owner = (conversation.ownerLabel || "").toLowerCase();
-    if (ownerFilter === "jack") return owner === "jack";
-    if (ownerFilter === "brandon") return owner === "brandon";
-    if (ownerFilter === "unassigned") return owner.length === 0;
+    if (filters.ownerFilter === "jack") return owner === "jack";
+    if (filters.ownerFilter === "brandon") return owner === "brandon";
+    if (filters.ownerFilter === "unassigned") return owner.length === 0;
     return true;
   });
 
@@ -700,7 +725,7 @@ export default function InboxV2() {
     (c) => displaySetterName(c.ownerLabel) === "Brandon",
   ).length;
   const unassignedCount = conversations.filter((c) => !c.ownerLabel).length;
-  
+
   // More meaningful health metrics instead of opaque score
   const criticalCount = conversations.filter(
     (c) => c.escalation.level === 1 && c.openNeedsReplyCount > 0,
@@ -712,27 +737,29 @@ export default function InboxV2() {
     return hoursSince > 48 && c.openNeedsReplyCount > 0;
   }).length;
   const activeFiltersCount =
-    Number(statusFilter !== "open") +
-    Number(ownerFilter !== "all") +
-    Number(Boolean(search.trim())) +
-    Number(!needsReplyOnly) +
-    Number(sortMode !== "recent");
+    Number(filters.statusFilter !== "open") +
+    Number(filters.ownerFilter !== "all") +
+    Number(Boolean(filters.search.trim())) +
+    Number(!filters.needsReplyOnly) +
+    Number(filters.sortMode !== "recent");
   const sortedConversations = useMemo(() => {
     const rows = [...conversations];
     rows.sort((a, b) => {
       const aAt = parseDateValue(a.lastMessage.createdAt || "")?.getTime() || 0;
       const bAt = parseDateValue(b.lastMessage.createdAt || "")?.getTime() || 0;
-      if (sortMode === "oldest") return aAt - bAt;
-      if (sortMode === "needs_reply") {
+      if (filters.sortMode === "oldest") return aAt - bAt;
+      if (filters.sortMode === "needs_reply") {
         const delta = b.openNeedsReplyCount - a.openNeedsReplyCount;
         if (delta !== 0) return delta;
         return bAt - aAt;
       }
-      if (sortMode === "urgent") {
+      if (filters.sortMode === "urgent") {
         const aPriority =
-          (a.escalation.level <= 2 ? 5 : 0) + Math.min(a.openNeedsReplyCount, 4);
+          (a.escalation.level <= 2 ? 5 : 0) +
+          Math.min(a.openNeedsReplyCount, 4);
         const bPriority =
-          (b.escalation.level <= 2 ? 5 : 0) + Math.min(b.openNeedsReplyCount, 4);
+          (b.escalation.level <= 2 ? 5 : 0) +
+          Math.min(b.openNeedsReplyCount, 4);
         const delta = bPriority - aPriority;
         if (delta !== 0) return delta;
         return bAt - aAt;
@@ -740,7 +767,7 @@ export default function InboxV2() {
       return bAt - aAt;
     });
     return rows;
-  }, [conversations, sortMode]);
+  }, [conversations, filters.sortMode]);
   const selectedConversationIndex = useMemo(
     () =>
       sortedConversations.findIndex((row) => row.id === selectedConversationId),
@@ -761,7 +788,11 @@ export default function InboxV2() {
     if (!element) return;
 
     const maybeLoadNextPage = () => {
-      if (!listQuery.hasNextPage || listQuery.isFetchingNextPage || listQuery.isLoading) {
+      if (
+        !listQuery.hasNextPage ||
+        listQuery.isFetchingNextPage ||
+        listQuery.isLoading
+      ) {
         return;
       }
       const distanceFromBottom =
@@ -786,11 +817,13 @@ export default function InboxV2() {
   const composerLayoutStorageId = isNarrowComposerViewport
     ? "v2-inbox-composer-layout-vertical"
     : "v2-inbox-composer-layout-horizontal";
-  const { defaultLayout: composerSavedLayout, onLayoutChanged: onComposerLayoutChanged } =
-    useDefaultLayout({
-      id: composerLayoutStorageId,
-      panelIds: ["composer-primary", "composer-sidebar"],
-    });
+  const {
+    defaultLayout: composerSavedLayout,
+    onLayoutChanged: onComposerLayoutChanged,
+  } = useDefaultLayout({
+    id: composerLayoutStorageId,
+    panelIds: ["composer-primary", "composer-sidebar"],
+  });
   const composerDefaultLayout = composerSavedLayout ?? {
     "composer-primary": isNarrowComposerViewport ? 62 : 66,
     "composer-sidebar": isNarrowComposerViewport ? 38 : 34,
@@ -800,8 +833,8 @@ export default function InboxV2() {
     floatingStyles: templateFloatingStyles,
     context: templateFloatingContext,
   } = useFloating({
-    open: showTemplates,
-    onOpenChange: setShowTemplates,
+    open: uiState.showTemplates,
+    onOpenChange: (open) => updateUIState({ showTemplates: open }),
     placement: "top-end",
     whileElementsMounted: autoUpdate,
     middleware: [
@@ -826,23 +859,24 @@ export default function InboxV2() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const mediaQuery = window.matchMedia("(max-width: 900px)");
-    const onChange = () => setIsNarrowComposerViewport(mediaQuery.matches);
+    const onChange = () =>
+      updateUIState({ isNarrowComposerViewport: mediaQuery.matches });
     onChange();
     mediaQuery.addEventListener("change", onChange);
     return () => mediaQuery.removeEventListener("change", onChange);
   }, []);
 
   useEffect(() => {
-    if (!isComposerModalOpen && showTemplates) {
-      setShowTemplates(false);
+    if (!uiState.isComposerModalOpen && uiState.showTemplates) {
+      updateUIState({ showTemplates: false });
     }
-  }, [isComposerModalOpen, showTemplates]);
+  }, [uiState.isComposerModalOpen, uiState.showTemplates]);
 
   useEffect(() => {
-    if (!isComposerModalOpen && isEmojiPickerOpen) {
-      setIsEmojiPickerOpen(false);
+    if (!uiState.isComposerModalOpen && uiState.isEmojiPickerOpen) {
+      updateUIState({ isEmojiPickerOpen: false });
     }
-  }, [isComposerModalOpen, isEmojiPickerOpen]);
+  }, [uiState.isComposerModalOpen, uiState.isEmojiPickerOpen]);
 
   useEffect(() => {
     // Do NOT auto-switch while the composer modal is open.
@@ -850,27 +884,34 @@ export default function InboxV2() {
     // the moment you reply to it — without this guard the effect would immediately
     // snap selectedConversationId to conversations[0] (a completely different
     // contact) while the user is still looking at the modal they just sent from.
-    if (isComposerModalOpen) return;
+    if (uiState.isComposerModalOpen) return;
 
-    if (!selectedConversationId && conversations.length > 0) {
-      setSelectedConversationId(conversations[0]?.id || null);
+    if (!uiState.uiState.selectedConversationId && conversations.length > 0) {
+      inboxState.selectConversation(conversations[0]?.id || null);
       return;
     }
 
     if (
-      selectedConversationId &&
-      !conversations.some((row) => row.id === selectedConversationId)
+      uiState.selectedConversationId &&
+      !conversations.some((row) => row.id === uiState.selectedConversationId)
     ) {
-      setSelectedConversationId(conversations[0]?.id || null);
+      inboxState.selectConversation(conversations[0]?.id || null);
     }
-  }, [conversations, selectedConversationId, isComposerModalOpen]);
+  }, [
+    conversations,
+    uiState.selectedConversationId,
+    uiState.isComposerModalOpen,
+  ]);
 
-  const detailQuery = useV2InboxConversationDetail(selectedConversationId, {
-    forceSync: isComposerModalOpen && Boolean(selectedConversationId),
-    ...(isComposerModalOpen && selectedConversationId
-      ? { refetchIntervalMs: 7000 }
-      : {}),
-  });
+  const detailQuery = useV2InboxConversationDetail(
+    uiState.selectedConversationId,
+    {
+      forceSync:
+        uiState.isComposerModalOpen && Boolean(uiState.selectedConversationId),
+      // FIXED: Removed aggressive 7-second polling - was causing message race conditions
+      // Messages now only fetch when explicitly requested or on conversation change
+    },
+  );
 
   const generateDraftMutation = useV2GenerateDraft();
   const generateCrmNotesMutation = useV2GenerateCrmNotes();
@@ -884,7 +925,7 @@ export default function InboxV2() {
   const sequenceDisenrollMutation = useV2DisenrollConversationFromSequence();
 
   // Phase 2 hooks
-  const notesQuery = useV2ConversationNotes(selectedConversationId);
+  const notesQuery = useV2ConversationNotes(uiState.selectedConversationId);
   const addNoteMutation = useV2AddConversationNote();
   const snoozeMutation = useV2SnoozeConversation();
   const assignMutation = useV2AssignConversation();
@@ -898,13 +939,9 @@ export default function InboxV2() {
 
   const detail = detailQuery.data?.data || null;
   const manualContactNameFromDetail =
-    detail?.contactCard.name ||
-    detail?.conversation.contactName ||
-    "";
+    detail?.contactCard.name || detail?.conversation.contactName || "";
   const manualContactPhoneFromDetail =
-    detail?.contactCard.phone ||
-    detail?.conversation.contactPhone ||
-    "";
+    detail?.contactCard.phone || detail?.conversation.contactPhone || "";
   useEffect(() => {
     setManualContactNameInput(manualContactNameFromDetail);
   }, [manualContactNameFromDetail]);
@@ -914,13 +951,29 @@ export default function InboxV2() {
   const detailConversation = detail?.conversation || null;
   const detailContactCard = detail?.contactCard || null;
   const detailMessages = Array.isArray(detail?.messages) ? detail.messages : [];
+  // FIXED: Deduplicate messages by ID to prevent duplicates on refetch
+  // This ensures each message appears only once even if refetch collides with incoming messages
+  const deduplicatedMessages = useMemo(() => {
+    const seen = new Map<string, boolean>();
+    const result = [];
+    for (const msg of detailMessages) {
+      if (msg?.id && !seen.has(msg.id)) {
+        seen.set(msg.id, true);
+        result.push(msg);
+      } else if (!msg?.id) {
+        result.push(msg);
+      }
+    }
+    return result;
+  }, [detailMessages]);
   const latestInboundMessage = useMemo(() => {
-    for (let i = detailMessages.length - 1; i >= 0; i -= 1) {
-      const row = detailMessages[i];
+    // FIXED: Use deduplicatedMessages instead of detailMessages to prevent looking at stale duplicates
+    for (let i = deduplicatedMessages.length - 1; i >= 0; i -= 1) {
+      const row = deduplicatedMessages[i];
       if (row?.direction === "inbound") return row;
     }
     return null;
-  }, [detailMessages]);
+  }, [deduplicatedMessages]);
   const inferredIntent = inferSetterIntent(latestInboundMessage?.body);
   const setterAssistSummary = useMemo(() => {
     if (inferredIntent === "ready") {
@@ -986,7 +1039,8 @@ export default function InboxV2() {
   const newTemplateName = templateForm.watch("name");
   const newTemplateBody = templateForm.watch("body");
   const selectedLineOption =
-    lineOptions.find((option) => option.key === selectedLineKey) || null;
+    lineOptions.find((option) => option.key === uiState.selectedLineKey) ||
+    null;
   const lineSelectionRequired =
     Boolean(sendConfig?.requiresSelection) && !selectedLineOption;
   const savedDefaultSummary = sendConfig?.defaultSelection
@@ -1007,31 +1061,35 @@ export default function InboxV2() {
         (option) => option.key === sendConfig.defaultSelection?.key,
       )
     ) {
-      setSelectedLineKey(sendConfig.defaultSelection.key);
+      updateUIState({ selectedLineKey: sendConfig.defaultSelection.key });
       return;
     }
 
     if (lineOptions.length === 1) {
       const onlyOption = lineOptions[0];
       if (onlyOption) {
-        setSelectedLineKey(onlyOption.key);
+        updateUIState({ selectedLineKey: onlyOption.key });
       }
       return;
     }
 
-    setSelectedLineKey("");
-  }, [lineOptions, selectedLineKey, sendConfig]);
+    updateUIState({ selectedLineKey: "" });
+  }, [lineOptions, uiState.selectedLineKey, sendConfig]);
 
   useEffect(() => {
     if (!detailConversation) return;
 
-    setQualificationState(detailConversation.qualification);
-    setEscalationLevel(detailConversation.escalation.level);
-    setEscalationReason(detailConversation.escalation.reason || "");
+    updateQualification(detailConversation.qualification);
+    updateEscalation({
+      level: detailConversation.escalation.level,
+      reason: detailConversation.escalation.reason || "",
+    });
     setSequenceIdInput(detailContactCard?.sequenceId || "");
     assignForm.reset({ ownerLabel: detailConversation.ownerLabel || "" });
-    setLocalObjectionTags(detailConversation.objectionTags ?? []);
-    setLocalCallOutcome(detailConversation.callOutcome ?? null);
+    updateSelectionState({
+      localObjectionTags: detailConversation.objectionTags ?? [],
+      localCallOutcome: detailConversation.callOutcome ?? null,
+    });
   }, [
     assignForm,
     detailConversation?.id,
@@ -1044,7 +1102,7 @@ export default function InboxV2() {
     // Clear the optimistic sent-message bubble so it doesn't bleed into the
     // next conversation's thread when the user switches contacts.
     setJustSentMessage(null);
-    setSendStatus("idle");
+    inboxState.updateUIState({ sendStatus: "idle" });
     sendLockRef.current = false;
     pendingIdempotencyRef.current = null;
     setShowDoublePitchWarning(false);
@@ -1064,7 +1122,7 @@ export default function InboxV2() {
     const latestDraft = detailDrafts[0];
     if (!latestDraft) return;
 
-    if (composerText.trim().length === 0) {
+    if (uiState.composerText.trim().length === 0) {
       setComposerText(latestDraft.text);
       setSelectedDraftId(latestDraft.id);
     }
@@ -1077,9 +1135,18 @@ export default function InboxV2() {
   ]);
 
   useEffect(() => {
-    if (!isComposerModalOpen || !selectedConversationId || !detail) return;
+    if (
+      !uiState.isComposerModalOpen ||
+      !uiState.selectedConversationId ||
+      !detail
+    )
+      return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
-  }, [isComposerModalOpen, selectedConversationId, detailConversation?.id]);
+  }, [
+    uiState.isComposerModalOpen,
+    uiState.selectedConversationId,
+    detailConversation?.id,
+  ]);
 
   // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
   useEffect(() => {
@@ -1088,7 +1155,7 @@ export default function InboxV2() {
   }, [detailMessages, justSentMessage]);
 
   useEffect(() => {
-    if (!isComposerModalOpen) return;
+    if (!uiState.isComposerModalOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -1098,10 +1165,13 @@ export default function InboxV2() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isComposerModalOpen]);
+  }, [uiState.isComposerModalOpen]);
 
   const selectConversationAtIndex = (index: number) => {
-    const bounded = Math.max(0, Math.min(index, sortedConversations.length - 1));
+    const bounded = Math.max(
+      0,
+      Math.min(index, sortedConversations.length - 1),
+    );
     const row = sortedConversations[bounded];
     if (!row) return;
     setSelectedConversationId(row.id);
@@ -1126,7 +1196,8 @@ export default function InboxV2() {
     (event) => {
       event.preventDefault();
       if (sortedConversations.length === 0) return;
-      const start = selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
+      const start =
+        selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
       selectConversationAtIndex(start + 1);
     },
     { enableOnFormTags: false },
@@ -1138,7 +1209,8 @@ export default function InboxV2() {
     (event) => {
       event.preventDefault();
       if (sortedConversations.length === 0) return;
-      const start = selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
+      const start =
+        selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
       selectConversationAtIndex(start - 1);
     },
     { enableOnFormTags: false },
@@ -1160,20 +1232,22 @@ export default function InboxV2() {
   );
 
   const onGenerateDraft = async () => {
-    if (!selectedConversationId) return;
+    if (!uiState.selectedConversationId) return;
 
     setFlashMessage(null);
     try {
       const result = await generateDraftMutation.mutateAsync({
-        conversationId: selectedConversationId,
+        conversationId: uiState.selectedConversationId,
       });
-      setComposerText(result.data.text);
-      setSelectedDraftId(result.data.id);
+      updateUIState({ composerText: result.data.text });
+      updateUIState({ selectedDraftId: result.data.id });
       setDraftPrefillDoneForConversation(selectedConversationId);
       if (result.data.generationMode === "contextual_fallback") {
         const firstWarning =
           result.data.generationWarnings[0] || "AI generation unavailable";
-        setFlashMessage(`Draft generated in fallback mode. ${firstWarning}`);
+        setFlashMessage(
+          `Draft generated in fallback mode. ${firstWarning}`,
+        );
         return;
       }
       if (result.data.lint.passed) {
@@ -1205,14 +1279,14 @@ export default function InboxV2() {
   };
 
   const onGenerateCrmNotes = async () => {
-    if (!selectedConversationId) return;
+    if (!uiState.selectedConversationId) return;
     setFlashMessage(null);
     try {
       const result = await generateCrmNotesMutation.mutateAsync({
-        conversationId: selectedConversationId,
+        conversationId: uiState.selectedConversationId,
       });
       const nextText = result.data.text || "";
-      setCrmNotesText(nextText);
+      updateUIState({ crmNotesText: nextText });
       const copied = await copyCrmNotesToClipboard(nextText);
       setCrmNotesCopied(copied);
       if (copied) {
@@ -1231,7 +1305,7 @@ export default function InboxV2() {
   };
 
   const onCopyCrmNotes = async () => {
-    const copied = await copyCrmNotesToClipboard(crmNotesText);
+    const copied = await copyCrmNotesToClipboard(uiState.crmNotesText);
     setCrmNotesCopied(copied);
     if (copied) {
       toast.success("CRM notes copied.");
@@ -1243,16 +1317,20 @@ export default function InboxV2() {
 
   const onSend = async () => {
     if (sendLockRef.current) return;
-    if (!selectedConversationId || composerText.trim().length === 0) return;
+    if (
+      !uiState.selectedConversationId ||
+      uiState.composerText.trim().length === 0
+    )
+      return;
     if (lineSelectionRequired) {
       setFlashMessage("Select a send line before sending.");
       return;
     }
 
-    const messageText = composerText.trim();
+    const messageText = uiState.composerText.trim();
 
     // Phase 2: Stage Gating
-    if (containsCallLink(messageText) && escalationLevel <= 1) {
+    if (containsCallLink(messageText) && escalationState.level <= 1) {
       setFlashMessage(
         "Set the escalation stage to L2 or higher before sending a call link.",
       );
@@ -1283,16 +1361,16 @@ export default function InboxV2() {
           .some((m) => m.direction === "inbound");
         if (!hasReplyAfter) {
           // Show the banner and block send — user must dismiss or it stays visible
-          setShowDoublePitchWarning(true);
+          updateUIState({ showDoublePitchWarning: true });
           return;
         }
       }
     }
 
     // Phase 2: Guardrail Checklist (L3/L4)
-    if (containsCallLink(messageText) && escalationLevel >= 3) {
+    if (containsCallLink(messageText) && escalationState.level >= 3) {
       setPendingMessageText(messageText);
-      setIsGuardrailModalOpen(true);
+      updateUIState({ isGuardrailModalOpen: true });
       return;
     }
 
@@ -1300,8 +1378,15 @@ export default function InboxV2() {
   };
 
   const onAppendEmoji = (emojiData: EmojiClickData) => {
-    setComposerText((prev) => `${prev}${emojiData.emoji}`);
-    setSendStatus((prev) => (prev === "sent" || prev === "error" ? "idle" : prev));
+    updateUIState({
+      composerText: `${uiState.composerText}${emojiData.emoji}`,
+    });
+    updateUIState({
+      sendStatus:
+        uiState.sendStatus === "sent" || uiState.sendStatus === "error"
+          ? "idle"
+          : uiState.sendStatus,
+    });
     pendingIdempotencyRef.current = null;
     window.requestAnimationFrame(() => composerRef.current?.focus());
   };
@@ -1309,10 +1394,10 @@ export default function InboxV2() {
   useHotkeys(
     "mod+enter",
     (event) => {
-      if (!isComposerModalOpen) return;
+      if (!uiState.isComposerModalOpen) return;
       if (
         sendMutation.isPending ||
-        composerText.trim().length === 0 ||
+        uiState.composerText.trim().length === 0 ||
         lineSelectionRequired ||
         sendConfigQuery.isLoading
       ) {
@@ -1323,9 +1408,9 @@ export default function InboxV2() {
     },
     { enableOnFormTags: true },
     [
-      isComposerModalOpen,
+      uiState.isComposerModalOpen,
       sendMutation.isPending,
-      composerText,
+      uiState.composerText,
       lineSelectionRequired,
       sendConfigQuery.isLoading,
       onSend,
@@ -1335,18 +1420,20 @@ export default function InboxV2() {
   useHotkeys(
     "mod+shift+a",
     (event) => {
-      if (!isComposerModalOpen || !selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId)
+        return;
       event.preventDefault();
       void onUpdateStatus("closed");
     },
     { enableOnFormTags: true },
-    [isComposerModalOpen, selectedConversationId],
+    [uiState.isComposerModalOpen, uiState.selectedConversationId],
   );
 
   useHotkeys(
     "mod+shift+s",
     (event) => {
-      if (!isComposerModalOpen || !selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId)
+        return;
       event.preventDefault();
       const snoozedUntil = addHours(new Date(), 24).toISOString();
       void snoozeMutation
@@ -1370,7 +1457,7 @@ export default function InboxV2() {
     sendLockRef.current = true;
 
     setFlashMessage(null);
-    setSendStatus("sending");
+    inboxState.updateUIState({ sendStatus: "sending" });
     setJustSentMessage({
       text: messageText,
       timestamp: new Date().toISOString(),
@@ -1411,7 +1498,7 @@ export default function InboxV2() {
       const lineSummary = formatSendLineLabel(result.data.lineSelection);
 
       if (result.data.status === "sent" || result.data.status === "duplicate") {
-        setSendStatus("sent");
+        inboxState.updateUIState({ sendStatus: "sent" });
         setJustSentMessage(null);
         void detailQuery.refetch();
 
@@ -1442,17 +1529,17 @@ export default function InboxV2() {
         }
 
         setTimeout(() => {
-          setSendStatus("idle");
+          inboxState.updateUIState({ sendStatus: "idle" });
         }, 2000);
       } else {
-        setSendStatus("error");
+        inboxState.updateUIState({ sendStatus: "error" });
         setJustSentMessage(null);
         toast.error(
           `Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`,
         );
       }
     } catch (error) {
-      setSendStatus("error");
+      inboxState.updateUIState({ sendStatus: "error" });
       setJustSentMessage(null);
       toast.error(`Send failed: ${String((error as Error)?.message || error)}`);
     } finally {
@@ -1517,7 +1604,9 @@ export default function InboxV2() {
         revenueMix: qualificationState.revenueMix,
         coachingInterest: qualificationState.coachingInterest,
       });
-      setFlashMessage("Qualification saved.");
+      // FIXED: Always refetch after save to verify backend accepted the change
+      await detailQuery.refetch();
+      setFlashMessage("Qualification saved and verified.");
     } catch (error) {
       setFlashMessage(
         `Qualification update failed: ${String((error as Error)?.message || error)}`,
@@ -1532,10 +1621,12 @@ export default function InboxV2() {
     try {
       await escalationMutation.mutateAsync({
         conversationId: selectedConversationId,
-        level: escalationLevel,
-        reason: escalationReason,
+        level: escalationState.level,
+        reason: escalationState.reason,
       });
-      setFlashMessage("Stage saved.");
+      // FIXED: Always refetch after save to verify backend accepted the change
+      await detailQuery.refetch();
+      setFlashMessage("Stage saved and verified.");
     } catch (error) {
       setFlashMessage(
         `Escalation update failed: ${String((error as Error)?.message || error)}`,
@@ -1733,6 +1824,8 @@ export default function InboxV2() {
         conversationId: selectedConversationId,
         ownerLabel: ownerLabel || null,
       });
+      // FIXED: Always refetch after save to verify backend accepted the change
+      await detailQuery.refetch();
       setFlashMessage(`Assigned to: ${ownerLabel || "Unassigned"}`);
     } catch (error) {
       setFlashMessage(
@@ -1782,7 +1875,8 @@ export default function InboxV2() {
       return;
     }
     try {
-      const eventTs = detail.conversation.lastTouchAt || detail.conversation.lastInboundAt;
+      const eventTs =
+        detail.conversation.lastTouchAt || detail.conversation.lastInboundAt;
       await manualMutation.mutateAsync({
         contactName: manualContactNameInput.trim(),
         contactPhone: manualContactPhoneInput.trim() || null,
@@ -1867,9 +1961,9 @@ export default function InboxV2() {
       <div className="V2Inbox__filterBar">
         <div className="V2Inbox__filterGroup">
           <button
-            className={`V2Inbox__filterChip ${statusFilter === "open" ? "is-active" : ""}`}
+            className={`V2Inbox__filterChip ${filters.statusFilter === "open" ? "is-active" : ""}`}
             onClick={() =>
-              setStatusFilter(statusFilter === "open" ? "" : "open")
+              updateFilters({ statusFilter: filters.statusFilter === "open" ? "" : "open" })
             }
           >
             <span
@@ -1879,9 +1973,9 @@ export default function InboxV2() {
             Open
           </button>
           <button
-            className={`V2Inbox__filterChip ${statusFilter === "closed" ? "is-active" : ""}`}
+            className={`V2Inbox__filterChip ${filters.statusFilter === "closed" ? "is-active" : ""}`}
             onClick={() =>
-              setStatusFilter(statusFilter === "closed" ? "" : "closed")
+              updateFilters({ statusFilter: filters.statusFilter === "closed" ? "" : "closed" })
             }
           >
             <span
@@ -1891,8 +1985,8 @@ export default function InboxV2() {
             Closed
           </button>
           <button
-            className={`V2Inbox__filterChip ${statusFilter === "dnc" ? "is-active" : ""}`}
-            onClick={() => setStatusFilter(statusFilter === "dnc" ? "" : "dnc")}
+            className={`V2Inbox__filterChip ${filters.statusFilter === "dnc" ? "is-active" : ""}`}
+            onClick={() => updateFilters({ statusFilter: filters.statusFilter === "dnc" ? "" : "dnc" })}
           >
             <span
               className="V2Inbox__filterDot"
@@ -1918,16 +2012,16 @@ export default function InboxV2() {
             ref={searchInputRef}
             type="text"
             placeholder="Search conversations…"
-            value={search}
+            value={filters.search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
         <div className="V2Inbox__filterGroup">
           <button
-            className={`V2Inbox__ownerChip ${ownerFilter === "jack" ? "is-active" : ""}`}
+            className={`V2Inbox__ownerChip ${filters.ownerFilter === "jack" ? "is-active" : ""}`}
             onClick={() =>
-              setOwnerFilter(ownerFilter === "jack" ? "all" : "jack")
+              updateFilters({ ownerFilter: filters.ownerFilter === "jack" ? "all" : "jack" })
             }
             style={{ "--owner-color": "#11b8d6" } as React.CSSProperties}
           >
@@ -1935,9 +2029,9 @@ export default function InboxV2() {
             Jack
           </button>
           <button
-            className={`V2Inbox__ownerChip ${ownerFilter === "brandon" ? "is-active" : ""}`}
+            className={`V2Inbox__ownerChip ${filters.ownerFilter === "brandon" ? "is-active" : ""}`}
             onClick={() =>
-              setOwnerFilter(ownerFilter === "brandon" ? "all" : "brandon")
+              updateFilters({ ownerFilter: filters.ownerFilter === "brandon" ? "all" : "brandon" })
             }
             style={{ "--owner-color": "#13b981" } as React.CSSProperties}
           >
@@ -1945,11 +2039,11 @@ export default function InboxV2() {
             Brandon
           </button>
           <button
-            className={`V2Inbox__ownerChip ${ownerFilter === "unassigned" ? "is-active" : ""}`}
+            className={`V2Inbox__ownerChip ${filters.ownerFilter === "unassigned" ? "is-active" : ""}`}
             onClick={() =>
-              setOwnerFilter(
-                ownerFilter === "unassigned" ? "all" : "unassigned",
-              )
+              updateFilters({
+                ownerFilter: filters.ownerFilter === "unassigned" ? "all" : "unassigned",
+              })
             }
           >
             <span className="V2Inbox__ownerAvatar">?</span>
@@ -2007,14 +2101,17 @@ export default function InboxV2() {
         </div>
       </div>
 
-      <section className="V2Inbox__commandDeck" aria-label="Inbox quick actions">
+      <section
+        className="V2Inbox__commandDeck"
+        aria-label="Inbox quick actions"
+      >
         <button
           type="button"
           className="V2Inbox__commandCard V2Inbox__commandCard--urgent"
           onClick={() => {
-            setSortMode("urgent");
-            setNeedsReplyOnly(true);
-            setStatusFilter("open");
+            updateFilters({ sortMode: "urgent" });
+            updateFilters({ needsReplyOnly: true });
+            updateFilters({ statusFilter: "open" });
           }}
         >
           <span className="V2Inbox__commandLabel">Urgent Queue</span>
@@ -2025,7 +2122,7 @@ export default function InboxV2() {
           className="V2Inbox__commandCard V2Inbox__commandCard--reply"
           onClick={() => {
             setSortMode("needs_reply");
-            setNeedsReplyOnly(true);
+            updateFilters({ needsReplyOnly: true });
           }}
         >
           <span className="V2Inbox__commandLabel">Needs Reply</span>
@@ -2035,10 +2132,9 @@ export default function InboxV2() {
           type="button"
           className="V2Inbox__commandCard V2Inbox__commandCard--owner"
           onClick={() => {
-            setOwnerFilter("unassigned");
-            setNeedsReplyOnly(true);
-            setStatusFilter("open");
-            setSortMode("urgent");
+            updateFilters({ ownerFilter: "unassigned", needsReplyOnly: true });
+            updateFilters({ statusFilter: "open" });
+            updateFilters({ sortMode: "urgent" });
           }}
         >
           <span className="V2Inbox__commandLabel">Unassigned</span>
@@ -2050,11 +2146,11 @@ export default function InboxV2() {
             type="button"
             className="V2Inbox__commandReset"
             onClick={() => {
-              setStatusFilter("open");
-              setNeedsReplyOnly(true);
-              setOwnerFilter("all");
-              setSearch("");
-              setSortMode("recent");
+              updateFilters({ statusFilter: "open" });
+              updateFilters({ needsReplyOnly: true });
+              updateFilters({ ownerFilter: "all" });
+              updateFilters({ search: "" });
+              updateFilters({ sortMode: "recent" });
             }}
           >
             Reset inbox view
@@ -2149,7 +2245,9 @@ export default function InboxV2() {
                     const hasUnread = conversation.openNeedsReplyCount > 0;
                     const isUrgent =
                       conversation.escalation.level <= 2 && hasUnread;
-                    const setterName = displaySetterName(conversation.ownerLabel);
+                    const setterName = displaySetterName(
+                      conversation.ownerLabel,
+                    );
                     const setterColor = getSetterColor(conversation.ownerLabel);
 
                     return (
@@ -2176,79 +2274,91 @@ export default function InboxV2() {
                             setIsComposerModalOpen(true);
                           }}
                         >
-                        {/* Row 1: name + time */}
-                        <div className="V2Inbox__convRow">
-                          <div className="V2Inbox__convNameWrap">
-                            {hasUnread && <span className="V2Inbox__convPip" />}
-                            <span className="V2Inbox__convName">
-                              {conversation.contactName ||
-                                formatPhoneDisplay(conversation.contactPhone) ||
-                                conversation.contactKey}
-                              {conversation.dnc && (
-                                <span className="V2Inbox__dncBadge">DNC</span>
+                          {/* Row 1: name + time */}
+                          <div className="V2Inbox__convRow">
+                            <div className="V2Inbox__convNameWrap">
+                              {hasUnread && (
+                                <span className="V2Inbox__convPip" />
                               )}
-                              {conversation.mondayBooked && (
-                                <span className="V2Inbox__mondayBadge">
-                                  📅 Booked
-                                </span>
-                              )}
+                              <span className="V2Inbox__convName">
+                                {conversation.contactName ||
+                                  formatPhoneDisplay(
+                                    conversation.contactPhone,
+                                  ) ||
+                                  conversation.contactKey}
+                                {conversation.dnc && (
+                                  <span className="V2Inbox__dncBadge">DNC</span>
+                                )}
+                                {conversation.mondayBooked && (
+                                  <span className="V2Inbox__mondayBadge">
+                                    📅 Booked
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <span className="V2Inbox__convTime">
+                              <time
+                                dateTime={
+                                  conversation.lastMessage.createdAt ||
+                                  undefined
+                                }
+                                title={fmtDateTime(
+                                  conversation.lastMessage.createdAt,
+                                )}
+                              >
+                                {timeAgo(conversation.lastMessage.createdAt) ||
+                                  "just now"}
+                              </time>
+                              <small>
+                                {formatListTimestamp(
+                                  conversation.lastMessage.createdAt,
+                                )}
+                              </small>
                             </span>
                           </div>
-                          <span className="V2Inbox__convTime">
-                            <time
-                              dateTime={conversation.lastMessage.createdAt || undefined}
-                              title={fmtDateTime(conversation.lastMessage.createdAt)}
-                            >
-                              {timeAgo(conversation.lastMessage.createdAt) || "just now"}
-                            </time>
-                            <small>
-                              {formatListTimestamp(conversation.lastMessage.createdAt)}
-                            </small>
-                          </span>
-                        </div>
 
-                        {/* Row 2: direction + preview */}
-                        <p className="V2Inbox__convPreview">
-                          <span
-                            className="V2Inbox__convDir"
-                            data-dir={conversation.lastMessage.direction}
-                          >
-                            {conversation.lastMessage.direction === "inbound"
-                              ? "←"
-                              : "→"}
-                          </span>
-                          {shorten(conversation.lastMessage.body, 85) || (
-                            <em>No preview</em>
-                          )}
-                        </p>
-
-                        {/* Row 3: tags */}
-                        <div className="V2Inbox__convTags">
-                          <span
-                            className="V2Inbox__convEscTag"
-                            data-tone={escalationToneForLevel(
-                              conversation.escalation.level,
-                            )}
-                          >
-                            L{conversation.escalation.level}
-                          </span>
-                          {setterName && (
+                          {/* Row 2: direction + preview */}
+                          <p className="V2Inbox__convPreview">
                             <span
-                              className="V2Inbox__convOwnerTag"
-                              style={
-                                { "--c": setterColor } as React.CSSProperties
-                              }
+                              className="V2Inbox__convDir"
+                              data-dir={conversation.lastMessage.direction}
                             >
-                              <span className="V2Inbox__convOwnerDot" />
-                              {setterName}
+                              {conversation.lastMessage.direction === "inbound"
+                                ? "←"
+                                : "→"}
                             </span>
-                          )}
-                          {conversation.openNeedsReplyCount > 0 && (
-                            <span className="V2Inbox__convReplyTag">
-                              {conversation.openNeedsReplyCount} needs reply
+                            {shorten(conversation.lastMessage.body, 85) || (
+                              <em>No preview</em>
+                            )}
+                          </p>
+
+                          {/* Row 3: tags */}
+                          <div className="V2Inbox__convTags">
+                            <span
+                              className="V2Inbox__convEscTag"
+                              data-tone={escalationToneForLevel(
+                                conversation.escalation.level,
+                              )}
+                            >
+                              L{conversation.escalation.level}
                             </span>
-                          )}
-                        </div>
+                            {setterName && (
+                              <span
+                                className="V2Inbox__convOwnerTag"
+                                style={
+                                  { "--c": setterColor } as React.CSSProperties
+                                }
+                              >
+                                <span className="V2Inbox__convOwnerDot" />
+                                {setterName}
+                              </span>
+                            )}
+                            {conversation.openNeedsReplyCount > 0 && (
+                              <span className="V2Inbox__convReplyTag">
+                                {conversation.openNeedsReplyCount} needs reply
+                              </span>
+                            )}
+                          </div>
                         </button>
                       </div>
                     );
@@ -2277,93 +2387,151 @@ export default function InboxV2() {
         {/* Right: Analytics Dashboard */}
         <div className="V2Inbox__analyticsColumn">
           <div className="V2Inbox__analyticsPanel">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1rem",
+              }}
+            >
               <h3 className="V2Inbox__analyticsTitle">Inbox Overview</h3>
               {listQuery.dataUpdatedAt ? (
-                <span style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>
-                  Updated {timeAgo(new Date(listQuery.dataUpdatedAt).toISOString())}
+                <span
+                  style={{ fontSize: "0.7rem", color: "var(--v2-text-dim)" }}
+                >
+                  Updated{" "}
+                  {timeAgo(new Date(listQuery.dataUpdatedAt).toISOString())}
                 </span>
               ) : null}
             </div>
 
             {/* Clearer priority metrics instead of opaque score */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.75rem",
+                marginBottom: "1.25rem",
+              }}
+            >
               {criticalCount > 0 ? (
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: '0.625rem',
-                  background: 'rgba(239, 76, 98, 0.1)',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(239, 76, 98, 0.2)'
-                }}>
-                  <span style={{ fontSize: '1rem' }}>🚨</span>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--v2-critical)', fontWeight: 600 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.625rem",
+                    background: "rgba(239, 76, 98, 0.1)",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(239, 76, 98, 0.2)",
+                  }}
+                >
+                  <span style={{ fontSize: "1rem" }}>🚨</span>
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "var(--v2-critical)",
+                      fontWeight: 600,
+                    }}
+                  >
                     {criticalCount} critical
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>
+                  <span
+                    style={{ fontSize: "0.75rem", color: "var(--v2-text-dim)" }}
+                  >
                     (L1 + needs reply)
                   </span>
                 </div>
               ) : null}
-              
+
               {staleCount > 0 ? (
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: '0.625rem',
-                  background: 'rgba(245, 157, 13, 0.1)',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(245, 157, 13, 0.2)'
-                }}>
-                  <span style={{ fontSize: '1rem' }}>⏰</span>
-                  <span style={{ fontSize: '0.85rem', color: '#f59d0d', fontWeight: 600 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.625rem",
+                    background: "rgba(245, 157, 13, 0.1)",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(245, 157, 13, 0.2)",
+                  }}
+                >
+                  <span style={{ fontSize: "1rem" }}>⏰</span>
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "#f59d0d",
+                      fontWeight: 600,
+                    }}
+                  >
                     {staleCount} stale
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>
+                  <span
+                    style={{ fontSize: "0.75rem", color: "var(--v2-text-dim)" }}
+                  >
                     (48h+ no reply)
                   </span>
                 </div>
               ) : null}
-              
+
               {unassignedCount > 0 ? (
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: '0.625rem',
-                  background: 'rgba(17, 184, 214, 0.1)',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(17, 184, 214, 0.2)'
-                }}>
-                  <span style={{ fontSize: '1rem' }}>👤</span>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--v2-accent)', fontWeight: 600 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.625rem",
+                    background: "rgba(17, 184, 214, 0.1)",
+                    borderRadius: "6px",
+                    border: "1px solid rgba(17, 184, 214, 0.2)",
+                  }}
+                >
+                  <span style={{ fontSize: "1rem" }}>👤</span>
+                  <span
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "var(--v2-accent)",
+                      fontWeight: 600,
+                    }}
+                  >
                     {unassignedCount} unassigned
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>
+                  <span
+                    style={{ fontSize: "0.75rem", color: "var(--v2-text-dim)" }}
+                  >
                     (need owner)
                   </span>
                 </div>
               ) : null}
-              
-              {criticalCount === 0 && staleCount === 0 && unassignedCount === 0 && totalConversations > 0 && (
-                <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  gap: '0.5rem',
-                  padding: '0.625rem',
-                  background: 'rgba(19, 185, 129, 0.1)',
-                  borderRadius: '6px',
-                  border: '1px solid rgba(19, 185, 129, 0.2)'
-                }}>
-                  <span style={{ fontSize: '1rem' }}>✅</span>
-                  <span style={{ fontSize: '0.85rem', color: 'var(--v2-positive)', fontWeight: 600 }}>
-                    All caught up
-                  </span>
-                </div>
-              )}
+
+              {criticalCount === 0 &&
+                staleCount === 0 &&
+                unassignedCount === 0 &&
+                totalConversations > 0 && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      padding: "0.625rem",
+                      background: "rgba(19, 185, 129, 0.1)",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(19, 185, 129, 0.2)",
+                    }}
+                  >
+                    <span style={{ fontSize: "1rem" }}>✅</span>
+                    <span
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "var(--v2-positive)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      All caught up
+                    </span>
+                  </div>
+                )}
             </div>
 
             <div className="V2Inbox__statGrid">
@@ -2383,7 +2551,10 @@ export default function InboxV2() {
                 >
                   {urgentCount}
                 </span>
-                <span className="V2Inbox__statLabel" title="L1-L2 escalation + needs reply">
+                <span
+                  className="V2Inbox__statLabel"
+                  title="L1-L2 escalation + needs reply"
+                >
                   Urgent
                 </span>
               </div>
@@ -2396,7 +2567,6 @@ export default function InboxV2() {
                 <span className="V2Inbox__statLabel">Brandon</span>
               </div>
             </div>
-
           </div>
         </div>
       </section>
@@ -2453,7 +2623,7 @@ export default function InboxV2() {
                 marginBottom: "1rem",
               }}
             >
-              You&apos;re sending a call link at L{escalationLevel}. Confirm at
+              You&apos;re sending a call link at L{escalationState.level}. Confirm at
               least 2 buying signals before proceeding.
             </AlertDialog.Description>
 
@@ -2579,9 +2749,9 @@ export default function InboxV2() {
                         detailContactCard?.contactKey}
                     </h3>
                     <p className="V2Inbox__composerMeta">
-                      {formatPhoneDisplay(detailContactCard?.phone) || "n/a"} · Owner:{" "}
-                      {detailConversation?.ownerLabel || "Unassigned"} · Stage:
-                      L{detailConversation?.escalation.level ?? "?"}
+                      {formatPhoneDisplay(detailContactCard?.phone) || "n/a"} ·
+                      Owner: {detailConversation?.ownerLabel || "Unassigned"} ·
+                      Stage: L{detailConversation?.escalation.level ?? "?"}
                     </p>
                     <div className="V2Inbox__statusRow">
                       <span
@@ -2733,11 +2903,14 @@ export default function InboxV2() {
                   Select a conversation to open it.
                 </V2State>
               ) : detailQuery.isLoading ? (
-                <div style={{ padding: '1.5rem' }}>
+                <div style={{ padding: "1.5rem" }}>
                   <SkeletonText lines={6} />
                 </div>
               ) : detailQuery.isError || !detail ? (
-                <V2State kind="error" onRetry={() => void detailQuery.refetch()}>
+                <V2State
+                  kind="error"
+                  onRetry={() => void detailQuery.refetch()}
+                >
                   Failed to load messages. Check your connection and try again.
                 </V2State>
               ) : (
@@ -2755,43 +2928,117 @@ export default function InboxV2() {
                     minSize={isNarrowComposerViewport ? "260px" : "45%"}
                   >
                     <div className="V2Inbox__composerPrimary">
-                    {/* Conversation Thread - Chat Style */}
-                    <div className="V2Inbox__chatThread" ref={chatThreadRef}>
-                      {detailMessages.map((message) => {
-                        const leadLabel =
-                          detailContactCard?.name ||
-                          formatPhoneDisplay(detailContactCard?.phone) ||
-                          "Lead";
-                        // For outbound messages: prefer inferring from message body (e.g., "Jack with PT Biz")
-                        // Fall back to alowareUser field, then to default setter
-                        const defaultSetter =
-                          displaySetterName(detailConversation?.ownerLabel) ||
-                          "Setter";
-                        let speaker: string;
-                        if (message.direction === "inbound") {
-                          speaker = leadLabel;
-                        } else {
-                          // Try to infer from message body for sequence messages
-                          const bodySenderMatch = message.body?.match(
-                            /^Hey.*?,\s*(\w+(?:\s+\w+)?)\s+with\s+PT/i,
+                      {/* Conversation Thread - Chat Style */}
+                      <div className="V2Inbox__chatThread" ref={chatThreadRef}>
+                        {/* FIXED: Use deduplicatedMessages instead of detailMessages to prevent duplicate rendering */}
+                        {deduplicatedMessages.map((message) => {
+                          const leadLabel =
+                            detailContactCard?.name ||
+                            formatPhoneDisplay(detailContactCard?.phone) ||
+                            "Lead";
+                          // For outbound messages: prefer inferring from message body (e.g., "Jack with PT Biz")
+                          // Fall back to alowareUser field, then to default setter
+                          const defaultSetter =
+                            displaySetterName(detailConversation?.ownerLabel) ||
+                            "Setter";
+                          let speaker: string;
+                          if (message.direction === "inbound") {
+                            speaker = leadLabel;
+                          } else {
+                            // Try to infer from message body for sequence messages
+                            const bodySenderMatch = message.body?.match(
+                              /^Hey.*?,\s*(\w+(?:\s+\w+)?)\s+with\s+PT/i,
+                            );
+                            const bodySender = bodySenderMatch?.[1] || null;
+                            speaker =
+                              displaySetterName(bodySender) ||
+                              displaySetterName(message.alowareUser) ||
+                              defaultSetter;
+                          }
+                          return (
+                            <article
+                              key={message.id}
+                              className={`V2Inbox__chatMessage V2Inbox__chatMessage--${message.direction}`}
+                            >
+                              <div className="V2Inbox__chatMessageHeader">
+                                <span className="V2Inbox__chatSpeaker">
+                                  {speaker}
+                                </span>
+                                <time className="V2Inbox__chatTime">
+                                  {fmtDateTime(message.createdAt)}
+                                </time>
+                              </div>
+                              <p className="V2Inbox__chatBody">
+                                <Linkify
+                                  options={{
+                                    target: "_blank",
+                                    rel: "noopener noreferrer",
+                                    className: "V2Inbox__chatLink",
+                                  }}
+                                >
+                                  {message.body || "(empty)"}
+                                </Linkify>
+                              </p>
+                              {Array.isArray(message.linkPreviews) &&
+                              message.linkPreviews.length > 0 ? (
+                                <div className="V2Inbox__chatPreviews">
+                                  {message.linkPreviews
+                                    .slice(0, 2)
+                                    .map((preview) => (
+                                      <a
+                                        key={`${message.id}-${preview.url}`}
+                                        className="V2Inbox__chatPreviewCard"
+                                        href={preview.url}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                      >
+                                        {preview.image ? (
+                                          <img
+                                            className="V2Inbox__chatPreviewImage"
+                                            src={preview.image}
+                                            alt={
+                                              preview.title ||
+                                              preview.hostname ||
+                                              "Link preview"
+                                            }
+                                          />
+                                        ) : null}
+                                        <div className="V2Inbox__chatPreviewBody">
+                                          <strong>
+                                            {preview.title ||
+                                              preview.siteName ||
+                                              preview.hostname ||
+                                              preview.url}
+                                          </strong>
+                                          {preview.description ? (
+                                            <small>
+                                              {shorten(
+                                                preview.description,
+                                                120,
+                                              )}
+                                            </small>
+                                          ) : null}
+                                          <span>
+                                            {preview.hostname || preview.url}
+                                          </span>
+                                        </div>
+                                      </a>
+                                    ))}
+                                </div>
+                              ) : null}
+                            </article>
                           );
-                          const bodySender = bodySenderMatch?.[1] || null;
-                          speaker =
-                            displaySetterName(bodySender) ||
-                            displaySetterName(message.alowareUser) ||
-                            defaultSetter;
-                        }
-                        return (
+                        })}
+
+                        {/* Optimistic sent message */}
+                        {justSentMessage && !justSentMessage.confirmed && (
                           <article
-                            key={message.id}
-                            className={`V2Inbox__chatMessage V2Inbox__chatMessage--${message.direction}`}
+                            className={`V2Inbox__chatMessage V2Inbox__chatMessage--outbound ${!justSentMessage.confirmed ? "V2Inbox__chatMessage--sending" : "V2Inbox__chatMessage--confirmed"}`}
                           >
                             <div className="V2Inbox__chatMessageHeader">
-                              <span className="V2Inbox__chatSpeaker">
-                                {speaker}
-                              </span>
+                              <span className="V2Inbox__chatSpeaker">You</span>
                               <time className="V2Inbox__chatTime">
-                                {fmtDateTime(message.createdAt)}
+                                {fmtDateTime(justSentMessage.timestamp)}
                               </time>
                             </div>
                             <p className="V2Inbox__chatBody">
@@ -2802,435 +3049,385 @@ export default function InboxV2() {
                                   className: "V2Inbox__chatLink",
                                 }}
                               >
-                                {message.body || "(empty)"}
+                                {justSentMessage.text}
                               </Linkify>
                             </p>
-                            {Array.isArray(message.linkPreviews) &&
-                            message.linkPreviews.length > 0 ? (
-                              <div className="V2Inbox__chatPreviews">
-                                {message.linkPreviews.slice(0, 2).map((preview) => (
-                                  <a
-                                    key={`${message.id}-${preview.url}`}
-                                    className="V2Inbox__chatPreviewCard"
-                                    href={preview.url}
-                                    target="_blank"
-                                    rel="noreferrer noopener"
-                                  >
-                                    {preview.image ? (
-                                      <img
-                                        className="V2Inbox__chatPreviewImage"
-                                        src={preview.image}
-                                        alt={preview.title || preview.hostname || "Link preview"}
-                                      />
-                                    ) : null}
-                                    <div className="V2Inbox__chatPreviewBody">
-                                      <strong>
-                                        {preview.title || preview.siteName || preview.hostname || preview.url}
-                                      </strong>
-                                      {preview.description ? <small>{shorten(preview.description, 120)}</small> : null}
-                                      <span>{preview.hostname || preview.url}</span>
-                                    </div>
-                                  </a>
-                                ))}
-                              </div>
-                            ) : null}
-                          </article>
-                        );
-                      })}
-
-                      {/* Optimistic sent message */}
-                      {justSentMessage && !justSentMessage.confirmed && (
-                        <article
-                          className={`V2Inbox__chatMessage V2Inbox__chatMessage--outbound ${!justSentMessage.confirmed ? "V2Inbox__chatMessage--sending" : "V2Inbox__chatMessage--confirmed"}`}
-                        >
-                          <div className="V2Inbox__chatMessageHeader">
-                            <span className="V2Inbox__chatSpeaker">You</span>
-                            <time className="V2Inbox__chatTime">
-                              {fmtDateTime(justSentMessage.timestamp)}
-                            </time>
-                          </div>
-                          <p className="V2Inbox__chatBody">
-                            <Linkify
-                              options={{
-                                target: "_blank",
-                                rel: "noopener noreferrer",
-                                className: "V2Inbox__chatLink",
-                              }}
-                            >
-                              {justSentMessage.text}
-                            </Linkify>
-                          </p>
-                          <span className="V2Inbox__sendingIndicator">
-                            {!justSentMessage.confirmed ? "Sending…" : "✓ Sent"}
-                          </span>
-                        </article>
-                      )}
-                    </div>
-
-                    {/* Composer Area */}
-                    <div className="V2Inbox__chatComposer">
-                      <div className="V2Inbox__setterAssist">
-                        <div className="V2Inbox__setterAssistHeader">
-                          <p>Setter Assist</p>
-                          <span>{setterAssistSummary.label}</span>
-                        </div>
-                        <p className="V2Inbox__setterAssistAction">
-                          {setterAssistSummary.action}
-                        </p>
-                      </div>
-                      {crmNotesText ? (
-                        <div className="V2Inbox__crmNotesCard">
-                          <div className="V2Inbox__crmNotesHeader">
-                            <p>CRM Notes</p>
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small"
-                              onClick={() => void onCopyCrmNotes()}
-                            >
-                              {crmNotesCopied ? "Copied" : "Copy"}
-                            </button>
-                          </div>
-                          <textarea
-                            className="V2Inbox__crmNotesText"
-                            value={crmNotesText}
-                            readOnly
-                            rows={12}
-                            onFocus={(event) => event.currentTarget.select()}
-                          />
-                        </div>
-                      ) : null}
-
-                      {/* Double Pitch Protection Banner */}
-                      {showDoublePitchWarning && (
-                        <div
-                          style={{
-                            background: "rgba(245, 157, 13, 0.12)",
-                            border: "1px solid #f59d0d",
-                            borderRadius: "4px",
-                            padding: "0.5rem 0.75rem",
-                            marginBottom: "0.5rem",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: "0.5rem",
-                            fontSize: "0.8rem",
-                            color: "#f59d0d",
-                          }}
-                        >
-                          <span>
-                            ⚠ Call link already sent — no reply yet. Try a
-                            follow-up question instead.
-                          </span>
-                          <button
-                            type="button"
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "#f59d0d",
-                              cursor: "pointer",
-                              fontSize: "0.8rem",
-                              padding: "0 0.25rem",
-                            }}
-                            onClick={() => setShowDoublePitchWarning(false)}
-                            title="Dismiss and send anyway"
-                          >
-                            Send anyway ✕
-                          </button>
-                        </div>
-                      )}
-                      <div className="V2Inbox__chatInputRow">
-                        <MentionTextarea
-                          inputRef={(element) => {
-                            composerRef.current = element;
-                          }}
-                          className="V2Inbox__chatInput"
-                          value={composerText}
-                          onChange={(nextText) => {
-                            setComposerText(nextText);
-                            setSendStatus((prev) =>
-                              prev === "sent" || prev === "error"
-                                ? "idle"
-                                : prev,
-                            );
-                            pendingIdempotencyRef.current = null;
-                            if (selectedDraftId) {
-                              const selectedDraft = detailDrafts.find(
-                                (draft) => draft.id === selectedDraftId,
-                              );
-                              if (
-                                !selectedDraft ||
-                                selectedDraft.text !== nextText
-                              ) {
-                                setSelectedDraftId(null);
-                              }
-                            }
-                          }}
-                          placeholder="Type your message... use @ for owners, / for variables, Cmd/Ctrl+Enter to send"
-                        />
-                        <div className="V2Inbox__chatActions">
-                          <button
-                            type="button"
-                            className="V2Inbox__button V2Inbox__button--secondary V2Inbox__button--small"
-                            onClick={onGenerateDraft}
-                            disabled={
-                              generateDraftMutation.isPending ||
-                              sendMutation.isPending
-                            }
-                            title="Generate AI draft"
-                          >
-                            {generateDraftMutation.isPending ? "..." : "✨"}
-                          </button>
-                          <button
-                            type="button"
-                            className="V2Inbox__button V2Inbox__button--secondary V2Inbox__button--small"
-                            onClick={onGenerateCrmNotes}
-                            disabled={
-                              generateCrmNotesMutation.isPending ||
-                              sendMutation.isPending
-                            }
-                            title="Generate CRM notes from full thread and copy"
-                          >
-                            {generateCrmNotesMutation.isPending ? "..." : "CRM"}
-                          </button>
-                          <button
-                            type="button"
-                            className={`V2Inbox__button V2Inbox__button--primary V2Inbox__button--small ${sendStatus === "sending" ? "V2Inbox__button--sending" : ""} ${sendStatus === "sent" ? "V2Inbox__button--success" : ""}`}
-                            onClick={onSend}
-                            disabled={
-                              sendMutation.isPending ||
-                              composerText.trim().length === 0 ||
-                              lineSelectionRequired ||
-                              sendConfigQuery.isLoading
-                            }
-                          >
-                            {sendStatus === "sending" ? (
-                              <span className="V2Inbox__buttonSpinner" />
-                            ) : sendStatus === "sent" ? (
-                              "Sent!"
-                            ) : (
-                              "Send"
-                            )}
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="V2Inbox__chatFooter">
-                        {(() => {
-                          const { segments, charsRemaining, isUnicode } =
-                            getSmsSegmentInfo(composerText);
-                          const warn = segments >= 2;
-                          const danger = segments >= 4;
-                          return (
-                            <span
-                              className={`V2Inbox__chatCount${danger ? " V2Inbox__chatCount--danger" : warn ? " V2Inbox__chatCount--warn" : ""}`}
-                              title={
-                                isUnicode
-                                  ? "Message contains Unicode characters — reduced segment size (70/67 chars)"
-                                  : "GSM-7 encoding — 160 chars single / 153 per segment"
-                              }
-                            >
-                              {composerText.length === 0
-                                ? "160 chars left"
-                                : `${charsRemaining} left · ${segments} SMS${isUnicode ? " ⚠ unicode" : ""}`}
+                            <span className="V2Inbox__sendingIndicator">
+                              {!justSentMessage.confirmed
+                                ? "Sending…"
+                                : "✓ Sent"}
                             </span>
-                          );
-                        })()}
-                        <div className="V2Inbox__chatTools">
-                          <span className="V2Inbox__sendReliability">
-                            {sendStatus === "sending"
-                              ? "Sending with retry-safe guard…"
-                              : pendingIdempotencyRef.current
-                                ? "Retry-safe key active"
-                                : "Retry-safe send enabled"}
-                          </span>
-                          {lineOptions.length > 0 && (
-                            <V2Select
-                              triggerClassName="V2Inbox__chatLineSelect"
-                              value={selectedLineKey || LINE_NONE_VALUE}
-                              onValueChange={(value) =>
-                                setSelectedLineKey(
-                                  value === LINE_NONE_VALUE ? "" : value,
-                                )
-                              }
-                              options={lineSelectOptions}
-                              ariaLabel="Select send line"
-                            />
-                          )}
-                          {detailDrafts.length > 0 && (
-                            <V2Select
-                              triggerClassName="V2Inbox__chatDraftSelect"
-                              value={selectedDraftId || DRAFT_NONE_VALUE}
-                              onValueChange={(value) => {
-                                if (value === DRAFT_NONE_VALUE) {
-                                  setSelectedDraftId(null);
-                                  return;
-                                }
-                                const draft = detailDrafts.find(
-                                  (d) => d.id === value,
-                                );
-                                if (!draft) return;
-                                setComposerText(draft.text);
-                                setSelectedDraftId(draft.id);
-                              }}
-                              options={[
-                                {
-                                  value: DRAFT_NONE_VALUE,
-                                  label: `Drafts (${detailDrafts.length})`,
-                                },
-                                ...detailDrafts.slice(0, 5).map((draft) => ({
-                                  value: draft.id,
-                                  label: `${shorten(draft.text, 40)} (L${toFiniteNumber(draft.lintScore).toFixed(0)})`,
-                                })),
-                              ]}
-                              ariaLabel="Use a saved draft"
-                            />
-                          )}
-                          {/* Templates */}
-                          <div className="V2Inbox__templateWrapper">
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small"
-                              title="Insert template"
-                              ref={templateFloatingRefs.setReference}
-                              {...getTemplateReferenceProps({
-                                onClick: () =>
-                                  setShowTemplates((prev) => !prev),
-                                "aria-expanded": showTemplates,
-                                "aria-haspopup": "dialog",
-                              })}
-                            >
-                              Templates
-                            </button>
-                            {showTemplates && (
-                              <FloatingPortal>
-                                <div
-                                  className="V2Inbox__templateDropdown"
-                                  ref={templateFloatingRefs.setFloating}
-                                  style={templateFloatingStyles}
-                                  {...getFloatingProps({
-                                    "aria-label": "Templates menu",
-                                  })}
-                                >
-                                  {templatesQuery.data &&
-                                  templatesQuery.data.length > 0 ? (
-                                    templatesQuery.data.map((tpl) => (
-                                      <div
-                                        key={tpl.id}
-                                        className="V2Inbox__templateItem"
-                                      >
-                                        <button
-                                          type="button"
-                                          className="V2Inbox__templateInsert"
-                                          onClick={() =>
-                                            onInsertTemplate(tpl.body)
-                                          }
-                                          title={tpl.body}
-                                        >
-                                          {tpl.name}
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="V2Inbox__templateDelete"
-                                          onClick={() =>
-                                            void onDeleteTemplate(tpl.id)
-                                          }
-                                          title="Delete template"
-                                        >
-                                          ✕
-                                        </button>
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <p className="V2Inbox__templateEmpty">
-                                      No templates saved yet.
-                                    </p>
-                                  )}
-                                  <div className="V2Inbox__templateCreate">
-                                    <input
-                                      type="text"
-                                      className="V2Inbox__templateNameInput"
-                                      value={newTemplateName}
-                                      onChange={(e) =>
-                                        templateForm.setValue(
-                                          "name",
-                                          e.target.value,
-                                          { shouldValidate: true },
-                                        )
-                                      }
-                                      placeholder="Template name…"
-                                    />
-                                    <MentionTextarea
-                                      className="V2Inbox__templateBodyInput"
-                                      value={newTemplateBody}
-                                      onChange={(newValue) =>
-                                        templateForm.setValue(
-                                          "body",
-                                          newValue,
-                                          { shouldValidate: true },
-                                        )
-                                      }
-                                      placeholder="Message body... use / for variables and @ for owner tags"
-                                    />
-                                    <button
-                                      type="button"
-                                      className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                                      onClick={() =>
-                                        void submitCreateTemplate()
-                                      }
-                                      disabled={
-                                        createTemplateMutation.isPending ||
-                                        !newTemplateName.trim() ||
-                                        !newTemplateBody.trim()
-                                      }
-                                    >
-                                      {createTemplateMutation.isPending
-                                        ? "Saving…"
-                                        : "+ Save Template"}
-                                    </button>
-                                  </div>
-                                </div>
-                              </FloatingPortal>
-                            )}
+                          </article>
+                        )}
+                      </div>
+
+                      {/* Composer Area */}
+                      <div className="V2Inbox__chatComposer">
+                        <div className="V2Inbox__setterAssist">
+                          <div className="V2Inbox__setterAssistHeader">
+                            <p>Setter Assist</p>
+                            <span>{setterAssistSummary.label}</span>
                           </div>
-                          <div className="V2Inbox__emojiWrap">
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small"
-                              onClick={() =>
-                                setIsEmojiPickerOpen((prev) => !prev)
-                              }
-                              title="Insert emoji"
-                            >
-                              😀
-                            </button>
-                            {isEmojiPickerOpen ? (
-                              <div className="V2Inbox__emojiPopover">
-                                <Suspense fallback={<div className="V2Inbox__emojiLoading">Loading…</div>}>
-                                  <LazyEmojiPicker
-                                    width={300}
-                                    height={360}
-                                    lazyLoadEmojis
-                                    searchDisabled={false}
-                                    onEmojiClick={onAppendEmoji}
-                                  />
-                                </Suspense>
-                              </div>
-                            ) : null}
+                          <p className="V2Inbox__setterAssistAction">
+                            {setterAssistSummary.action}
+                          </p>
+                        </div>
+                        {crmNotesText ? (
+                          <div className="V2Inbox__crmNotesCard">
+                            <div className="V2Inbox__crmNotesHeader">
+                              <p>CRM Notes</p>
+                              <button
+                                type="button"
+                                className="V2Inbox__button V2Inbox__button--small"
+                                onClick={() => void onCopyCrmNotes()}
+                              >
+                                {crmNotesCopied ? "Copied" : "Copy"}
+                              </button>
+                            </div>
+                            <textarea
+                              className="V2Inbox__crmNotesText"
+                              value={crmNotesText}
+                              readOnly
+                              rows={12}
+                              onFocus={(event) => event.currentTarget.select()}
+                            />
                           </div>
-                          <button
-                            type="button"
-                            className="V2Inbox__chatClear"
-                            onClick={onClearDraft}
-                            disabled={
-                              !selectedDraftId && composerText.length === 0
-                            }
-                            title="Clear message"
+                        ) : null}
+
+                        {/* Double Pitch Protection Banner */}
+                        {showDoublePitchWarning && (
+                          <div
+                            style={{
+                              background: "rgba(245, 157, 13, 0.12)",
+                              border: "1px solid #f59d0d",
+                              borderRadius: "4px",
+                              padding: "0.5rem 0.75rem",
+                              marginBottom: "0.5rem",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: "0.5rem",
+                              fontSize: "0.8rem",
+                              color: "#f59d0d",
+                            }}
                           >
-                            Clear
-                          </button>
+                            <span>
+                              ⚠ Call link already sent — no reply yet. Try a
+                              follow-up question instead.
+                            </span>
+                            <button
+                              type="button"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "#f59d0d",
+                                cursor: "pointer",
+                                fontSize: "0.8rem",
+                                padding: "0 0.25rem",
+                              }}
+                              onClick={() => setShowDoublePitchWarning(false)}
+                              title="Dismiss and send anyway"
+                            >
+                              Send anyway ✕
+                            </button>
+                          </div>
+                        )}
+                        <div className="V2Inbox__chatInputRow">
+                          <MentionTextarea
+                            inputRef={(element) => {
+                              composerRef.current = element;
+                            }}
+                            className="V2Inbox__chatInput"
+                            value={composerText}
+                            onChange={(nextText) => {
+                              setComposerText(nextText);
+                              pendingIdempotencyRef.current = null;
+                              if (selectedDraftId) {
+                                const selectedDraft = detailDrafts.find(
+                                  (draft) => draft.id === selectedDraftId,
+                                );
+                                if (
+                                  !selectedDraft ||
+                                  selectedDraft.text !== nextText
+                                ) {
+                                  setSelectedDraftId(null);
+                                }
+                              }
+                            }}
+                            placeholder="Type your message... use @ for owners, / for variables, Cmd/Ctrl+Enter to send"
+                          />
+                          <div className="V2Inbox__chatActions">
+                            <button
+                              type="button"
+                              className="V2Inbox__button V2Inbox__button--secondary V2Inbox__button--small"
+                              onClick={onGenerateDraft}
+                              disabled={
+                                generateDraftMutation.isPending ||
+                                sendMutation.isPending
+                              }
+                              title="Generate AI draft"
+                            >
+                              {generateDraftMutation.isPending ? "..." : "✨"}
+                            </button>
+                            <button
+                              type="button"
+                              className="V2Inbox__button V2Inbox__button--secondary V2Inbox__button--small"
+                              onClick={onGenerateCrmNotes}
+                              disabled={
+                                generateCrmNotesMutation.isPending ||
+                                sendMutation.isPending
+                              }
+                              title="Generate CRM notes from full thread and copy"
+                            >
+                              {generateCrmNotesMutation.isPending
+                                ? "..."
+                                : "CRM"}
+                            </button>
+                            <button
+                              type="button"
+                              className={`V2Inbox__button V2Inbox__button--primary V2Inbox__button--small ${sendStatus === "sending" ? "V2Inbox__button--sending" : ""} ${sendStatus === "sent" ? "V2Inbox__button--success" : ""}`}
+                              onClick={onSend}
+                              disabled={
+                                sendMutation.isPending ||
+                                composerText.trim().length === 0 ||
+                                lineSelectionRequired ||
+                                sendConfigQuery.isLoading
+                              }
+                            >
+                              {sendStatus === "sending" ? (
+                                <span className="V2Inbox__buttonSpinner" />
+                              ) : sendStatus === "sent" ? (
+                                "Sent!"
+                              ) : (
+                                "Send"
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="V2Inbox__chatFooter">
+                          {(() => {
+                            const { segments, charsRemaining, isUnicode } =
+                              getSmsSegmentInfo(composerText);
+                            const warn = segments >= 2;
+                            const danger = segments >= 4;
+                            return (
+                              <span
+                                className={`V2Inbox__chatCount${danger ? " V2Inbox__chatCount--danger" : warn ? " V2Inbox__chatCount--warn" : ""}`}
+                                title={
+                                  isUnicode
+                                    ? "Message contains Unicode characters — reduced segment size (70/67 chars)"
+                                    : "GSM-7 encoding — 160 chars single / 153 per segment"
+                                }
+                              >
+                                {composerText.length === 0
+                                  ? "160 chars left"
+                                  : `${charsRemaining} left · ${segments} SMS${isUnicode ? " ⚠ unicode" : ""}`}
+                              </span>
+                            );
+                          })()}
+                          <div className="V2Inbox__chatTools">
+                            <span className="V2Inbox__sendReliability">
+                              {sendStatus === "sending"
+                                ? "Sending with retry-safe guard…"
+                                : pendingIdempotencyRef.current
+                                  ? "Retry-safe key active"
+                                  : "Retry-safe send enabled"}
+                            </span>
+                            {lineOptions.length > 0 && (
+                              <V2Select
+                                triggerClassName="V2Inbox__chatLineSelect"
+                                value={selectedLineKey || LINE_NONE_VALUE}
+                                onValueChange={(value) =>
+                                  setSelectedLineKey(
+                                    value === LINE_NONE_VALUE ? "" : value,
+                                  )
+                                }
+                                options={lineSelectOptions}
+                                ariaLabel="Select send line"
+                              />
+                            )}
+                            {detailDrafts.length > 0 && (
+                              <V2Select
+                                triggerClassName="V2Inbox__chatDraftSelect"
+                                value={selectedDraftId || DRAFT_NONE_VALUE}
+                                onValueChange={(value) => {
+                                  if (value === DRAFT_NONE_VALUE) {
+                                    setSelectedDraftId(null);
+                                    return;
+                                  }
+                                  const draft = detailDrafts.find(
+                                    (d) => d.id === value,
+                                  );
+                                  if (!draft) return;
+                                  setComposerText(draft.text);
+                                  setSelectedDraftId(draft.id);
+                                }}
+                                options={[
+                                  {
+                                    value: DRAFT_NONE_VALUE,
+                                    label: `Drafts (${detailDrafts.length})`,
+                                  },
+                                  ...detailDrafts.slice(0, 5).map((draft) => ({
+                                    value: draft.id,
+                                    label: `${shorten(draft.text, 40)} (L${toFiniteNumber(draft.lintScore).toFixed(0)})`,
+                                  })),
+                                ]}
+                                ariaLabel="Use a saved draft"
+                              />
+                            )}
+                            {/* Templates */}
+                            <div className="V2Inbox__templateWrapper">
+                              <button
+                                type="button"
+                                className="V2Inbox__button V2Inbox__button--small"
+                                title="Insert template"
+                                ref={templateFloatingRefs.setReference}
+                                {...getTemplateReferenceProps({
+                                  onClick: () =>
+                                    setShowTemplates((prev) => !prev),
+                                  "aria-expanded": showTemplates,
+                                  "aria-haspopup": "dialog",
+                                })}
+                              >
+                                Templates
+                              </button>
+                              {showTemplates && (
+                                <FloatingPortal>
+                                  <div
+                                    className="V2Inbox__templateDropdown"
+                                    ref={templateFloatingRefs.setFloating}
+                                    style={templateFloatingStyles}
+                                    {...getFloatingProps({
+                                      "aria-label": "Templates menu",
+                                    })}
+                                  >
+                                    {templatesQuery.data &&
+                                    templatesQuery.data.length > 0 ? (
+                                      templatesQuery.data.map((tpl) => (
+                                        <div
+                                          key={tpl.id}
+                                          className="V2Inbox__templateItem"
+                                        >
+                                          <button
+                                            type="button"
+                                            className="V2Inbox__templateInsert"
+                                            onClick={() =>
+                                              onInsertTemplate(tpl.body)
+                                            }
+                                            title={tpl.body}
+                                          >
+                                            {tpl.name}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            className="V2Inbox__templateDelete"
+                                            onClick={() =>
+                                              void onDeleteTemplate(tpl.id)
+                                            }
+                                            title="Delete template"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <p className="V2Inbox__templateEmpty">
+                                        No templates saved yet.
+                                      </p>
+                                    )}
+                                    <div className="V2Inbox__templateCreate">
+                                      <input
+                                        type="text"
+                                        className="V2Inbox__templateNameInput"
+                                        value={newTemplateName}
+                                        onChange={(e) =>
+                                          templateForm.setValue(
+                                            "name",
+                                            e.target.value,
+                                            { shouldValidate: true },
+                                          )
+                                        }
+                                        placeholder="Template name…"
+                                      />
+                                      <MentionTextarea
+                                        className="V2Inbox__templateBodyInput"
+                                        value={newTemplateBody}
+                                        onChange={(newValue) =>
+                                          templateForm.setValue(
+                                            "body",
+                                            newValue,
+                                            { shouldValidate: true },
+                                          )
+                                        }
+                                        placeholder="Message body... use / for variables and @ for owner tags"
+                                      />
+                                      <button
+                                        type="button"
+                                        className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                                        onClick={() =>
+                                          void submitCreateTemplate()
+                                        }
+                                        disabled={
+                                          createTemplateMutation.isPending ||
+                                          !newTemplateName.trim() ||
+                                          !newTemplateBody.trim()
+                                        }
+                                      >
+                                        {createTemplateMutation.isPending
+                                          ? "Saving…"
+                                          : "+ Save Template"}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </FloatingPortal>
+                              )}
+                            </div>
+                            <div className="V2Inbox__emojiWrap">
+                              <button
+                                type="button"
+                                className="V2Inbox__button V2Inbox__button--small"
+                                onClick={() =>
+                                  setIsEmojiPickerOpen((prev) => !prev)
+                                }
+                                title="Insert emoji"
+                              >
+                                😀
+                              </button>
+                              {isEmojiPickerOpen ? (
+                                <div className="V2Inbox__emojiPopover">
+                                  <Suspense
+                                    fallback={
+                                      <div className="V2Inbox__emojiLoading">
+                                        Loading…
+                                      </div>
+                                    }
+                                  >
+                                    <LazyEmojiPicker
+                                      width={300}
+                                      height={360}
+                                      lazyLoadEmojis
+                                      searchDisabled={false}
+                                      onEmojiClick={onAppendEmoji}
+                                    />
+                                  </Suspense>
+                                </div>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              className="V2Inbox__chatClear"
+                              onClick={onClearDraft}
+                              disabled={
+                                !selectedDraftId && composerText.length === 0
+                              }
+                              title="Clear message"
+                            >
+                              Clear
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
                     </div>
                   </Panel>
 
@@ -3254,98 +3451,17 @@ export default function InboxV2() {
                         flexDirection: "column",
                         overflow: "hidden",
                       }}
-                  >
-                    <Tabs.List
-                      style={{
-                        display: "flex",
-                        borderBottom: "1px solid rgba(17, 184, 214, 0.12)",
-                        flexShrink: 0,
-                        overflowX: "auto",
-                      }}
                     >
-                      <Tabs.Trigger
-                        value="qualify"
+                      <Tabs.List
                         style={{
-                          padding: "0.45rem 0.7rem",
-                          fontSize: "0.72rem",
-                          fontWeight: 500,
-                          background: "none",
-                          border: "none",
-                          borderBottom: "2px solid transparent",
-                          cursor: "pointer",
-                          color: "var(--v2-muted)",
-                          fontFamily: "inherit",
+                          display: "flex",
+                          borderBottom: "1px solid rgba(17, 184, 214, 0.12)",
+                          flexShrink: 0,
+                          overflowX: "auto",
                         }}
                       >
-                        Qualify
-                      </Tabs.Trigger>
-                      <Tabs.Trigger
-                        value="stage"
-                        style={{
-                          padding: "0.45rem 0.7rem",
-                          fontSize: "0.72rem",
-                          fontWeight: 500,
-                          background: "none",
-                          border: "none",
-                          borderBottom: "2px solid transparent",
-                          cursor: "pointer",
-                          color: "var(--v2-muted)",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Stage
-                      </Tabs.Trigger>
-                      <Tabs.Trigger
-                        value="notes"
-                        style={{
-                          padding: "0.45rem 0.7rem",
-                          fontSize: "0.72rem",
-                          fontWeight: 500,
-                          background: "none",
-                          border: "none",
-                          borderBottom: "2px solid transparent",
-                          cursor: "pointer",
-                          color: "var(--v2-muted)",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Notes
-                      </Tabs.Trigger>
-                      <Tabs.Trigger
-                        value="contact"
-                        style={{
-                          padding: "0.45rem 0.7rem",
-                          fontSize: "0.72rem",
-                          fontWeight: 500,
-                          background: "none",
-                          border: "none",
-                          borderBottom: "2px solid transparent",
-                          cursor: "pointer",
-                          color: "var(--v2-muted)",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Contact
-                      </Tabs.Trigger>
-                      <Tabs.Trigger
-                        value="outcome"
-                        style={{
-                          padding: "0.45rem 0.7rem",
-                          fontSize: "0.72rem",
-                          fontWeight: 500,
-                          background: "none",
-                          border: "none",
-                          borderBottom: "2px solid transparent",
-                          cursor: "pointer",
-                          color: "var(--v2-muted)",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Outcome
-                      </Tabs.Trigger>
-                      {lineOptions.length > 0 && (
                         <Tabs.Trigger
-                          value="line"
+                          value="qualify"
                           style={{
                             padding: "0.45rem 0.7rem",
                             fontSize: "0.72rem",
@@ -3358,749 +3474,863 @@ export default function InboxV2() {
                             fontFamily: "inherit",
                           }}
                         >
-                          Line
+                          Qualify
                         </Tabs.Trigger>
-                      )}
-                    </Tabs.List>
-                    <div style={{ overflowY: "auto", flex: 1 }}>
-                      {/* ── Qualify Tab ── */}
-                      <Tabs.Content value="qualify">
-                        <div
-                          className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${qualificationTone}`}
+                        <Tabs.Trigger
+                          value="stage"
+                          style={{
+                            padding: "0.45rem 0.7rem",
+                            fontSize: "0.72rem",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            borderBottom: "2px solid transparent",
+                            cursor: "pointer",
+                            color: "var(--v2-muted)",
+                            fontFamily: "inherit",
+                          }}
                         >
-                          <p className="V2Panel__title">Qualification</p>
-                          <div className="V2Inbox__stateTop">
-                            <span className="V2Inbox__stateBadge">
-                              {qualificationProgressLive} of 4 fields
-                            </span>
-                            <span className="V2Inbox__stateHint">
-                              {qualificationProgressPct}% complete
-                            </span>
-                          </div>
-                          <div className="V2Inbox__stateMeter">
-                            <span
-                              style={{ width: `${qualificationProgressPct}%` }}
-                            />
-                          </div>
-                          <div className="V2Inbox__pillRow">
-                            {qualificationFields.map((field) => (
-                              <span
-                                key={field.key}
-                                className={`V2Inbox__pill ${field.complete ? "is-complete" : ""}`}
-                              >
-                                {field.label}
-                              </span>
-                            ))}
-                          </div>
-                          <div
+                          Stage
+                        </Tabs.Trigger>
+                        <Tabs.Trigger
+                          value="notes"
+                          style={{
+                            padding: "0.45rem 0.7rem",
+                            fontSize: "0.72rem",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            borderBottom: "2px solid transparent",
+                            cursor: "pointer",
+                            color: "var(--v2-muted)",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Notes
+                        </Tabs.Trigger>
+                        <Tabs.Trigger
+                          value="contact"
+                          style={{
+                            padding: "0.45rem 0.7rem",
+                            fontSize: "0.72rem",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            borderBottom: "2px solid transparent",
+                            cursor: "pointer",
+                            color: "var(--v2-muted)",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Contact
+                        </Tabs.Trigger>
+                        <Tabs.Trigger
+                          value="outcome"
+                          style={{
+                            padding: "0.45rem 0.7rem",
+                            fontSize: "0.72rem",
+                            fontWeight: 500,
+                            background: "none",
+                            border: "none",
+                            borderBottom: "2px solid transparent",
+                            cursor: "pointer",
+                            color: "var(--v2-muted)",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Outcome
+                        </Tabs.Trigger>
+                        {lineOptions.length > 0 && (
+                          <Tabs.Trigger
+                            value="line"
                             style={{
-                              display: "grid",
-                              gap: "0.5rem",
-                              marginTop: "0.75rem",
+                              padding: "0.45rem 0.7rem",
+                              fontSize: "0.72rem",
+                              fontWeight: 500,
+                              background: "none",
+                              border: "none",
+                              borderBottom: "2px solid transparent",
+                              cursor: "pointer",
+                              color: "var(--v2-muted)",
+                              fontFamily: "inherit",
                             }}
                           >
-                            <label className="V2Control">
-                              <span>Full or Part Time</span>
-                              <V2Select
-                                value={qualificationState.fullOrPartTime}
-                                onValueChange={(value) =>
-                                  setQualificationState((prev) => ({
-                                    ...prev,
-                                    fullOrPartTime:
-                                      value as QualificationStateV2["fullOrPartTime"],
-                                  }))
-                                }
-                                options={FULL_OR_PART_TIME_OPTIONS}
-                                ariaLabel="Full or part time"
+                            Line
+                          </Tabs.Trigger>
+                        )}
+                      </Tabs.List>
+                      <div style={{ overflowY: "auto", flex: 1 }}>
+                        {/* ── Qualify Tab ── */}
+                        <Tabs.Content value="qualify">
+                          <div
+                            className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${qualificationTone}`}
+                          >
+                            <p className="V2Panel__title">Qualification</p>
+                            <div className="V2Inbox__stateTop">
+                              <span className="V2Inbox__stateBadge">
+                                {qualificationProgressLive} of 4 fields
+                              </span>
+                              <span className="V2Inbox__stateHint">
+                                {qualificationProgressPct}% complete
+                              </span>
+                            </div>
+                            <div className="V2Inbox__stateMeter">
+                              <span
+                                style={{
+                                  width: `${qualificationProgressPct}%`,
+                                }}
                               />
-                            </label>
-                            <label className="V2Control">
-                              <span>Niche</span>
-                              <input
-                                type="text"
-                                value={qualificationState.niche || ""}
+                            </div>
+                            <div className="V2Inbox__pillRow">
+                              {qualificationFields.map((field) => (
+                                <span
+                                  key={field.key}
+                                  className={`V2Inbox__pill ${field.complete ? "is-complete" : ""}`}
+                                >
+                                  {field.label}
+                                </span>
+                              ))}
+                            </div>
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: "0.5rem",
+                                marginTop: "0.75rem",
+                              }}
+                            >
+                              <label className="V2Control">
+                                <span>Full or Part Time</span>
+                                <V2Select
+                                  value={qualificationState.fullOrPartTime}
+                                  onValueChange={(value) =>
+                                    setQualificationState((prev) => ({
+                                      ...prev,
+                                      fullOrPartTime:
+                                        value as QualificationStateV2["fullOrPartTime"],
+                                    }))
+                                  }
+                                  options={FULL_OR_PART_TIME_OPTIONS}
+                                  ariaLabel="Full or part time"
+                                />
+                              </label>
+                              <label className="V2Control">
+                                <span>Niche</span>
+                                <input
+                                  type="text"
+                                  value={qualificationState.niche || ""}
+                                  onChange={(e) =>
+                                    setQualificationState((prev) => ({
+                                      ...prev,
+                                      niche: e.target.value,
+                                    }))
+                                  }
+                                  placeholder="e.g. Sports performance"
+                                />
+                              </label>
+                              <label className="V2Control">
+                                <span>Revenue Mix</span>
+                                <V2Select
+                                  value={qualificationState.revenueMix}
+                                  onValueChange={(value) =>
+                                    setQualificationState((prev) => ({
+                                      ...prev,
+                                      revenueMix:
+                                        value as QualificationStateV2["revenueMix"],
+                                    }))
+                                  }
+                                  options={REVENUE_MIX_OPTIONS}
+                                  ariaLabel="Revenue mix"
+                                />
+                              </label>
+                              <label className="V2Control">
+                                <span>Coaching Interest</span>
+                                <V2Select
+                                  value={qualificationState.coachingInterest}
+                                  onValueChange={(value) =>
+                                    setQualificationState((prev) => ({
+                                      ...prev,
+                                      coachingInterest:
+                                        value as QualificationStateV2["coachingInterest"],
+                                    }))
+                                  }
+                                  options={COACHING_INTEREST_OPTIONS}
+                                  ariaLabel="Coaching interest"
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                className="V2Inbox__stateAction V2Inbox__stateAction--primary"
+                                onClick={onSaveQualification}
+                                disabled={qualificationMutation.isPending}
+                              >
+                                {qualificationMutation.isPending
+                                  ? "Saving…"
+                                  : "Save Qualification"}
+                              </button>
+                            </div>
+                          </div>
+                        </Tabs.Content>
+
+                        {/* ── Stage Tab ── */}
+                        <Tabs.Content value="stage">
+                          <div
+                            className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${escalationTone}`}
+                          >
+                            <p className="V2Panel__title">Escalation Stage</p>
+                            <div className="V2Inbox__stateTop">
+                              <span className="V2Inbox__stateBadge">
+                                L{escalationState.level} ·{" "}
+                                {escalationLevelSubtitle(escalationState.level)}
+                              </span>
+                              <span className="V2Inbox__stateHint">
+                                {escalationProgressPct}%
+                              </span>
+                            </div>
+                            <div className="V2Inbox__stateMeter">
+                              <span
+                                style={{ width: `${escalationProgressPct}%` }}
+                              />
+                            </div>
+                            <div className="V2Inbox__levelRail">
+                              {([1, 2, 3, 4] as const).map((level) => (
+                                <button
+                                  key={level}
+                                  type="button"
+                                  className={`V2Inbox__levelChip ${escalationState.level === level ? "is-active" : ""}`}
+                                  onClick={() => updateEscalation({ level })}
+                                >
+                                  L{level}
+                                </button>
+                              ))}
+                            </div>
+                            <label
+                              className="V2Control"
+                              style={{ marginTop: "0.5rem" }}
+                            >
+                              <span>Override Reason</span>
+                              <textarea
+                                value={escalationState.reason}
                                 onChange={(e) =>
-                                  setQualificationState((prev) => ({
-                                    ...prev,
-                                    niche: e.target.value,
-                                  }))
+                                  updateEscalation({ reason: e.target.value })
                                 }
-                                placeholder="e.g. Sports performance"
-                              />
-                            </label>
-                            <label className="V2Control">
-                              <span>Revenue Mix</span>
-                              <V2Select
-                                value={qualificationState.revenueMix}
-                                onValueChange={(value) =>
-                                  setQualificationState((prev) => ({
-                                    ...prev,
-                                    revenueMix:
-                                      value as QualificationStateV2["revenueMix"],
-                                  }))
-                                }
-                                options={REVENUE_MIX_OPTIONS}
-                                ariaLabel="Revenue mix"
-                              />
-                            </label>
-                            <label className="V2Control">
-                              <span>Coaching Interest</span>
-                              <V2Select
-                                value={qualificationState.coachingInterest}
-                                onValueChange={(value) =>
-                                  setQualificationState((prev) => ({
-                                    ...prev,
-                                    coachingInterest:
-                                      value as QualificationStateV2["coachingInterest"],
-                                  }))
-                                }
-                                options={COACHING_INTEREST_OPTIONS}
-                                ariaLabel="Coaching interest"
+                                rows={2}
+                                placeholder="Why are you overriding? (optional)"
                               />
                             </label>
                             <button
                               type="button"
                               className="V2Inbox__stateAction V2Inbox__stateAction--primary"
-                              onClick={onSaveQualification}
-                              disabled={qualificationMutation.isPending}
+                              style={{ marginTop: "0.5rem" }}
+                              onClick={onOverrideEscalation}
+                              disabled={escalationMutation.isPending}
                             >
-                              {qualificationMutation.isPending
+                              {escalationMutation.isPending
                                 ? "Saving…"
-                                : "Save Qualification"}
+                                : "Save Stage"}
                             </button>
                           </div>
-                        </div>
-                      </Tabs.Content>
+                        </Tabs.Content>
 
-                      {/* ── Stage Tab ── */}
-                      <Tabs.Content value="stage">
-                        <div
-                          className={`V2Panel V2Inbox__sidePanel V2Inbox__stateCard V2Inbox__stateCard--${escalationTone}`}
-                        >
-                          <p className="V2Panel__title">Escalation Stage</p>
-                          <div className="V2Inbox__stateTop">
-                            <span className="V2Inbox__stateBadge">
-                              L{escalationLevel} ·{" "}
-                              {escalationLevelSubtitle(escalationLevel)}
-                            </span>
-                            <span className="V2Inbox__stateHint">
-                              {escalationProgressPct}%
-                            </span>
-                          </div>
-                          <div className="V2Inbox__stateMeter">
-                            <span
-                              style={{ width: `${escalationProgressPct}%` }}
-                            />
-                          </div>
-                          <div className="V2Inbox__levelRail">
-                            {([1, 2, 3, 4] as const).map((level) => (
-                              <button
-                                key={level}
-                                type="button"
-                                className={`V2Inbox__levelChip ${escalationLevel === level ? "is-active" : ""}`}
-                                onClick={() => setEscalationLevel(level)}
-                              >
-                                L{level}
-                              </button>
-                            ))}
-                          </div>
-                          <label
-                            className="V2Control"
-                            style={{ marginTop: "0.5rem" }}
-                          >
-                            <span>Override Reason</span>
-                            <textarea
-                              value={escalationReason}
-                              onChange={(e) =>
-                                setEscalationReason(e.target.value)
-                              }
-                              rows={2}
-                              placeholder="Why are you overriding? (optional)"
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            className="V2Inbox__stateAction V2Inbox__stateAction--primary"
-                            style={{ marginTop: "0.5rem" }}
-                            onClick={onOverrideEscalation}
-                            disabled={escalationMutation.isPending}
-                          >
-                            {escalationMutation.isPending
-                              ? "Saving…"
-                              : "Save Stage"}
-                          </button>
-                        </div>
-                      </Tabs.Content>
-
-                      {/* ── Notes Tab ── */}
-                      <Tabs.Content value="notes">
-                        <div className="V2Panel V2Inbox__sidePanel">
-                          <p className="V2Panel__title">Internal Notes</p>
-                          <p
-                            className="V2Panel__caption"
-                            style={{
-                              fontSize: "0.75rem",
-                              marginBottom: "0.5rem",
-                              color: "var(--v2-muted)",
-                            }}
-                          >
-                            Not visible to the lead
-                          </p>
-                          <div className="V2Inbox__notesList">
-                            {notesQuery.isLoading && (
-                              <p
-                                style={{
-                                  fontSize: "0.75rem",
-                                  color: "var(--v2-muted)",
-                                }}
-                              >
-                                Loading…
-                              </p>
-                            )}
-                            {notesQuery.data &&
-                              notesQuery.data.length === 0 && (
+                        {/* ── Notes Tab ── */}
+                        <Tabs.Content value="notes">
+                          <div className="V2Panel V2Inbox__sidePanel">
+                            <p className="V2Panel__title">Internal Notes</p>
+                            <p
+                              className="V2Panel__caption"
+                              style={{
+                                fontSize: "0.75rem",
+                                marginBottom: "0.5rem",
+                                color: "var(--v2-muted)",
+                              }}
+                            >
+                              Not visible to the lead
+                            </p>
+                            <div className="V2Inbox__notesList">
+                              {notesQuery.isLoading && (
                                 <p
                                   style={{
                                     fontSize: "0.75rem",
                                     color: "var(--v2-muted)",
                                   }}
                                 >
-                                  No notes yet.
+                                  Loading…
                                 </p>
                               )}
-                            {notesQuery.data?.map((note) => (
-                              <div key={note.id} className="V2Inbox__noteItem">
-                                <div className="V2Inbox__noteHeader">
-                                  <span className="V2Inbox__noteAuthor">
-                                    {note.author}
-                                  </span>
-                                  <span className="V2Inbox__noteTime">
-                                    {fmtDateTime(note.createdAt)}
-                                  </span>
-                                </div>
-                                <p className="V2Inbox__noteBody">{note.text}</p>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="V2Inbox__noteComposer">
-                            <textarea
-                              className="V2Inbox__noteInput"
-                              value={noteText}
-                              onChange={(e) =>
-                                noteForm.setValue("text", e.target.value, {
-                                  shouldValidate: true,
-                                })
-                              }
-                              rows={2}
-                              placeholder="Add a note… (⌘↵ to save)"
-                              onKeyDown={(e) => {
-                                if (
-                                  e.key === "Enter" &&
-                                  (e.metaKey || e.ctrlKey)
-                                ) {
-                                  e.preventDefault();
-                                  void submitAddNote();
-                                }
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                              onClick={() => void submitAddNote()}
-                              disabled={
-                                addNoteMutation.isPending ||
-                                noteText.trim().length === 0
-                              }
-                            >
-                              {addNoteMutation.isPending ? "Saving…" : "+ Note"}
-                            </button>
-                          </div>
-                        </div>
-                      </Tabs.Content>
-
-                      {/* ── Contact Tab ── */}
-                      <Tabs.Content value="contact">
-                        <div className="V2Panel V2Inbox__sidePanel">
-                          <p className="V2Panel__title">Aloware Contact Sync</p>
-                          <p
-                            className="V2Panel__caption"
-                            style={{
-                              fontSize: "0.75rem",
-                              marginBottom: "0.5rem",
-                              color: "var(--v2-muted)",
-                            }}
-                          >
-                            Use the current sequence ID or enter a new one.
-                          </p>
-
-                          <div
-                            style={{
-                              fontSize: "0.75rem",
-                              marginBottom: "0.6rem",
-                              color:
-                                (lastSequenceSync?.status || null) === "synced"
-                                  ? "var(--v2-positive)"
-                                  : "var(--v2-muted)",
-                            }}
-                          >
-                            {describeSequenceSync(lastSequenceSync)}
-                          </div>
-
-                          <label className="V2Control">
-                            <span>Sequence ID</span>
-                            <input
-                              type="text"
-                              value={sequenceIdInput}
-                              onChange={(e) => setSequenceIdInput(e.target.value)}
-                              placeholder="e.g. 12345"
-                            />
-                          </label>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: "0.5rem",
-                              marginTop: "0.6rem",
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                              onClick={onEnrollToSequence}
-                              disabled={
-                                sequenceEnrollMutation.isPending ||
-                                !sequenceIdInput.trim()
-                              }
-                            >
-                              {sequenceEnrollMutation.isPending
-                                ? "Enrolling…"
-                                : "Enroll"}
-                            </button>
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small"
-                              onClick={onDisenrollFromSequence}
-                              disabled={sequenceDisenrollMutation.isPending}
-                            >
-                              {sequenceDisenrollMutation.isPending
-                                ? "Disenrolling…"
-                                : "Disenroll"}
-                            </button>
-                          </div>
-
-                          <div className="V2Inbox__manualMonday">
-                            <div className="V2Inbox__manualHeader">
-                              <p className="V2Inbox__manualTitle">Manual Monday push</p>
-                              <button
-                                type="button"
-                                className="V2Inbox__manualToggle"
-                                onClick={() => setManualPanelOpen((prev) => !prev)}
-                              >
-                                {manualPanelOpen ? "Close" : "Open form"}
-                              </button>
-                            </div>
-                            {manualPanelOpen && (
-                              <form
-                                className="V2Inbox__manualForm"
-                                onSubmit={(event) => {
-                                  event.preventDefault();
-                                  void onSubmitManualMonday();
-                                }}
-                              >
-                                <label className="V2Control V2Inbox__manualControl">
-                                  <span>Contact Name</span>
-                                  <input
-                                    type="text"
-                                    value={manualContactNameInput}
-                                    onChange={(event) =>
-                                      setManualContactNameInput(event.target.value)
-                                    }
-                                    placeholder="First and last name"
-                                    required
-                                  />
-                                </label>
-                                <label className="V2Control V2Inbox__manualControl">
-                                  <span>Phone</span>
-                                  <input
-                                    type="text"
-                                    value={manualContactPhoneInput}
-                                    onChange={(event) =>
-                                      setManualContactPhoneInput(event.target.value)
-                                    }
-                                    placeholder="(optional)"
-                                  />
-                                </label>
-                                <label className="V2Control V2Inbox__manualControl">
-                                  <span>Line</span>
-                                  <input
-                                    type="text"
-                                    value={manualLine}
-                                    onChange={(event) => setManualLine(event.target.value)}
-                                    placeholder="Slack line or fallback"
-                                  />
-                                </label>
-                                <label className="V2Control V2Inbox__manualControl">
-                                  <span>Notes</span>
-                                  <textarea
-                                    rows={2}
-                                    value={manualNotes}
-                                    onChange={(event) => setManualNotes(event.target.value)}
-                                    placeholder="Add context for Monday…"
-                                  />
-                                </label>
-                                <label className="V2Control V2Inbox__manualControl">
-                                  <span>Setter</span>
-                                  <select
-                                    value={manualSetter}
-                                    onChange={(event) =>
-                                      setManualSetter(
-                                        event.target.value === "brandon" ? "brandon" : "jack",
-                                      )
-                                    }
+                              {notesQuery.data &&
+                                notesQuery.data.length === 0 && (
+                                  <p
+                                    style={{
+                                      fontSize: "0.75rem",
+                                      color: "var(--v2-muted)",
+                                    }}
                                   >
-                                    <option value="jack">Jack</option>
-                                    <option value="brandon">Brandon</option>
-                                  </select>
-                                </label>
-                                <button
-                                  type="submit"
-                                  className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                                  disabled={
-                                    manualMutation.isPending ||
-                                    !manualContactNameInput.trim()
-                                  }
-                                >
-                                  {manualMutation.isPending
-                                    ? "Pushing…"
-                                    : "Send to Monday"}
-                                </button>
-                              </form>
-                            )}
-                          </div>
-
-                          <div
-                            style={{
-                              marginTop: "0.8rem",
-                              borderTop: "1px solid rgba(17, 184, 214, 0.12)",
-                              paddingTop: "0.65rem",
-                              display: "grid",
-                              gap: "0.35rem",
-                              fontSize: "0.75rem",
-                            }}
-                          >
-                            <div>
-                              <strong>Lead Source:</strong>{" "}
-                              {detailContactCard?.leadSource || "n/a"}
-                            </div>
-                            <div>
-                              <strong>Current Sequence:</strong>{" "}
-                              {detailContactCard?.sequenceId || "n/a"}
-                            </div>
-                            <div>
-                              <strong>Disposition:</strong>{" "}
-                              {detailContactCard?.dispositionStatusId || "n/a"}
-                            </div>
-                            <div>
-                              <strong>Tags:</strong>{" "}
-                              {contactTags.length > 0
-                                ? contactTags.join(", ")
-                                : "n/a"}
-                            </div>
-                            <div>
-                              <strong>Text Authorized:</strong>{" "}
-                              {detailContactCard?.textAuthorized == null
-                                ? "n/a"
-                                : detailContactCard.textAuthorized
-                                  ? "yes"
-                                  : "no"}
-                            </div>
-                            <div>
-                              <strong>Blocked:</strong>{" "}
-                              {detailContactCard?.isBlocked == null
-                                ? "n/a"
-                                : detailContactCard.isBlocked
-                                  ? "yes"
-                                  : "no"}
-                            </div>
-                            <div>
-                              <strong>Carrier / Line:</strong>{" "}
-                              {detailContactCard?.lrnCarrier || "n/a"} /{" "}
-                              {detailContactCard?.lrnLineType || "n/a"}
-                            </div>
-                            <div>
-                              <strong>Unread:</strong>{" "}
-                              {detailContactCard?.unreadCount ?? 0}
-                            </div>
-                            <div>
-                              <strong>SMS In/Out:</strong>{" "}
-                              {detailContactCard?.inboundSmsCount ?? 0}/
-                              {detailContactCard?.outboundSmsCount ?? 0}
-                            </div>
-                            <div>
-                              <strong>Calls In/Out:</strong>{" "}
-                              {detailContactCard?.inboundCallCount ?? 0}/
-                              {detailContactCard?.outboundCallCount ?? 0}
-                            </div>
-                            <div>
-                              <strong>Last Engagement:</strong>{" "}
-                              {fmtDateTime(
-                                detailContactCard?.lastEngagementAt || null,
-                              )}
-                            </div>
-                            <div>
-                              <strong>LRN Checked:</strong>{" "}
-                              {fmtDateTime(
-                                detailContactCard?.lrnLastCheckedAt || null,
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </Tabs.Content>
-
-                      {/* ── Outcome Tab ── */}
-                      <Tabs.Content value="outcome">
-                        <div className="V2Panel V2Inbox__sidePanel">
-                          <p className="V2Panel__title">
-                            Call Outcome &amp; Objections
-                          </p>
-
-                          <p
-                            className="V2Panel__caption"
-                            style={{
-                              fontSize: "0.72rem",
-                              marginBottom: "0.4rem",
-                            }}
-                          >
-                            Call Outcome
-                          </p>
-                          <div className="V2Inbox__outcomeChips">
-                            {(
-                              [
-                                "not_a_fit",
-                                "too_early",
-                                "budget",
-                                "joined",
-                                "ghosted",
-                              ] as CallOutcomeV2[]
-                            ).map((outcome) => (
-                              <button
-                                key={outcome}
-                                type="button"
-                                className={`V2Inbox__outcomeChip${localCallOutcome === outcome ? " is-active" : ""}`}
-                                data-outcome={outcome}
-                                onClick={() =>
-                                  void onSetCallOutcome(
-                                    localCallOutcome === outcome
-                                      ? null
-                                      : outcome,
-                                  )
-                                }
-                                disabled={updateCallOutcomeMutation.isPending}
-                                title={CALL_OUTCOME_LABELS[outcome]}
-                              >
-                                {CALL_OUTCOME_LABELS[outcome]}
-                              </button>
-                            ))}
-                          </div>
-
-                          <p
-                            className="V2Panel__caption"
-                            style={{
-                              fontSize: "0.72rem",
-                              marginTop: "0.75rem",
-                              marginBottom: "0.4rem",
-                            }}
-                          >
-                            Objection Tags
-                          </p>
-                          <div className="V2Inbox__objectionTagChips">
-                            {localObjectionTags.length === 0 && (
-                              <span
-                                style={{
-                                  fontSize: "0.72rem",
-                                  color: "var(--v2-muted)",
-                                }}
-                              >
-                                No tags yet
-                              </span>
-                            )}
-                            {localObjectionTags.map((tag) => (
-                              <span
-                                key={tag}
-                                className="V2Inbox__objectionTagChip"
-                              >
-                                {tag}
-                                <button
-                                  type="button"
-                                  className="V2Inbox__objectionTagRemove"
-                                  onClick={() => void onRemoveObjectionTag(tag)}
-                                  disabled={
-                                    updateObjectionTagsMutation.isPending
-                                  }
-                                  title="Remove tag"
-                                >
-                                  ✕
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                          <div className="V2Inbox__objectionTagInput">
-                            <input
-                              type="text"
-                              className="V2Inbox__assignInput"
-                              value={objectionTagInput}
-                              onChange={(e) =>
-                                setObjectionTagInput(e.target.value)
-                              }
-                              placeholder="Add tag… (e.g. price, timing)"
-                              title="Add objection tag"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") void onAddObjectionTag();
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small"
-                              onClick={onAddObjectionTag}
-                              disabled={
-                                updateObjectionTagsMutation.isPending ||
-                                !objectionTagInput.trim()
-                              }
-                            >
-                              + Tag
-                            </button>
-                          </div>
-
-                          <div style={{ marginTop: "0.75rem" }}>
-                            <button
-                              type="button"
-                              className="V2Inbox__button V2Inbox__button--small V2Inbox__button--danger"
-                              onClick={onIncrementGuardrailOverride}
-                              disabled={
-                                incrementGuardrailOverrideMutation.isPending
-                              }
-                              title="Record that a guardrail was overridden for this conversation"
-                            >
-                              {incrementGuardrailOverrideMutation.isPending
-                                ? "…"
-                                : "⚠ Log Override"}
-                            </button>
-                            <p
-                              style={{
-                                fontSize: "0.68rem",
-                                color: "var(--v2-muted)",
-                                marginTop: "0.25rem",
-                              }}
-                            >
-                              Overrides:{" "}
-                              {detail?.conversation.guardrailOverrideCount ?? 0}
-                            </p>
-                          </div>
-                        </div>
-
-                        {detail && detailMondayTrail.length > 0 && (
-                          <div className="V2Panel V2Inbox__sidePanel">
-                            <p className="V2Panel__title">
-                              📅 Monday Booked Calls
-                            </p>
-                            <div className="V2Inbox__mondayTrail">
-                              {detailMondayTrail.map((snap) => (
+                                    No notes yet.
+                                  </p>
+                                )}
+                              {notesQuery.data?.map((note) => (
                                 <div
-                                  key={snap.itemId}
-                                  className="V2Inbox__mondayTrailRow"
+                                  key={note.id}
+                                  className="V2Inbox__noteItem"
                                 >
-                                  <div className="V2Inbox__mondayTrailName">
-                                    {snap.itemName || "—"}
-                                    {snap.isBooked && (
-                                      <span className="V2Inbox__mondayBadge V2Inbox__mondayBadge--inline">
-                                        Booked
-                                      </span>
-                                    )}
+                                  <div className="V2Inbox__noteHeader">
+                                    <span className="V2Inbox__noteAuthor">
+                                      {note.author}
+                                    </span>
+                                    <span className="V2Inbox__noteTime">
+                                      {fmtDateTime(note.createdAt)}
+                                    </span>
                                   </div>
-                                  <div className="V2Inbox__mondayTrailMeta">
-                                    {snap.stage && (
-                                      <span className="V2Inbox__mondayTrailStage">
-                                        {snap.stage}
-                                      </span>
-                                    )}
-                                    {snap.callDate && (
-                                      <span className="V2Inbox__mondayTrailDate">
-                                        {snap.callDate}
-                                      </span>
-                                    )}
-                                    {snap.disposition && (
-                                      <span className="V2Inbox__mondayTrailDisp">
-                                        {snap.disposition}
-                                      </span>
-                                    )}
-                                  </div>
+                                  <p className="V2Inbox__noteBody">
+                                    {note.text}
+                                  </p>
                                 </div>
                               ))}
                             </div>
+                            <div className="V2Inbox__noteComposer">
+                              <textarea
+                                className="V2Inbox__noteInput"
+                                value={noteText}
+                                onChange={(e) =>
+                                  noteForm.setValue("text", e.target.value, {
+                                    shouldValidate: true,
+                                  })
+                                }
+                                rows={2}
+                                placeholder="Add a note… (⌘↵ to save)"
+                                onKeyDown={(e) => {
+                                  if (
+                                    e.key === "Enter" &&
+                                    (e.metaKey || e.ctrlKey)
+                                  ) {
+                                    e.preventDefault();
+                                    void submitAddNote();
+                                  }
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                                onClick={() => void submitAddNote()}
+                                disabled={
+                                  addNoteMutation.isPending ||
+                                  noteText.trim().length === 0
+                                }
+                              >
+                                {addNoteMutation.isPending
+                                  ? "Saving…"
+                                  : "+ Note"}
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </Tabs.Content>
+                        </Tabs.Content>
 
-                      {/* ── Line Tab ── */}
-                      {lineOptions.length > 0 && (
-                        <Tabs.Content value="line">
+                        {/* ── Contact Tab ── */}
+                        <Tabs.Content value="contact">
                           <div className="V2Panel V2Inbox__sidePanel">
-                            <p className="V2Panel__title">Send Line</p>
+                            <p className="V2Panel__title">
+                              Aloware Contact Sync
+                            </p>
                             <p
                               className="V2Panel__caption"
                               style={{
-                                fontSize: "0.78rem",
+                                fontSize: "0.75rem",
                                 marginBottom: "0.5rem",
+                                color: "var(--v2-muted)",
                               }}
                             >
-                              Default: {savedDefaultSummary}
+                              Use the current sequence ID or enter a new one.
                             </p>
+
+                            <div
+                              style={{
+                                fontSize: "0.75rem",
+                                marginBottom: "0.6rem",
+                                color:
+                                  (lastSequenceSync?.status || null) ===
+                                  "synced"
+                                    ? "var(--v2-positive)"
+                                    : "var(--v2-muted)",
+                              }}
+                            >
+                              {describeSequenceSync(lastSequenceSync)}
+                            </div>
+
                             <label className="V2Control">
-                              <span>Active Line</span>
-                              <V2Select
-                                value={selectedLineKey || LINE_NONE_VALUE}
-                                onValueChange={(value) =>
-                                  setSelectedLineKey(
-                                    value === LINE_NONE_VALUE ? "" : value,
-                                  )
+                              <span>Sequence ID</span>
+                              <input
+                                type="text"
+                                value={sequenceIdInput}
+                                onChange={(e) =>
+                                  setSequenceIdInput(e.target.value)
                                 }
-                                options={lineSelectOptions}
-                                ariaLabel="Active send line"
+                                placeholder="e.g. 12345"
                               />
                             </label>
+
                             <div
                               style={{
                                 display: "flex",
                                 gap: "0.5rem",
-                                marginTop: "0.5rem",
+                                marginTop: "0.6rem",
                                 flexWrap: "wrap",
                               }}
                             >
                               <button
                                 type="button"
-                                className="V2Inbox__button V2Inbox__button--primary V2Inbox__button--small"
-                                onClick={onSaveDefaultLine}
+                                className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                                onClick={onEnrollToSequence}
                                 disabled={
-                                  setDefaultLineMutation.isPending ||
-                                  !selectedLineOption
+                                  sequenceEnrollMutation.isPending ||
+                                  !sequenceIdInput.trim()
                                 }
                               >
-                                Save as Default
+                                {sequenceEnrollMutation.isPending
+                                  ? "Enrolling…"
+                                  : "Enroll"}
                               </button>
                               <button
                                 type="button"
                                 className="V2Inbox__button V2Inbox__button--small"
-                                onClick={onClearDefaultLine}
-                                disabled={setDefaultLineMutation.isPending}
+                                onClick={onDisenrollFromSequence}
+                                disabled={sequenceDisenrollMutation.isPending}
                               >
-                                Clear Default
+                                {sequenceDisenrollMutation.isPending
+                                  ? "Disenrolling…"
+                                  : "Disenroll"}
                               </button>
+                            </div>
+
+                            <div className="V2Inbox__manualMonday">
+                              <div className="V2Inbox__manualHeader">
+                                <p className="V2Inbox__manualTitle">
+                                  Manual Monday push
+                                </p>
+                                <button
+                                  type="button"
+                                  className="V2Inbox__manualToggle"
+                                  onClick={() =>
+                                    setManualPanelOpen((prev) => !prev)
+                                  }
+                                >
+                                  {manualPanelOpen ? "Close" : "Open form"}
+                                </button>
+                              </div>
+                              {manualPanelOpen && (
+                                <form
+                                  className="V2Inbox__manualForm"
+                                  onSubmit={(event) => {
+                                    event.preventDefault();
+                                    void onSubmitManualMonday();
+                                  }}
+                                >
+                                  <label className="V2Control V2Inbox__manualControl">
+                                    <span>Contact Name</span>
+                                    <input
+                                      type="text"
+                                      value={manualContactNameInput}
+                                      onChange={(event) =>
+                                        setManualContactNameInput(
+                                          event.target.value,
+                                        )
+                                      }
+                                      placeholder="First and last name"
+                                      required
+                                    />
+                                  </label>
+                                  <label className="V2Control V2Inbox__manualControl">
+                                    <span>Phone</span>
+                                    <input
+                                      type="text"
+                                      value={manualContactPhoneInput}
+                                      onChange={(event) =>
+                                        setManualContactPhoneInput(
+                                          event.target.value,
+                                        )
+                                      }
+                                      placeholder="(optional)"
+                                    />
+                                  </label>
+                                  <label className="V2Control V2Inbox__manualControl">
+                                    <span>Line</span>
+                                    <input
+                                      type="text"
+                                      value={manualLine}
+                                      onChange={(event) =>
+                                        setManualLine(event.target.value)
+                                      }
+                                      placeholder="Slack line or fallback"
+                                    />
+                                  </label>
+                                  <label className="V2Control V2Inbox__manualControl">
+                                    <span>Notes</span>
+                                    <textarea
+                                      rows={2}
+                                      value={manualNotes}
+                                      onChange={(event) =>
+                                        setManualNotes(event.target.value)
+                                      }
+                                      placeholder="Add context for Monday…"
+                                    />
+                                  </label>
+                                  <label className="V2Control V2Inbox__manualControl">
+                                    <span>Setter</span>
+                                    <select
+                                      value={manualSetter}
+                                      onChange={(event) =>
+                                        setManualSetter(
+                                          event.target.value === "brandon"
+                                            ? "brandon"
+                                            : "jack",
+                                        )
+                                      }
+                                    >
+                                      <option value="jack">Jack</option>
+                                      <option value="brandon">Brandon</option>
+                                    </select>
+                                  </label>
+                                  <button
+                                    type="submit"
+                                    className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
+                                    disabled={
+                                      manualMutation.isPending ||
+                                      !manualContactNameInput.trim()
+                                    }
+                                  >
+                                    {manualMutation.isPending
+                                      ? "Pushing…"
+                                      : "Send to Monday"}
+                                  </button>
+                                </form>
+                              )}
+                            </div>
+
+                            <div
+                              style={{
+                                marginTop: "0.8rem",
+                                borderTop: "1px solid rgba(17, 184, 214, 0.12)",
+                                paddingTop: "0.65rem",
+                                display: "grid",
+                                gap: "0.35rem",
+                                fontSize: "0.75rem",
+                              }}
+                            >
+                              <div>
+                                <strong>Lead Source:</strong>{" "}
+                                {detailContactCard?.leadSource || "n/a"}
+                              </div>
+                              <div>
+                                <strong>Current Sequence:</strong>{" "}
+                                {detailContactCard?.sequenceId || "n/a"}
+                              </div>
+                              <div>
+                                <strong>Disposition:</strong>{" "}
+                                {detailContactCard?.dispositionStatusId ||
+                                  "n/a"}
+                              </div>
+                              <div>
+                                <strong>Tags:</strong>{" "}
+                                {contactTags.length > 0
+                                  ? contactTags.join(", ")
+                                  : "n/a"}
+                              </div>
+                              <div>
+                                <strong>Text Authorized:</strong>{" "}
+                                {detailContactCard?.textAuthorized == null
+                                  ? "n/a"
+                                  : detailContactCard.textAuthorized
+                                    ? "yes"
+                                    : "no"}
+                              </div>
+                              <div>
+                                <strong>Blocked:</strong>{" "}
+                                {detailContactCard?.isBlocked == null
+                                  ? "n/a"
+                                  : detailContactCard.isBlocked
+                                    ? "yes"
+                                    : "no"}
+                              </div>
+                              <div>
+                                <strong>Carrier / Line:</strong>{" "}
+                                {detailContactCard?.lrnCarrier || "n/a"} /{" "}
+                                {detailContactCard?.lrnLineType || "n/a"}
+                              </div>
+                              <div>
+                                <strong>Unread:</strong>{" "}
+                                {detailContactCard?.unreadCount ?? 0}
+                              </div>
+                              <div>
+                                <strong>SMS In/Out:</strong>{" "}
+                                {detailContactCard?.inboundSmsCount ?? 0}/
+                                {detailContactCard?.outboundSmsCount ?? 0}
+                              </div>
+                              <div>
+                                <strong>Calls In/Out:</strong>{" "}
+                                {detailContactCard?.inboundCallCount ?? 0}/
+                                {detailContactCard?.outboundCallCount ?? 0}
+                              </div>
+                              <div>
+                                <strong>Last Engagement:</strong>{" "}
+                                {fmtDateTime(
+                                  detailContactCard?.lastEngagementAt || null,
+                                )}
+                              </div>
+                              <div>
+                                <strong>LRN Checked:</strong>{" "}
+                                {fmtDateTime(
+                                  detailContactCard?.lrnLastCheckedAt || null,
+                                )}
+                              </div>
                             </div>
                           </div>
                         </Tabs.Content>
-                      )}
-                    </div>
+
+                        {/* ── Outcome Tab ── */}
+                        <Tabs.Content value="outcome">
+                          <div className="V2Panel V2Inbox__sidePanel">
+                            <p className="V2Panel__title">
+                              Call Outcome &amp; Objections
+                            </p>
+
+                            <p
+                              className="V2Panel__caption"
+                              style={{
+                                fontSize: "0.72rem",
+                                marginBottom: "0.4rem",
+                              }}
+                            >
+                              Call Outcome
+                            </p>
+                            <div className="V2Inbox__outcomeChips">
+                              {(
+                                [
+                                  "not_a_fit",
+                                  "too_early",
+                                  "budget",
+                                  "joined",
+                                  "ghosted",
+                                ] as CallOutcomeV2[]
+                              ).map((outcome) => (
+                                <button
+                                  key={outcome}
+                                  type="button"
+                                  className={`V2Inbox__outcomeChip${localCallOutcome === outcome ? " is-active" : ""}`}
+                                  data-outcome={outcome}
+                                  onClick={() =>
+                                    void onSetCallOutcome(
+                                      localCallOutcome === outcome
+                                        ? null
+                                        : outcome,
+                                    )
+                                  }
+                                  disabled={updateCallOutcomeMutation.isPending}
+                                  title={CALL_OUTCOME_LABELS[outcome]}
+                                >
+                                  {CALL_OUTCOME_LABELS[outcome]}
+                                </button>
+                              ))}
+                            </div>
+
+                            <p
+                              className="V2Panel__caption"
+                              style={{
+                                fontSize: "0.72rem",
+                                marginTop: "0.75rem",
+                                marginBottom: "0.4rem",
+                              }}
+                            >
+                              Objection Tags
+                            </p>
+                            <div className="V2Inbox__objectionTagChips">
+                              {localObjectionTags.length === 0 && (
+                                <span
+                                  style={{
+                                    fontSize: "0.72rem",
+                                    color: "var(--v2-muted)",
+                                  }}
+                                >
+                                  No tags yet
+                                </span>
+                              )}
+                              {localObjectionTags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="V2Inbox__objectionTagChip"
+                                >
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    className="V2Inbox__objectionTagRemove"
+                                    onClick={() =>
+                                      void onRemoveObjectionTag(tag)
+                                    }
+                                    disabled={
+                                      updateObjectionTagsMutation.isPending
+                                    }
+                                    title="Remove tag"
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="V2Inbox__objectionTagInput">
+                              <input
+                                type="text"
+                                className="V2Inbox__assignInput"
+                                value={objectionTagInput}
+                                onChange={(e) =>
+                                  setObjectionTagInput(e.target.value)
+                                }
+                                placeholder="Add tag… (e.g. price, timing)"
+                                title="Add objection tag"
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter")
+                                    void onAddObjectionTag();
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="V2Inbox__button V2Inbox__button--small"
+                                onClick={onAddObjectionTag}
+                                disabled={
+                                  updateObjectionTagsMutation.isPending ||
+                                  !objectionTagInput.trim()
+                                }
+                              >
+                                + Tag
+                              </button>
+                            </div>
+
+                            <div style={{ marginTop: "0.75rem" }}>
+                              <button
+                                type="button"
+                                className="V2Inbox__button V2Inbox__button--small V2Inbox__button--danger"
+                                onClick={onIncrementGuardrailOverride}
+                                disabled={
+                                  incrementGuardrailOverrideMutation.isPending
+                                }
+                                title="Record that a guardrail was overridden for this conversation"
+                              >
+                                {incrementGuardrailOverrideMutation.isPending
+                                  ? "…"
+                                  : "⚠ Log Override"}
+                              </button>
+                              <p
+                                style={{
+                                  fontSize: "0.68rem",
+                                  color: "var(--v2-muted)",
+                                  marginTop: "0.25rem",
+                                }}
+                              >
+                                Overrides:{" "}
+                                {detail?.conversation.guardrailOverrideCount ??
+                                  0}
+                              </p>
+                            </div>
+                          </div>
+
+                          {detail && detailMondayTrail.length > 0 && (
+                            <div className="V2Panel V2Inbox__sidePanel">
+                              <p className="V2Panel__title">
+                                📅 Monday Booked Calls
+                              </p>
+                              <div className="V2Inbox__mondayTrail">
+                                {detailMondayTrail.map((snap) => (
+                                  <div
+                                    key={snap.itemId}
+                                    className="V2Inbox__mondayTrailRow"
+                                  >
+                                    <div className="V2Inbox__mondayTrailName">
+                                      {snap.itemName || "—"}
+                                      {snap.isBooked && (
+                                        <span className="V2Inbox__mondayBadge V2Inbox__mondayBadge--inline">
+                                          Booked
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="V2Inbox__mondayTrailMeta">
+                                      {snap.stage && (
+                                        <span className="V2Inbox__mondayTrailStage">
+                                          {snap.stage}
+                                        </span>
+                                      )}
+                                      {snap.callDate && (
+                                        <span className="V2Inbox__mondayTrailDate">
+                                          {snap.callDate}
+                                        </span>
+                                      )}
+                                      {snap.disposition && (
+                                        <span className="V2Inbox__mondayTrailDisp">
+                                          {snap.disposition}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </Tabs.Content>
+
+                        {/* ── Line Tab ── */}
+                        {lineOptions.length > 0 && (
+                          <Tabs.Content value="line">
+                            <div className="V2Panel V2Inbox__sidePanel">
+                              <p className="V2Panel__title">Send Line</p>
+                              <p
+                                className="V2Panel__caption"
+                                style={{
+                                  fontSize: "0.78rem",
+                                  marginBottom: "0.5rem",
+                                }}
+                              >
+                                Default: {savedDefaultSummary}
+                              </p>
+                              <label className="V2Control">
+                                <span>Active Line</span>
+                                <V2Select
+                                  value={selectedLineKey || LINE_NONE_VALUE}
+                                  onValueChange={(value) =>
+                                    setSelectedLineKey(
+                                      value === LINE_NONE_VALUE ? "" : value,
+                                    )
+                                  }
+                                  options={lineSelectOptions}
+                                  ariaLabel="Active send line"
+                                />
+                              </label>
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: "0.5rem",
+                                  marginTop: "0.5rem",
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <button
+                                  type="button"
+                                  className="V2Inbox__button V2Inbox__button--primary V2Inbox__button--small"
+                                  onClick={onSaveDefaultLine}
+                                  disabled={
+                                    setDefaultLineMutation.isPending ||
+                                    !selectedLineOption
+                                  }
+                                >
+                                  Save as Default
+                                </button>
+                                <button
+                                  type="button"
+                                  className="V2Inbox__button V2Inbox__button--small"
+                                  onClick={onClearDefaultLine}
+                                  disabled={setDefaultLineMutation.isPending}
+                                >
+                                  Clear Default
+                                </button>
+                              </div>
+                            </div>
+                          </Tabs.Content>
+                        )}
+                      </div>
                     </Tabs.Root>
                   </Panel>
                 </Group>

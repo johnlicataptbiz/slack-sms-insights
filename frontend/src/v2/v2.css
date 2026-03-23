@@ -1,10 +1,10 @@
-@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Lexend+Deca:wght@400;500;600;700&family=Fira+Code:wght@400;500;600&display=swap");
 
 :root {
-  --v2-font-display: "Space Grotesk", "Avenir Next", sans-serif;
-  --v2-font-ui: "Manrope", "Inter", sans-serif;
+  --v2-font-display: "Plus Jakarta Sans", system-ui, sans-serif;
+  --v2-font-ui: "Lexend Deca", system-ui, sans-serif;
   --v2-font-mono:
-    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
 
   --v2-space-1: 0.25rem;
   --v2-space-2: 0.5rem;
@@ -13,33 +13,38 @@
   --v2-space-5: 1.5rem;
   --v2-space-6: 2rem;
 
-  --v2-radius-sm: 0.55rem;
-  --v2-radius-md: 0.9rem;
-  --v2-radius-lg: 1.2rem;
-  --v2-radius-xl: 1.8rem;
+  --v2-radius-sm: 0.5rem;
+  --v2-radius-md: 0.75rem;
+  --v2-radius-lg: 1rem;
+  --v2-radius-xl: 1.5rem;
 
-  --v2-shadow-1: 0 8px 24px rgba(8, 12, 29, 0.12);
-  --v2-shadow-2: 0 18px 45px rgba(8, 12, 29, 0.22);
+  --v2-shadow-1: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --v2-shadow-2: 0 12px 32px rgba(0, 0, 0, 0.25);
 
-  --v2-base-900: #050913;
-  --v2-base-800: #0a1528;
-  --v2-base-700: #13223c;
-  --v2-surface: #f2f7fb;
-  --v2-surface-elev: #ffffff;
-  --v2-surface-2: rgba(255, 255, 255, 0.9);
-  --v2-text: #0c1429;
-  --v2-muted: #56607a;
-  --v2-text-muted: #56607a;
-  --v2-border: rgba(7, 19, 36, 0.14);
+  --v2-base-900: #0f1419;
+  --v2-base-800: #1a202c;
+  --v2-base-700: #2d3748;
+  --v2-surface: #0f1419;
+  --v2-surface-elev: #1a202c;
+  --v2-surface-2: rgba(26, 32, 44, 0.8);
+  --v2-text: #f0f4f8;
+  --v2-muted: #a0aec0;
+  --v2-text-muted: #a0aec0;
+  --v2-border: rgba(255, 255, 255, 0.08);
 
-  --v2-accent: #11b8d6;
-  --v2-accent-strong: #0f9fb8;
-  --v2-accent-soft: #91edf8;
-  --v2-positive: #13b981;
-  --v2-critical: #ef4c62;
-  --v2-warning: #f59d0d;
-  --v2-topbar-height: 92px;
-  --v2-topbar-height-mobile: 68px;
+  --v2-accent: #00d9ff;
+  --v2-accent-strong: #00b8d6;
+  --v2-accent-soft: #33e9ff;
+  --v2-positive: #2ecc71;
+  --v2-critical: #ff3860;
+  --v2-warning: #ffb33d;
+  --v2-topbar-height: 72px;
+  --v2-topbar-height-mobile: 64px;
+
+  /* New semantic color tokens for integrations */
+  --v2-slack: #36c5f0;
+  --v2-monday: #7b5cff;
+  --v2-hubspot: #ff7a59;
 }
 
 .V2Shell,
@@ -52,7 +57,7 @@
   overflow-x: clip;
   color: var(--v2-text);
   font-family: var(--v2-font-ui);
-  background: linear-gradient(180deg, #f7fbfe 0%, #eef5fa 100%);
+  background: linear-gradient(135deg, #0f1419 0%, #1a202c 100%);
   display: flex;
 }
 
@@ -67,22 +72,26 @@
   position: sticky;
   top: 0;
   height: 100vh;
-  width: 220px;
+  width: 240px;
   flex-shrink: 0;
-  border-right: 1px solid rgba(8, 12, 29, 0.08);
-  background:
-    linear-gradient(180deg, rgba(10, 21, 40, 0.98), rgba(12, 22, 37, 0.96)),
-    radial-gradient(circle at 50% 0%, rgba(17, 184, 214, 0.14), transparent 24%);
-  padding: var(--v2-space-5);
+  border-right: 1px solid var(--v2-border);
+  background: linear-gradient(
+    180deg,
+    rgba(15, 20, 25, 0.95) 0%,
+    rgba(26, 32, 44, 0.98) 100%
+  );
+  padding: var(--v2-space-6);
   display: flex;
   flex-direction: column;
+  gap: var(--v2-space-4);
 }
 
 .V2Shell__content {
   flex: 1;
-  padding: var(--v2-space-5);
+  padding: var(--v2-space-6);
   min-width: 0;
   overflow-y: auto;
+  background: var(--v2-surface);
 }
 
 .V2Shell__contentHeader {
@@ -90,13 +99,13 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--v2-space-6);
-  padding-bottom: var(--v2-space-4);
-  border-bottom: 1px solid rgba(16, 27, 50, 0.06);
+  padding-bottom: var(--v2-space-6);
+  border-bottom: 1px solid var(--v2-border);
 }
 
 .V2Shell__sidebar {
   position: relative;
-  border-right: 1px solid rgba(8, 12, 29, 0.08);
+  border-right: 1px solid var(--v2-border);
   background:
     linear-gradient(180deg, rgba(10, 21, 40, 0.98), rgba(12, 22, 37, 0.96)),
     radial-gradient(circle at 50% 0%, rgba(17, 184, 214, 0.14), transparent 24%);
@@ -234,14 +243,14 @@
 
 .V2Page {
   display: grid;
-  gap: var(--v2-space-5);
-  animation: v2-enter 360ms cubic-bezier(0.22, 1, 0.36, 1);
+  gap: var(--v2-space-6);
+  animation: v2-enter 400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 @keyframes v2-enter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -254,20 +263,33 @@
   justify-content: space-between;
   align-items: flex-start;
   flex-wrap: wrap;
-  gap: var(--v2-space-4);
+  gap: var(--v2-space-6);
+  margin-bottom: var(--v2-space-4);
 }
 
 .V2PageHeader h1 {
-  margin: 0.2rem 0;
+  margin: 0;
   font-family: var(--v2-font-display);
-  font-size: clamp(1.8rem, 2.8vw, 2.7rem);
+  font-size: clamp(2rem, 3.5vw, 3rem);
+  font-weight: 800;
   line-height: 1.1;
+  letter-spacing: -0.02em;
+  background: linear-gradient(
+    135deg,
+    var(--v2-text) 0%,
+    var(--v2-accent-soft) 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .V2PageHeader__subtitle {
-  margin: 0;
-  max-width: 780px;
+  margin: 0.5rem 0 0 0;
+  max-width: 800px;
   color: var(--v2-muted);
+  font-size: 1rem;
+  line-height: 1.6;
 }
 
 .V2ControlsRow {
@@ -608,135 +630,182 @@
 .V2MetricsGrid,
 .V2MetricGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   grid-auto-rows: auto;
-  gap: var(--v2-space-3);
+  gap: var(--v2-space-4);
 }
 
 .V2MetricsGrid--compact {
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--v2-space-3);
 }
 
 .V2MetricsGrid--compact .V2MetricCard {
-  padding: 0.72rem 0.78rem;
+  padding: 1rem;
   min-height: 0;
 }
 
 .V2MetricsGrid--compact .V2MetricCard__label {
-  font-size: 0.58rem;
-  letter-spacing: 0.11em;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
 }
 
 .V2MetricsGrid--compact .V2MetricCard__value {
-  margin-top: 0.35rem;
-  font-size: 1.45rem;
+  margin-top: 0.5rem;
+  font-size: 1.6rem;
   line-height: 1.04;
 }
 
 .V2InlineWarning {
   margin-bottom: 0.6rem;
   border: 1px solid
-    color-mix(in srgb, var(--v2-warning) 45%, rgba(7, 19, 36, 0.22) 55%);
-  background: color-mix(in srgb, var(--v2-warning) 12%, white 88%);
-  color: color-mix(in srgb, var(--v2-warning) 72%, var(--v2-base-800) 28%);
-  border-radius: var(--v2-radius-sm);
-  padding: 0.55rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 700;
+    color-mix(in srgb, var(--v2-warning) 35%, rgba(255, 255, 255, 0.1) 65%);
+  background: color-mix(
+    in srgb,
+    var(--v2-warning) 8%,
+    rgba(255, 255, 255, 0.02) 92%
+  );
+  color: var(--v2-warning);
+  border-radius: var(--v2-radius-md);
+  padding: 0.75rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .V2MetricCard {
   margin: 0;
   height: 100%;
-  border-radius: var(--v2-radius-md);
+  border-radius: var(--v2-radius-lg);
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(255, 255, 255, 0.82)
+    135deg,
+    rgba(26, 32, 44, 0.6) 0%,
+    rgba(42, 52, 73, 0.4) 100%
   );
-  border: 1px solid rgba(6, 20, 38, 0.1);
-  box-shadow: var(--v2-shadow-1);
-  padding: var(--v2-space-4);
-  transition: transform 220ms ease;
+  border: 1px solid rgba(0, 217, 255, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 1.25rem;
+  transition: all 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.V2MetricCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 217, 255, 0.05) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
 }
 
 .V2MetricCard:hover {
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  border-color: rgba(0, 217, 255, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 217, 255, 0.15);
 }
 
 .V2MetricCard__label {
   margin: 0;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
-  font-size: 0.67rem;
-  font-weight: 800;
+  letter-spacing: 0.15em;
+  font-size: 0.7rem;
+  font-weight: 700;
   color: var(--v2-muted);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  position: relative;
+  z-index: 1;
 }
 
 .V2MetricCard__value {
-  margin: 0.55rem 0 0;
+  margin: 0.75rem 0 0;
   font-family: var(--v2-font-display);
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--v2-text);
+  position: relative;
+  z-index: 1;
 }
 
 .V2MetricCard__trendBadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 0.9rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 0.95rem;
   font-weight: 800;
   font-family: var(--v2-font-ui);
 }
 
 .V2MetricCard__trendBadge--up {
-  background: rgba(19, 185, 129, 0.15);
+  background: rgba(46, 204, 113, 0.15);
   color: var(--v2-positive);
+  border: 1px solid rgba(46, 204, 113, 0.25);
 }
 
 .V2MetricCard__trendBadge--down {
-  background: rgba(239, 76, 98, 0.15);
+  background: rgba(255, 56, 96, 0.15);
   color: var(--v2-critical);
+  border: 1px solid rgba(255, 56, 96, 0.25);
 }
 
 .V2MetricCard__meta {
-  margin: 0.55rem 0 0;
-  font-size: 0.78rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
   color: var(--v2-muted);
+  position: relative;
+  z-index: 1;
 }
 
 .V2MetricCard--positive {
-  border-color: rgba(19, 185, 129, 0.34);
+  border-color: rgba(46, 204, 113, 0.22);
   background: linear-gradient(
-    160deg,
-    rgba(19, 185, 129, 0.17),
-    rgba(255, 255, 255, 0.9)
+    135deg,
+    rgba(46, 204, 113, 0.08) 0%,
+    rgba(26, 32, 44, 0.5) 100%
   );
+}
+
+.V2MetricCard--positive:hover {
+  border-color: rgba(46, 204, 113, 0.35);
+  box-shadow: 0 8px 32px rgba(46, 204, 113, 0.1);
 }
 
 .V2MetricCard--critical {
-  border-color: rgba(239, 76, 98, 0.34);
+  border-color: rgba(255, 56, 96, 0.22);
   background: linear-gradient(
-    160deg,
-    rgba(239, 76, 98, 0.15),
-    rgba(255, 255, 255, 0.92)
+    135deg,
+    rgba(255, 56, 96, 0.08) 0%,
+    rgba(26, 32, 44, 0.5) 100%
   );
 }
 
+.V2MetricCard--critical:hover {
+  border-color: rgba(255, 56, 96, 0.35);
+  box-shadow: 0 8px 32px rgba(255, 56, 96, 0.1);
+}
+
 .V2MetricCard--accent {
-  border-color: rgba(17, 184, 214, 0.34);
+  border-color: rgba(0, 217, 255, 0.22);
   background: linear-gradient(
-    160deg,
-    rgba(17, 184, 214, 0.14),
-    rgba(255, 255, 255, 0.92)
+    135deg,
+    rgba(0, 217, 255, 0.08) 0%,
+    rgba(26, 32, 44, 0.5) 100%
   );
+}
+
+.V2MetricCard--accent:hover {
+  border-color: rgba(0, 217, 255, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 217, 255, 0.15);
 }
 
 .V2Grid {
@@ -772,26 +841,49 @@
 .V2Panel {
   border-radius: var(--v2-radius-lg);
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(255, 255, 255, 0.86)
+    135deg,
+    rgba(26, 32, 44, 0.7) 0%,
+    rgba(42, 52, 73, 0.3) 100%
   );
-  border: 1px solid rgba(7, 19, 36, 0.11);
-  box-shadow: var(--v2-shadow-1);
-  padding: var(--v2-space-4);
+  border: 1px solid rgba(0, 217, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  padding: 1.5rem;
   min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.V2Panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(0, 217, 255, 0.03) 0%,
+    transparent 50%
+  );
+  pointer-events: none;
 }
 
 .V2Panel__title {
   margin: 0;
   font-family: var(--v2-font-display);
-  font-size: 1.18rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--v2-text);
+  position: relative;
+  z-index: 1;
 }
 
 .V2Panel__caption {
-  margin: 0.45rem 0 0.85rem;
-  font-size: 0.87rem;
+  margin: 0.5rem 0 0 0;
+  font-size: 0.9rem;
   color: var(--v2-muted);
+  position: relative;
+  z-index: 1;
 }
 
 .V2SplitStat {

@@ -7,8 +7,9 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM deps AS build
-ARG DATABASE_URL
-ENV DATABASE_URL=$DATABASE_URL
+# Use a placeholder DATABASE_URL at build time for Prisma client generation;
+# the real value must be provided at runtime via environment variable.
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public"
 COPY . .
 ENV NODE_ENV=production
 ENV SKIP_FRONTEND_BUILD=true

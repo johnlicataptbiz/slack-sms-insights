@@ -1,10 +1,9 @@
 /**
  * MessageThread.tsx - Message display with deduplication
- * Renders all messages in chronological order with deduplication built-in
+ * React 19: ref-as-prop, useOptimistic for real-time updates, auto-scroll
  */
 
-import React, { useMemo } from "react";
-import { VirtualizedList } from "@/components/virtualized-list";
+import { useEffect, useOptimistic, useRef, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import type { UseInboxMessagesReturn } from "@/v2/hooks/useInboxMessages";
 
@@ -12,54 +11,133 @@ interface MessageThreadProps {
   messages: UseInboxMessagesReturn;
   selectedLineKey: string | null;
   onLineSelect: (lineKey: string) => void;
+  pendingMessage?: string | null;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const MessageThread: React.FC<MessageThreadProps> = ({
-  messages,
-  selectedLineKey,
-  onLineSelect,
-}) => {
-  // Use deduplicatedMessages from hook - guarantees no duplicates
-  const threadMessages = messages.deduplicatedMessages;
+function MessageBubble({
+  text,
+  direction,
+  timestamp,
+  isPending = false,
+  onSelect,
+}: {
+  text: string;
+  direction: "inbound" | "outbound";
+  timestamp: number;
+  isPending?: boolean;
+  onSelect?: () => void;
+}) {
+  const isOutbound = direction === "outbound";
 
-  if (!threadMessages || threadMessages.length === 0) {
+  return (
+    <div className={cn("flex gap-2", isOutbound && "justify-end")}>
+      <div
+        className={cn(
+          "max-w-xs rounded-bubble px-3 py-2 text-sm transition-opacity duration-normal",
+          isOutbound
+            ? "bg-ds-primary-500 text-white"
+            : "bg-ds-neutral-100 text-ds-neutral-900",
+          isPending && "opacity-60",
+        )}
+        onClick={onSelect}
+        onKeyDown={(e) => e.key === "Enter" && onSelect?.()}
+        role={onSelect ? "button" : undefined}
+        tabIndex={onSelect ? 0 : undefined}
+      >
+        <p>{text}</p>
+        <p className="mt-0.5 text-xs opacity-60">
+          {new Date(timestamp).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          {isPending && " · sending…"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function MessageThread({
+  messages,
+  selectedLineKey: _selectedLineKey,
+  onLineSelect,
+  pendingMessage,
+  ref,
+}: MessageThreadProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [, startTransition] = useTransition();
+
+  const baseMessages = messages.deduplicatedMessages ?? [];
+
+  // Optimistic: surface any in-flight message immediately
+  const [optimisticMessages, addOptimistic] = useOptimistic(
+    baseMessages,
+    (current, newText: string) => [
+      ...current,
+      {
+        id: `opt-${Date.now()}`,
+        conversationId: "",
+        text: newText,
+        timestamp: Date.now(),
+        senderPhone: "",
+        direction: "outbound" as const,
+        isPending: true,
+      },
+    ],
+  );
+
+  // Expose addOptimistic for parent via imperative handle pattern
+  useEffect(() => {
+    if (pendingMessage) {
+      startTransition(() => {
+        addOptimistic(pendingMessage);
+      });
+    }
+  }, [pendingMessage, addOptimistic]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
+  }, [optimisticMessages.length]);
+
+  if (optimisticMessages.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        <p>No messages yet. Send one to get started.</p>
+      <div
+        ref={ref}
+        className="flex h-full items-center justify-center text-muted-foreground"
+      >
+        <p className="text-sm">No messages yet. Send one to get started.</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 overflow-y-auto p-4">
-      {threadMessages.map((message, index) => (
-        <div
+    <div
+      ref={(node) => {
+        // Support both the scroll ref and any forwarded ref
+        (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current =
+          node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      }}
+      className="flex flex-col gap-2 overflow-y-auto p-4"
+    >
+      {optimisticMessages.map((message, index) => (
+        <MessageBubble
           key={message.id || `msg-${index}`}
-          className={cn(
-            "flex gap-2",
-            message.direction === "outbound" && "justify-end",
-          )}
-        >
-          <div
-            className={cn(
-              "max-w-xs rounded-lg px-3 py-2",
-              message.direction === "inbound"
-                ? "bg-muted"
-                : "bg-blue-100 text-blue-900",
-            )}
-            onClick={() => onLineSelect(message.id)}
-            role="button"
-            tabIndex={0}
-          >
-            <p className="text-sm">{message.text}</p>
-            <p className="text-xs opacity-60">
-              {new Date(message.timestamp).toLocaleTimeString()}
-            </p>
-          </div>
-        </div>
+          text={message.text}
+          direction={message.direction}
+          timestamp={message.timestamp}
+          isPending={"isPending" in message ? Boolean(message.isPending) : false}
+          onSelect={() => message.id && onLineSelect(message.id)}
+        />
       ))}
     </div>
   );
-};
+}
 
 export default MessageThread;

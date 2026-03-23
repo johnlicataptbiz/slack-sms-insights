@@ -45,6 +45,10 @@ export const mondaySmsBoardSchemas: Record<MondayBoardSchema['key'], MondayBoard
       { title: 'Summary', type: 'long_text' },
       { title: 'Conversation ID', type: 'text' },
       { title: 'Sequence', type: 'text' },
+      // Computed metrics
+      { title: 'Reply Rate %', type: 'numbers' },
+      { title: 'Response Time Hours', type: 'numbers' },
+      { title: 'Conversation Quality Score', type: 'numbers' },
     ],
   },
   sequences: {
@@ -63,6 +67,9 @@ export const mondaySmsBoardSchemas: Record<MondayBoardSchema['key'], MondayBoard
       buildStatusColumn('Trend', ['Up', 'Flat', 'Down']),
       { title: 'Last Updated', type: 'date' },
       { title: 'Optimization Notes', type: 'long_text' },
+      // Computed metrics
+      { title: 'Week over Week Change %', type: 'numbers' },
+      { title: 'Engagement Score', type: 'numbers' },
     ],
   },
   reports: {
@@ -81,6 +88,10 @@ export const mondaySmsBoardSchemas: Record<MondayBoardSchema['key'], MondayBoard
       { title: 'Actions Next Week', type: 'long_text' },
       { title: 'Exceptions', type: 'long_text' },
       { title: 'Last Synced', type: 'date' },
+      // Computed metrics
+      { title: 'Total Booked', type: 'numbers' },
+      { title: 'vs Last Week', type: 'numbers' },
+      { title: 'Health Score', type: 'numbers' },
     ],
   },
 };

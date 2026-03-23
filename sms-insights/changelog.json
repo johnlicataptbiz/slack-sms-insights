@@ -1,55 +1,10 @@
 {
-  "generatedAt": "2026-03-23T07:27:51.426Z",
+  "generatedAt": "2026-03-23T03:50:07.628Z",
   "daysIncluded": 365,
-  "totalCount": 454,
+  "totalCount": 448,
   "entries": [
     {
-      "hash": "c0da0a5",
-      "date": "2026-03-23T00:11:48-05:00",
-      "message": "refactor(inbox): Phase 2.2 Batch 2 - Major state read/setter replacements (WIP)",
-      "author": "Jack Licata",
-      "type": "refactor",
-      "category": "Dashboard",
-      "description": "Phase 2.2 Batch 2 - Major state read/setter replacements (WIP)"
-    },
-    {
-      "hash": "74dba81",
-      "date": "2026-03-23T00:08:30-05:00",
-      "message": "refactor(inbox): Phase 2.2 - Replace state setters (Batch 1/4)",
-      "author": "Jack Licata",
-      "type": "refactor",
-      "category": "Dashboard",
-      "description": "Phase 2.2 - Replace state setters (Batch 1/4)"
-    },
-    {
-      "hash": "73f243c",
-      "date": "2026-03-23T00:06:25-05:00",
-      "message": "refactor(inbox): Consolidate 40+ useState into useInboxState hook",
-      "author": "Jack Licata",
-      "type": "refactor",
-      "category": "Dashboard",
-      "description": "Consolidate 40+ useState into useInboxState hook"
-    },
-    {
-      "hash": "9afd1a5",
-      "date": "2026-03-22T23:55:37-05:00",
-      "message": "fix(inbox): Critical hotfixes to eliminate message disappearing and attribution sync issues",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Dashboard",
-      "description": "Critical hotfixes to eliminate message disappearing and attribution sync issues"
-    },
-    {
-      "hash": "ef88eb2",
-      "date": "2026-03-22T23:35:57-05:00",
-      "message": "feat: modernize SMS Insights UI with dark-first design system",
-      "author": "Jack Licata",
-      "type": "feature",
-      "category": "UI/UX",
-      "description": "Modernize SMS Insights UI with dark-first design system"
-    },
-    {
-      "hash": "74a5ad5",
+      "hash": "378e95b",
       "date": "2026-03-22T20:23:24-05:00",
       "message": "feat: live database report + daily automation",
       "author": "Jack Licata",
@@ -58,7 +13,7 @@
       "description": "Live database report + daily automation"
     },
     {
-      "hash": "df51690",
+      "hash": "79e7b88",
       "date": "2026-03-22T18:50:47-05:00",
       "message": "fix(railway): use .node-version 22.15.1 (nixpacks.toml conflict)",
       "author": "Jack Licata",
@@ -67,22 +22,13 @@
       "description": "Use .node-version 22.15.1 (nixpacks.toml conflict)"
     },
     {
-      "hash": "f7223b9",
+      "hash": "6aa72dc",
       "date": "2026-03-22T18:44:07-05:00",
       "message": "fix(railway): force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)",
       "author": "Jack Licata",
       "type": "fix",
       "category": "Database",
       "description": "Force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)"
-    },
-    {
-      "hash": "a3c4a05",
-      "date": "2026-03-23T00:02:44Z",
-      "message": "fix: add .node-version to pin Node.js 22.12.0 for Prisma 7",
-      "author": "railway-app[bot]",
-      "type": "feature",
-      "category": "Database",
-      "description": "Add .node-version to pin Node.js 22.12.0 for Prisma 7"
     },
     {
       "hash": "137327e",

@@ -175,6 +175,23 @@ const buildWeeklySummaryColumnValues = (
         .join('\n')
     : 'None this week.';
 
+  // Compute Total Booked: sum of Jack + Brandon + Self Booked
+  const totalBooked = jack + brandon + selfBooked;
+
+  // Compute vs Last Week: percentage change from previous week
+  let vsLastWeek: number | null = null;
+  if (Number.isFinite(previousBookedCalls) && previousBookedCalls !== null && previousBookedCalls > 0) {
+    vsLastWeek = Math.round(((totalBooked - previousBookedCalls) / previousBookedCalls) * 100);
+  }
+
+  // Compute Health Score: composite of booked calls and reply rate
+  // Score range: 0-100, based on meeting targets
+  const bookedTarget = 10; // reasonable weekly target
+  const replyRateTarget = 15; // percent
+  const bookedScore = Math.min(totalBooked / bookedTarget, 1) * 50;
+  const replyScore = Math.min(summary.teamTotals.replyRatePct / replyRateTarget, 1) * 50;
+  const healthScore = Math.round(bookedScore + replyScore);
+
   const values: Record<string, unknown> = {};
   if (columnIds.weekStart) values[columnIds.weekStart] = { date: summary.window.weekStart };
   if (columnIds.reportingPeriod) values[columnIds.reportingPeriod] = `${summary.window.weekStart} → ${summary.window.weekEnd}`;
@@ -188,6 +205,10 @@ const buildWeeklySummaryColumnValues = (
   if (columnIds.actionsNextWeek) values[columnIds.actionsNextWeek] = summary.actionsNextWeek.join('\n');
   if (columnIds.exceptions) values[columnIds.exceptions] = exceptions;
   if (columnIds.lastSynced) values[columnIds.lastSynced] = { date: new Date(summary.sources.generatedAt).toISOString().slice(0, 10) };
+  // Computed metrics enrichment
+  if (columnIds.totalBooked) values[columnIds.totalBooked] = totalBooked;
+  if (columnIds.vsLastWeek && vsLastWeek !== null) values[columnIds.vsLastWeek] = vsLastWeek;
+  if (columnIds.healthScore) values[columnIds.healthScore] = healthScore;
   return values;
 };
 
@@ -435,6 +456,10 @@ export const syncWeeklySummaryToMonday = async (
     actionsNextWeek: findColumnIdByTitle(boardColumns, ['Actions Next Week']),
     exceptions: findColumnIdByTitle(boardColumns, ['Exceptions']),
     lastSynced: findColumnIdByTitle(boardColumns, ['Last Synced']),
+    // Computed metrics columns
+    totalBooked: findColumnIdByTitle(boardColumns, ['Total Booked']),
+    vsLastWeek: findColumnIdByTitle(boardColumns, ['vs Last Week']),
+    healthScore: findColumnIdByTitle(boardColumns, ['Health Score']),
   };
 
   const result = await upsertWeeklySummaryItem(

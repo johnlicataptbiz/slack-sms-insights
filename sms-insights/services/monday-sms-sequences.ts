@@ -1,5 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import { queryBoardColumns, queryBoardItems } from './monday-client.js';
+import { queryBoardColumns, queryBoardItems, upsertBookedCallItem } from './monday-client.js';
 import {
   coerceBoardMapping,
   inferBoardMapping,
@@ -56,6 +56,15 @@ const cutoffDate = (daysBack: number): Date => {
   const value = new Date();
   value.setUTCDate(value.getUTCDate() - Math.max(1, daysBack));
   return value;
+};
+
+const parseColumnValueJson = (value: string | null): unknown | null => {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
 };
 
 const resolveSyncBoardIds = (): string[] => {
@@ -136,6 +145,7 @@ export const syncMondaySmsSequencesBoard = async (
       });
     }
     await saveMondayColumnMapping(boardId, mapping, logger);
+    const columnsById = new Map(columns.map((column) => [column.id, column]));
     let boardProfile = await getMondayBoardRegistry(boardId, logger);
     if (!boardProfile) {
       const fallback = resolveDefaultBoardGovernance(boardId);

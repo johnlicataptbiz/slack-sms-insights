@@ -3,3 +3,8 @@ node_modules
 dist
 .env*
 !.env.sample
+
+# Stale tsc CJS build artifacts — source of truth is the .ts files
+services/*.js
+scripts/_*.ts
+

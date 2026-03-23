@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { RunV2, SalesMetricsV2 } from '../../../frontend/src/api/v2-types.js';
-import { computeInsightsBookedBreakdown } from '../../../frontend/src/v2/pages/InsightsV2.js';
-import { resolveSelectedRunViewModel } from '../../../frontend/src/v2/pages/RunsV2.js';
-import { computeSequenceHeaderMetrics } from '../../../frontend/src/v2/pages/SequencesV2.js';
+import {
+  computeInsightsBookedBreakdown,
+  computeSequenceHeaderMetrics,
+  resolveSelectedRunViewModel,
+} from '../../../frontend/src/v2/pages/page-metrics.js';
 
 const baseRun = (overrides: Partial<RunV2> = {}): RunV2 => ({
   processing: {

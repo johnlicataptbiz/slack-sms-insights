@@ -28,10 +28,7 @@ import {
   getBookedCallSmsReplyLinks,
   getBookedCallsSummary,
 } from "../services/booked-calls.js";
-import {
-  getChangelogByDateRange,
-  getChangelogTimeline,
-} from "../services/changelog-service.js";
+import { getChangelogByDateRange } from "../services/changelog-service.js";
 import {
   autoAssignWorkItems,
   bulkInferQualification,
@@ -68,6 +65,11 @@ import {
   upsertInboxContactProfile,
 } from "../services/inbox-contact-profiles.js";
 import { generateCrmNotesSuggestion } from "../services/inbox-crm-notes-engine.js";
+import {
+  listContactActivities,
+  getContactActivityStats,
+  type ContactActivityRow,
+} from "../services/contact-activity-service.js";
 import { generateDraftSuggestion } from "../services/inbox-draft-engine.js";
 import { sendInboxMessage } from "../services/inbox-send.js";
 import {
@@ -276,8 +278,8 @@ const cleanupRateLimitState = (): void => {
   }
 };
 
-// Start periodic cleanup
-setInterval(cleanupRateLimitState, RATE_LIMIT_CLEANUP_INTERVAL_MS);
+// Start periodic cleanup without keeping the process alive in tests/CLI runs.
+setInterval(cleanupRateLimitState, RATE_LIMIT_CLEANUP_INTERVAL_MS).unref();
 
 const parseBooleanFlag = (
   value: string | undefined,
@@ -1542,7 +1544,7 @@ const handleGetSequenceKpisV2: RequestHandler = async (
 };
 
 const handleGetAttributionHealthV2: RequestHandler = async (
-  req,
+  _req,
   res,
   logger,
   origin,
@@ -3081,7 +3083,7 @@ const toInboxConversationV2 = (row: {
   };
 };
 
-const toInboxMessageV2 = (row: InboxMessageRow) => ({
+const _toInboxMessageV2 = (row: InboxMessageRow) => ({
   id: row.id,
   conversation_id: row.conversation_id,
   event_ts:
@@ -4939,6 +4941,81 @@ const handlePostInboxNoteV2: RequestHandler = async (
   );
 };
 
+// ── Contact Activities ───────────────────────────────────────────────────────
+
+const handleGetContactActivitiesV2: RequestHandler = async (
+  req,
+  res,
+  _logger,
+  origin,
+) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: "Inbox is disabled" }, origin);
+  }
+  const url = new URL(req.url ?? "", "http://localhost");
+  const contactKey = url.searchParams.get("contactKey");
+  if (!contactKey) {
+    return sendJson(res, 400, { error: "contactKey is required" }, origin);
+  }
+  const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 100);
+  const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
+  
+  const activities = await listContactActivities(contactKey, limit, offset);
+  const stats = await getContactActivityStats(contactKey);
+  
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: {
+        activities: activities.map((a: ContactActivityRow) => ({
+          id: a.id,
+          contactKey: a.contact_key,
+          activityType: a.activity_type,
+          referenceId: a.reference_id,
+          referenceType: a.reference_type,
+          repId: a.rep_id,
+          summary: a.summary,
+          metadata: a.metadata,
+          occurredAt: a.occurred_at,
+          createdAt: a.created_at,
+        })),
+        stats,
+      },
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
+const handleGetContactActivityStatsV2: RequestHandler = async (
+  req,
+  res,
+  _logger,
+  origin,
+) => {
+  if (!isV2InboxEnabled()) {
+    return sendJson(res, 404, { error: "Inbox is disabled" }, origin);
+  }
+  const url = new URL(req.url ?? "", "http://localhost");
+  const contactKey = url.searchParams.get("contactKey");
+  if (!contactKey) {
+    return sendJson(res, 400, { error: "contactKey is required" }, origin);
+  }
+  
+  const stats = await getContactActivityStats(contactKey);
+  
+  sendJson(
+    res,
+    200,
+    toEnvelope({
+      data: stats,
+      timeZone: DEFAULT_BUSINESS_TIMEZONE,
+    }),
+    origin,
+  );
+};
+
 // ── Phase 2: Snooze ───────────────────────────────────────────────────────────
 
 const handlePostInboxSnoozeV2: RequestHandler = async (
@@ -5818,9 +5895,9 @@ const handleGetOutcomeKeywordAnalyticsV2: RequestHandler = async (
 };
 
 const handleGetMondaySmsSyncBoardIds: RequestHandler = async (
-  req,
+  _req,
   res,
-  logger,
+  _logger,
   origin,
 ) => {
   const boardIds = listMondaySmsSyncBoardIds();
@@ -5864,9 +5941,9 @@ const handlePostMondaySmsSync: RequestHandler = async (
 };
 
 const handleGetMondaySmsSequencesSyncBoardIds: RequestHandler = async (
-  req,
+  _req,
   res,
-  logger,
+  _logger,
   origin,
 ) => {
   const boardIds = listMondaySmsSequencesSyncBoardIds();
@@ -5912,9 +5989,9 @@ const handlePostMondaySmsSequencesSync: RequestHandler = async (
 };
 
 const handleGetMondaySmsReportsSyncBoardIds: RequestHandler = async (
-  req,
+  _req,
   res,
-  logger,
+  _logger,
   origin,
 ) => {
   const boardIds = listMondaySmsReportsSyncBoardIds();
@@ -6331,6 +6408,68 @@ const handleGetDailyReportRangeV2: RequestHandler = async (
   }
 };
 
+// Alert webhook handlers (for cron-scheduler integration)
+const handleAlertWebhook: RequestHandler = async (req, res, logger, origin) => {
+  try {
+    const body = (await parseJsonBody(req)) as Record<string, unknown>;
+    logger?.debug("Alert webhook received:", body);
+    sendJson(
+      res,
+      200,
+      { status: "alert received", message: "Webhook processed" },
+      origin,
+    );
+  } catch (error) {
+    logger?.error("Alert webhook error:", error);
+    sendJson(res, 400, { error: "Failed to process alert webhook" }, origin);
+  }
+};
+
+const handleAlertStatus: RequestHandler = async (req, res, _logger, origin) => {
+  const alertStatus = {
+    status: "healthy",
+    lastInboxAlert: null,
+    lastAttributionAlert: null,
+    inboxHealthy: true,
+    attributionHealthy: true,
+  };
+  sendJson(res, 200, alertStatus, origin);
+};
+
+const handleAlertInbox: RequestHandler = async (req, res, logger, origin) => {
+  try {
+    const body = (await parseJsonBody(req)) as Record<string, unknown>;
+    logger?.debug("Inbox alert webhook received:", body);
+    // TODO: Trigger Slack Workflow for inbox alerts
+    sendJson(res, 200, { status: "inbox alert received" }, origin);
+  } catch (error) {
+    logger?.error("Inbox alert webhook error:", error);
+    sendJson(res, 400, { error: "Failed to process inbox alert" }, origin);
+  }
+};
+
+const handleAlertAttribution: RequestHandler = async (
+  req,
+  res,
+  logger,
+  origin,
+) => {
+  try {
+    const body = (await parseJsonBody(req)) as Record<string, unknown>;
+    logger?.debug("Attribution alert webhook received:", body);
+    // TODO: Trigger Slack Workflow for attribution alerts
+    sendJson(res, 200, { status: "attribution alert received" }, origin);
+  } catch (error) {
+    logger?.error("Attribution alert webhook error:", error);
+    sendJson(
+      res,
+      400,
+      { error: "Failed to process attribution alert" },
+      origin,
+    );
+  }
+};
+
 type ApiRoute = {
   method: "GET" | "POST" | "DELETE";
   path: string;
@@ -6558,6 +6697,16 @@ const apiRoutes: ApiRoute[] = [
     handler: handlePostInboxNoteV2,
   },
   {
+    method: "GET",
+    path: "/api/v2/contact-activities",
+    handler: handleGetContactActivitiesV2,
+  },
+  {
+    method: "GET",
+    path: "/api/v2/contact-activities/stats",
+    handler: handleGetContactActivityStatsV2,
+  },
+  {
     method: "POST",
     path: "/api/v2/inbox/conversations/:id/snooze",
     handler: handlePostInboxSnoozeV2,
@@ -6772,6 +6921,32 @@ const apiRoutes: ApiRoute[] = [
     method: "POST",
     path: "/api/admin/monday/sms-reports/sync",
     handler: handlePostMondaySmsReportsSync,
+  },
+
+  // Alert webhook endpoints (for cron integration)
+  {
+    method: "POST",
+    path: "/api/alerts/webhook",
+    handler: handleAlertWebhook,
+    public: true,
+  },
+  {
+    method: "GET",
+    path: "/api/alerts/status",
+    handler: handleAlertStatus,
+    public: true,
+  },
+  {
+    method: "POST",
+    path: "/api/alerts/inbox",
+    handler: handleAlertInbox,
+    public: true,
+  },
+  {
+    method: "POST",
+    path: "/api/alerts/attribution",
+    handler: handleAlertAttribution,
+    public: true,
   },
 
   {

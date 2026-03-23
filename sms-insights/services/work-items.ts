@@ -1,13 +1,8 @@
-import type { Prisma, WorkItemType } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 import { publishRealtimeEvent } from './realtime.js';
 
 const getPrisma = () => getPrismaClient();
-
-type WorkItemWithConversation = Prisma.work_itemsGetPayload<{
-  include: { conversations: true };
-}>;
 
 export type WorkItemListRow = {
   id: string;
@@ -71,11 +66,11 @@ export const listOpenWorkItems = async (
   const prisma = getPrisma();
   try {
     const limit = Math.max(1, Math.min(params.limit, 200));
-    const where: Prisma.work_itemsWhereInput = {
+    const where: any = {
       resolved_at: null,
     };
 
-    if (params.type) where.type = params.type as WorkItemType;
+    if (params.type) where.type = params.type;
     if (params.repId) where.rep_id = params.repId;
     if (params.severity) where.severity = params.severity;
     if (params.overdueOnly) where.due_at = { lt: new Date() };
@@ -83,8 +78,26 @@ export const listOpenWorkItems = async (
 
     const results = await prisma.work_items.findMany({
       where,
-      include: {
-        conversations: true,
+      select: {
+        id: true,
+        type: true,
+        severity: true,
+        due_at: true,
+        created_at: true,
+        resolved_at: true,
+        rep_id: true,
+        conversations: {
+          select: {
+            id: true,
+            contactKey: true,
+            contact_id: true,
+            contact_phone: true,
+            last_inbound_at: true,
+            last_outbound_at: true,
+            last_touch_at: true,
+            unreplied_inbound_count: true,
+          },
+        },
       },
       orderBy: [{ due_at: 'asc' }, { id: 'asc' }],
       take: limit + 1,
@@ -95,10 +108,10 @@ export const listOpenWorkItems = async (
     const hasMore = results.length > limit;
     const itemsRaw = hasMore ? results.slice(0, limit) : results;
 
-    const items: WorkItemListRow[] = itemsRaw.map((wi: WorkItemWithConversation) => ({
+    const items: WorkItemListRow[] = itemsRaw.map((wi) => ({
       id: wi.id,
       type: wi.type,
-      severity: wi.severity as WorkItemListRow['severity'],
+      severity: wi.severity as any,
       due_at: wi.due_at.toISOString(),
       created_at: wi.created_at.toISOString(),
       resolved_at: wi.resolved_at ? wi.resolved_at.toISOString() : null,

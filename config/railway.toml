@@ -1,4 +1,5 @@
 builder = "nixpacks"
 
-[project]
-id = "14a78a3e-641c-49a6-86fd-1c8623d3cfdb"
+[build.nixpacks]
+# Match the backend package and .nvmrc pin
+nodeVersion = "22.12.0"

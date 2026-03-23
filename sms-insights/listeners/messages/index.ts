@@ -40,6 +40,10 @@ const register = (app: App) => {
     const attachments = (message as any).attachments as any[] | undefined;
     const firstAttachmentTitle = attachments?.[0]?.title as string | undefined;
 
+    // Count every message that enters the channel handler as "seen" before any early returns,
+    // so the skip rate denominator includes all events (not just non-bot ones).
+    recordAlowareIngestSeen();
+
     // If message is from a bot, check if we should skip it
     if (botId) {
       const isDailySnapshot =
@@ -60,11 +64,6 @@ const register = (app: App) => {
         return;
       }
     }
-
-    // Ignore bot messages to avoid loops (Aloware integration messages are typically bot/app messages,
-    // but we still want them. So only ignore *this* app's bot messages if present.)
-    // Bolt message has subtype sometimes; keep permissive for now.
-    recordAlowareIngestSeen();
 
     const parsed = parseAlowareMessage(text || '', attachments);
 

@@ -47,12 +47,12 @@ describe('SequenceQualificationBreakdown', () => {
 
   it('renders loading state', () => {
     render(<SequenceQualificationBreakdown items={[]} isLoading={true} />);
-    expect(screen.getByText(/Loading.*qualification/i)).toBeInTheDocument();
+    expect(screen.getByText('Loading qualification data...')).toBeInTheDocument();
   });
 
   it('renders empty state', () => {
     render(<SequenceQualificationBreakdown items={[]} isLoading={false} />);
-    expect(screen.getByText(/No qualification data.*time period/i)).toBeInTheDocument();
+    expect(screen.getByText('No qualification data available for the selected time period.')).toBeInTheDocument();
   });
 
   it('renders sequence name and expands details on click', () => {
@@ -69,6 +69,11 @@ describe('SequenceQualificationBreakdown', () => {
 
     // Expanded section headers should now be visible
     expect(screen.getByText('Employment Status')).toBeInTheDocument();
+    expect(screen.getByText('Revenue Model')).toBeInTheDocument();
     expect(screen.getByText('Coaching Interest')).toBeInTheDocument();
+    expect(screen.getByText('Monday.com Outcomes')).toBeInTheDocument();
+
+    // Check that full time badge is present (sample quote is in tooltip)
+    expect(screen.getByText('Full-time')).toBeInTheDocument();
   });
 });

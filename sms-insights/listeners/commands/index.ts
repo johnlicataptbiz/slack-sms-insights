@@ -10,6 +10,13 @@ import {
   ALOWARE_CHANNEL_NAME,
   generateAndPostScoreboard,
 } from '../../services/scoreboard-poster.js';
+import {
+  addUserMessage,
+  addAssistantMessage,
+  buildConversationPrompt,
+  clearConversationContext,
+  CONVERSATION_SYSTEM_PROMPT,
+} from '../../services/conversation-context.js';
 
 const SLACK_TEXT_CHUNK_LIMIT = 3000;
 
@@ -47,7 +54,7 @@ const resolveReportPrompt = (text: string): string => {
 };
 
 const register = (app: App) => {
-  // ── /ask — generic AI / analytics query ──────────────────────────────────
+  // ── /ask — generic AI / analytics query with multi-turn context ───────────
   app.command('/ask', async ({ ack, client, command, logger, respond }) => {
     try {
       await ack();
@@ -56,9 +63,16 @@ const register = (app: App) => {
       return;
     }
 
-    const prompt = command.text?.trim();
+    let prompt = command.text?.trim();
     if (!prompt) {
-      await respond('Usage: `/ask <question>`');
+      await respond('Usage: `/ask <question>`\n\nTip: Ask follow-up questions and I\'ll remember the context!');
+      return;
+    }
+
+    // Handle special commands
+    if (prompt.toLowerCase() === 'clear' || prompt.toLowerCase() === 'reset') {
+      clearConversationContext(command.user_id, command.channel_id);
+      await respond('Conversation context cleared. Starting fresh!');
       return;
     }
 
@@ -73,17 +87,39 @@ const register = (app: App) => {
     }
 
     try {
+      // Build conversation context for multi-turn support
+      const conversationHistory = buildConversationPrompt(command.user_id, command.channel_id);
+      let enhancedPrompt: string;
+
+      if (conversationHistory) {
+        enhancedPrompt = `${CONVERSATION_SYSTEM_PROMPT}\n\nPrevious conversation:\n${conversationHistory}\n\nCurrent question: ${prompt}`;
+      } else {
+        enhancedPrompt = `${CONVERSATION_SYSTEM_PROMPT}\n\n${prompt}`;
+      }
+
       const answer = isAlowareChannel(command.channel_id)
         ? await buildAlowareAnalyticsReport({
             channelId: command.channel_id,
             client,
             logger,
-            prompt,
+            prompt: enhancedPrompt,
           })
-        : await generateAiResponse(prompt);
+        : await generateAiResponse(enhancedPrompt);
 
+      // Store conversation context for multi-turn
+      addUserMessage(command.user_id, command.channel_id, prompt);
+      addAssistantMessage(command.user_id, command.channel_id, answer);
+
+      // Send response in chunks if needed
       for (const chunk of splitSlackText(answer)) {
         await respond(chunk);
+      }
+
+      // Add context hint if this was a multi-turn conversation
+      const context = buildConversationPrompt(command.user_id, command.channel_id);
+      if (context && context.includes('\n\nAssistant:')) {
+        // This is now a multi-turn conversation
+        await respond('_I\'ll remember this context for our next exchange. Say "clear" to start fresh._');
       }
     } catch (error) {
       logger.error(error);

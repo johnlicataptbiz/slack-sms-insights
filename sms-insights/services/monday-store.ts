@@ -1,7 +1,18 @@
+import { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
+
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull => {
+  if (value == null) return Prisma.DbNull;
+  return value as Prisma.InputJsonValue;
+};
+
+const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
+  if (value == null) return {};
+  return value as Prisma.InputJsonValue;
+};
 
 export type MondaySyncStatus = 'idle' | 'running' | 'success' | 'error';
 export type MondayBoardClass =
@@ -254,6 +265,14 @@ export const getMondaySyncState = async (
   try {
     const result = await prisma.monday_sync_state.findUnique({
       where: { board_id: boardId },
+      select: {
+        board_id: true,
+        cursor: true,
+        last_sync_at: true,
+        status: true,
+        error: true,
+        updated_at: true,
+      },
     });
     return result as unknown as MondaySyncStateRow | null;
   } catch (error) {
@@ -270,6 +289,19 @@ export const getMondayBoardRegistry = async (
   try {
     const result = await prisma.monday_board_registry.findUnique({
       where: { board_id: boardId },
+      select: {
+        board_id: true,
+        board_label: true,
+        board_class: true,
+        metric_grain: true,
+        include_in_funnel: true,
+        include_in_exec: true,
+        active: true,
+        owner_team: true,
+        notes: true,
+        created_at: true,
+        updated_at: true,
+      },
     });
     return result as unknown as MondayBoardRegistryRow | null;
   } catch (error) {
@@ -333,6 +365,18 @@ export const listPendingMondayBookedCallPushes = async (
     const result = await prisma.monday_booked_call_pushes.findMany({
       where: { status: 'pending' },
       orderBy: { updated_at: 'asc' },
+      select: {
+        board_id: true,
+        slack_channel_id: true,
+        slack_message_ts: true,
+        setter_bucket: true,
+        monday_item_id: true,
+        status: true,
+        error: true,
+        payload_json: true,
+        pushed_at: true,
+        updated_at: true,
+      },
     });
     return result as unknown as MondayBookedCallPushRow[];
   } catch (error) {
@@ -346,6 +390,19 @@ export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Pr
   try {
     const result = await prisma.monday_board_registry.findMany({
       orderBy: [{ board_label: 'asc' }, { board_id: 'asc' }],
+      select: {
+        board_id: true,
+        board_label: true,
+        board_class: true,
+        metric_grain: true,
+        include_in_funnel: true,
+        include_in_exec: true,
+        active: true,
+        owner_team: true,
+        notes: true,
+        created_at: true,
+        updated_at: true,
+      },
     });
     return result as unknown as MondayBoardRegistryRow[];
   } catch (error) {
@@ -360,6 +417,15 @@ export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): P
     const result = await prisma.actor_directory.findMany({
       where: { active: true },
       orderBy: [{ role: 'asc' }, { canonical_name: 'asc' }],
+      select: {
+        canonical_name: true,
+        role: true,
+        aliases: true,
+        active: true,
+        notes: true,
+        created_at: true,
+        updated_at: true,
+      },
     });
     return result as unknown as ActorDirectoryRow[];
   } catch (error) {
@@ -413,12 +479,12 @@ export const saveMondayColumnMapping = async (
     await prisma.monday_column_mappings.upsert({
       where: { board_id: boardId },
       update: {
-        mapping_json: (mapping ?? {}) as any,
+        mapping_json: toJsonValue(mapping),
         updated_at: new Date(),
       },
       create: {
         board_id: boardId,
-        mapping_json: (mapping ?? {}) as any,
+        mapping_json: toJsonValue(mapping),
         updated_at: new Date(),
       },
     });
@@ -456,7 +522,7 @@ export const deleteMondayCallSnapshots = async (
       where: {
         board_id: boardId,
         item_id: { in: itemIds },
-      } as any,
+      } satisfies Prisma.monday_call_snapshotsWhereInput,
     });
   } catch (error) {
     logger?.warn?.('Failed to delete monday call snapshots', error);
@@ -485,7 +551,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableJson(input.raw),
         synced_at: new Date(),
       },
       create: {
@@ -499,7 +565,7 @@ export const upsertMondayCallSnapshot = async (
         disposition: input.disposition ?? null,
         is_booked: input.isBooked === true,
         contact_key: input.contactKey ?? null,
-        raw: (input.raw ?? null) as any,
+        raw: toNullableJson(input.raw),
         synced_at: new Date(),
       },
     });
@@ -1030,7 +1096,7 @@ export const listMondayCallSnapshotsInRange = async (
 ): Promise<MondayCallSnapshotRow[]> => {
   const prisma = getPrisma();
   try {
-    const where: any = {
+    const where: Prisma.monday_call_snapshotsWhereInput = {
       updated_at: {
         gte: params.from,
         lte: params.to,
@@ -1041,6 +1107,18 @@ export const listMondayCallSnapshotsInRange = async (
     const result = await prisma.monday_call_snapshots.findMany({
       where,
       orderBy: { updated_at: 'desc' },
+      select: {
+        board_id: true,
+        item_id: true,
+        item_name: true,
+        updated_at: true,
+        call_date: true,
+        setter: true,
+        stage: true,
+        disposition: true,
+        is_booked: true,
+        contact_key: true,
+      },
     });
     return result as unknown as MondayCallSnapshotRow[];
   } catch (error) {
@@ -1059,6 +1137,14 @@ export const getLatestMondaySyncStatus = async (
       where: boardId ? { board_id: boardId } : {},
       orderBy: { updated_at: 'desc' },
       take: 1,
+      select: {
+        board_id: true,
+        cursor: true,
+        last_sync_at: true,
+        status: true,
+        error: true,
+        updated_at: true,
+      },
     });
     return (result[0] as unknown as MondaySyncStateRow) || null;
   } catch (error) {
@@ -1083,14 +1169,14 @@ export const upsertMondayWeeklyReport = async (
       where: { week_start: new Date(params.weekStart) },
       update: {
         source_board_id: params.sourceBoardId ?? null,
-        summary_json: (params.summaryJson ?? {}) as any,
+        summary_json: toJsonValue(params.summaryJson),
         monday_item_id: params.mondayItemId ?? null,
         synced_at: params.syncedAt ?? new Date(),
       },
       create: {
         week_start: new Date(params.weekStart),
         source_board_id: params.sourceBoardId ?? null,
-        summary_json: (params.summaryJson ?? {}) as any,
+        summary_json: toJsonValue(params.summaryJson),
         monday_item_id: params.mondayItemId ?? null,
         synced_at: params.syncedAt ?? new Date(),
       },
@@ -1108,6 +1194,13 @@ export const getMondayWeeklyReport = async (
   try {
     const result = await prisma.monday_weekly_reports.findUnique({
       where: { week_start: new Date(weekStart) },
+      select: {
+        week_start: true,
+        source_board_id: true,
+        summary_json: true,
+        monday_item_id: true,
+        synced_at: true,
+      },
     });
     return result as unknown as MondayWeeklyReportRow | null;
   } catch (error) {
@@ -1165,7 +1258,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: (params.payloadJson ?? {}) as any,
+        payload_json: toNullableJson(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },
@@ -1177,7 +1270,7 @@ export const upsertMondayBookedCallPush = async (
         monday_item_id: params.mondayItemId ?? null,
         status: params.status,
         error: params.error ?? null,
-        payload_json: (params.payloadJson ?? {}) as any,
+        payload_json: toNullableJson(params.payloadJson),
         pushed_at: params.pushedAt ?? null,
         updated_at: new Date(),
       },

@@ -1,6 +1,16 @@
 # Railway configuration for SMS Insights Backend
 [build]
-builder = "DOCKERFILE"
+builder = "nixpacks"
+
+[build.nixpacks]
+# Use Node.js 22.12+ for Prisma 7 compatibility
+nodeVersion = "22.12.0"
+
+# Build command
+buildCmd = "npm run build"
+
+# Start command
+startCmd = "npm start"
 
 [deploy]
 # Health check configuration

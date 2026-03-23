@@ -134,6 +134,8 @@ import {
 } from "../services/monday-sms-sync.js";
 import { getOutcomeKeywordAnalytics } from "../services/outcome-keyword-analytics.js";
 import { getPrisma, getPrismaRuntimeStatus } from "../services/prisma.js";
+import { AlowareProcessor } from "../services/aloware-processor.js";
+import { SMSMessage } from "../types/aloware.js";
 import { syncQualificationFromConversationText } from "../services/qualification-sync.js";
 import { subscribeRealtimeEvents } from "../services/realtime.js";
 import { getSlackAuthRuntimeStatus } from "../services/runtime-status.js";
@@ -6425,6 +6427,25 @@ const handleAlertWebhook: RequestHandler = async (req, res, logger, origin) => {
   }
 };
 
+const alowareProcessor = new AlowareProcessor();
+
+const handleAlowareWebhook: RequestHandler = async (req, res, logger, origin) => {
+  try {
+    const body = (await parseJsonBody(req)) as SMSMessage;
+    logger?.info("Aloware webhook received:", { id: body.id });
+    await alowareProcessor.processWebhook(body);
+    sendJson(
+      res,
+      200,
+      { status: "ok", message: "Aloware webhook processed" },
+      origin,
+    );
+  } catch (error) {
+    logger?.error("Aloware webhook error:", error);
+    sendJson(res, 500, { error: "Failed to process Aloware webhook" }, origin);
+  }
+};
+
 const handleAlertStatus: RequestHandler = async (req, res, _logger, origin) => {
   const alertStatus = {
     status: "healthy",
@@ -6497,6 +6518,12 @@ const apiRoutes: ApiRoute[] = [
     path: "/api/health",
     public: true,
     handler: handleApiHealth,
+  },
+  {
+    method: "POST",
+    path: "/api/webhooks/aloware/sms",
+    public: true,
+    handler: handleAlowareWebhook,
   },
   {
     method: "GET",

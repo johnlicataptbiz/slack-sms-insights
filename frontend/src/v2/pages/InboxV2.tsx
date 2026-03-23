@@ -583,6 +583,7 @@ export default function InboxV2() {
     updateQualification,
     updateEscalation,
     updateSelectionState,
+    setFlashMessage,
   } = inboxState;
 
   // Refs for DOM elements and locks
@@ -677,7 +678,7 @@ export default function InboxV2() {
   const listQuery = useV2InboxConversationsInfinite({
     ...(filters.statusFilter ? { status: filters.statusFilter } : {}),
     needsReplyOnly: filters.needsReplyOnly,
-    search,
+    search: filters.search,
     pageSize: 75,
   });
 
@@ -1227,7 +1228,7 @@ export default function InboxV2() {
   const onGenerateDraft = async () => {
     if (!uiState.selectedConversationId) return;
 
-    inboxState.setFlashMessage(null);
+    setFlashMessage(null);
     try {
       const result = await generateDraftMutation.mutateAsync({
         conversationId: uiState.selectedConversationId,
@@ -1238,20 +1239,20 @@ export default function InboxV2() {
       if (result.data.generationMode === "contextual_fallback") {
         const firstWarning =
           result.data.generationWarnings[0] || "AI generation unavailable";
-        inboxState.setFlashMessage(
+        setFlashMessage(
           `Draft generated in fallback mode. ${firstWarning}`,
         );
         return;
       }
       if (result.data.lint.passed) {
-        inboxState.setFlashMessage("Draft generated and passed quality check.");
+        setFlashMessage("Draft generated and passed quality check.");
       } else {
-        inboxState.setFlashMessage(
+        setFlashMessage(
           "Draft generated with quality issues. Review before sending.",
         );
       }
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Draft generation failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1273,7 +1274,7 @@ export default function InboxV2() {
 
   const onGenerateCrmNotes = async () => {
     if (!uiState.selectedConversationId) return;
-    inboxState.setFlashMessage(null);
+    setFlashMessage(null);
     try {
       const result = await generateCrmNotesMutation.mutateAsync({
         conversationId: uiState.selectedConversationId,
@@ -1292,7 +1293,7 @@ export default function InboxV2() {
       }
     } catch (error) {
       const message = `CRM notes failed: ${String((error as Error)?.message || error)}`;
-      inboxState.setFlashMessage(message);
+      setFlashMessage(message);
       toast.error(message);
     }
   };
@@ -1316,7 +1317,7 @@ export default function InboxV2() {
     )
       return;
     if (lineSelectionRequired) {
-      inboxState.setFlashMessage("Select a send line before sending.");
+      setFlashMessage("Select a send line before sending.");
       return;
     }
 
@@ -1324,7 +1325,7 @@ export default function InboxV2() {
 
     // Phase 2: Stage Gating
     if (containsCallLink(messageText) && escalationState.level <= 1) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         "Set the escalation stage to L2 or higher before sending a call link.",
       );
       return;
@@ -1434,9 +1435,9 @@ export default function InboxV2() {
           conversationId: selectedConversationId,
           snoozedUntil,
         })
-        .then(() => inboxState.setFlashMessage("Snoozed for 24 hours."))
+        .then(() => setFlashMessage("Snoozed for 24 hours."))
         .catch((error) =>
-          inboxState.setFlashMessage(
+          setFlashMessage(
             `Snooze failed: ${String((error as Error)?.message || error)}`,
           ),
         );
@@ -1449,7 +1450,7 @@ export default function InboxV2() {
     if (!selectedConversationId || sendLockRef.current) return;
     sendLockRef.current = true;
 
-    inboxState.setFlashMessage(null);
+    setFlashMessage(null);
     inboxState.updateUIState({ sendStatus: "sending" });
     setJustSentMessage({
       text: messageText,
@@ -1542,11 +1543,11 @@ export default function InboxV2() {
 
   const onSaveDefaultLine = async () => {
     if (!selectedLineOption) {
-      inboxState.setFlashMessage("Choose a line before saving default.");
+      setFlashMessage("Choose a line before saving default.");
       return;
     }
 
-    inboxState.setFlashMessage(null);
+    setFlashMessage(null);
     try {
       const defaultFromNumber = selectedLineOption.fromNumber || null;
       await setDefaultLineMutation.mutateAsync({
@@ -1555,23 +1556,23 @@ export default function InboxV2() {
           : {}),
         ...(defaultFromNumber ? { fromNumber: defaultFromNumber } : {}),
       });
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Default send line saved: ${formatSendLineLabel(selectedLineOption)}`,
       );
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Failed to save default line: ${String((error as Error)?.message || error)}`,
       );
     }
   };
 
   const onClearDefaultLine = async () => {
-    inboxState.setFlashMessage(null);
+    setFlashMessage(null);
     try {
       await setDefaultLineMutation.mutateAsync({ clear: true });
-      inboxState.setFlashMessage("Default send line cleared.");
+      setFlashMessage("Default send line cleared.");
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Failed to clear default line: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1582,13 +1583,13 @@ export default function InboxV2() {
     setComposerText("");
     setSelectedDraftId(null);
     setDraftPrefillDoneForConversation(selectedConversationId);
-    inboxState.setFlashMessage("Draft cleared.");
+    setFlashMessage("Draft cleared.");
   };
 
   const onSaveQualification = async () => {
     if (!selectedConversationId) return;
 
-    inboxState.setFlashMessage(null);
+    setFlashMessage(null);
     try {
       await qualificationMutation.mutateAsync({
         conversationId: selectedConversationId,
@@ -1599,9 +1600,9 @@ export default function InboxV2() {
       });
       // FIXED: Always refetch after save to verify backend accepted the change
       await detailQuery.refetch();
-      inboxState.setFlashMessage("Qualification saved and verified.");
+      setFlashMessage("Qualification saved and verified.");
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Qualification update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1610,7 +1611,7 @@ export default function InboxV2() {
   const onOverrideEscalation = async () => {
     if (!selectedConversationId) return;
 
-    inboxState.setFlashMessage(null);
+    setFlashMessage(null);
     try {
       await escalationMutation.mutateAsync({
         conversationId: selectedConversationId,
@@ -1619,9 +1620,9 @@ export default function InboxV2() {
       });
       // FIXED: Always refetch after save to verify backend accepted the change
       await detailQuery.refetch();
-      inboxState.setFlashMessage("Stage saved and verified.");
+      setFlashMessage("Stage saved and verified.");
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Escalation update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1640,7 +1641,7 @@ export default function InboxV2() {
       }
       toast.success(`Conversation marked as ${status.toUpperCase()}`);
       if (sync) {
-        inboxState.setFlashMessage(`Aloware sync: ${describeSequenceSync(sync)}`);
+        setFlashMessage(`Aloware sync: ${describeSequenceSync(sync)}`);
       }
     } catch (error) {
       toast.error(
@@ -1653,7 +1654,7 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     const sequenceId = sequenceIdInput.trim();
     if (!sequenceId) {
-      inboxState.setFlashMessage("Enter a sequence ID before enrolling.");
+      setFlashMessage("Enter a sequence ID before enrolling.");
       return;
     }
     try {
@@ -1663,9 +1664,9 @@ export default function InboxV2() {
       });
       const sync = result.data.alowareSequenceSync || null;
       setLastSequenceSync(sync);
-      inboxState.setFlashMessage(`Sequence enroll: ${describeSequenceSync(sync)}`);
+      setFlashMessage(`Sequence enroll: ${describeSequenceSync(sync)}`);
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Sequence enroll failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1679,9 +1680,9 @@ export default function InboxV2() {
       });
       const sync = result.data.alowareSequenceSync || null;
       setLastSequenceSync(sync);
-      inboxState.setFlashMessage(`Sequence disenroll: ${describeSequenceSync(sync)}`);
+      setFlashMessage(`Sequence disenroll: ${describeSequenceSync(sync)}`);
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Sequence disenroll failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1703,7 +1704,7 @@ export default function InboxV2() {
         tags: next,
       });
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Objection tag update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1719,7 +1720,7 @@ export default function InboxV2() {
         tags: next,
       });
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Objection tag update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1734,7 +1735,7 @@ export default function InboxV2() {
         outcome,
       });
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Call outcome update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1746,9 +1747,9 @@ export default function InboxV2() {
       await incrementGuardrailOverrideMutation.mutateAsync(
         selectedConversationId,
       );
-      inboxState.setFlashMessage("Override recorded.");
+      setFlashMessage("Override recorded.");
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Guardrail override failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1766,7 +1767,7 @@ export default function InboxV2() {
       });
       noteForm.reset({ text: "" });
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Note failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1776,7 +1777,7 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     const snoozedUntil = parseDateValue(values.snoozedUntil);
     if (!snoozedUntil) {
-      inboxState.setFlashMessage("Select a valid snooze date.");
+      setFlashMessage("Select a valid snooze date.");
       return;
     }
     try {
@@ -1785,9 +1786,9 @@ export default function InboxV2() {
         snoozedUntil: snoozedUntil.toISOString(),
       });
       snoozeForm.reset({ snoozedUntil: "" });
-      inboxState.setFlashMessage("Conversation snoozed.");
+      setFlashMessage("Conversation snoozed.");
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Snooze failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1801,9 +1802,9 @@ export default function InboxV2() {
         snoozedUntil: null,
       });
       snoozeForm.reset({ snoozedUntil: "" });
-      inboxState.setFlashMessage("Snooze cleared.");
+      setFlashMessage("Snooze cleared.");
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Clear snooze failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1819,9 +1820,9 @@ export default function InboxV2() {
       });
       // FIXED: Always refetch after save to verify backend accepted the change
       await detailQuery.refetch();
-      inboxState.setFlashMessage(`Assigned to: ${ownerLabel || "Unassigned"}`);
+      setFlashMessage(`Assigned to: ${ownerLabel || "Unassigned"}`);
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Assign failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1842,7 +1843,7 @@ export default function InboxV2() {
       });
       templateForm.reset({ name: "", body: "" });
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Template save failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1852,7 +1853,7 @@ export default function InboxV2() {
     try {
       await deleteTemplateMutation.mutateAsync(id);
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Template delete failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1860,11 +1861,11 @@ export default function InboxV2() {
 
   const onSubmitManualMonday = async () => {
     if (!manualContactNameInput.trim()) {
-      inboxState.setFlashMessage("Contact name is required for manual Monday pushes.");
+      setFlashMessage("Contact name is required for manual Monday pushes.");
       return;
     }
     if (!detail) {
-      inboxState.setFlashMessage("Select a conversation first.");
+      setFlashMessage("Select a conversation first.");
       return;
     }
     try {
@@ -1878,12 +1879,12 @@ export default function InboxV2() {
         setter: manualSetter,
         ...(eventTs ? { eventTs } : {}),
       });
-      inboxState.setFlashMessage("Manual Monday booked call created.");
+      setFlashMessage("Manual Monday booked call created.");
       setManualPanelOpen(false);
       setManualLine("");
       setManualNotes("");
     } catch (error) {
-      inboxState.setFlashMessage(
+      setFlashMessage(
         `Manual Monday push failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1929,7 +1930,7 @@ export default function InboxV2() {
 
     if (!canPassGuardrails) {
       if (!canOverrideGuardrails) {
-        inboxState.setFlashMessage("Not enough signals. Check at least 1 to override.");
+        setFlashMessage("Not enough signals. Check at least 1 to override.");
         return;
       }
       // Log override

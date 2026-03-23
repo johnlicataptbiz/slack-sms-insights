@@ -31,22 +31,37 @@ function MessageBubble({
   const isOutbound = direction === "outbound";
 
   return (
-    <div className={cn("flex gap-2", isOutbound && "justify-end")}>
+    <div
+      className={cn(
+        "flex gap-2 animate-message-in",
+        isOutbound ? "justify-end" : "justify-start",
+      )}
+      style={{
+        animation: `messageSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards`,
+        opacity: 0,
+      }}
+    >
       <div
         className={cn(
-          "max-w-xs rounded-bubble px-3 py-2 text-sm transition-opacity duration-normal",
+          "max-w-xs rounded-bubble px-4 py-2.5 text-sm transition-all duration-200",
+          "hover:scale-[1.01] hover:shadow-lg cursor-pointer",
           isOutbound
-            ? "bg-ds-primary-500 text-white"
-            : "bg-ds-neutral-100 text-ds-neutral-900",
-          isPending && "opacity-60",
+            ? "bg-gradient-to-br from-ds-primary-500 to-ds-primary-600 text-white shadow-md shadow-ds-primary-500/20"
+            : "bg-ds-neutral-100 text-ds-neutral-900 shadow-sm hover:bg-ds-neutral-50",
+          isPending && "opacity-60 animate-pulse-subtle",
         )}
         onClick={onSelect}
         onKeyDown={(e) => e.key === "Enter" && onSelect?.()}
         role={onSelect ? "button" : undefined}
         tabIndex={onSelect ? 0 : undefined}
       >
-        <p>{text}</p>
-        <p className="mt-0.5 text-xs opacity-60">
+        <p className="leading-relaxed">{text}</p>
+        <p className="mt-1 text-xs opacity-70 flex items-center gap-1">
+          {isOutbound && !isPending && (
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>
+          )}
           {new Date(timestamp).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",

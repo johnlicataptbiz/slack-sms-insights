@@ -45,35 +45,53 @@ function ConversationRow({
       type="button"
       onClick={onSelect}
       className={cn(
-        "w-full rounded-control p-2 text-left transition-colors duration-fast hover:bg-muted",
-        isSelected && "bg-ds-primary-50 dark:bg-ds-primary-900/30",
+        "w-full rounded-control p-2.5 text-left transition-all duration-200",
+        "hover:bg-gradient-to-r hover:from-ds-primary-50/50 hover:to-ds-primary-100/30",
+        "hover:shadow-sm hover:scale-[1.01]",
+        "active:scale-[0.99] active:transition-transform",
+        isSelected 
+          ? "bg-gradient-to-r from-ds-primary-100/60 to-ds-primary-50/40 border border-ds-primary-200 shadow-sm" 
+          : "border border-transparent",
       )}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
+          <p className={cn(
+            "truncate text-sm font-semibold transition-colors",
+            isSelected ? "text-ds-primary-700" : "text-foreground"
+          )}>
             {conv.senderName || conv.senderPhone}
           </p>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-xs text-muted-foreground line-clamp-1">
             {conv.lastMessage}
           </p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
           {(conv.unreadCount ?? 0) > 0 && (
-            <Badge variant="destructive" className="text-xs">
+            <Badge variant="destructive" className="text-xs animate-unread-pulse">
               {conv.unreadCount}
             </Badge>
           )}
           {conv.needsReply && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-xs bg-ds-warning-50 border-ds-warning-200 text-ds-warning-700">
               💬
             </Badge>
           )}
         </div>
       </div>
-      <p className="mt-0.5 text-xs text-muted-foreground">
-        {conv.status} · {conv.owner || "Unassigned"}
-      </p>
+      <div className="mt-1 flex items-center gap-2">
+        <span className={cn(
+          "text-xs px-1.5 py-0.5 rounded-chip",
+          conv.status === 'open' && "bg-ds-success-100 text-ds-success-700",
+          conv.status === 'closed' && "bg-ds-neutral-100 text-ds-neutral-600",
+          conv.status === 'dnc' && "bg-ds-error-100 text-ds-error-700"
+        )}>
+          {conv.status}
+        </span>
+        <span className="text-xs text-muted-foreground/70">
+          {conv.owner || "Unassigned"}
+        </span>
+      </div>
     </button>
   );
 }

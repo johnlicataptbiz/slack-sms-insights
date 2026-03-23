@@ -1,4 +1,3 @@
-
 import type { App } from "@slack/bolt";
 import { getAttributionLagStatus } from "./attribution-health.js";
 import { refreshBookedCallAttribution } from "./booked-call-attribution-refresh.js";

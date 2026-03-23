@@ -121,16 +121,16 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
   const errorMessage = sendState.error || state.uiState.flashMessage;
 
   return (
-    <div className="flex flex-col gap-3 border-t p-4">
+    <div className="flex flex-col gap-3 border-t p-4 bg-gradient-to-t from-white to-white/50">
       {/* Error / flash */}
       {errorMessage && (
         <div
           role="alert"
           className={cn(
-            "rounded-control p-2 text-sm",
+            "rounded-control p-3 text-sm animate-error-shake",
             sendState.error
-              ? "bg-ds-error-50 text-ds-error-900"
-              : "bg-ds-primary-50 text-ds-primary-900",
+              ? "bg-gradient-to-r from-ds-error-50 to-ds-error-100 text-ds-error-900 border border-ds-error-200"
+              : "bg-gradient-to-r from-ds-primary-50 to-ds-primary-100 text-ds-primary-900 border border-ds-primary-200",
           )}
         >
           {errorMessage}
@@ -139,7 +139,7 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
 
       {/* Stage warning */}
       {state.escalationState.level <= 1 && (
-        <Badge variant="outline" className="w-fit text-ds-warning-700">
+        <Badge variant="outline" className="w-fit text-ds-warning-700 border-ds-warning-300 bg-ds-warning-50/50 animate-pulse-subtle">
           ⚠️ Stage {state.escalationState.level} — no scheduling links yet
         </Badge>
       )}
@@ -157,7 +157,11 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => state.updateUIState({ composerText: e.target.value })}
           onKeyDown={handleKeyDown}
           placeholder="Type message… (⌘↵ to send)"
-          className="resize-none"
+          className={cn(
+            "resize-none transition-all duration-200",
+            "border-ds-primary-200 focus:border-ds-primary-500 focus:ring-2 focus:ring-ds-primary-500/20",
+            charCount > 0 && "bg-gradient-to-br from-white to-ds-primary-50/20"
+          )}
           rows={3}
           disabled={isLoading}
           aria-label="Message text"
@@ -172,6 +176,7 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
               type="button"
               variant="outline"
               onClick={() => setShowTemplates((v) => !v)}
+              className="hover:bg-ds-primary-50 hover:border-ds-primary-300 transition-all duration-200"
             >
               Templates
             </Button>
@@ -180,6 +185,7 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
               variant="ghost"
               onClick={() => state.clearComposer()}
               disabled={charCount === 0}
+              className="hover:bg-ds-error-50 hover:text-ds-error-600 transition-colors duration-200"
             >
               Clear
             </Button>
@@ -189,16 +195,17 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
 
       {/* Templates */}
       {showTemplates && (
-        <div className="space-y-1.5 border-t pt-2">
+        <div className="space-y-1.5 border-t pt-2 animate-template-expand">
           <p className="text-xs font-semibold text-muted-foreground">
             Quick templates
           </p>
-          {QUICK_TEMPLATES.map((template) => (
+          {QUICK_TEMPLATES.map((template, idx) => (
             <button
               key={template}
               type="button"
               onClick={() => insertTemplate(template)}
-              className="w-full rounded-control bg-muted p-2 text-left text-sm hover:bg-muted-foreground/20 transition-colors"
+              className="w-full rounded-control bg-muted p-2.5 text-left text-sm hover:bg-gradient-to-r hover:from-ds-primary-50 hover:to-ds-primary-100 hover:border hover:border-ds-primary-200 transition-all duration-200"
+              style={{ animationDelay: `${idx * 50}ms` }}
             >
               {template}
             </button>
@@ -208,14 +215,14 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
 
       {/* CRM Notes */}
       <details className="border-t pt-2">
-        <summary className="cursor-pointer select-none text-xs font-semibold text-muted-foreground">
+        <summary className="cursor-pointer select-none text-xs font-semibold text-muted-foreground hover:text-ds-primary-600 transition-colors">
           CRM Notes (internal only)
         </summary>
         <Textarea
           value={state.uiState.crmNotesText}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => state.updateUIState({ crmNotesText: e.target.value })}
           placeholder="Internal notes visible only to your team…"
-          className="mt-2 resize-none"
+          className="mt-2 resize-none bg-ds-neutral-50/50"
           rows={2}
         />
       </details>

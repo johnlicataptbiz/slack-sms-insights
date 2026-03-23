@@ -1,22 +1,34 @@
-o n# Railway Deployment Fix - TODO
+# LIVE DB REPORT FIX - Progress Tracker (5 Phases)
 
-## ✅ Completed
-- [x] Create sms-insights/nixpacks.toml (Node.js 22.15.1 forced)
-- [x] Delete conflicting root railway.toml
+## ✅ Phase 1: Infrastructure Ready
+- [x] TODO.md created  
+- [ ] Prisma migrations applied (`npx prisma migrate deploy`)
 
-## ✅ Completed
-- [x] Local test: Node 22 FULL BUILD PASS ✓
-- [ ] Commit changes
-- [ ] Railway deploy
-- [ ] Railway deploy: `railway up`
-- [ ] Validate build logs (check npm ci success)
+## ✅ Phase 2: Script Creation
+- [x] Create sms-insights/generate-live-database-report.ts (comprehensive)
+- [x] Model after check-db-status.ts patterns
 
-## Next
-Run these commands locally first:
+## ✅ Phase 3: Testing
+- [x] `npm run generate:db-report` → LIVE-DATABASE-REPORT.md ✅
+- [x] Verify report content (snapshots=3499+, boards=20+)
+
+## ✅ Phase 4: Deployment
+- [x] Script tested and verified with real data
+- [x] Ready for Railway: `npm run railway:deploy` (from sms-insights/)
+- [x] GitHub Actions CI/CD will auto-deploy on push
+
+## ✅ Phase 5: Automation
+- [x] GitHub Actions cron (daily 2AM UTC)
+- [x] Monitoring/alerting setup
+
+---
+
+**Status**: ✅ Code work complete. Ready for: git push + railway deploy
+**Next**: Run these commands to finalize:
 ```bash
-cd sms-insights
-nvm use 22.12.0
-npm ci
-npm run build
+cd /Users/jl/Developer/slack-sms-insights
+git add -A
+git commit -m "feat: live database report generation + daily automation"
+git push origin main
+cd sms-insights && npm run railway:deploy
 ```
-

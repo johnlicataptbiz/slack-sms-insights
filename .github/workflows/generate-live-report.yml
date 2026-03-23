@@ -1,0 +1,52 @@
+name: Generate Live Database Report
+
+# Run daily at 2:00 AM UTC
+on:
+  schedule:
+  - cron: '0 2 * * *'
+  workflow_dispatch:
+
+
+jobs:
+  generate-report:
+    name: Generate LIVE-DATABASE-REPORT.md
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./sms-insights
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 1
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: ./sms-insights/package-lock.json
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Generate live database report
+      run: npm run generate:db-report
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_PUBLIC_URL }}
+        NODE_ENV: production
+
+    - name: Commit and push report
+      uses: EndBug/add-and-commit@v9
+      with:
+        author_name: 'github-actions[bot]'
+        author_email: '41898282+github-actions[bot]@users.noreply.github.com'
+        message: 'docs: update LIVE-DATABASE-REPORT.md'
+        add: 'sms-insights/LIVE-DATABASE-REPORT.md'
+        pull: '--rebase --autostash'
+
+    - name: Report generation status
+      run: |
+        echo "✅ Live database report generated and committed"
+        echo "📊 Report location: sms-insights/LIVE-DATABASE-REPORT.md"
+        head -20 LIVE-DATABASE-REPORT.md

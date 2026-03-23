@@ -21,8 +21,9 @@ export const useInboxSubscription = ({
   onError,
 }: SubscriptionOptions) => {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldReconnectRef = useRef(true);
+  const reconnectAttemptsRef = useRef(0);
 
   // Establish WebSocket connection
   const connect = useCallback(() => {
@@ -36,6 +37,7 @@ export const useInboxSubscription = ({
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
+        reconnectAttemptsRef.current = 0;
         console.log("[Inbox WS] Connected to conversation subscription");
         // Subscribe to message updates
         wsRef.current?.send(
@@ -66,7 +68,7 @@ export const useInboxSubscription = ({
         }
       };
 
-      wsRef.current.onerror = (event: Event) => {
+      wsRef.current.onerror = (_event: Event) => {
         const error = new Error("WebSocket error");
         console.error("[Inbox WS] Error:", error);
         onError?.(error);
@@ -77,7 +79,7 @@ export const useInboxSubscription = ({
         if (shouldReconnectRef.current) {
           // Exponential backoff reconnection: 1s, 2s, 4s, 8s, max 30s
           const delay = Math.min(
-            (wsRef.current?.reconnectAttempts || 0) * 1000 + 1000,
+            reconnectAttemptsRef.current++ * 1000 + 1000,
             30000,
           );
           reconnectTimeoutRef.current = setTimeout(connect, delay);

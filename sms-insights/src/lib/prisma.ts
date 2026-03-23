@@ -1,22 +1,24 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { withAccelerate } from "@prisma/extension-accelerate";
 
 // Prisma client configuration with optimizations
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-    // Prisma 7: Must specify accelerateUrl for client engine or use adapter
-    ...(process.env.DATABASE_ACCELERATE_URL && {
-      accelerateUrl: process.env.DATABASE_ACCELERATE_URL,
-    }),
-  });
+const createPrisma = (): PrismaClient => {
+  const accelerateUrl = process.env.DATABASE_ACCELERATE_URL || process.env.PRISMA_ACCELERATE_URL;
+  if (accelerateUrl) {
+    const clientOptions = { accelerateUrl } as unknown as ConstructorParameters<typeof PrismaClient>[0];
+    return (new PrismaClient(clientOptions) as PrismaClient).$extends(withAccelerate()) as unknown as PrismaClient;
+  }
+  const connectionString = process.env.DATABASE_URL || '';
+  const adapter = new PrismaPg({ connectionString });
+  return new PrismaClient({ adapter } as unknown as ConstructorParameters<typeof PrismaClient>[0]);
+};
+
+export const prisma = globalForPrisma.prisma ?? createPrisma();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 

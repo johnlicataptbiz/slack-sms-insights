@@ -4,7 +4,6 @@
  */
 
 import { useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
 import type { UseInboxStateReturn } from "./useInboxState";
 
 export interface MutationHandlers {

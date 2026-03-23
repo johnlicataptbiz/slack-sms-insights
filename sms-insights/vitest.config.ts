@@ -13,7 +13,8 @@ export default defineConfig({
       'node_modules',
       'dist',
       'coverage',
-      'tests/services/**/*.test.ts', // Old Node.js test runner format
+      'tests/services/!(bot-personality).test.ts', // Old Node.js test runner format
+      'tests/services/**/!(bot-personality).test.ts', // Old Node.js test runner format (subdirs)
       'tests/listeners/**/*.test.ts', // Old Node.js test runner format
       'tests/api/**/*.test.ts', // Old Node.js test runner format
       'tests/events/**/*.test.ts', // Old Node.js test runner format

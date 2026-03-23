@@ -67,6 +67,7 @@
     "url": "https://github.com/slack-samples/bolt-ts-starter-template/issues"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.4.2",
     "@prisma/extension-accelerate": "^3.0.1",
     "@slack/bolt": "^4.6.0",

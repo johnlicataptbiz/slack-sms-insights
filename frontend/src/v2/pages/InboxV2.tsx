@@ -71,6 +71,14 @@ import { V2Select, type V2SelectOption } from "../components/V2Select";
 import { V2State } from "../components/V2Primitives";
 import { SkeletonText } from "../components/Skeleton";
 import { useToast } from "../hooks/useToast";
+import { useInboxState } from "../hooks/useInboxState";
+import { useInboxMessages } from "../hooks/useInboxMessages";
+import { useInboxMutations } from "../hooks/useInboxMutations";
+import { useInboxSubscription } from "../hooks/useInboxSubscription";
+import { useSetterIntentDetection } from "../hooks/useSetterIntentDetection";
+import { Composer } from "../components/Composer";
+import { MessageThread } from "../components/MessageThread";
+import { ConversationList } from "../components/ConversationList";
 
 const LazyEmojiPicker = lazy(async () => ({
   default: (await import("emoji-picker-react")).default,
@@ -558,39 +566,26 @@ type NoteFormValues = z.infer<typeof noteSchema>;
 type TemplateFormValues = z.infer<typeof templateSchema>;
 
 export default function InboxV2() {
-  const [statusFilter, setStatusFilter] = useState<
-    "open" | "closed" | "dnc" | ""
-  >("open");
-  const [needsReplyOnly, setNeedsReplyOnly] = useState(true);
   const toast = useToast();
-  const [ownerFilter, setOwnerFilter] = useState<
-    "all" | "jack" | "brandon" | "unassigned"
-  >("all");
-  const [sortMode, setSortMode] = useState<
-    "recent" | "oldest" | "urgent" | "needs_reply"
-  >("recent");
-  const [search, setSearch] = useState("");
-  const [selectedConversationId, setSelectedConversationId] = useState<
-    string | null
-  >(null);
-  const [isComposerModalOpen, setIsComposerModalOpen] = useState(false);
-  const [composerText, setComposerText] = useState("");
-  const [crmNotesText, setCrmNotesText] = useState("");
-  const [crmNotesCopied, setCrmNotesCopied] = useState(false);
-  const [selectedDraftId, setSelectedDraftId] = useState<string | null>(null);
-  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
-  const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
-    useState<string | null>(null);
-  const [selectedLineKey, setSelectedLineKey] = useState("");
-  const [flashMessage, setFlashMessage] = useState<string | null>(null);
-  const [sendStatus, setSendStatus] = useState<
-    "idle" | "sending" | "sent" | "error"
-  >("idle");
-  const [justSentMessage, setJustSentMessage] = useState<{
-    text: string;
-    timestamp: string;
-    confirmed?: boolean;
-  } | null>(null);
+
+  // Consolidated state management - replaces 40+ useState declarations
+  const inboxState = useInboxState();
+  const {
+    filters,
+    uiState,
+    qualificationState,
+    escalationState,
+    selectionState,
+  } = inboxState;
+  const {
+    updateFilters,
+    updateUIState,
+    updateQualification,
+    updateEscalation,
+    updateSelectionState,
+  } = inboxState;
+
+  // Refs for DOM elements and locks
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
   const listParentRef = useRef<HTMLDivElement | null>(null);
@@ -601,29 +596,27 @@ export default function InboxV2() {
     key: string;
   } | null>(null);
 
-  const [qualificationState, setQualificationState] =
-    useState<QualificationStateV2>({
-      fullOrPartTime: "unknown",
-      niche: "",
-      revenueMix: "unknown",
-      deliveryModel: "unknown",
-      coachingInterest: "unknown",
-      progressStep: 0,
-    });
-  const [escalationLevel, setEscalationLevel] = useState<1 | 2 | 3 | 4>(1);
-  const [escalationReason, setEscalationReason] = useState("");
-
-  // Phase 2 — Team Collaboration
-  const [showTemplates, setShowTemplates] = useState(false);
+  // Local state for items not yet consolidated into useInboxState
+  const [crmNotesCopied, setCrmNotesCopied] = useState(false);
+  const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
+    useState<string | null>(null);
+  const [justSentMessage, setJustSentMessage] = useState<{
+    text: string;
+    timestamp: string;
+    confirmed?: boolean;
+  } | null>(null);
   const [sequenceIdInput, setSequenceIdInput] = useState("");
   const [lastSequenceSync, setLastSequenceSync] =
     useState<AlowareSequenceSyncV2 | null>(null);
-  const [manualPanelOpen, setManualPanelOpen] = useState(false);
   const [manualLine, setManualLine] = useState("");
   const [manualNotes, setManualNotes] = useState("");
   const [manualSetter, setManualSetter] = useState<"jack" | "brandon">("jack");
   const [manualContactNameInput, setManualContactNameInput] = useState("");
   const [manualContactPhoneInput, setManualContactPhoneInput] = useState("");
+  const [objectionTagInput, setObjectionTagInput] = useState("");
+  const [guardrailChecks, setGuardrailChecks] = useState<
+    Record<string, boolean>
+  >({});
   const assignForm = useForm<AssignFormValues>({
     resolver: zodResolver(assignSchema),
     defaultValues: { ownerLabel: "" },
@@ -642,28 +635,7 @@ export default function InboxV2() {
   });
   const manualMutation = useManualMondayBookedCall();
 
-  // Phase 3 state
-  const [objectionTagInput, setObjectionTagInput] = useState("");
-  const [localObjectionTags, setLocalObjectionTags] = useState<string[]>([]);
-  const [localCallOutcome, setLocalCallOutcome] =
-    useState<CallOutcomeV2 | null>(null);
-
-  // Phase 2 Guardrail Modal state
-  const [isGuardrailModalOpen, setIsGuardrailModalOpen] = useState(false);
-  const [guardrailChecks, setGuardrailChecks] = useState<
-    Record<string, boolean>
-  >({});
-  const [pendingMessageText, setPendingMessageText] = useState<string | null>(
-    null,
-  );
-  // Double Pitch Protection banner
-  const [showDoublePitchWarning, setShowDoublePitchWarning] = useState(false);
-  const [isNarrowComposerViewport, setIsNarrowComposerViewport] = useState(
-    () =>
-      typeof window !== "undefined"
-        ? window.matchMedia("(max-width: 900px)").matches
-        : false,
-  );
+  // Refs and state dependencies for queries
 
   const qualificationProgressLive =
     computeQualificationProgress(qualificationState);

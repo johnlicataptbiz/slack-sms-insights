@@ -675,8 +675,8 @@ export default function InboxV2() {
   ];
 
   const listQuery = useV2InboxConversationsInfinite({
-    ...(statusFilter ? { status: statusFilter } : {}),
-    needsReplyOnly,
+    ...(filters.statusFilter ? { status: filters.statusFilter } : {}),
+    needsReplyOnly: filters.needsReplyOnly,
     search,
     pageSize: 75,
   });
@@ -695,11 +695,11 @@ export default function InboxV2() {
     return merged;
   }, [listQuery.data]);
   const conversations = conversationsRaw.filter((conversation) => {
-    if (ownerFilter === "all") return true;
+    if (filters.ownerFilter === "all") return true;
     const owner = (conversation.ownerLabel || "").toLowerCase();
-    if (ownerFilter === "jack") return owner === "jack";
-    if (ownerFilter === "brandon") return owner === "brandon";
-    if (ownerFilter === "unassigned") return owner.length === 0;
+    if (filters.ownerFilter === "jack") return owner === "jack";
+    if (filters.ownerFilter === "brandon") return owner === "brandon";
+    if (filters.ownerFilter === "unassigned") return owner.length === 0;
     return true;
   });
 
@@ -730,23 +730,23 @@ export default function InboxV2() {
     return hoursSince > 48 && c.openNeedsReplyCount > 0;
   }).length;
   const activeFiltersCount =
-    Number(statusFilter !== "open") +
-    Number(ownerFilter !== "all") +
-    Number(Boolean(search.trim())) +
-    Number(!needsReplyOnly) +
-    Number(sortMode !== "recent");
+    Number(filters.statusFilter !== "open") +
+    Number(filters.ownerFilter !== "all") +
+    Number(Boolean(filters.search.trim())) +
+    Number(!filters.needsReplyOnly) +
+    Number(filters.sortMode !== "recent");
   const sortedConversations = useMemo(() => {
     const rows = [...conversations];
     rows.sort((a, b) => {
       const aAt = parseDateValue(a.lastMessage.createdAt || "")?.getTime() || 0;
       const bAt = parseDateValue(b.lastMessage.createdAt || "")?.getTime() || 0;
-      if (sortMode === "oldest") return aAt - bAt;
-      if (sortMode === "needs_reply") {
+      if (filters.sortMode === "oldest") return aAt - bAt;
+      if (filters.sortMode === "needs_reply") {
         const delta = b.openNeedsReplyCount - a.openNeedsReplyCount;
         if (delta !== 0) return delta;
         return bAt - aAt;
       }
-      if (sortMode === "urgent") {
+      if (filters.sortMode === "urgent") {
         const aPriority =
           (a.escalation.level <= 2 ? 5 : 0) +
           Math.min(a.openNeedsReplyCount, 4);
@@ -760,7 +760,7 @@ export default function InboxV2() {
       return bAt - aAt;
     });
     return rows;
-  }, [conversations, sortMode]);
+  }, [conversations, filters.sortMode]);
   const selectedConversationIndex = useMemo(
     () =>
       sortedConversations.findIndex((row) => row.id === selectedConversationId),
@@ -1095,7 +1095,7 @@ export default function InboxV2() {
     // Clear the optimistic sent-message bubble so it doesn't bleed into the
     // next conversation's thread when the user switches contacts.
     setJustSentMessage(null);
-    setSendStatus("idle");
+    inboxState.updateUIState({ sendStatus: "idle" });
     sendLockRef.current = false;
     pendingIdempotencyRef.current = null;
     setShowDoublePitchWarning(false);
@@ -1434,9 +1434,9 @@ export default function InboxV2() {
           conversationId: selectedConversationId,
           snoozedUntil,
         })
-        .then(() => setFlashMessage("Snoozed for 24 hours."))
+        .then(() => inboxState.setFlashMessage("Snoozed for 24 hours."))
         .catch((error) =>
-          setFlashMessage(
+          inboxState.setFlashMessage(
             `Snooze failed: ${String((error as Error)?.message || error)}`,
           ),
         );
@@ -1449,8 +1449,8 @@ export default function InboxV2() {
     if (!selectedConversationId || sendLockRef.current) return;
     sendLockRef.current = true;
 
-    setFlashMessage(null);
-    setSendStatus("sending");
+    inboxState.setFlashMessage(null);
+    inboxState.updateUIState({ sendStatus: "sending" });
     setJustSentMessage({
       text: messageText,
       timestamp: new Date().toISOString(),
@@ -1491,7 +1491,7 @@ export default function InboxV2() {
       const lineSummary = formatSendLineLabel(result.data.lineSelection);
 
       if (result.data.status === "sent" || result.data.status === "duplicate") {
-        setSendStatus("sent");
+        inboxState.updateUIState({ sendStatus: "sent" });
         setJustSentMessage(null);
         void detailQuery.refetch();
 
@@ -1522,17 +1522,17 @@ export default function InboxV2() {
         }
 
         setTimeout(() => {
-          setSendStatus("idle");
+          inboxState.updateUIState({ sendStatus: "idle" });
         }, 2000);
       } else {
-        setSendStatus("error");
+        inboxState.updateUIState({ sendStatus: "error" });
         setJustSentMessage(null);
         toast.error(
           `Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`,
         );
       }
     } catch (error) {
-      setSendStatus("error");
+      inboxState.updateUIState({ sendStatus: "error" });
       setJustSentMessage(null);
       toast.error(`Send failed: ${String((error as Error)?.message || error)}`);
     } finally {
@@ -1542,11 +1542,11 @@ export default function InboxV2() {
 
   const onSaveDefaultLine = async () => {
     if (!selectedLineOption) {
-      setFlashMessage("Choose a line before saving default.");
+      inboxState.setFlashMessage("Choose a line before saving default.");
       return;
     }
 
-    setFlashMessage(null);
+    inboxState.setFlashMessage(null);
     try {
       const defaultFromNumber = selectedLineOption.fromNumber || null;
       await setDefaultLineMutation.mutateAsync({
@@ -1555,23 +1555,23 @@ export default function InboxV2() {
           : {}),
         ...(defaultFromNumber ? { fromNumber: defaultFromNumber } : {}),
       });
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Default send line saved: ${formatSendLineLabel(selectedLineOption)}`,
       );
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Failed to save default line: ${String((error as Error)?.message || error)}`,
       );
     }
   };
 
   const onClearDefaultLine = async () => {
-    setFlashMessage(null);
+    inboxState.setFlashMessage(null);
     try {
       await setDefaultLineMutation.mutateAsync({ clear: true });
-      setFlashMessage("Default send line cleared.");
+      inboxState.setFlashMessage("Default send line cleared.");
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Failed to clear default line: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1582,13 +1582,13 @@ export default function InboxV2() {
     setComposerText("");
     setSelectedDraftId(null);
     setDraftPrefillDoneForConversation(selectedConversationId);
-    setFlashMessage("Draft cleared.");
+    inboxState.setFlashMessage("Draft cleared.");
   };
 
   const onSaveQualification = async () => {
     if (!selectedConversationId) return;
 
-    setFlashMessage(null);
+    inboxState.setFlashMessage(null);
     try {
       await qualificationMutation.mutateAsync({
         conversationId: selectedConversationId,
@@ -1599,9 +1599,9 @@ export default function InboxV2() {
       });
       // FIXED: Always refetch after save to verify backend accepted the change
       await detailQuery.refetch();
-      setFlashMessage("Qualification saved and verified.");
+      inboxState.setFlashMessage("Qualification saved and verified.");
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Qualification update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1610,7 +1610,7 @@ export default function InboxV2() {
   const onOverrideEscalation = async () => {
     if (!selectedConversationId) return;
 
-    setFlashMessage(null);
+    inboxState.setFlashMessage(null);
     try {
       await escalationMutation.mutateAsync({
         conversationId: selectedConversationId,
@@ -1619,9 +1619,9 @@ export default function InboxV2() {
       });
       // FIXED: Always refetch after save to verify backend accepted the change
       await detailQuery.refetch();
-      setFlashMessage("Stage saved and verified.");
+      inboxState.setFlashMessage("Stage saved and verified.");
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Escalation update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1640,7 +1640,7 @@ export default function InboxV2() {
       }
       toast.success(`Conversation marked as ${status.toUpperCase()}`);
       if (sync) {
-        setFlashMessage(`Aloware sync: ${describeSequenceSync(sync)}`);
+        inboxState.setFlashMessage(`Aloware sync: ${describeSequenceSync(sync)}`);
       }
     } catch (error) {
       toast.error(
@@ -1653,7 +1653,7 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     const sequenceId = sequenceIdInput.trim();
     if (!sequenceId) {
-      setFlashMessage("Enter a sequence ID before enrolling.");
+      inboxState.setFlashMessage("Enter a sequence ID before enrolling.");
       return;
     }
     try {
@@ -1663,9 +1663,9 @@ export default function InboxV2() {
       });
       const sync = result.data.alowareSequenceSync || null;
       setLastSequenceSync(sync);
-      setFlashMessage(`Sequence enroll: ${describeSequenceSync(sync)}`);
+      inboxState.setFlashMessage(`Sequence enroll: ${describeSequenceSync(sync)}`);
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Sequence enroll failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1679,9 +1679,9 @@ export default function InboxV2() {
       });
       const sync = result.data.alowareSequenceSync || null;
       setLastSequenceSync(sync);
-      setFlashMessage(`Sequence disenroll: ${describeSequenceSync(sync)}`);
+      inboxState.setFlashMessage(`Sequence disenroll: ${describeSequenceSync(sync)}`);
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Sequence disenroll failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1703,7 +1703,7 @@ export default function InboxV2() {
         tags: next,
       });
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Objection tag update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1719,7 +1719,7 @@ export default function InboxV2() {
         tags: next,
       });
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Objection tag update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1734,7 +1734,7 @@ export default function InboxV2() {
         outcome,
       });
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Call outcome update failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1746,9 +1746,9 @@ export default function InboxV2() {
       await incrementGuardrailOverrideMutation.mutateAsync(
         selectedConversationId,
       );
-      setFlashMessage("Override recorded.");
+      inboxState.setFlashMessage("Override recorded.");
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Guardrail override failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1766,7 +1766,7 @@ export default function InboxV2() {
       });
       noteForm.reset({ text: "" });
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Note failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1776,7 +1776,7 @@ export default function InboxV2() {
     if (!selectedConversationId) return;
     const snoozedUntil = parseDateValue(values.snoozedUntil);
     if (!snoozedUntil) {
-      setFlashMessage("Select a valid snooze date.");
+      inboxState.setFlashMessage("Select a valid snooze date.");
       return;
     }
     try {
@@ -1785,9 +1785,9 @@ export default function InboxV2() {
         snoozedUntil: snoozedUntil.toISOString(),
       });
       snoozeForm.reset({ snoozedUntil: "" });
-      setFlashMessage("Conversation snoozed.");
+      inboxState.setFlashMessage("Conversation snoozed.");
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Snooze failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1801,9 +1801,9 @@ export default function InboxV2() {
         snoozedUntil: null,
       });
       snoozeForm.reset({ snoozedUntil: "" });
-      setFlashMessage("Snooze cleared.");
+      inboxState.setFlashMessage("Snooze cleared.");
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Clear snooze failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1819,9 +1819,9 @@ export default function InboxV2() {
       });
       // FIXED: Always refetch after save to verify backend accepted the change
       await detailQuery.refetch();
-      setFlashMessage(`Assigned to: ${ownerLabel || "Unassigned"}`);
+      inboxState.setFlashMessage(`Assigned to: ${ownerLabel || "Unassigned"}`);
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Assign failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1842,7 +1842,7 @@ export default function InboxV2() {
       });
       templateForm.reset({ name: "", body: "" });
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Template save failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1852,7 +1852,7 @@ export default function InboxV2() {
     try {
       await deleteTemplateMutation.mutateAsync(id);
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Template delete failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1860,11 +1860,11 @@ export default function InboxV2() {
 
   const onSubmitManualMonday = async () => {
     if (!manualContactNameInput.trim()) {
-      setFlashMessage("Contact name is required for manual Monday pushes.");
+      inboxState.setFlashMessage("Contact name is required for manual Monday pushes.");
       return;
     }
     if (!detail) {
-      setFlashMessage("Select a conversation first.");
+      inboxState.setFlashMessage("Select a conversation first.");
       return;
     }
     try {
@@ -1878,12 +1878,12 @@ export default function InboxV2() {
         setter: manualSetter,
         ...(eventTs ? { eventTs } : {}),
       });
-      setFlashMessage("Manual Monday booked call created.");
+      inboxState.setFlashMessage("Manual Monday booked call created.");
       setManualPanelOpen(false);
       setManualLine("");
       setManualNotes("");
     } catch (error) {
-      setFlashMessage(
+      inboxState.setFlashMessage(
         `Manual Monday push failed: ${String((error as Error)?.message || error)}`,
       );
     }
@@ -1929,7 +1929,7 @@ export default function InboxV2() {
 
     if (!canPassGuardrails) {
       if (!canOverrideGuardrails) {
-        setFlashMessage("Not enough signals. Check at least 1 to override.");
+        inboxState.setFlashMessage("Not enough signals. Check at least 1 to override.");
         return;
       }
       // Log override
@@ -1954,9 +1954,9 @@ export default function InboxV2() {
       <div className="V2Inbox__filterBar">
         <div className="V2Inbox__filterGroup">
           <button
-            className={`V2Inbox__filterChip ${statusFilter === "open" ? "is-active" : ""}`}
+            className={`V2Inbox__filterChip ${filters.statusFilter === "open" ? "is-active" : ""}`}
             onClick={() =>
-              setStatusFilter(statusFilter === "open" ? "" : "open")
+              updateFilters({ statusFilter: filters.statusFilter === "open" ? "" : "open" })
             }
           >
             <span
@@ -1966,9 +1966,9 @@ export default function InboxV2() {
             Open
           </button>
           <button
-            className={`V2Inbox__filterChip ${statusFilter === "closed" ? "is-active" : ""}`}
+            className={`V2Inbox__filterChip ${filters.statusFilter === "closed" ? "is-active" : ""}`}
             onClick={() =>
-              setStatusFilter(statusFilter === "closed" ? "" : "closed")
+              updateFilters({ statusFilter: filters.statusFilter === "closed" ? "" : "closed" })
             }
           >
             <span
@@ -1978,8 +1978,8 @@ export default function InboxV2() {
             Closed
           </button>
           <button
-            className={`V2Inbox__filterChip ${statusFilter === "dnc" ? "is-active" : ""}`}
-            onClick={() => setStatusFilter(statusFilter === "dnc" ? "" : "dnc")}
+            className={`V2Inbox__filterChip ${filters.statusFilter === "dnc" ? "is-active" : ""}`}
+            onClick={() => updateFilters({ statusFilter: filters.statusFilter === "dnc" ? "" : "dnc" })}
           >
             <span
               className="V2Inbox__filterDot"
@@ -2005,16 +2005,16 @@ export default function InboxV2() {
             ref={searchInputRef}
             type="text"
             placeholder="Search conversations…"
-            value={search}
+            value={filters.search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
         <div className="V2Inbox__filterGroup">
           <button
-            className={`V2Inbox__ownerChip ${ownerFilter === "jack" ? "is-active" : ""}`}
+            className={`V2Inbox__ownerChip ${filters.ownerFilter === "jack" ? "is-active" : ""}`}
             onClick={() =>
-              setOwnerFilter(ownerFilter === "jack" ? "all" : "jack")
+              updateFilters({ ownerFilter: filters.ownerFilter === "jack" ? "all" : "jack" })
             }
             style={{ "--owner-color": "#11b8d6" } as React.CSSProperties}
           >
@@ -2022,9 +2022,9 @@ export default function InboxV2() {
             Jack
           </button>
           <button
-            className={`V2Inbox__ownerChip ${ownerFilter === "brandon" ? "is-active" : ""}`}
+            className={`V2Inbox__ownerChip ${filters.ownerFilter === "brandon" ? "is-active" : ""}`}
             onClick={() =>
-              setOwnerFilter(ownerFilter === "brandon" ? "all" : "brandon")
+              updateFilters({ ownerFilter: filters.ownerFilter === "brandon" ? "all" : "brandon" })
             }
             style={{ "--owner-color": "#13b981" } as React.CSSProperties}
           >
@@ -2032,11 +2032,11 @@ export default function InboxV2() {
             Brandon
           </button>
           <button
-            className={`V2Inbox__ownerChip ${ownerFilter === "unassigned" ? "is-active" : ""}`}
+            className={`V2Inbox__ownerChip ${filters.ownerFilter === "unassigned" ? "is-active" : ""}`}
             onClick={() =>
-              setOwnerFilter(
-                ownerFilter === "unassigned" ? "all" : "unassigned",
-              )
+              updateFilters({
+                ownerFilter: filters.ownerFilter === "unassigned" ? "all" : "unassigned",
+              })
             }
           >
             <span className="V2Inbox__ownerAvatar">?</span>
@@ -2102,9 +2102,9 @@ export default function InboxV2() {
           type="button"
           className="V2Inbox__commandCard V2Inbox__commandCard--urgent"
           onClick={() => {
-            setSortMode("urgent");
-            setNeedsReplyOnly(true);
-            setStatusFilter("open");
+            updateFilters({ sortMode: "urgent" });
+            updateFilters({ needsReplyOnly: true });
+            updateFilters({ statusFilter: "open" });
           }}
         >
           <span className="V2Inbox__commandLabel">Urgent Queue</span>
@@ -2115,7 +2115,7 @@ export default function InboxV2() {
           className="V2Inbox__commandCard V2Inbox__commandCard--reply"
           onClick={() => {
             setSortMode("needs_reply");
-            setNeedsReplyOnly(true);
+            updateFilters({ needsReplyOnly: true });
           }}
         >
           <span className="V2Inbox__commandLabel">Needs Reply</span>
@@ -2125,10 +2125,9 @@ export default function InboxV2() {
           type="button"
           className="V2Inbox__commandCard V2Inbox__commandCard--owner"
           onClick={() => {
-            setOwnerFilter("unassigned");
-            setNeedsReplyOnly(true);
-            setStatusFilter("open");
-            setSortMode("urgent");
+            updateFilters({ ownerFilter: "unassigned", needsReplyOnly: true });
+            updateFilters({ statusFilter: "open" });
+            updateFilters({ sortMode: "urgent" });
           }}
         >
           <span className="V2Inbox__commandLabel">Unassigned</span>
@@ -2140,11 +2139,11 @@ export default function InboxV2() {
             type="button"
             className="V2Inbox__commandReset"
             onClick={() => {
-              setStatusFilter("open");
-              setNeedsReplyOnly(true);
-              setOwnerFilter("all");
-              setSearch("");
-              setSortMode("recent");
+              updateFilters({ statusFilter: "open" });
+              updateFilters({ needsReplyOnly: true });
+              updateFilters({ ownerFilter: "all" });
+              updateFilters({ search: "" });
+              updateFilters({ sortMode: "recent" });
             }}
           >
             Reset inbox view
@@ -3135,11 +3134,6 @@ export default function InboxV2() {
                             value={composerText}
                             onChange={(nextText) => {
                               setComposerText(nextText);
-                              setSendStatus((prev) =>
-                                prev === "sent" || prev === "error"
-                                  ? "idle"
-                                  : prev,
-                              );
                               pendingIdempotencyRef.current = null;
                               if (selectedDraftId) {
                                 const selectedDraft = detailDrafts.find(

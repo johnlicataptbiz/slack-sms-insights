@@ -1,6 +1,10 @@
 nhde_modules/
 dist/
 coverage/
+# Ignore compiled JavaScript files in source directories
+services/**/*.js
+listeners/**/*.js
+api/**/*.js
 .DS_Store
 .env
 .env.local

@@ -15,27 +15,27 @@ jobs:
         working-directory: ./sms-insights
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: "22"
-        cache: "npm"
-        cache-dependency-path: ./sms-insights/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ./sms-insights/package-lock.json
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run linter
-      run: npm run lint || true
+      - name: Run linter
+        run: npm run lint || true
 
-    - name: Run backend tests
-      run: npm run build && npm run test:vitest && npm run test:node
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
-        SKIP_FRONTEND_BUILD: "true"
-        NODE_ENV: test
+      - name: Run backend tests
+        run: npm run build && npm run test:vitest && npm run test:node
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+          SKIP_FRONTEND_BUILD: "true"
+          NODE_ENV: test
 
   test-frontend:
     name: Test Frontend
@@ -45,28 +45,28 @@ jobs:
         working-directory: ./frontend
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: "22"
-        cache: "npm"
-        cache-dependency-path: ./frontend/package-lock.json
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: ./frontend/package-lock.json
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Run frontend tests
-      run: npm test
+      - name: Run frontend tests
+        run: npm test
 
-    - name: Run type check
-      run: npm run typecheck:v2
+      - name: Run type check
+        run: npm run typecheck:v2
 
-    - name: Build
-      run: npm run build
+      - name: Build
+        run: npm run build
 
   deploy-backend:
     name: Deploy Backend to Railway
@@ -75,15 +75,15 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Railway CLI
-      run: npm install -g @railway/cli
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
-    - name: Deploy to Railway
-      run: railway up --service=sms-insights
-      env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      - name: Deploy to Railway
+        run: railway up --service=sms-insights
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   deploy-frontend:
     name: Deploy Frontend to Vercel
@@ -92,15 +92,15 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Install Vercel CLI
-      run: npm install -g vercel
+      - name: Install Vercel CLI
+        run: npm install -g vercel
 
-    - name: Deploy to Vercel
-      run: vercel --prod --yes
-      working-directory: ./frontend
-      env:
-        VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-        VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - name: Deploy to Vercel
+        run: vercel --prod --yes
+        working-directory: ./frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

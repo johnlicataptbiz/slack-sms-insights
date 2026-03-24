@@ -128,7 +128,15 @@ export const listBookedCallsInRange = async (
 
     const rows = await prisma.booked_calls.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        slack_team_id: true,
+        slack_channel_id: true,
+        slack_message_ts: true,
+        event_ts: true,
+        text: true,
+        raw: true,
+        created_at: true,
         booked_call_reactions: {
           select: {
             reaction_name: true,

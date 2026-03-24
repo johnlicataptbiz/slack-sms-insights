@@ -278,6 +278,59 @@ const register = (app: App) => {
         .catch(() => {});
     }
   });
+
+  // ── Proactive Alert Actions ────────────────────────────────────────────────
+  app.action('alert_acknowledge', async ({ ack, body, client, logger }) => {
+    await ack();
+    const messageTs = (body as { message?: { ts?: string } }).message?.ts;
+    const channelId = body.channel?.id;
+    if (!messageTs || !channelId) return;
+    try {
+      await client.reactions.add({ channel: channelId, name: 'eyes', timestamp: messageTs });
+      await client.chat.postEphemeral({ channel: channelId, user: body.user.id, text: '✅ Alert acknowledged' });
+    } catch (error) {
+      logger.error('[alert_acknowledge] Failed:', error);
+    }
+  });
+
+  app.action('alert_resolve', async ({ ack, body, client, logger }) => {
+    await ack();
+    const messageTs = (body as { message?: { ts?: string } }).message?.ts;
+    const channelId = body.channel?.id;
+    if (!messageTs || !channelId) return;
+    try {
+      await client.reactions.add({ channel: channelId, name: 'white_check_mark', timestamp: messageTs });
+      const timeStr = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Chicago' });
+      await client.chat.postMessage({ channel: channelId, thread_ts: messageTs, text: `✅ Resolved by <@${body.user.id}> at ${timeStr} CT` });
+    } catch (error) {
+      logger.error('[alert_resolve] Failed:', error);
+    }
+  });
+
+  app.action('alert_suppress', async ({ ack, body, client, logger }) => {
+    await ack();
+    const messageTs = (body as { message?: { ts?: string } }).message?.ts;
+    const channelId = body.channel?.id;
+    if (!messageTs || !channelId) return;
+    try {
+      await client.reactions.add({ channel: channelId, name: 'mute', timestamp: messageTs });
+      await client.chat.postEphemeral({ channel: channelId, user: body.user.id, text: '🔕 Alert suppressed for 1 hour' });
+    } catch (error) {
+      logger.error('[alert_suppress] Failed:', error);
+    }
+  });
+
+  app.action('alert_view_details', async ({ ack, body, client, logger }) => {
+    await ack();
+    const messageTs = (body as { message?: { ts?: string } }).message?.ts;
+    const channelId = body.channel?.id;
+    if (!messageTs || !channelId) return;
+    try {
+      await client.chat.postMessage({ channel: channelId, thread_ts: messageTs, blocks: [{ type: 'section', text: { type: 'mrkdwn', text: `*Alert Details*\n• Triggered: ${new Date().toISOString()}\n• Status: Active` } }] });
+    } catch (error) {
+      logger.error('[alert_view_details] Failed:', error);
+    }
+  });
 };
 
 export default { register };

@@ -1,43 +1,88 @@
 {
-  "generatedAt": "2026-03-24T09:33:23.448Z",
+  "generatedAt": "2026-03-23T03:50:07.628Z",
   "daysIncluded": 365,
-  "totalCount": 443,
+  "totalCount": 448,
   "entries": [
     {
-      "hash": "36b83e0",
-      "date": "2026-03-22T22:56:39Z",
-      "message": "fix: apply review feedback — health endpoint safety, Prisma postgres:// support, startup error handling, engine constraint alignment",
-      "author": "copilot-swe-agent[bot]",
-      "type": "fix",
+      "hash": "378e95b",
+      "date": "2026-03-22T20:23:24-05:00",
+      "message": "feat: live database report + daily automation",
+      "author": "Jack Licata",
+      "type": "feature",
       "category": "Database",
-      "description": "Apply review feedback — health endpoint safety, Prisma postgres:// support, startup error handlin..."
+      "description": "Live database report + daily automation"
     },
     {
-      "hash": "8a3d799",
-      "date": "2026-03-22T22:48:27Z",
-      "message": "Initial plan",
-      "author": "copilot-swe-agent[bot]",
-      "type": "other",
-      "category": "General",
-      "description": "Initial plan"
-    },
-    {
-      "hash": "9cdbf09",
-      "date": "2026-03-22T17:48:02-05:00",
-      "message": "Update sms-insights/api/routes.ts",
-      "author": "johnlicataptbiz",
-      "type": "chore",
-      "category": "Integrations",
-      "description": "Update sms-insights/api/routes.ts"
-    },
-    {
-      "hash": "19b513b",
-      "date": "2026-03-22T12:11:22-05:00",
-      "message": "fix(railway): restore backend deployment health",
+      "hash": "79e7b88",
+      "date": "2026-03-22T18:50:47-05:00",
+      "message": "fix(railway): use .node-version 22.15.1 (nixpacks.toml conflict)",
       "author": "Jack Licata",
       "type": "fix",
       "category": "AI & ML",
-      "description": "Restore backend deployment health"
+      "description": "Use .node-version 22.15.1 (nixpacks.toml conflict)"
+    },
+    {
+      "hash": "6aa72dc",
+      "date": "2026-03-22T18:44:07-05:00",
+      "message": "fix(railway): force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)"
+    },
+    {
+      "hash": "137327e",
+      "date": "2026-03-22T18:22:16-05:00",
+      "message": "Add database analysis scripts, reports, and updates",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add database analysis scripts, reports, and updates"
+    },
+    {
+      "hash": "fb20fc9",
+      "date": "2026-03-22T17:45:23-05:00",
+      "message": "fix: resolve TypeScript errors in attribution and conversion services",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Resolve TypeScript errors in attribution and conversion services"
+    },
+    {
+      "hash": "17867a1",
+      "date": "2026-03-22T16:35:44-05:00",
+      "message": "fix: Prisma 7 adapter, empty body default, remove stale CJS artifacts",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Prisma 7 adapter, empty body default, remove stale CJS artifacts"
+    },
+    {
+      "hash": "5d4d0f7",
+      "date": "2026-03-22T15:50:28-05:00",
+      "message": "chore(changelog): regenerate changelog.json (439 entries, build artifact)",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Infrastructure",
+      "description": "Regenerate changelog.json (439 entries, build artifact)"
+    },
+    {
+      "hash": "10470bd",
+      "date": "2026-03-22T15:50:11-05:00",
+      "message": "chore: sync prisma schema from Railway + add data-clean hygiene script",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Sync prisma schema from Railway + add data-clean hygiene script"
+    },
+    {
+      "hash": "1fdf791",
+      "date": "2026-03-22T15:50:05-05:00",
+      "message": "ci: align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows"
     },
     {
       "hash": "d0738b9",

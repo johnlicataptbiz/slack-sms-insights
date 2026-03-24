@@ -78,8 +78,26 @@ export const listOpenWorkItems = async (
 
     const results = await prisma.work_items.findMany({
       where,
-      include: {
-        conversations: true,
+      select: {
+        id: true,
+        type: true,
+        severity: true,
+        due_at: true,
+        created_at: true,
+        resolved_at: true,
+        rep_id: true,
+        conversations: {
+          select: {
+            id: true,
+            contactKey: true,
+            contact_id: true,
+            contact_phone: true,
+            last_inbound_at: true,
+            last_outbound_at: true,
+            last_touch_at: true,
+            unreplied_inbound_count: true,
+          },
+        },
       },
       orderBy: [{ due_at: 'asc' }, { id: 'asc' }],
       take: limit + 1,
@@ -90,7 +108,7 @@ export const listOpenWorkItems = async (
     const hasMore = results.length > limit;
     const itemsRaw = hasMore ? results.slice(0, limit) : results;
 
-    const items: WorkItemListRow[] = itemsRaw.map((wi: any) => ({
+    const items: WorkItemListRow[] = itemsRaw.map((wi) => ({
       id: wi.id,
       type: wi.type,
       severity: wi.severity as any,

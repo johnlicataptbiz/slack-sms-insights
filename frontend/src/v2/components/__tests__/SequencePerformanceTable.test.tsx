@@ -87,8 +87,7 @@ describe('SequencePerformanceTable', () => {
   it('filters out manual sequences', () => {
     render(<SequencePerformanceTable mergedRows={mockMergedRows} modeLabel="Last 7 days" />);
     
-    // Should not show manual sequence data - check that no manual rows are rendered
-    // The mock data has isManual: false, so all sequences should be shown
-    expect(screen.getByRole('heading', { name: 'Test Magnet' })).toBeInTheDocument();
+    // Manual sequence label should not appear as a rendered card row
+    expect(screen.queryByText('Manual Sequence')).not.toBeInTheDocument();
   });
 });

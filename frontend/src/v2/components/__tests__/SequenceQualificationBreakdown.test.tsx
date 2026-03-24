@@ -55,25 +55,24 @@ describe('SequenceQualificationBreakdown', () => {
     expect(screen.getByText('No qualification data available for the selected time period.')).toBeInTheDocument();
   });
 
-  it('renders sequence data and handles expansion', () => {
+  it('renders sequence name and expands details on click', () => {
     render(<SequenceQualificationBreakdown items={mockItems} isLoading={false} />);
-    
-    // Sequence should be visible
+
+    // Sequence name should be visible
     expect(screen.getByText('Test Sequence')).toBeInTheDocument();
-    
+
     // Details should not be visible initially
     expect(screen.queryByText('Employment Status')).not.toBeInTheDocument();
-    
-    // Click to expand
-    const expandButton = screen.getByText('Test Sequence');
-    fireEvent.click(expandButton);
-    
-    // Details should now be visible
+
+    // Click the header div to expand
+    fireEvent.click(screen.getByTestId('sequence-card-header'));
+
+    // Expanded section headers should now be visible
     expect(screen.getByText('Employment Status')).toBeInTheDocument();
     expect(screen.getByText('Revenue Model')).toBeInTheDocument();
     expect(screen.getByText('Coaching Interest')).toBeInTheDocument();
     expect(screen.getByText('Monday.com Outcomes')).toBeInTheDocument();
-    
+
     // Check that full time badge is present (sample quote is in tooltip)
     expect(screen.getByText('Full-time')).toBeInTheDocument();
   });

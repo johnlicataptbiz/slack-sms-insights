@@ -60,7 +60,7 @@ jobs:
       run: npm ci --legacy-peer-deps
 
     - name: Run frontend tests
-      run: npm test
+      run: npm run test:run
 
     - name: Run type check
       run: npm run typecheck:v2

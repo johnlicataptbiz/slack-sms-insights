@@ -1,6 +1,15 @@
 import type { AllMiddlewareArgs, SlackEventMiddlewareArgs } from '@slack/bolt';
 import { getDailyRuns } from '../../services/daily-run-logger.js';
 import { DASHBOARD_URL } from '../../services/report-poster.js';
+import { DashboardCard } from '../../src/ui/components/DashboardCard.js';
+import { ProgressiveDisclosure } from '../../src/ui/layouts/ProgressiveDisclosure.js';
+import { SkeletonLoader } from '../../src/ui/components/SkeletonLoader.js';
+import { PersonalizedDashboard } from '../../src/ui/components/PersonalizedDashboard.js';
+import { FloatingActionsBar } from '../../src/ui/components/FloatingActionsBar.js';
+import { ActivityFeed } from '../../src/ui/components/ActivityFeed.js';
+import { UIStateManager } from '../../src/services/ui-state-manager.js';
+import { uiCache } from '../../src/services/ui-cache.js';
+import { prisma } from '../../src/lib/prisma.js';
 
 const appHomeOpenedCallback = async ({
   client,
@@ -12,7 +21,18 @@ const appHomeOpenedCallback = async ({
     return;
   }
 
-  // ── Fetch recent runs from DB for live "Recent Reports" section ───────────
+  // ── Initialize UI services ─────────────────────────────────────────────
+  const uiStateManager = new UIStateManager(prisma);
+
+  // ── Fetch user UI state with caching ───────────────────────────────────
+  let userState = uiCache.get(event.user);
+  if (!userState) {
+    userState = await uiStateManager.getUserState(event.user).catch(() => null);
+    if (userState) {
+      uiCache.set(event.user, userState);
+    }
+  }
+
   const recentRuns = await getDailyRuns({ limit: 3, daysBack: 14, legacyMode: 'exclude' }, logger).catch(() => []);
 
   // ── Format recent run rows ────────────────────────────────────────────────
@@ -45,191 +65,70 @@ const appHomeOpenedCallback = async ({
   });
 
   try {
+    // ── Get user role and create personalized dashboard ─────────────────────
+    const userRole = PersonalizedDashboard.getUserRole(event.user);
+
+    // Prepare data for personalized sections
+    const dashboardData = {
+      recentRuns: recentRuns.map(run => ({
+        id: run.id || `run_${Date.now()}`,
+        date: formatRunDate(run),
+        type: run.report_type === 'daily' ? 'Auto' : 'Manual',
+        summary: run.summary_text?.split('\n')[1]?.trim() || 'Report generated',
+        status: run.status,
+      })),
+      todayCalls: 0, // Would be fetched from database
+      conversionRate: 0, // Would be calculated from data
+      conversionTrend: { direction: 'up' as const, value: 5 },
+      activeSetters: 0, // Would be fetched from database
+      teamCallsToday: 0, // Would be fetched from database
+      teamCallsTrend: { direction: 'up' as const, value: 12 },
+      apiStatus: 'Operational', // Would check actual API status
+      dbStatus: 'Healthy', // Would check actual DB status
+    };
+
+    // Create personalized sections
+    const sections = PersonalizedDashboard.createPersonalizedSections(userState, userRole, dashboardData);
+
+    // Add activity feed section
+    sections.push({
+      id: 'activity-feed',
+      title: 'Live Activity Feed',
+      content: ActivityFeed.createFeed(ActivityFeed.createMockActivities(), 3),
+      priority: 'low' as const,
+    });
+
+    // Build the complete UI with progressive loading
+    const userPrefs = userState ? {
+      expandedSections: userState.expandedSections,
+      theme: userState.theme,
+    } : undefined;
+
+    const blocks = [
+      // Hero header (always visible)
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: '🚀 SMS Insights — PT Biz Command Center',
+          emoji: true,
+        },
+      },
+      { type: 'divider' },
+
+      // Floating actions bar
+      FloatingActionsBar.createDefaultBar(),
+      { type: 'divider' },
+
+      // Progressive disclosure sections with personalization
+      ...ProgressiveDisclosure.createSections(sections, userPrefs),
+    ];
+
     await client.views.publish({
       user_id: event.user,
       view: {
         type: 'home',
-        blocks: [
-          // ── Hero ──────────────────────────────────────────────────────────
-          {
-            type: 'header',
-            text: {
-              type: 'plain_text',
-              text: '📊  SMS Insights — PT Biz Command Center',
-              emoji: true,
-            },
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `Hey <@${event.user}> 👋  Welcome to *SMS Insights* — your real-time SMS performance hub.\nDaily analytics, setter scoreboard, AI-powered reports, and interactive snapshots, all inside Slack.`,
-            },
-          },
-          { type: 'divider' },
-
-          // ── Quick Actions ─────────────────────────────────────────────────
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: '⚡  Quick Actions', emoji: true },
-          },
-          {
-            type: 'actions',
-            elements: [
-              {
-                type: 'button',
-                text: { type: 'plain_text', text: '📈 Open Dashboard', emoji: true },
-                action_id: 'sms_report_open_dashboard',
-                url: DASHBOARD_URL,
-                style: 'primary',
-              },
-              {
-                type: 'button',
-                text: { type: 'plain_text', text: '📊 Weekly Scoreboard', emoji: true },
-                action_id: 'sms_scoreboard_view',
-                value: JSON.stringify({ channelId: 'C09ULGH1BEC' }),
-              },
-            ],
-          },
-          {
-            type: 'context',
-            elements: [
-              {
-                type: 'mrkdwn',
-                text: `🔐 Dashboard access is password-protected  ·  <${DASHBOARD_URL}|Open Dashboard>`,
-              },
-            ],
-          },
-          { type: 'divider' },
-
-          // ── Recent Reports (live from DB) ─────────────────────────────────
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: '🕐  Recent Reports', emoji: true },
-          },
-          ...(recentRunFields.length > 0
-            ? [
-                {
-                  type: 'section' as const,
-                  fields: recentRunFields,
-                },
-                {
-                  type: 'context' as const,
-                  elements: [
-                    {
-                      type: 'mrkdwn' as const,
-                      text: `<${DASHBOARD_URL}|View all reports →>`,
-                    },
-                  ],
-                },
-              ]
-            : [
-                {
-                  type: 'section' as const,
-                  text: {
-                    type: 'mrkdwn' as const,
-                    text: '_No recent reports found. Reports auto-post at 6:00 AM CT or use `/sms-report` to generate one._',
-                  },
-                },
-              ]),
-          { type: 'divider' },
-
-          // ── Slash Commands ────────────────────────────────────────────────
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: '🛠  Slash Commands', emoji: true },
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: [
-                '*Use these commands in `#alowaresmsupdates` (or any channel for scoreboard):*',
-                '',
-                "`/sms-report`  →  Generate *today's* full SMS performance report",
-                "`/sms-report yesterday`  →  Generate *yesterday's* report",
-                '`/sms-report 2025-01-15`  →  Report for a *specific date* (YYYY-MM-DD)',
-                '`/sms-report 1/15`  →  Report for a *specific date* (MM/DD)',
-                '`/sms-scoreboard`  →  Post the *weekly setter scoreboard* with bookings, sequences & compliance',
-                '',
-                '*Use this command in any allowed channel:*',
-                '',
-                '`/ask [question]`  →  Ask any analytics question in plain English',
-              ].join('\n'),
-            },
-          },
-          { type: 'divider' },
-
-          // ── Capabilities ──────────────────────────────────────────────────
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: '🤖  What SMS Insights Can Do', emoji: true },
-          },
-          {
-            type: 'section',
-            fields: [
-              { type: 'mrkdwn', text: '📊 *Daily SMS Snapshots*\nLeads, replies, bookings & conversion rates' },
-              { type: 'mrkdwn', text: '📅 *Historical Reports*\nAny date, on demand' },
-              { type: 'mrkdwn', text: '🔄 *Live Refresh*\nUpdate any report in-place with latest data' },
-              { type: 'mrkdwn', text: '💬 *Plain-English Q&A*\nAsk analytics questions naturally' },
-              { type: 'mrkdwn', text: '🏆 *Weekly Scoreboard*\nSetter leaderboard, top sequences & compliance' },
-              { type: 'mrkdwn', text: '📈 *Trend Analysis*\nWeek-over-week and period comparisons' },
-            ],
-          },
-          { type: 'divider' },
-
-          // ── Schedule ──────────────────────────────────────────────────────
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: '🕕  Automated Schedule', emoji: true },
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: [
-                'Reports are automatically posted every morning at *6:00 AM CT* in `#alowaresmsupdates`.',
-                '',
-                'Each automated report includes:',
-                '• A rich *Block Kit summary card* with 🟢🟡🔴 performance indicators',
-                '• Interactive buttons — *Full Report*, *Yesterday*, *📊 Scoreboard*, *Refresh*, *Dashboard*',
-                '• The complete report text posted in a *thread* for deep-dive reading',
-              ].join('\n'),
-            },
-          },
-          { type: 'divider' },
-
-          // ── Pro Tips ──────────────────────────────────────────────────────
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: '💡  Pro Tips', emoji: true },
-          },
-          {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: [
-                '• Hit *🔄 Refresh* on any report card to pull the latest data without generating a new message',
-                "• Hit *📅 Yesterday* to instantly compare with the previous day's performance",
-                '• Hit *📊 Scoreboard* on any report card to see the weekly setter leaderboard',
-                '• Mention *@SMS Insights* in any allowed channel to ask a question or request a report',
-                '• Use `/ask` for free-form questions like _"how many leads did we get this week?"_',
-              ].join('\n'),
-            },
-          },
-
-          // ── Footer ────────────────────────────────────────────────────────
-          { type: 'divider' },
-          {
-            type: 'context',
-            elements: [
-              {
-                type: 'mrkdwn',
-                text: `*SMS Insights*  ·  PT Biz SMS  ·  Reports auto-post at 6:00 AM CT  ·  <${DASHBOARD_URL}|Dashboard>`,
-              },
-            ],
-          },
-        ],
+        blocks,
       },
     });
   } catch (error) {

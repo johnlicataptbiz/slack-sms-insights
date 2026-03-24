@@ -1101,6 +1101,19 @@ enum ActivityType {
   escalation
 }
 
+model UIState {
+  userId           String    @id @map("user_id")
+  theme            String    @default("light")
+  expandedSections String[]  @default([]) @map("expanded_sections")
+  quickActions     String[]  @default([]) @map("quick_actions")
+  lastActivity     DateTime  @default(now()) @map("last_activity") @db.Timestamptz(6)
+  preferences      Json      @default("{}")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("ui_states")
+}
+
 enum DeliveryStatus {
   pending
   queued

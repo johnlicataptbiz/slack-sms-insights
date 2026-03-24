@@ -119,7 +119,7 @@ const register = (app: App) => {
         body: parsed.body || null,
         line: parsed.line || null,
         sequence: parsed.sequence || null,
-        raw: { text, attachments },
+        raw: JSON.stringify({ text, attachments }),
       },
       logger,
     );

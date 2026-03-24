@@ -125,9 +125,6 @@ app.error(async (error) => {
       logger.app.warn(`[startup] stream token config: ${streamStatus.reason}`);
     }
 
-    // Initialize database
-    await initDatabase(app.logger);
-
     // Frontend is deployed on Vercel in production. Only attempt to serve a local
     // `frontend/dist` bundle when explicitly enabled (useful for single-container dev).
     const serveFrontendFromDisk = (process.env.SERVE_FRONTEND_FROM_DISK || '').trim().toLowerCase() === 'true';
@@ -214,6 +211,19 @@ app.error(async (error) => {
     server.listen(port, '0.0.0.0', () => {
       logger.app.info(`🌐 HTTP server listening on port ${port}`);
     });
+
+    // Initialize the pg pool after the HTTP server starts listening so Railway
+    // health checks are not blocked by cold database connection latency.
+    void (async () => {
+      try {
+        await initDatabase(app.logger);
+      } catch (error) {
+        logger.app.error(
+          `[startup] Database initialization error: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        await reportError(app, error, 'Database init failure');
+      }
+    })();
 
     // Start Bolt App
     let slackStarted = false;

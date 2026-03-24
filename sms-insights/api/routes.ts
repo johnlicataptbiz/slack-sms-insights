@@ -134,8 +134,8 @@ import {
 } from "../services/monday-sms-sync.js";
 import { getOutcomeKeywordAnalytics } from "../services/outcome-keyword-analytics.js";
 import { getPrisma, getPrismaRuntimeStatus } from "../services/prisma.js";
-import { AlowareProcessor } from "../services/aloware-processor.js";
-import { SMSMessage } from "../types/aloware.js";
+import { AlowareProcessor } from "../src/services/aloware-processor.js";
+import { SMSMessage } from "../src/types/aloware.js";
 import { syncQualificationFromConversationText } from "../services/qualification-sync.js";
 import { subscribeRealtimeEvents } from "../services/realtime.js";
 import { getSlackAuthRuntimeStatus } from "../services/runtime-status.js";

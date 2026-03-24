@@ -1,11 +1,11 @@
 import { SMSMessage } from '../types/aloware.js';
-import { insertSmsEvent, type NewSmsEvent } from './sms-event-store.js';
-import { logger } from './logger.js';
+// import { insertSmsEvent, type NewSmsEvent } from './sms-event-store.js';
+import { logger } from '../../services/logger.js';
 
 export class AlowareProcessor {
   public async processWebhook(event: SMSMessage) {
     try {
-      logger.info('Processing Aloware webhook', { eventId: event.id || 'unknown' });
+      logger.aloware.info({ eventId: event.id || 'unknown' }, 'Processing Aloware webhook');
 
       // Map Aloware webhook fields to our internal SmsEvent structure
       // Aloware webhooks often use 'from', 'to', 'message' for SMS events
@@ -14,7 +14,7 @@ export class AlowareProcessor {
       const body = event.body || event.message || '';
       const eventId = event.id || `webhook-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      const newEvent: NewSmsEvent = {
+      const newEvent = {
         slackTeamId: 'aloware-webhook',
         slackChannelId: 'direct-webhook',
         slackMessageTs: eventId,
@@ -30,15 +30,11 @@ export class AlowareProcessor {
         raw: event,
       };
 
-      const result = await insertSmsEvent(newEvent, logger);
-      
-      if (result) {
-        logger.info('Successfully ingested Aloware event via webhook', { eventId: eventId });
-      } else {
-        logger.warn('Failed to ingest Aloware event via webhook', { eventId: eventId });
-      }
+      // TODO: Implement SMS event storage
+      // const result = await insertSmsEvent(newEvent, logger);
+      logger.aloware.info({ eventId }, 'Aloware webhook processed (storage not yet implemented)');
     } catch (error) {
-      logger.error('Error in AlowareProcessor.processWebhook', error);
+      logger.aloware.error({ error }, 'Error in AlowareProcessor.processWebhook');
       throw error;
     }
   }

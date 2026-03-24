@@ -8,7 +8,8 @@
     "esModuleInterop": true,
     "module": "NodeNext",
     "outDir": "./dist",
-    "strict": true
+    "strict": true,
+    "skipLibCheck": true
   },
   "include": ["app.ts", "listeners/**/*.ts", "services/**/*.ts", "api/**/*.ts", "types/**/*.ts"],
   "exclude": ["tests/**", "dist/**", "node_modules/**"],

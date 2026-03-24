@@ -1,10 +1,199 @@
 {
-  "generatedAt": "2026-03-23T03:50:07.628Z",
+  "generatedAt": "2026-03-24T09:31:16.558Z",
   "daysIncluded": 365,
-  "totalCount": 448,
+  "totalCount": 470,
   "entries": [
     {
-      "hash": "378e95b",
+      "hash": "32c7d2e",
+      "date": "2026-03-23T15:35:07-04:00",
+      "message": "feat: update Aloware webhook payload handling based on documentation",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Update Aloware webhook payload handling based on documentation"
+    },
+    {
+      "hash": "8b4bd13",
+      "date": "2026-03-23T15:32:36-04:00",
+      "message": "feat: implement direct Aloware webhook integration",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Implement direct Aloware webhook integration"
+    },
+    {
+      "hash": "c0bb8f2",
+      "date": "2026-03-23T04:42:13-05:00",
+      "message": "chore: update AGENTS.md docs, service improvements, and changelog",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Update AGENTS.md docs, service improvements, and changelog"
+    },
+    {
+      "hash": "1f8bcc5",
+      "date": "2026-03-23T04:41:47-05:00",
+      "message": "fix(prisma): add accelerateUrl for Prisma 7 client engine requirement",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add accelerateUrl for Prisma 7 client engine requirement"
+    },
+    {
+      "hash": "44abafa",
+      "date": "2026-03-23T04:41:00-05:00",
+      "message": "fix(sms): record aloware ingest seen before early returns",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Record aloware ingest seen before early returns"
+    },
+    {
+      "hash": "f4b0abc",
+      "date": "2026-03-23T04:35:03-05:00",
+      "message": "fix(prisma): remove invalid datasources option from PrismaClient constructor",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Remove invalid datasources option from PrismaClient constructor"
+    },
+    {
+      "hash": "7519182",
+      "date": "2026-03-23T04:32:37-05:00",
+      "message": "fix(inbox): destructure uiState properties for clarity",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Destructure uiState properties for clarity"
+    },
+    {
+      "hash": "9c89d71",
+      "date": "2026-03-23T04:25:47-05:00",
+      "message": "fix: add setFlashMessage destructuring and search reference fix",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Add setFlashMessage destructuring and search reference fix"
+    },
+    {
+      "hash": "179b281",
+      "date": "2026-03-23T04:22:59-05:00",
+      "message": "fix: complete state migration in InboxV2 - replace legacy setState with useInboxState hook",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Complete state migration in InboxV2 - replace legacy setState with useInboxState hook"
+    },
+    {
+      "hash": "7778e39",
+      "date": "2026-03-23T04:09:57-05:00",
+      "message": "fix: resolve escalationLevel ReferenceError in InboxV2",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Resolve escalationLevel ReferenceError in InboxV2"
+    },
+    {
+      "hash": "9d47444",
+      "date": "2026-03-23T03:38:36-05:00",
+      "message": "refactor(inbox): update qualification labels to match core pre-qualifiers",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Update qualification labels to match core pre-qualifiers"
+    },
+    {
+      "hash": "33a955a",
+      "date": "2026-03-23T03:27:16-05:00",
+      "message": "feat(frontend): enhance InboxV2 UI with animations and polish",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Enhance InboxV2 UI with animations and polish"
+    },
+    {
+      "hash": "532418b",
+      "date": "2026-03-23T02:58:13-05:00",
+      "message": "feat(ui): add Database Explorer button to sidebar (Prisma Studio)",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add Database Explorer button to sidebar (Prisma Studio)"
+    },
+    {
+      "hash": "e88df9d",
+      "date": "2026-03-23T02:40:49-05:00",
+      "message": "feat(frontend): add MetricsDashboard component with KPI cards",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add MetricsDashboard component with KPI cards"
+    },
+    {
+      "hash": "44caa71",
+      "date": "2026-03-23T02:35:20-05:00",
+      "message": "feat(frontend): React 19 UI overhaul — design tokens, virtual list, modern hooks",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "React 19 UI overhaul — design tokens, virtual list, modern hooks"
+    },
+    {
+      "hash": "a3a1de1",
+      "date": "2026-03-23T02:30:20-05:00",
+      "message": "feat(slack): implement Slack Command Center with intelligent proactive alerts",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Implement Slack Command Center with intelligent proactive alerts"
+    },
+    {
+      "hash": "c0da0a5",
+      "date": "2026-03-23T00:11:48-05:00",
+      "message": "refactor(inbox): Phase 2.2 Batch 2 - Major state read/setter replacements (WIP)",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Phase 2.2 Batch 2 - Major state read/setter replacements (WIP)"
+    },
+    {
+      "hash": "74dba81",
+      "date": "2026-03-23T00:08:30-05:00",
+      "message": "refactor(inbox): Phase 2.2 - Replace state setters (Batch 1/4)",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Phase 2.2 - Replace state setters (Batch 1/4)"
+    },
+    {
+      "hash": "73f243c",
+      "date": "2026-03-23T00:06:25-05:00",
+      "message": "refactor(inbox): Consolidate 40+ useState into useInboxState hook",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Dashboard",
+      "description": "Consolidate 40+ useState into useInboxState hook"
+    },
+    {
+      "hash": "9afd1a5",
+      "date": "2026-03-22T23:55:37-05:00",
+      "message": "fix(inbox): Critical hotfixes to eliminate message disappearing and attribution sync issues",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Critical hotfixes to eliminate message disappearing and attribution sync issues"
+    },
+    {
+      "hash": "ef88eb2",
+      "date": "2026-03-22T23:35:57-05:00",
+      "message": "feat: modernize SMS Insights UI with dark-first design system",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Modernize SMS Insights UI with dark-first design system"
+    },
+    {
+      "hash": "74a5ad5",
       "date": "2026-03-22T20:23:24-05:00",
       "message": "feat: live database report + daily automation",
       "author": "Jack Licata",
@@ -13,7 +202,7 @@
       "description": "Live database report + daily automation"
     },
     {
-      "hash": "79e7b88",
+      "hash": "df51690",
       "date": "2026-03-22T18:50:47-05:00",
       "message": "fix(railway): use .node-version 22.15.1 (nixpacks.toml conflict)",
       "author": "Jack Licata",
@@ -22,13 +211,22 @@
       "description": "Use .node-version 22.15.1 (nixpacks.toml conflict)"
     },
     {
-      "hash": "6aa72dc",
+      "hash": "f7223b9",
       "date": "2026-03-22T18:44:07-05:00",
       "message": "fix(railway): force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)",
       "author": "Jack Licata",
       "type": "fix",
       "category": "Database",
       "description": "Force Node.js 22.15.1 via nixpacks.toml (resolves Prisma 7 npm ci failure)"
+    },
+    {
+      "hash": "a3c4a05",
+      "date": "2026-03-23T00:02:44Z",
+      "message": "fix: add .node-version to pin Node.js 22.12.0 for Prisma 7",
+      "author": "railway-app[bot]",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add .node-version to pin Node.js 22.12.0 for Prisma 7"
     },
     {
       "hash": "137327e",

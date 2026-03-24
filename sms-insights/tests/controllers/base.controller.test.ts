@@ -1,12 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, it } from 'node:test';
+import { strict as assert } from 'node:assert';
 import { BaseController, type RequestContext } from '../../src/controllers/base.controller';
 import { TestUtils } from '../utils/test-helpers';
 
 // Mock logger
 const mockLogger = {
-  info: vi.fn(),
-  error: vi.fn(),
-  warn: vi.fn(),
+  info: () => {},
+  error: () => {},
+  warn: () => {},
 };
 
 // Create a concrete implementation for testing
@@ -28,24 +29,36 @@ describe('BaseController', () => {
     mockReq = TestUtils.createMockRequest();
     mockRes = {
       ...TestUtils.createMockResponse(),
-      writeHead: vi.fn(),
-      end: vi.fn(),
+      writeHead: () => {},
+      end: () => {},
     };
   });
 
   describe('constructor', () => {
     it('should initialize with logger', () => {
-      expect(controller).toBeInstanceOf(BaseController);
-      expect(controller).toBeInstanceOf(TestController);
+      assert(controller instanceof BaseController);
+      assert(controller instanceof TestController);
     });
   });
 
   describe('handleRequest', () => {
     it('should handle successful requests', async () => {
+      let writeHeadCalled = false;
+      let endCalled = false;
+      mockRes.writeHead = (status: number, headers: any) => {
+        writeHeadCalled = true;
+        assert.equal(status, 200);
+        assert.deepEqual(headers, { 'Content-Type': 'application/json' });
+      };
+      mockRes.end = (data: string) => {
+        endCalled = true;
+        assert.equal(data, JSON.stringify({ success: true }));
+      };
+
       await (controller as any).handleRequest(mockReq, mockRes, {}, {}, {});
 
-      expect(mockRes.writeHead).toHaveBeenCalledWith(200, { 'Content-Type': 'application/json' });
-      expect(mockRes.end).toHaveBeenCalledWith(JSON.stringify({ success: true }));
+      assert(writeHeadCalled);
+      assert(endCalled);
     });
 
     it('should handle errors gracefully', async () => {
@@ -58,17 +71,21 @@ describe('BaseController', () => {
 
       const errorController = new ErrorController(mockLogger as any);
 
+      let errorLogged = false;
+      let writeHeadCalled = false;
+      mockLogger.error = () => { errorLogged = true; };
+      mockRes.writeHead = (status: number, headers: any) => {
+        writeHeadCalled = true;
+        assert.equal(status, 500);
+        assert(headers['Content-Type'] === 'application/json');
+        assert(headers['X-Content-Type-Options'] === 'nosniff');
+        assert(headers['X-Frame-Options'] === 'DENY');
+      };
+
       await (errorController as any).handleRequest(mockReq, mockRes, {}, {}, {});
 
-      expect(mockLogger.error).toHaveBeenCalled();
-      expect(mockRes.writeHead).toHaveBeenCalledWith(
-        500,
-        expect.objectContaining({
-          'Content-Type': 'application/json',
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'DENY',
-        }),
-      );
+      assert(errorLogged);
+      assert(writeHeadCalled);
     });
   });
 });

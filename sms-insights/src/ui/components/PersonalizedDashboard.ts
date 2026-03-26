@@ -1,4 +1,4 @@
-import { UserUIState } from '../services/ui-state-manager.js';
+import { UserUIState } from '../../services/ui-state-manager.js';
 import { DashboardCard } from './DashboardCard.js';
 import { SkeletonLoader } from './SkeletonLoader.js';
 
@@ -176,7 +176,7 @@ export class PersonalizedDashboard {
             DashboardCard.create({
               title: 'Active Setters',
               value: data.activeSetters || 0,
-              status: 'info',
+              status: 'warning',
             }),
             DashboardCard.create({
               title: 'Total Calls Today',

@@ -1,8 +1,35 @@
 {
-  "generatedAt": "2026-03-24T09:47:08.380Z",
+  "generatedAt": "2026-03-26T15:43:23.968Z",
   "daysIncluded": 365,
-  "totalCount": 476,
+  "totalCount": 483,
   "entries": [
+    {
+      "hash": "ee25c5f",
+      "date": "2026-03-24T06:03:06-05:00",
+      "message": "Complete UI overhaul implementation across all phases",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Complete UI overhaul implementation across all phases"
+    },
+    {
+      "hash": "d4c1287",
+      "date": "2026-03-24T06:09:01-05:00",
+      "message": "Fix TS errors by stringifying raw fields",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix TS errors by stringifying raw fields"
+    },
+    {
+      "hash": "73e11d4",
+      "date": "2026-03-24T06:08:10-05:00",
+      "message": "Resolve merge conflict in package-lock.json by accepting theirs",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "General",
+      "description": "Resolve merge conflict in package-lock.json by accepting theirs"
+    },
     {
       "hash": "09bde3d",
       "date": "2026-03-24T04:33:47-05:00",
@@ -11,15 +38,6 @@
       "type": "other",
       "category": "General",
       "description": "Regenerate changelog after merge"
-    },
-    {
-      "hash": "d8ffc16",
-      "date": "2026-03-24T04:32:33-05:00",
-      "message": "Fix Aloware logger calls and JSX types issue",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Integrations",
-      "description": "Fix Aloware logger calls and JSX types issue"
     },
     {
       "hash": "32c7d2e",
@@ -103,6 +121,24 @@
       "description": "Complete state migration in InboxV2 - replace legacy setState with useInboxState hook"
     },
     {
+      "hash": "3765f87",
+      "date": "2026-03-23T09:22:13Z",
+      "message": "fix: apply reviewer suggestions — Dockerfile placeholder URL, sms-event-store raw types, heading query in test",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Apply reviewer suggestions — Dockerfile placeholder URL, sms-event-store raw types, heading query..."
+    },
+    {
+      "hash": "6d8be78",
+      "date": "2026-03-23T04:18:31-05:00",
+      "message": "Apply suggestion from @Copilot",
+      "author": "johnlicataptbiz",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Apply suggestion from @Copilot"
+    },
+    {
       "hash": "7778e39",
       "date": "2026-03-23T04:09:57-05:00",
       "message": "fix: resolve escalationLevel ReferenceError in InboxV2",
@@ -119,6 +155,15 @@
       "type": "refactor",
       "category": "Dashboard",
       "description": "Update qualification labels to match core pre-qualifiers"
+    },
+    {
+      "hash": "e162e6c",
+      "date": "2026-03-23T08:29:30Z",
+      "message": "Fix: Non-null assertion on `.closest()` return value without explicit null check makes test fragile to DOM structure changes",
+      "author": "Vercel",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Non-null assertion on `.closest()` return value without explicit null check makes test fragile to..."
     },
     {
       "hash": "33a955a",
@@ -362,6 +407,24 @@
       "type": "feature",
       "category": "Database",
       "description": "Merge PR #27: Add DATABASE_URL build arg for Prisma generation"
+    },
+    {
+      "hash": "81bd67b",
+      "date": "2026-03-22T01:55:07Z",
+      "message": "fix: reconcile PRs — TS build, Prisma raw field, frontend tests, CI workflows, Dockerfile DATABASE_URL, remove TODO.md",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Reconcile PRs — TS build, Prisma raw field, frontend tests, CI workflows, Dockerfile DATABASE_URL..."
+    },
+    {
+      "hash": "ce19452",
+      "date": "2026-03-22T01:39:59Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
     },
     {
       "hash": "2e1c0ac",

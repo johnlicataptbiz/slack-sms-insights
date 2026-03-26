@@ -30,13 +30,27 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Check database secret
+      id: db_secret
+      env:
+        DATABASE_PUBLIC_URL: ${{ secrets.DATABASE_PUBLIC_URL }}
+      run: |
+        if [ -z "${DATABASE_PUBLIC_URL}" ]; then
+          echo "available=false" >> "$GITHUB_OUTPUT"
+          echo "DATABASE_PUBLIC_URL is not set; skipping live report generation."
+        else
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Generate live database report
+      if: steps.db_secret.outputs.available == 'true'
       run: npm run generate:db-report
       env:
         DATABASE_URL: ${{ secrets.DATABASE_PUBLIC_URL }}
         NODE_ENV: production
 
     - name: Commit and push report
+      if: steps.db_secret.outputs.available == 'true'
       uses: EndBug/add-and-commit@v9
       with:
         author_name: 'github-actions[bot]'
@@ -47,6 +61,10 @@ jobs:
 
     - name: Report generation status
       run: |
-        echo "✅ Live database report generated and committed"
-        echo "📊 Report location: sms-insights/LIVE-DATABASE-REPORT.md"
-        head -20 LIVE-DATABASE-REPORT.md
+        if [ "${{ steps.db_secret.outputs.available }}" = "true" ]; then
+          echo "✅ Live database report generated and committed"
+          echo "📊 Report location: sms-insights/LIVE-DATABASE-REPORT.md"
+          head -20 LIVE-DATABASE-REPORT.md
+        else
+          echo "⚠️ Skipped report generation: DATABASE_PUBLIC_URL is not configured."
+        fi

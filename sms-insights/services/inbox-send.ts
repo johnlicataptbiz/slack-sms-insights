@@ -325,11 +325,11 @@ export const sendInboxMessage = async (
         line: context.lineId != null ? String(context.lineId) : context.fromNumber || null,
         sequence: null,
         conversationId: context.conversation.id,
-        raw: {
+        raw: JSON.stringify({
           source: 'aloware_api_send',
           sendAttemptId: sendAttempt.id,
           response,
-        },
+        }),
       },
       logger,
     );

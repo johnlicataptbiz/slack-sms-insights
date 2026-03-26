@@ -54,39 +54,6 @@ interface MessageThreadProps {
 }
 
 // ============================================
-// SEND MESSAGE ACTION (Server Action pattern)
-// ============================================
-
-async function sendMessageAction(
-  _prevState: { error?: string },
-  formData: FormData,
-): Promise<{ error?: string; success?: boolean }> {
-  const text = formData.get("message") as string;
-
-  if (!text?.trim()) {
-    return { error: "Message cannot be empty" };
-  }
-
-  try {
-    const response = await fetch("/api/messages/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.trim() }),
-    });
-
-    if (!response.ok) {
-      throw new Error("Failed to send message");
-    }
-
-    return { success: true };
-  } catch (error) {
-    return {
-      error: error instanceof Error ? error.message : "Unknown error",
-    };
-  }
-}
-
-// ============================================
 // MESSAGE BUBBLE COMPONENT
 // ============================================
 
@@ -153,7 +120,10 @@ function MessageBubble({ message, isOptimistic }: MessageBubbleProps) {
 // ============================================
 
 interface MessageFormProps {
-  onSubmit: (formData: FormData) => Promise<{ error?: string }>;
+  onSubmit: (
+    prevState: { error?: string },
+    formData: FormData,
+  ) => Promise<{ error?: string }>;
   disabled?: boolean;
 }
 
@@ -169,7 +139,7 @@ function MessageForm({ onSubmit, disabled }: MessageFormProps) {
             ref={inputRef}
             name="message"
             placeholder="Type your message..."
-            disabled={disabled}
+            disabled={Boolean(disabled)}
             rows={2}
             className={cn(
               "flex-1 p-3 border rounded-lg resize-none",
@@ -177,13 +147,13 @@ function MessageForm({ onSubmit, disabled }: MessageFormProps) {
               disabled && "opacity-50 cursor-not-allowed",
             )}
           />
-          <SubmitButton disabled={disabled} />
+          <SubmitButton disabled={Boolean(disabled)} />
         </div>
 
         {state.error && <p className="text-sm text-red-600">{state.error}</p>}
 
         {/* Character count */}
-        <CharacterCounter ref={inputRef} />
+        <CharacterCounter />
       </div>
     </form>
   );
@@ -215,22 +185,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 // CHARACTER COUNTER
 // ============================================
 
-function CharacterCounter({ ref }: { ref: React.Ref<HTMLTextAreaElement> }) {
-  // Get current value (React 19 pattern - can access ref in event handlers)
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      // Just count characters as user types
-      const charCount = e.currentTarget.value.length;
-      // SMS typically has 160 character limit
-      if (charCount > 160) {
-        e.currentTarget.style.borderColor = "rgb(239, 68, 68)";
-      } else {
-        e.currentTarget.style.borderColor = "";
-      }
-    },
-    [],
-  );
-
+function CharacterCounter() {
   return (
     <div className="text-xs text-neutral-600">
       <span id="char-count">0</span> / 160 characters

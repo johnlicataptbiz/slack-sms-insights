@@ -11,6 +11,6 @@
     "strict": true,
     "skipLibCheck": true
   },
-  "include": ["app.ts", "listeners/**/*.ts", "services/**/*.ts", "api/**/*.ts", "types/**/*.ts", "src/**/*.ts"],
+  "include": ["app.ts", "listeners/**/*.ts", "services/**/*.ts", "api/**/*.ts", "types/**/*.ts"],
   "exclude": ["tests/**", "dist/**", "node_modules/**"],
 }

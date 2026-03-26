@@ -13,7 +13,7 @@ export class UIStateManager {
   constructor(private prisma: PrismaClient) {}
 
   async getUserState(userId: string): Promise<UserUIState> {
-    const state = await this.prisma.uiState.findUnique({
+    const state = await this.prisma.uIState.findUnique({
       where: { userId },
     });
 
@@ -48,7 +48,7 @@ export class UIStateManager {
       lastActivity: new Date(),
     };
 
-    const result = await this.prisma.uiState.upsert({
+    const result = await this.prisma.uIState.upsert({
       where: { userId },
       update: {
         theme: updatedState.theme,
@@ -107,4 +107,4 @@ export class UIStateManager {
 }
 
 // Singleton instance
-export const uiStateManager = new UIStateManager();
+export const uiStateManager = new UIStateManager(new PrismaClient());

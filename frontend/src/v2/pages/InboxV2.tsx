@@ -72,13 +72,6 @@ import { V2State } from "../components/V2Primitives";
 import { SkeletonText } from "../components/Skeleton";
 import { useToast } from "../hooks/useToast";
 import { useInboxState } from "../hooks/useInboxState";
-import { useInboxMessages } from "../hooks/useInboxMessages";
-import { useInboxMutations } from "../hooks/useInboxMutations";
-import { useInboxSubscription } from "../hooks/useInboxSubscription";
-import { useSetterIntentDetection } from "../hooks/useSetterIntentDetection";
-import { Composer } from "../components/Composer";
-import { MessageThread } from "../components/MessageThread";
-import { ConversationList } from "../components/ConversationList";
 
 const LazyEmojiPicker = lazy(async () => ({
   default: (await import("emoji-picker-react")).default,
@@ -592,6 +585,80 @@ export default function InboxV2() {
     updateSelectionState,
   } = inboxState;
 
+  const {
+    selectedDraftId,
+    selectedLineKey,
+    pendingMessageText,
+    showTemplates,
+    manualPanelOpen,
+    isGuardrailModalOpen,
+    showDoublePitchWarning,
+    isEmojiPickerOpen,
+    isNarrowComposerViewport,
+    flashMessage,
+  } = uiState;
+  const { localObjectionTags, localCallOutcome } = selectionState;
+  const { needsReplyOnly, sortMode } = filters;
+
+  const setSearch = (search: string) => updateFilters({ search });
+  const setSortMode = (nextSortMode: typeof filters.sortMode) =>
+    updateFilters({ sortMode: nextSortMode });
+  const setNeedsReplyOnly = (
+    next:
+      | boolean
+      | ((prev: boolean) => boolean),
+  ) =>
+    updateFilters({
+      needsReplyOnly:
+        typeof next === "function" ? next(filters.needsReplyOnly) : next,
+    });
+  const setSelectedConversationId = (id: string | null) =>
+    updateUIState({ selectedConversationId: id });
+  const setComposerText = (text: string) => updateUIState({ composerText: text });
+  const setSelectedDraftId = (id: string | null) =>
+    updateUIState({ selectedDraftId: id });
+  const setIsComposerModalOpen = (open: boolean) =>
+    updateUIState({ isComposerModalOpen: open });
+  const setPendingMessageText = (text: string | null) =>
+    updateUIState({ pendingMessageText: text });
+  const setIsGuardrailModalOpen = (open: boolean) =>
+    updateUIState({ isGuardrailModalOpen: open });
+  const setShowTemplates = (
+    next:
+      | boolean
+      | ((prev: boolean) => boolean),
+  ) =>
+    updateUIState({
+      showTemplates:
+        typeof next === "function" ? next(uiState.showTemplates) : next,
+    });
+  const setIsEmojiPickerOpen = (
+    next:
+      | boolean
+      | ((prev: boolean) => boolean),
+  ) =>
+    updateUIState({
+      isEmojiPickerOpen:
+        typeof next === "function" ? next(uiState.isEmojiPickerOpen) : next,
+    });
+  const setShowDoublePitchWarning = (open: boolean) =>
+    updateUIState({ showDoublePitchWarning: open });
+  const setCrmNotesText = (text: string) => updateUIState({ crmNotesText: text });
+  const setSelectedLineKey = (key: string) => updateUIState({ selectedLineKey: key });
+  const setManualPanelOpen = (
+    next:
+      | boolean
+      | ((prev: boolean) => boolean),
+  ) =>
+    updateUIState({
+      manualPanelOpen:
+        typeof next === "function" ? next(uiState.manualPanelOpen) : next,
+    });
+  const setLocalObjectionTags = (tags: string[]) =>
+    updateSelectionState({ localObjectionTags: tags });
+  const setLocalCallOutcome = (outcome: CallOutcomeV2 | null) =>
+    updateSelectionState({ localCallOutcome: outcome });
+
   // Refs for DOM elements and locks
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const chatThreadRef = useRef<HTMLDivElement | null>(null);
@@ -886,7 +953,7 @@ export default function InboxV2() {
     // contact) while the user is still looking at the modal they just sent from.
     if (uiState.isComposerModalOpen) return;
 
-    if (!uiState.uiState.selectedConversationId && conversations.length > 0) {
+    if (!uiState.selectedConversationId && conversations.length > 0) {
       inboxState.selectConversation(conversations[0]?.id || null);
       return;
     }
@@ -1438,7 +1505,7 @@ export default function InboxV2() {
       const snoozedUntil = addHours(new Date(), 24).toISOString();
       void snoozeMutation
         .mutateAsync({
-          conversationId: selectedConversationId,
+          conversationId: uiState.selectedConversationId,
           snoozedUntil,
         })
         .then(() => setFlashMessage("Snoozed for 24 hours."))
@@ -1449,7 +1516,7 @@ export default function InboxV2() {
         );
     },
     { enableOnFormTags: true },
-    [isComposerModalOpen, selectedConversationId],
+    [uiState.isComposerModalOpen, uiState.selectedConversationId],
   );
 
   const executeSend = async (messageText: string) => {
@@ -3072,7 +3139,7 @@ export default function InboxV2() {
                             {setterAssistSummary.action}
                           </p>
                         </div>
-                        {crmNotesText ? (
+                        {uiState.crmNotesText ? (
                           <div className="V2Inbox__crmNotesCard">
                             <div className="V2Inbox__crmNotesHeader">
                               <p>CRM Notes</p>
@@ -3086,7 +3153,7 @@ export default function InboxV2() {
                             </div>
                             <textarea
                               className="V2Inbox__crmNotesText"
-                              value={crmNotesText}
+                              value={uiState.crmNotesText}
                               readOnly
                               rows={12}
                               onFocus={(event) => event.currentTarget.select()}
@@ -3603,11 +3670,10 @@ export default function InboxV2() {
                                 <V2Select
                                   value={qualificationState.fullOrPartTime}
                                   onValueChange={(value) =>
-                                    setQualificationState((prev) => ({
-                                      ...prev,
+                                    updateQualification({
                                       fullOrPartTime:
                                         value as QualificationStateV2["fullOrPartTime"],
-                                    }))
+                                    })
                                   }
                                   options={FULL_OR_PART_TIME_OPTIONS}
                                   ariaLabel="Full or part time"
@@ -3619,10 +3685,9 @@ export default function InboxV2() {
                                   type="text"
                                   value={qualificationState.niche || ""}
                                   onChange={(e) =>
-                                    setQualificationState((prev) => ({
-                                      ...prev,
+                                    updateQualification({
                                       niche: e.target.value,
-                                    }))
+                                    })
                                   }
                                   placeholder="e.g. Sports performance"
                                 />
@@ -3632,11 +3697,10 @@ export default function InboxV2() {
                                 <V2Select
                                   value={qualificationState.revenueMix}
                                   onValueChange={(value) =>
-                                    setQualificationState((prev) => ({
-                                      ...prev,
+                                    updateQualification({
                                       revenueMix:
                                         value as QualificationStateV2["revenueMix"],
-                                    }))
+                                    })
                                   }
                                   options={REVENUE_MIX_OPTIONS}
                                   ariaLabel="Revenue mix"
@@ -3647,11 +3711,10 @@ export default function InboxV2() {
                                 <V2Select
                                   value={qualificationState.coachingInterest}
                                   onValueChange={(value) =>
-                                    setQualificationState((prev) => ({
-                                      ...prev,
+                                    updateQualification({
                                       coachingInterest:
                                         value as QualificationStateV2["coachingInterest"],
-                                    }))
+                                    })
                                   }
                                   options={COACHING_INTEREST_OPTIONS}
                                   ariaLabel="Coaching interest"

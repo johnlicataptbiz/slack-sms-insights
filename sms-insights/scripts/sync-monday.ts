@@ -133,6 +133,7 @@ const main = async (): Promise<void> => {
       {
         weekStart: options.weekStart,
         timeZone: options.timeZone,
+        force: options.force,
       },
       console,
     );

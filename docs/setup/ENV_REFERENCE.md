@@ -172,6 +172,7 @@ Get your key at [platform.openai.com/api-keys](https://platform.openai.com/api-k
 | `MONDAY_OUTBOUND_ENABLED` | optional | `false` | Allow outbound writes to Monday.com boards. Must be `true` for any writeback to occur. |
 | `MONDAY_AUTO_WRITE_ENABLED` | optional | `false` | **Master safety gate.** Must be `true` in addition to the feature-specific flags for any automatic sync job to run. Defaults to `false`. Set to `false` in Railway to immediately halt all automatic Monday.com writes without code changes. |
 | `MONDAY_ACQ_BOARD_ID` | optional | — | Acquisition calls board ID. |
+| `MONDAY_WEEKLY_SUMMARY_BOARD_ID` | optional | — | Target board for weekly summary writeback rows. |
 | `MONDAY_MY_CALLS_BOARD_ID` | optional | — | Personal calls board ID. |
 | `MONDAY_PERSONAL_BOARD_ID` | optional | — | Personal tracking board ID. |
 | `MONDAY_SYNC_EXTRA_BOARD_IDS` | optional | — | Comma-separated additional board IDs to ingest. |
@@ -179,6 +180,7 @@ Get your key at [platform.openai.com/api-keys](https://platform.openai.com/api-k
 | `MONDAY_PERSONAL_SETTER_MONDAY_USER_ID` | optional | — | Monday.com user ID for the setter. |
 | `MONDAY_PERSONAL_PUSH_LOOKBACK_DAYS` | optional | `14` | Days to look back when pushing personal board data. |
 | `MONDAY_PERSONAL_SELF_BOOKED_ENABLED` | optional | `false` | When true, also push self-booked calls to the personal board. |
+| `MONDAY_WEEKLY_WRITEBACK_MIN_INTERVAL_MS` | optional | `86400000` | Minimum delay between weekly summary writeback updates for the same week. |
 | `MONDAY_SYNC_BACKFILL_DAYS` | optional | `90` | Days to backfill on initial sync. |
 | `MONDAY_API_TIMEOUT_MS` | optional | `12000` | Monday API request timeout in milliseconds. |
 | `MONDAY_API_MAX_RETRIES` | optional | `2` | Maximum retry attempts for Monday API calls. |

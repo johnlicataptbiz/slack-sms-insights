@@ -43,7 +43,22 @@ const navItems: NavItem[] = [
 const PRISMA_STUDIO_URL =
   import.meta.env.VITE_PRISMA_STUDIO_URL || "http://localhost:5555";
 
+const isLocalhostUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return (
+      url.hostname === "localhost" ||
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
+};
+
 function DbExplorerButton() {
+  if (isLocalhostUrl(PRISMA_STUDIO_URL)) return null;
+
   return (
     <motion.a
       href={PRISMA_STUDIO_URL}
@@ -65,7 +80,6 @@ function DbExplorerButton() {
     </motion.a>
   );
 }
-
 
 const isRouteActive = (pathname: string, to: string) =>
   pathname === to || pathname.startsWith(`${to}/`);
@@ -154,7 +168,6 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             </motion.div>
           </nav>
 
-          {/* ── DB Explorer ── */}
           <div className="V2Shell__sidebarFooter">
             <DbExplorerButton />
           </div>

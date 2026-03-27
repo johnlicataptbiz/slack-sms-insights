@@ -13,8 +13,8 @@ export const prisma =
         ? ["query", "error", "warn"]
         : ["error"],
     // Prisma 7: Must specify accelerateUrl for client engine or use adapter
-    ...(process.env.DATABASE_ACCELERATE_URL && {
-      accelerateUrl: process.env.DATABASE_ACCELERATE_URL,
+    ...(process.env.PRISMA_ACCELERATE_URL && {
+      accelerateUrl: process.env.PRISMA_ACCELERATE_URL,
     }),
   });
 

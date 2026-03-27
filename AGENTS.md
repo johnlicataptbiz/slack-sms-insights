@@ -179,3 +179,55 @@ DEBUG=vite:* npm run dev
 - Onboarding: `docs/setup/ONBOARDING.md`
 - Env vars: `docs/setup/ENV_REFERENCE.md`
 - Contributing: `docs/development/CONTRIBUTING.md`
+
+## Figma Design System Rules
+
+### Design Token Sources
+- Color, typography, spacing, and state tokens live in `frontend/src/styles/design-tokens.ts` and are mirrored as CSS variables under `frontend/src/styles/tokens.css`. Use these exports instead of hardcoded hex values.
+  ```ts
+  export const colors = { primary: { 500: "#0ea5e9", 600: "#0284c7" }, success: { 500: "#22c55e" }, ... }
+  export const spacing = { 1: "4px", 2: "8px", 4: "16px", 8: "32px", 16: "64px" }
+  ```
+- Tokens.css exposes the same palette via `@theme` variables (e.g., `--color-ds-primary-500`, `--spacing-control-x`). Reference these vars in global CSS or CSS modules to keep the Tailwind-like scale consistent.
+
+### Component Library
+- UI components live in `frontend/src/components/` (with subfolders like `/insights`, `/v2`, `/ui`) and are orchestrated by the lazy-loaded `frontend/src/v2/V2App`.
+- New Figma-derived components should land under `frontend/src/components/` (feature-specific components near `features/` or `v2/` as needed). Storybook stories (inside `storybook-static` and `frontend/.storybook`) demonstrate how these components compose.
+- Prefer the existing `PasswordGate`, `RunList`, `RunDetail`, `SuspenseLoader`, and `theme-provider` patterns when adding shared UI. Keep exports in PascalCase and collocate styles via dedicated `.css` files.
+
+### Frameworks & Styling Stack
+- React 19 + Vite 7 power the UI via `frontend/src/main.tsx`, with `BrowserRouter` for `/v2/*` flows and React Query for data fetching.
+- Styling layers: Tailwind v4 utilities, project-specific CSS (`globals.css`, `utilities.css`, per-component CSS), and ThemeProvider-driven CSS class toggles for light/dark themes.
+- Vite bundle config (`vite.config.ts`) and `tailwind.config.js` hook into the tokens generator script (`frontend/scripts/generate-design-tokens.ts`). Run `npm run generate-tokens` if tokens change.
+
+### Asset / Icon Management
+- Static assets live in `frontend/src/assets/` and `public/` for direct Vite serving. When Figma provides assets, place optimized versions under `public/assets/figma/` and import them via `/assets/` paths so Vite handles hashing.
+- Icons use `lucide-react`, `@radix-ui/react-icons`, and Radix UI primitives. Wrap new icons in the shared `components/ui` wrappers if they require consistent sizing or color tokens.
+
+### Styling Rules & Responsive Behavior
+- Per-component CSS files (e.g., `Insights.css`, `Sequences.css`) rely on CSS variables defined in `tokens.css`. Always favor `var(--color-ds-*)` and spacing tokens over literal values.
+- Responsive breakpoints follow the CSS in `globals.css` and grid classes inside `frontend/src/styles/*.css`. Keep this structure when implementing designs (wide layout + 240px sidebar).
+- Animations use root-defined durations (`--duration-fast/normal/slow`), shadows (`--shadow-surface`), and radii (`--radius-panel`). Reuse these for hover/focus states instead of inventing new values.
+
+### Project Structure Callouts
+- Primary UI directories: `frontend/src/components/`, `frontend/src/features/`, `frontend/src/v2/` for the new dashboard, `frontend/src/styles/` for CSS/token definitions, and `frontend/src/lib/` for utilities (e.g., `hooks`, `utils`, `api`).
+- Keep imports grouped: React/core libs → third-party (Radix, TanStack) → local aliases (use `@/` from `tsconfig` if configured) → types.
+
+### Figma MCP Implementation Flow
+1. Always fetch `get_design_context(fileKey, nodeId)` before booking any code changes; it exposes layout, typography, and asset data that we translate into this stack.
+2. If the response is too large, call `get_metadata` to inspect child node IDs, then re-fetch those nodes individually.
+3. Grab a screenshot with `get_screenshot(fileKey, nodeId)` for visual validation and keep it handy while coding.
+4. Download assets from the MCP server (do not replace `localhost` URLs). Store them under `public/assets` and reference via Vite-friendly paths.
+5. Translate the default React/Tailwind output into the project conventions above (CSS files, token usage, existing components).
+6. Validate pixel-for-pixel against the screenshot before closing the ticket.
+
+### Asset Handling Rules
+- Use the MCP-provided asset endpoint URLs directly; do not host separate CDN copies unless explicitly needed.
+- Keep SVG/PNG assets in `public/assets/figma/` with descriptive names (e.g., `public/assets/figma/sequences-header.svg`).
+- Avoid adding new icon libraries; prefer `lucide-react` or inline SVGs reused through `components/ui/Icon`.
+
+### Miscellaneous Expectations
+- All new components must accept a `className` prop for composition and be documented in `src/components/ui/`.
+- Prop types must be typed (TypeScript) and include JSDoc comments for exported utilities.
+- Accessibility checklist: keyboard focus states, aria labels on interactive elements, and color contrast meeting WCAG AA.
+- Before committing, run `npm run build` (frontend) and `npm run test`/`npm run lint` (backend) to ensure the new UI doesn’t introduce regressions.

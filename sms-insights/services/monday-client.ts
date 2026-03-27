@@ -75,6 +75,7 @@ export type MondayBoardColumn = {
   id: string;
   title: string;
   type: string;
+  settingsStr?: string | null;
 };
 
 export type MondayBoardItem = {
@@ -106,6 +107,7 @@ export const queryBoardColumns = async (
           id
           title
           type
+          settingsStr: settings_str
         }
       }
     }

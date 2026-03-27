@@ -1,5 +1,5 @@
 import { SMSMessage } from '../types/aloware.js';
-// import { insertSmsEvent, type NewSmsEvent } from './sms-event-store.js';
+import { insertSmsEvent, type NewSmsEvent } from './sms-event-store.js';
 import { logger } from '../../services/logger.js';
 
 export class AlowareProcessor {
@@ -14,7 +14,7 @@ export class AlowareProcessor {
       const body = event.body || event.message || '';
       const eventId = event.id || `webhook-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      const newEvent = {
+      const newEvent: NewSmsEvent = {
         slackTeamId: 'aloware-webhook',
         slackChannelId: 'direct-webhook',
         slackMessageTs: eventId,
@@ -30,9 +30,8 @@ export class AlowareProcessor {
         raw: event,
       };
 
-      // TODO: Implement SMS event storage
-      // const result = await insertSmsEvent(newEvent, logger);
-      logger.aloware.info({ eventId }, 'Aloware webhook processed (storage not yet implemented)');
+      const result = await insertSmsEvent(newEvent, logger);
+      logger.aloware.info({ eventId, stored: Boolean(result) }, 'Aloware webhook processed');
     } catch (error) {
       logger.aloware.error({ error }, 'Error in AlowareProcessor.processWebhook');
       throw error;

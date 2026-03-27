@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma.js';
 
 export interface UserUIState {
   userId: string;
@@ -107,4 +108,4 @@ export class UIStateManager {
 }
 
 // Singleton instance
-export const uiStateManager = new UIStateManager(new PrismaClient());
+export const uiStateManager = new UIStateManager(prisma);

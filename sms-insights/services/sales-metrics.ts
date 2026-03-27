@@ -210,6 +210,17 @@ export const getSalesMetricsSummary = async (
         in: ['inbound', 'outbound'],
       },
     },
+    // Keep payload lean: selecting all columns can exceed Prisma response limits
+    // because sms_events rows may include large JSON payload fields.
+    select: {
+      contact_id: true,
+      contact_phone: true,
+      event_ts: true,
+      direction: true,
+      sequence: true,
+      aloware_user: true,
+      body: true,
+    },
     orderBy: { event_ts: 'asc' },
   });
 

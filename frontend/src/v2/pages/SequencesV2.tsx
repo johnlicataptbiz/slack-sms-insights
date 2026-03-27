@@ -72,7 +72,7 @@ const fmtSplit = (jack: number, brandon: number, selfBooked: number) => `${fmtIn
 
 const SEQUENCE_COLUMN_WIDTH_STORAGE_KEY = 'v2-sequences-column-widths';
 const DEFAULT_SEQUENCE_COLUMN_WIDTHS: SequenceColumnWidths = {
-  label: 280,
+  label: 360,
   uniqueContacted: 150,
   repliesReceived: 145,
   replyRatePct: 140,

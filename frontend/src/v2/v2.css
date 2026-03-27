@@ -6482,7 +6482,7 @@
 
 .V2Table--sequences .V2Table__col--label {
   min-width: 180px;
-  max-width: 260px;
+  max-width: 360px;
 }
 
 .V2Table--sequences .V2Table__col--version {
@@ -6525,10 +6525,10 @@
   color: var(--v2-text);
   overflow: hidden;
   text-overflow: ellipsis;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   white-space: normal;
-  max-width: 320px;
+  max-width: 360px;
   line-height: 1.25;
   word-break: break-word;
 }

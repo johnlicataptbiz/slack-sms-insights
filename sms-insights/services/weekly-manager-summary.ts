@@ -16,6 +16,16 @@ import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone, resolveBusinessDayRange, r
 
 type RiskSeverity = 'high' | 'med' | 'low';
 type SourceStatus = 'ready' | 'stale' | 'missing' | 'disabled';
+type TrendDirection = 'up' | 'flat' | 'down';
+type HealthStatus = 'good' | 'watch' | 'action';
+type WeeklyStatusLabelConfig = {
+  trend: Record<TrendDirection, string>;
+  health: Record<HealthStatus, string>;
+};
+
+// Hard safety guardrail:
+// Never allow weekly summary writeback onto personal setter board(s).
+const HARD_BLOCKED_WEEKLY_SUMMARY_BOARD_IDS = new Set<string>(['10029059942']);
 
 export type WeeklyManagerSummary = {
   window: {
@@ -136,29 +146,73 @@ const makeActions = (riskFlags: WeeklyManagerSummary['atRiskFlags']): string[] =
   return [...actions].slice(0, 3);
 };
 
-const trendLabelForWeeklySummary = (
+const trendDirectionForWeeklySummary = (
   currentBooked: number,
   previousBooked: number | null,
-): 'Up' | 'Flat' | 'Down' => {
-  if (!Number.isFinite(currentBooked) || currentBooked <= 0) return 'Flat';
-  if (!Number.isFinite(previousBooked ?? Number.NaN) || (previousBooked ?? 0) <= 0) return 'Flat';
+): TrendDirection => {
+  if (!Number.isFinite(currentBooked) || currentBooked <= 0) return 'flat';
+  if (!Number.isFinite(previousBooked ?? Number.NaN) || (previousBooked ?? 0) <= 0) return 'flat';
 
   const ratio = currentBooked / (previousBooked || 1);
-  if (ratio >= 1.1) return 'Up';
-  if (ratio <= 0.9) return 'Down';
-  return 'Flat';
+  if (ratio >= 1.1) return 'up';
+  if (ratio <= 0.9) return 'down';
+  return 'flat';
 };
 
-const healthLabelForSummary = (summary: WeeklyManagerSummary): 'Good' | 'Watch' | 'Action' => {
-  if (summary.atRiskFlags.some((flag) => flag.severity === 'high')) return 'Action';
-  if (summary.atRiskFlags.length > 0) return 'Watch';
-  return 'Good';
+const healthStatusForSummary = (summary: WeeklyManagerSummary): HealthStatus => {
+  if (summary.atRiskFlags.some((flag) => flag.severity === 'high')) return 'action';
+  if (summary.atRiskFlags.length > 0) return 'watch';
+  return 'good';
+};
+
+const normalizeStatusToken = (value: string): string => value.toLowerCase().replace(/[^a-z]/g, '');
+
+const parseStatusLabels = (settingsStr: string | null | undefined): string[] => {
+  if (!settingsStr) return [];
+  try {
+    const parsed = JSON.parse(settingsStr) as { labels?: Record<string, unknown> } | null;
+    if (!parsed?.labels || typeof parsed.labels !== 'object') return [];
+    return Object.values(parsed.labels).filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  } catch {
+    return [];
+  }
+};
+
+const pickStatusLabel = (labels: string[], token: string, fallback: string): string => {
+  const normalizedToken = normalizeStatusToken(token);
+  const exact = labels.find((label) => normalizeStatusToken(label) === normalizedToken);
+  if (exact) return exact;
+  const includes = labels.find((label) => normalizeStatusToken(label).includes(normalizedToken));
+  return includes || fallback;
+};
+
+const resolveWeeklyStatusLabels = (
+  boardColumns: Array<{ title: string; settingsStr?: string | null }>,
+): WeeklyStatusLabelConfig => {
+  const trendColumn = boardColumns.find((column) => column.title.trim().toLowerCase() === 'trend');
+  const healthColumn = boardColumns.find((column) => column.title.trim().toLowerCase() === 'health');
+  const trendLabels = parseStatusLabels(trendColumn?.settingsStr);
+  const healthLabels = parseStatusLabels(healthColumn?.settingsStr);
+
+  return {
+    trend: {
+      up: pickStatusLabel(trendLabels, 'up', 'Up'),
+      down: pickStatusLabel(trendLabels, 'down', 'Down'),
+      flat: pickStatusLabel(trendLabels, 'flat', 'Flat'),
+    },
+    health: {
+      good: pickStatusLabel(healthLabels, 'good', 'Good'),
+      watch: pickStatusLabel(healthLabels, 'watch', 'Watch'),
+      action: pickStatusLabel(healthLabels, 'action', 'Action'),
+    },
+  };
 };
 
 const buildWeeklySummaryColumnValues = (
   summary: WeeklyManagerSummary,
   previousBookedCalls: number | null,
   columnIds: Record<string, string | null>,
+  statusLabels: WeeklyStatusLabelConfig,
 ): Record<string, unknown> => {
   const jack = summary.setters.jack.canonicalBookedCalls;
   const brandon = summary.setters.brandon.canonicalBookedCalls;
@@ -199,8 +253,14 @@ const buildWeeklySummaryColumnValues = (
   if (columnIds.jack) values[columnIds.jack] = jack;
   if (columnIds.brandon) values[columnIds.brandon] = brandon;
   if (columnIds.selfBooked) values[columnIds.selfBooked] = selfBooked;
-  if (columnIds.trend) values[columnIds.trend] = { label: trendLabelForWeeklySummary(summary.teamTotals.canonicalBookedCalls, previousBookedCalls) };
-  if (columnIds.health) values[columnIds.health] = { label: healthLabelForSummary(summary) };
+  if (columnIds.trend) {
+    const trendDirection = trendDirectionForWeeklySummary(summary.teamTotals.canonicalBookedCalls, previousBookedCalls);
+    values[columnIds.trend] = { label: statusLabels.trend[trendDirection] };
+  }
+  if (columnIds.health) {
+    const healthStatus = healthStatusForSummary(summary);
+    values[columnIds.health] = { label: statusLabels.health[healthStatus] };
+  }
   if (columnIds.keyNotes) values[columnIds.keyNotes] = keyNotes;
   if (columnIds.actionsNextWeek) values[columnIds.actionsNextWeek] = summary.actionsNextWeek.join('\n');
   if (columnIds.exceptions) values[columnIds.exceptions] = exceptions;
@@ -415,10 +475,39 @@ const buildWeeklySummaryMarkdown = (summary: WeeklyManagerSummary): string => {
   return lines.join('\n');
 };
 
+const normalizedWeeklySummaryForComparison = (summary: WeeklyManagerSummary) => ({
+  window: summary.window,
+  teamTotals: summary.teamTotals,
+  setters: summary.setters,
+  mondayPipeline: summary.mondayPipeline,
+  topWins: summary.topWins,
+  atRiskFlags: summary.atRiskFlags,
+  actionsNextWeek: summary.actionsNextWeek,
+});
+
+const buildSummarySignature = (summary: WeeklyManagerSummary): string =>
+  JSON.stringify(normalizedWeeklySummaryForComparison(summary));
+
+const coerceStoredWeeklySummary = (value: unknown): WeeklyManagerSummary | null => {
+  if (!value || typeof value !== 'object') return null;
+  const row = value as Partial<WeeklyManagerSummary>;
+  if (!row.window || !row.teamTotals || !row.setters || !row.mondayPipeline) return null;
+  return row as WeeklyManagerSummary;
+};
+
+const wasSyncedWithinMinInterval = (syncedAt: string | null, minIntervalMs: number): boolean => {
+  if (!syncedAt) return false;
+  if (!Number.isFinite(minIntervalMs) || minIntervalMs <= 0) return false;
+  const syncedAtMs = new Date(syncedAt).getTime();
+  if (!Number.isFinite(syncedAtMs)) return false;
+  return Date.now() - syncedAtMs < minIntervalMs;
+};
+
 export const syncWeeklySummaryToMonday = async (
   params: {
     weekStart?: string;
     timeZone?: string;
+    force?: boolean;
   } = {},
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{ status: 'skipped' | 'synced'; weekStart: string; itemId: string | null }> => {
@@ -431,14 +520,47 @@ export const syncWeeklySummaryToMonday = async (
   const previousWeekStart = new Date(`${summary.window.weekStart}T00:00:00.000Z`);
   previousWeekStart.setUTCDate(previousWeekStart.getUTCDate() - 7);
   const previousReport = await getMondayWeeklyReport(previousWeekStart.toISOString().slice(0, 10), logger);
-  const targetBoardId = mondayConfig.personalBoardId || mondayConfig.myCallsBoardId;
+  const targetBoardId = mondayConfig.weeklySummaryBoardId;
   if (!targetBoardId) {
+    logger?.warn?.('Weekly summary writeback skipped: MONDAY_WEEKLY_SUMMARY_BOARD_ID is not configured');
     return { status: 'skipped', weekStart: summary.window.weekStart, itemId: null };
   }
+  if (HARD_BLOCKED_WEEKLY_SUMMARY_BOARD_IDS.has(targetBoardId) || targetBoardId === mondayConfig.personalBoardId) {
+    logger?.error?.('Weekly summary writeback blocked: target board is personal/protected', {
+      weekStart: summary.window.weekStart,
+      boardId: targetBoardId,
+    });
+    return { status: 'skipped', weekStart: summary.window.weekStart, itemId: null };
+  }
+
   const existing = await getMondayWeeklyReport(summary.window.weekStart, logger);
+  const existingForTargetBoard = existing?.source_board_id === targetBoardId ? existing : null;
+  const storedSummary = coerceStoredWeeklySummary(existingForTargetBoard?.summary_json ?? null);
+  const summaryUnchanged = storedSummary ? buildSummarySignature(storedSummary) === buildSummarySignature(summary) : false;
+  const throttled = wasSyncedWithinMinInterval(
+    existingForTargetBoard?.synced_at ? new Date(existingForTargetBoard.synced_at).toISOString() : null,
+    mondayConfig.weeklyWritebackMinIntervalMs,
+  );
+
+  if (!params.force && existingForTargetBoard?.monday_item_id && (summaryUnchanged || throttled)) {
+    logger?.info?.('Weekly summary writeback skipped (idempotent/throttled)', {
+      weekStart: summary.window.weekStart,
+      boardId: targetBoardId,
+      mondayItemId: existingForTargetBoard.monday_item_id,
+      summaryUnchanged,
+      throttled,
+      minIntervalMs: mondayConfig.weeklyWritebackMinIntervalMs,
+    });
+    return {
+      status: 'skipped',
+      weekStart: summary.window.weekStart,
+      itemId: existingForTargetBoard.monday_item_id,
+    };
+  }
+
   const markdown = buildWeeklySummaryMarkdown(summary);
   const title = `PTBizSMS Weekly Summary - ${summary.window.weekStart}`;
-  const existingItemId = existing?.source_board_id === targetBoardId ? existing?.monday_item_id || null : null;
+  const existingItemId = existingForTargetBoard?.monday_item_id || null;
   const previousBookedCalls = previousReport?.summary_json && typeof previousReport.summary_json === 'object'
     ? Number((previousReport.summary_json as { teamTotals?: { canonicalBookedCalls?: number } }).teamTotals?.canonicalBookedCalls ?? 0)
     : null;
@@ -461,6 +583,7 @@ export const syncWeeklySummaryToMonday = async (
     vsLastWeek: findColumnIdByTitle(boardColumns, ['vs Last Week']),
     healthScore: findColumnIdByTitle(boardColumns, ['Health Score']),
   };
+  const statusLabels = resolveWeeklyStatusLabels(boardColumns);
 
   const result = await upsertWeeklySummaryItem(
     targetBoardId,
@@ -468,7 +591,7 @@ export const syncWeeklySummaryToMonday = async (
     {
       title,
       summaryMarkdown: markdown,
-      columnValues: buildWeeklySummaryColumnValues(summary, previousBookedCalls, columnIds),
+      columnValues: buildWeeklySummaryColumnValues(summary, previousBookedCalls, columnIds, statusLabels),
       existingItemId,
     },
     logger,

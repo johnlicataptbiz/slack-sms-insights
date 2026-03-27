@@ -1210,16 +1210,20 @@ export const getMondayWeeklyReport = async (
 };
 
 export const getMondayBookedCallPush = async (
+  boardId: string,
   slackChannelId: string,
   slackMessageTs: string,
   logger?: Pick<Logger, 'warn'>,
 ): Promise<MondayBookedCallPushRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_booked_call_pushes.findFirst({
+    const result = await prisma.monday_booked_call_pushes.findUnique({
       where: {
-        slack_channel_id: slackChannelId,
-        slack_message_ts: slackMessageTs,
+        board_id_slack_channel_id_slack_message_ts: {
+          board_id: boardId,
+          slack_channel_id: slackChannelId,
+          slack_message_ts: slackMessageTs,
+        },
       },
     });
     return result as unknown as MondayBookedCallPushRow | null;

@@ -44,6 +44,16 @@ export const mondayConfig = {
     process.env.MONDAY_ACQ_BOARD_ID ||
     '5077164868'
   ).trim(),
+  weeklySummaryBoardId: (
+    process.env.MONDAY_WEEKLY_SUMMARY_BOARD_ID ||
+    process.env.MONDAY_SMS_REPORTS_BOARD_ID ||
+    ''
+  ).trim(),
+  // Prevent noisy writeback churn by default; tune via env if needed.
+  weeklyWritebackMinIntervalMs: Number.parseInt(
+    process.env.MONDAY_WEEKLY_WRITEBACK_MIN_INTERVAL_MS || `${24 * 60 * 60 * 1000}`,
+    10,
+  ),
   myCallsBoardId: (process.env.MONDAY_MY_CALLS_BOARD_ID || '10029059942').trim(),
   personalBoardId: (
     process.env.MONDAY_PERSONAL_BOARD_ID ||

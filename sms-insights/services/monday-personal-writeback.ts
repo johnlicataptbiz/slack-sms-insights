@@ -569,7 +569,7 @@ const pushOne = async (
   if (source.bucket === 'selfBooked' && !params.includeSelfBooked) {
     return 'skipped';
   }
-  const existing = await getMondayBookedCallPush(source.slackChannelId, source.slackMessageTs, logger);
+  const existing = await getMondayBookedCallPush(params.boardId, source.slackChannelId, source.slackMessageTs, logger);
 
   if (existing?.status === 'synced' && existing.monday_item_id) {
     return 'skipped';

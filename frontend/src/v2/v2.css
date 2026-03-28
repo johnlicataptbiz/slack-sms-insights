@@ -3550,6 +3550,16 @@
   border-bottom-left-radius: 4px;
 }
 
+.V2Inbox__chatMessage--inbound .V2Inbox__chatSpeaker,
+.V2Inbox__chatMessage--inbound .V2Inbox__chatTime,
+.V2Inbox__chatMessage--inbound .V2Inbox__chatBody {
+  color: var(--v2-base-900);
+}
+
+.V2Inbox__chatMessage--inbound .V2Inbox__chatLink {
+  color: color-mix(in srgb, var(--v2-accent) 70%, var(--v2-base-900) 30%);
+}
+
 .V2Inbox__chatMessage--outbound {
   align-self: flex-end;
   background: linear-gradient(
@@ -3560,6 +3570,16 @@
   border: 1px solid
     color-mix(in srgb, var(--v2-accent) 35%, var(--v2-border) 65%);
   border-bottom-right-radius: 4px;
+}
+
+.V2Inbox__chatMessage--outbound .V2Inbox__chatSpeaker,
+.V2Inbox__chatMessage--outbound .V2Inbox__chatTime,
+.V2Inbox__chatMessage--outbound .V2Inbox__chatBody {
+  color: var(--v2-base-900);
+}
+
+.V2Inbox__chatMessage--outbound .V2Inbox__chatLink {
+  color: color-mix(in srgb, var(--v2-accent) 70%, var(--v2-base-900) 30%);
 }
 
 .V2Inbox__chatMessageHeader {
@@ -6472,8 +6492,9 @@
 /* Tighter cell padding for the sequences table to prevent horizontal scroll */
 .V2Table--sequences th,
 .V2Table--sequences td {
-  padding: 0.32rem 0.44rem;
+  padding: 0.52rem 0.62rem;
   font-size: 0.82rem;
+  vertical-align: top;
 }
 
 .V2Table--sequences tbody tr {
@@ -6519,18 +6540,32 @@
 }
 
 .V2Table__seqName {
-  display: -webkit-box;
+  display: block;
   font-size: 0.84rem;
   font-weight: 600;
   color: var(--v2-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
+  overflow: visible;
+  text-overflow: unset;
   white-space: normal;
-  max-width: 360px;
+  max-width: 100%;
   line-height: 1.25;
   word-break: break-word;
+}
+
+.V2Table__seqMeta {
+  margin-top: 0.28rem;
+  font-size: 0.74rem;
+  color: var(--v2-muted);
+  letter-spacing: 0.02em;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+}
+
+.V2Table__seqMetaCode {
+  font-family: var(--v2-font-mono);
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--v2-muted) 70%, var(--v2-text) 30%);
 }
 
 .V2Table__leadMagnetText {

@@ -72,7 +72,7 @@ const fmtSplit = (jack: number, brandon: number, selfBooked: number) => `${fmtIn
 
 const SEQUENCE_COLUMN_WIDTH_STORAGE_KEY = 'v2-sequences-column-widths';
 const DEFAULT_SEQUENCE_COLUMN_WIDTHS: SequenceColumnWidths = {
-  label: 360,
+  label: 420,
   uniqueContacted: 150,
   repliesReceived: 145,
   replyRatePct: 140,
@@ -443,10 +443,15 @@ export default function SequencesV2() {
                           No sequences match the current filter.
                         </td>
                       </tr>
-                    ) : sortedSequences.map((row) => (
+                    ) : sortedSequences.map((row, index) => (
                       <tr key={row.sequenceId} className={row.isManualBucket ? 'V2Table__row--manual' : ''}>
                         <td title={`${row.label}${row.leadMagnet ? ` • ${row.leadMagnet}` : ''}`}>
                           <span className="V2Table__seqName">{row.label}</span>
+                          <div className="V2Table__seqMeta">
+                            {row.versionTag ? <span>Version {row.versionTag}</span> : null}
+                            {row.leadMagnet ? <span>Lead magnet: {row.leadMagnet}</span> : null}
+                            {index === 0 ? <span className="V2Table__seqMetaCode">ID {row.sequenceId}</span> : null}
+                          </div>
                         </td>
                         <td className="is-right">{fmtInt(row.uniqueContacted)}</td>
                         <td className="is-right">{fmtInt(row.repliesReceived)}</td>
@@ -464,7 +469,16 @@ export default function SequencesV2() {
             </V2Panel>
           </div>
 
-          <div className="V2Grid V2Grid--2">
+          <details className="V2ExecutiveSection">
+            <summary className="V2ExecutiveSection__summary">
+              <div className="V2ExecutiveSection__titleWrap">
+                <p className="V2ExecutiveSection__title">Advanced insights</p>
+                <p className="V2ExecutiveSection__meta">Funnel, attribution, response speed, and qualification details.</p>
+              </div>
+              <span className="V2ExecutiveSection__chevron">▾</span>
+            </summary>
+            <div className="V2ExecutiveSection__body">
+              <div className="V2Grid V2Grid--2">
             {funnelQuery.isLoading ? (
               <V2Panel title="Sequence Funnel" caption="Daily contacted-to-booked funnel across the selected range.">
                 <V2State kind="loading">Loading funnel data…</V2State>
@@ -492,9 +506,9 @@ export default function SequencesV2() {
             ) : (
               <AttributionReviewQueuePanel rows={reviewQueueRows} />
             )}
-          </div>
+              </div>
 
-          <div className="V2Grid V2Grid--2">
+              <div className="V2Grid V2Grid--2">
             <AttributionHealthPanel />
 
             {unresolvedQuery.isLoading ? (
@@ -510,9 +524,9 @@ export default function SequencesV2() {
             ) : (
               <UnresolvedAttributionPanel rows={unresolvedRows} />
             )}
-          </div>
+              </div>
 
-          <div className="V2Grid V2Grid--2">
+              <div className="V2Grid V2Grid--2">
             {attributionMethodQuery.isLoading ? (
               <V2Panel title="Attribution Methods" caption="How booked calls were matched in the selected range.">
                 <V2State kind="loading">Loading attribution methods…</V2State>
@@ -540,60 +554,62 @@ export default function SequencesV2() {
             ) : (
               <RepResponsePanel rows={repResponseRows} />
             )}
-          </div>
-
-            {!qualificationQuery.isLoading && !qualificationQuery.isError && qualificationItems.length > 0 ? (
-              <div className="V2QualSummary">
-                <article className="V2QualSummary__cell">
-                  <strong>{fmtPct(qualificationSummary.fullTimePct)}</strong>
-                  <span>Full-time</span>
-                  <small>{fmtPct(qualificationSummary.partTimePct)} part-time</small>
-                </article>
-                <article className="V2QualSummary__cell">
-                  <strong>{fmtPct(qualificationSummary.cashPct)}</strong>
-                  <span>Revenue mix</span>
-                  <small>
-                    {fmtPct(qualificationSummary.insurancePct)} insurance · {fmtPct(qualificationSummary.balancedPct)} balanced
-                  </small>
-                </article>
-                <article className="V2QualSummary__cell">
-                  <strong>{fmtPct(qualificationSummary.highInterestPct)}</strong>
-                  <span>Coaching interest</span>
-                  <small>
-                    {fmtPct(qualificationSummary.mediumInterestPct)} medium · {fmtPct(qualificationSummary.lowInterestPct)} low
-                  </small>
-                </article>
-                <article className="V2QualSummary__cell">
-                  <strong>Top niches</strong>
-                  <span>Incoming interests</span>
-                  <div className="V2QualSummary__niches">
-                    {qualificationSummary.topNiches.map((niche) => (
-                      <span key={niche.niche} className="V2QualSummary__niche">
-                        {niche.niche}
-                        <strong>{fmtInt(niche.count)}</strong>
-                      </span>
-                    ))}
-                  </div>
-                </article>
               </div>
-            ) : null}
 
-          <V2Panel
-            title="Lead Qualification by Sequence"
-            caption="Deeper breakdown as you scroll: employment, revenue model, interest level, and top niches."
-          >
-            {qualificationQuery.isLoading ? (
-              <V2State kind="loading">Loading qualification breakdown...</V2State>
-            ) : qualificationQuery.isError ? (
-              <V2State kind="error" onRetry={() => void qualificationQuery.refetch()}>
-                Failed to load qualification breakdown.
-              </V2State>
-            ) : qualificationItems.length === 0 ? (
-              <V2State kind="empty">No qualification breakdown available for this date range.</V2State>
-            ) : (
-              <SequenceQualificationBreakdown items={qualificationItems} isLoading={false} />
-            )}
-          </V2Panel>
+              {!qualificationQuery.isLoading && !qualificationQuery.isError && qualificationItems.length > 0 ? (
+                <div className="V2QualSummary">
+                  <article className="V2QualSummary__cell">
+                    <strong>{fmtPct(qualificationSummary.fullTimePct)}</strong>
+                    <span>Full-time</span>
+                    <small>{fmtPct(qualificationSummary.partTimePct)} part-time</small>
+                  </article>
+                  <article className="V2QualSummary__cell">
+                    <strong>{fmtPct(qualificationSummary.cashPct)}</strong>
+                    <span>Revenue mix</span>
+                    <small>
+                      {fmtPct(qualificationSummary.insurancePct)} insurance · {fmtPct(qualificationSummary.balancedPct)} balanced
+                    </small>
+                  </article>
+                  <article className="V2QualSummary__cell">
+                    <strong>{fmtPct(qualificationSummary.highInterestPct)}</strong>
+                    <span>Coaching interest</span>
+                    <small>
+                      {fmtPct(qualificationSummary.mediumInterestPct)} medium · {fmtPct(qualificationSummary.lowInterestPct)} low
+                    </small>
+                  </article>
+                  <article className="V2QualSummary__cell">
+                    <strong>Top niches</strong>
+                    <span>Incoming interests</span>
+                    <div className="V2QualSummary__niches">
+                      {qualificationSummary.topNiches.map((niche) => (
+                        <span key={niche.niche} className="V2QualSummary__niche">
+                          {niche.niche}
+                          <strong>{fmtInt(niche.count)}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  </article>
+                </div>
+              ) : null}
+
+              <V2Panel
+                title="Lead Qualification by Sequence"
+                caption="Deeper breakdown as you scroll: employment, revenue model, interest level, and top niches."
+              >
+                {qualificationQuery.isLoading ? (
+                  <V2State kind="loading">Loading qualification breakdown...</V2State>
+                ) : qualificationQuery.isError ? (
+                  <V2State kind="error" onRetry={() => void qualificationQuery.refetch()}>
+                    Failed to load qualification breakdown.
+                  </V2State>
+                ) : qualificationItems.length === 0 ? (
+                  <V2State kind="empty">No qualification breakdown available for this date range.</V2State>
+                ) : (
+                  <SequenceQualificationBreakdown items={qualificationItems} isLoading={false} />
+                )}
+              </V2Panel>
+            </div>
+          </details>
 
         </>
       )}

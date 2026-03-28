@@ -187,11 +187,7 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                 </p>
               </div>
             </div>
-            <div className="V2Shell__topbarPills" aria-label="Quick status">
-              <span className="V2Shell__topbarPill">Desktop-first</span>
-              <span className="V2Shell__topbarPill">Live data</span>
-              <span className="V2Shell__topbarPill">No chrome clutter</span>
-            </div>
+            {/* Removed top-right status pills to reduce UI noise per updated UX direction. */}
           </header>
           {children}
         </main>

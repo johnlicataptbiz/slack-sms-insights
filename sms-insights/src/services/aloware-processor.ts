@@ -1,5 +1,5 @@
 import { SMSMessage } from '../types/aloware.js';
-import { insertSmsEvent, type NewSmsEvent } from './sms-event-store.js';
+import { insertSmsEvent, type NewSmsEvent } from '../../services/sms-event-store.js';
 import { logger } from '../../services/logger.js';
 
 export class AlowareProcessor {
@@ -9,7 +9,7 @@ export class AlowareProcessor {
 
       // Map Aloware webhook fields to our internal SmsEvent structure
       // Aloware webhooks often use 'from', 'to', 'message' for SMS events
-      const direction = event.direction || (event.from && event.to ? 'inbound' : 'unknown');
+      const direction: NewSmsEvent['direction'] = event.direction || (event.from && event.to ? 'inbound' : 'unknown');
       const contactPhone = event.contact_phone || (direction === 'inbound' ? event.from : event.to);
       const body = event.body || event.message || '';
       const eventId = event.id || `webhook-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -19,7 +19,7 @@ export class AlowareProcessor {
         slackChannelId: 'direct-webhook',
         slackMessageTs: eventId,
         eventTs: event.created_at ? new Date(event.created_at) : new Date(),
-        direction: direction as 'inbound' | 'outbound',
+        direction,
         contactId: event.contact_id?.toString() || null,
         contactPhone: contactPhone || null,
         contactName: `${event.contact_first_name || ''} ${event.contact_last_name || ''}`.trim() || null,
@@ -27,10 +27,10 @@ export class AlowareProcessor {
         body: body,
         line: event.line_phone_number || event.line_id?.toString() || null,
         sequence: event.sequence_id?.toString() || null,
-        raw: event,
+        raw: JSON.stringify(event),
       };
 
-      const result = await insertSmsEvent(newEvent, logger);
+      const result = await insertSmsEvent(newEvent);
       logger.aloware.info({ eventId, stored: Boolean(result) }, 'Aloware webhook processed');
     } catch (error) {
       logger.aloware.error({ error }, 'Error in AlowareProcessor.processWebhook');

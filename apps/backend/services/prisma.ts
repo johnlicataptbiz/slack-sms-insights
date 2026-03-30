@@ -1,7 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { PrismaClient } from '@prisma/client';
 import { withAccelerate } from '@prisma/extension-accelerate';
-import { PrismaPg } from '@prisma/adapter-pg';
 
 type PrismaMode = 'accelerate' | 'direct';
 
@@ -51,9 +50,11 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
     return (new PrismaClient(clientOptions) as PrismaClient).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
-  // Direct connection via pg driver adapter (required by Prisma 7's client engine).
-  const adapter = new PrismaPg({ connectionString: config.url });
-  return new PrismaClient({ adapter } as unknown as Prisma.PrismaClientOptions);
+  // Direct connection using datasourceUrl (fallback for older Prisma versions)
+  return new PrismaClient({
+    datasourceUrl: config.url,
+    log: ['error', 'warn']
+  });
 
   // Fallback: try direct connection with minimal config
   return new PrismaClient({

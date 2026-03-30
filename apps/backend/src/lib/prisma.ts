@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaPg } from "@prisma/adapter-pg";
 
 // Prisma client configuration with optimizations
 const globalForPrisma = globalThis as unknown as {
@@ -13,8 +12,8 @@ export const prisma =
       process.env.NODE_ENV === "development"
         ? ["query", "error", "warn"]
         : ["error"],
-    // Prisma 7: Use adapter for direct connections
-    adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }),
+    // Direct connection using datasourceUrl
+    datasourceUrl: process.env.DATABASE_URL,
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

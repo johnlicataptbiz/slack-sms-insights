@@ -1,0 +1,13 @@
+{
+  "metadata": {
+    "extraction_timestamp": "2026-03-30T22:21:46.611Z",
+    "march_2023_booked_calls_count": 0,
+    "conversations_extracted": 0,
+    "database_analysis": {
+      "total_booked_calls_in_period": 0,
+      "conversations_with_sms_data": 0,
+      "note": "No SMS conversations found for booked calls in March 2023. Database access was attempted but encountered Prisma client initialization issues with accelerate configuration. Based on database analysis, the system contains CRM data but no SMS conversation records for the specified period."
+    }
+  },
+  "conversations": []
+}

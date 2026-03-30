@@ -1,5 +1,6 @@
 import { PrismaClient, Conversation, ConversationStatus } from '@prisma/client';
 import { BaseRepository } from './base.repository.js';
+import { ConversationDetailSelectPattern } from '../schemas/db-results.js';
 
 export interface CreateConversationData {
   contactKey: string;
@@ -29,41 +30,21 @@ export class ConversationRepository extends BaseRepository {
   async findById(id: string): Promise<Conversation | null> {
     return this.prisma.conversation.findUnique({
       where: { id },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
-        sms_events: {
-          orderBy: { created_at: 'desc' },
-          take: 10,
-        },
-      },
+      select: ConversationDetailSelectPattern,
     });
   }
 
   async findByContactKey(contactKey: string): Promise<Conversation | null> {
     return this.prisma.conversation.findUnique({
       where: { contactKey },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
-        sms_events: {
-          orderBy: { created_at: 'desc' },
-          take: 10,
-        },
-      },
+      select: ConversationDetailSelectPattern,
     });
   }
 
   async create(data: CreateConversationData): Promise<Conversation> {
     return this.prisma.conversation.create({
       data,
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
-      },
+      select: ConversationDetailSelectPattern,
     });
   }
 
@@ -72,11 +53,7 @@ export class ConversationRepository extends BaseRepository {
       return await this.prisma.conversation.update({
         where: { id },
         data,
-        include: {
-          conversation_notes: true,
-          draft_suggestions: true,
-          send_attempts: true,
-        },
+        select: ConversationDetailSelectPattern,
       });
     } catch (error) {
       // Handle not found case

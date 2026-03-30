@@ -1,4 +1,5 @@
 import {
+  Activity,
   CalendarCheck,
   LayoutGrid,
   MessageSquare,
@@ -9,6 +10,7 @@ import {
   TrendingDown,
   UserMinus,
   Users,
+  Zap,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -34,6 +36,7 @@ type Range = 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
 const fmtInt = (n: number) => n.toLocaleString();
 const fmtPct = (n: number) => `${n.toFixed(1)}%`;
 const fmtSignedInt = (n: number) => `${n >= 0 ? '+' : ''}${Math.abs(n).toLocaleString()}`;
+const fmtFloat = (n: number) => n.toFixed(1);
 
 const RANGE_LABELS: Record<Range, string> = {
   today: 'Today',
@@ -46,11 +49,12 @@ const RANGE_LABELS: Record<Range, string> = {
 
 export function InsightsV2() {
   const [range, setRange] = useState<Range>('7d');
+  const [realtime, setRealtime] = useState(false);
   const [searchParams] = useSearchParams();
   const repParam = (searchParams.get('rep') || '').toLowerCase();
   const selectedRep = repParam === 'jack' || repParam === 'brandon' ? repParam : null;
 
-  const query = useV2InsightsSummary({ range, tz: DEFAULT_BUSINESS_TIME_ZONE, rep: selectedRep });
+  const query = useV2InsightsSummary({ range, tz: DEFAULT_BUSINESS_TIME_ZONE, rep: selectedRep, realtime });
   const data = query.data?.data;
 
   const reps = useMemo(() => data?.reps ?? [], [data?.reps]);
@@ -141,9 +145,18 @@ export function InsightsV2() {
     <div className="V2Page V2PageTransition V2Page--clean">
       <V2PageHeader
         title="Performance"
-        subtitle="Team and setter results, what needs attention, and Monday board health."
+        subtitle={`Team and setter results, what needs attention, and Monday board health.${realtime ? ' • Live updates active' : ''}`}
         right={
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button
+              className={`V2Chip ${realtime ? 'is-active' : ''}`}
+              aria-pressed={realtime}
+              onClick={() => setRealtime(!realtime)}
+              title={realtime ? 'Disable real-time updates' : 'Enable real-time updates'}
+            >
+              {realtime ? <Zap size={11} /> : <Activity size={11} />}
+              Live
+            </button>
             {(Object.keys(RANGE_LABELS) as Range[]).map((value) => (
               <button
                 key={value}
@@ -205,6 +218,15 @@ export function InsightsV2() {
           label={<IconLabel icon={<UserMinus size={11} />}>Opt-outs</IconLabel>}
           value={fmtInt(data.kpis.optOuts)}
           tone={data.kpis.optOuts > 0 ? 'critical' : 'default'}
+        />
+        <V2MetricCard
+          label={<IconLabel icon={<MessageSquare size={11} />}>Msgs per contact</IconLabel>}
+          value={fmtFloat(data.kpis.uniqueContacted > 0 ? data.kpis.messagesSent / data.kpis.uniqueContacted : 0)}
+        />
+        <V2MetricCard
+          label={<IconLabel icon={<TrendingDown size={11} />}>Engagement rate</IconLabel>}
+          value={fmtPct(data.kpis.uniqueContacted > 0 ? (data.kpis.repliesReceived / data.kpis.uniqueContacted) * 100 : 0)}
+          tone={data.kpis.uniqueContacted > 0 && (data.kpis.repliesReceived / data.kpis.uniqueContacted) > 0.1 ? 'positive' : 'default'}
         />
         <V2MetricCard
           label={<IconLabel icon={<TrendingDown size={11} />}>Opt-out rate</IconLabel>}

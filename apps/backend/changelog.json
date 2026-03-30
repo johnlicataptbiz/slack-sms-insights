@@ -1,8 +1,152 @@
 {
-  "generatedAt": "2026-03-23T16:38:10.459Z",
+  "generatedAt": "2026-03-30T22:06:11.651Z",
   "daysIncluded": 365,
-  "totalCount": 485,
+  "totalCount": 493,
   "entries": [
+    {
+      "hash": "315358e",
+      "date": "2026-03-30T15:19:52-05:00",
+      "message": "Implement major backend and frontend updates for SMS insights",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Implement major backend and frontend updates for SMS insights"
+    },
+    {
+      "hash": "34b091b",
+      "date": "2026-03-28T13:29:18-04:00",
+      "message": "fix(build): repair aloware processor sms event import",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Repair aloware processor sms event import"
+    },
+    {
+      "hash": "6ad397b",
+      "date": "2026-03-28T13:25:19-04:00",
+      "message": "fix(sequences): use canonical fact rollups for deep metrics",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Use canonical fact rollups for deep metrics"
+    },
+    {
+      "hash": "df08073",
+      "date": "2026-03-27T12:57:39-04:00",
+      "message": "fix(aloware): persist webhook sms events",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Persist webhook sms events"
+    },
+    {
+      "hash": "cdcf6fb",
+      "date": "2026-03-27T12:56:17-04:00",
+      "message": "fix(v2): expand sequences name column",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Expand sequences name column"
+    },
+    {
+      "hash": "442f5ea",
+      "date": "2026-03-27T12:52:13-04:00",
+      "message": "fix(v2): darken inbox filters and sequences tables",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Darken inbox filters and sequences tables"
+    },
+    {
+      "hash": "9d87eb1",
+      "date": "2026-03-27T12:37:16-04:00",
+      "message": "fix(v2): improve dark theme contrast for inbox and sequences",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Improve dark theme contrast for inbox and sequences"
+    },
+    {
+      "hash": "d7e9fcc",
+      "date": "2026-03-27T11:35:00-04:00",
+      "message": "fix(monday): commit backend sync guardrails",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Commit backend sync guardrails"
+    },
+    {
+      "hash": "c2a3388",
+      "date": "2026-03-27T11:22:23-04:00",
+      "message": "fix(v2): improve inbox and sequences contrast",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Improve inbox and sequences contrast"
+    },
+    {
+      "hash": "bacbb65",
+      "date": "2026-03-26T11:52:06-04:00",
+      "message": "fix(ci): stabilize frontend/backend builds and report workflow",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Stabilize frontend/backend builds and report workflow"
+    },
+    {
+      "hash": "ee25c5f",
+      "date": "2026-03-24T06:03:06-05:00",
+      "message": "Complete UI overhaul implementation across all phases",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Complete UI overhaul implementation across all phases"
+    },
+    {
+      "hash": "d4c1287",
+      "date": "2026-03-24T06:09:01-05:00",
+      "message": "Fix TS errors by stringifying raw fields",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix TS errors by stringifying raw fields"
+    },
+    {
+      "hash": "73e11d4",
+      "date": "2026-03-24T06:08:10-05:00",
+      "message": "Resolve merge conflict in package-lock.json by accepting theirs",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "General",
+      "description": "Resolve merge conflict in package-lock.json by accepting theirs"
+    },
+    {
+      "hash": "09bde3d",
+      "date": "2026-03-24T04:33:47-05:00",
+      "message": "Regenerate changelog after merge",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Regenerate changelog after merge"
+    },
+    {
+      "hash": "32c7d2e",
+      "date": "2026-03-23T15:35:07-04:00",
+      "message": "feat: update Aloware webhook payload handling based on documentation",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Update Aloware webhook payload handling based on documentation"
+    },
+    {
+      "hash": "8b4bd13",
+      "date": "2026-03-23T15:32:36-04:00",
+      "message": "feat: implement direct Aloware webhook integration",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Implement direct Aloware webhook integration"
+    },
     {
       "hash": "c0bb8f2",
       "date": "2026-03-23T04:42:13-05:00",
@@ -67,6 +211,24 @@
       "description": "Complete state migration in InboxV2 - replace legacy setState with useInboxState hook"
     },
     {
+      "hash": "3765f87",
+      "date": "2026-03-23T09:22:13Z",
+      "message": "fix: apply reviewer suggestions — Dockerfile placeholder URL, sms-event-store raw types, heading query in test",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Apply reviewer suggestions — Dockerfile placeholder URL, sms-event-store raw types, heading query..."
+    },
+    {
+      "hash": "6d8be78",
+      "date": "2026-03-23T04:18:31-05:00",
+      "message": "Apply suggestion from @Copilot",
+      "author": "johnlicataptbiz",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Apply suggestion from @Copilot"
+    },
+    {
       "hash": "7778e39",
       "date": "2026-03-23T04:09:57-05:00",
       "message": "fix: resolve escalationLevel ReferenceError in InboxV2",
@@ -83,6 +245,15 @@
       "type": "refactor",
       "category": "Dashboard",
       "description": "Update qualification labels to match core pre-qualifiers"
+    },
+    {
+      "hash": "e162e6c",
+      "date": "2026-03-23T08:29:30Z",
+      "message": "Fix: Non-null assertion on `.closest()` return value without explicit null check makes test fragile to DOM structure changes",
+      "author": "Vercel",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Non-null assertion on `.closest()` return value without explicit null check makes test fragile to..."
     },
     {
       "hash": "33a955a",
@@ -220,6 +391,33 @@
       "description": "Add database analysis scripts, reports, and updates"
     },
     {
+      "hash": "36b83e0",
+      "date": "2026-03-22T22:56:39Z",
+      "message": "fix: apply review feedback — health endpoint safety, Prisma postgres:// support, startup error handling, engine constraint alignment",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Apply review feedback — health endpoint safety, Prisma postgres:// support, startup error handlin..."
+    },
+    {
+      "hash": "8a3d799",
+      "date": "2026-03-22T22:48:27Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
+    },
+    {
+      "hash": "9cdbf09",
+      "date": "2026-03-22T17:48:02-05:00",
+      "message": "Update sms-insights/api/routes.ts",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Integrations",
+      "description": "Update sms-insights/api/routes.ts"
+    },
+    {
       "hash": "fb20fc9",
       "date": "2026-03-22T17:45:23-05:00",
       "message": "fix: resolve TypeScript errors in attribution and conversion services",
@@ -265,25 +463,7 @@
       "description": "Align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows"
     },
     {
-      "hash": "0629272",
-      "date": "2026-03-22T20:07:02Z",
-      "message": "fix: implement all reviewer suggestions - remove dead code, fix SQL injection, align Node version",
-      "author": "copilot-swe-agent[bot]",
-      "type": "feature",
-      "category": "Database",
-      "description": "Implement all reviewer suggestions - remove dead code, fix SQL injection, align Node version"
-    },
-    {
-      "hash": "3311a2b",
-      "date": "2026-03-22T19:58:03Z",
-      "message": "Initial plan",
-      "author": "copilot-swe-agent[bot]",
-      "type": "other",
-      "category": "General",
-      "description": "Initial plan"
-    },
-    {
-      "hash": "698fde4",
+      "hash": "19b513b",
       "date": "2026-03-22T12:11:22-05:00",
       "message": "fix(railway): restore backend deployment health",
       "author": "Jack Licata",
@@ -299,78 +479,6 @@
       "type": "fix",
       "category": "AI & ML",
       "description": "Reconcile cleaned railway branch and unblock backend tests"
-    },
-    {
-      "hash": "2874cbc",
-      "date": "2026-03-22T10:24:41-05:00",
-      "message": "fix(ci): remove frontend-only dependency from shared page metrics",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Dashboard",
-      "description": "Remove frontend-only dependency from shared page metrics"
-    },
-    {
-      "hash": "4f240f1",
-      "date": "2026-03-22T10:20:12-05:00",
-      "message": "fix(ci): use node runner for backend test discovery",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Infrastructure",
-      "description": "Use node runner for backend test discovery"
-    },
-    {
-      "hash": "3f187bb",
-      "date": "2026-03-22T10:13:55-05:00",
-      "message": "fix(ci): unblock backend node test runner",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Infrastructure",
-      "description": "Unblock backend node test runner"
-    },
-    {
-      "hash": "9e899f7",
-      "date": "2026-03-22T10:00:47-05:00",
-      "message": "fix(ci): repair node test discovery script",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "AI & ML",
-      "description": "Repair node test discovery script"
-    },
-    {
-      "hash": "24fa61d",
-      "date": "2026-03-22T09:26:24-05:00",
-      "message": "fix(stores): use Prisma JSON values for backend payload fields",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Database",
-      "description": "Use Prisma JSON values for backend payload fields"
-    },
-    {
-      "hash": "5313a0a",
-      "date": "2026-03-22T09:22:12-05:00",
-      "message": "fix(sms-event-store): use Prisma.InputJsonValue and Prisma.DbNull for Json fields",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Database",
-      "description": "Use Prisma.InputJsonValue and Prisma.DbNull for Json fields"
-    },
-    {
-      "hash": "79a637c",
-      "date": "2026-03-21T17:33:26Z",
-      "message": "fix: remove invalid frontend install step from test-backend job",
-      "author": "copilot-swe-agent[bot]",
-      "type": "fix",
-      "category": "Bug Fixes",
-      "description": "Remove invalid frontend install step from test-backend job"
-    },
-    {
-      "hash": "cad3bf2",
-      "date": "2026-03-22T09:11:59-05:00",
-      "message": "fix(ci): clean up CI and test setup",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Infrastructure",
-      "description": "Clean up CI and test setup"
     },
     {
       "hash": "6c58fe6",
@@ -391,13 +499,22 @@
       "description": "Merge PR #27: Add DATABASE_URL build arg for Prisma generation"
     },
     {
-      "hash": "b252eea",
-      "date": "2026-03-21T08:10:39-05:00",
-      "message": "fix(ci): unblock vercel and frontend tests",
-      "author": "Jack Licata",
+      "hash": "81bd67b",
+      "date": "2026-03-22T01:55:07Z",
+      "message": "fix: reconcile PRs — TS build, Prisma raw field, frontend tests, CI workflows, Dockerfile DATABASE_URL, remove TODO.md",
+      "author": "copilot-swe-agent[bot]",
       "type": "fix",
-      "category": "Infrastructure",
-      "description": "Unblock vercel and frontend tests"
+      "category": "Database",
+      "description": "Reconcile PRs — TS build, Prisma raw field, frontend tests, CI workflows, Dockerfile DATABASE_URL..."
+    },
+    {
+      "hash": "ce19452",
+      "date": "2026-03-22T01:39:59Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
     },
     {
       "hash": "2e1c0ac",
@@ -416,42 +533,6 @@
       "type": "feature",
       "category": "Integrations",
       "description": "Restore all important dangling commits - type-motion, Monday integration, CI secret scan, docs fi..."
-    },
-    {
-      "hash": "beca8b2",
-      "date": "2026-03-21T06:15:01-05:00",
-      "message": "fix(ci+tests): backend CI via npm scripts + frontend RTL magnet tests",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Infrastructure",
-      "description": "Backend CI via npm scripts + frontend RTL magnet tests"
-    },
-    {
-      "hash": "6d06a71",
-      "date": "2026-03-21T05:44:00-05:00",
-      "message": "fix(ci): frontend test step + vitest script",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Infrastructure",
-      "description": "Frontend test step + vitest script"
-    },
-    {
-      "hash": "873a431",
-      "date": "2026-03-21T05:26:27-05:00",
-      "message": "fix(ci): backend tests exclude frontend",
-      "author": "Jack Licata",
-      "type": "fix",
-      "category": "Infrastructure",
-      "description": "Backend tests exclude frontend"
-    },
-    {
-      "hash": "fed2b6b",
-      "date": "2026-03-21T05:21:29-05:00",
-      "message": "fix(react): add frontend test steps + vitest scripts",
-      "author": "Jack Licata",
-      "type": "feature",
-      "category": "Bug Fixes",
-      "description": "Add frontend test steps + vitest scripts"
     },
     {
       "hash": "103fa38",
@@ -488,15 +569,6 @@
       "type": "feature",
       "category": "General",
       "description": "Add nvmrc and update changelog"
-    },
-    {
-      "hash": "b0e0187",
-      "date": "2026-03-20T21:32:40Z",
-      "message": "fix: add .nvmrc to pin Node.js 20 for sms-insights",
-      "author": "railway-app[bot]",
-      "type": "feature",
-      "category": "Bug Fixes",
-      "description": "Add .nvmrc to pin Node.js 20 for sms-insights"
     },
     {
       "hash": "469a436",

@@ -263,3 +263,136 @@ export type InboxContactProfileArray = z.infer<
 
 export const SendAttemptArraySchema = z.array(SendAttemptSelectSchema);
 export type SendAttemptArray = z.infer<typeof SendAttemptArraySchema>;
+
+// ============================================================================
+// SELECT PATTERN SCHEMAS (Phase 3 Optimization)
+// ============================================================================
+
+/**
+ * Optimized SELECT pattern for conversation detail views
+ * Reduces payload from ~50-100 fields to ~15 fields
+ */
+export const ConversationDetailSelectPattern = {
+  id: true,
+  contactKey: true,
+  status: true,
+  last_touch_at: true,
+  conversation_notes: {
+    select: {
+      id: true,
+      author: true,
+      text: true,
+      created_at: true,
+    },
+  },
+  draft_suggestions: {
+    select: {
+      id: true,
+      suggestion: true,
+      created_at: true,
+    },
+  },
+  sms_events: {
+    select: {
+      id: true,
+      direction: true,
+      body: true,
+      event_ts: true,
+    },
+    orderBy: { event_ts: "desc" },
+    take: 10,
+  },
+  send_attempts: {
+    select: {
+      id: true,
+      status: true,
+      created_at: true,
+    },
+    where: { status: { in: ["failed", "blocked"] } },
+  },
+} as const;
+
+/**
+ * Zod schema for validating conversation SELECT patterns
+ */
+export const ConversationSelectSchema = z.object({
+  id: z.boolean().optional(),
+  contactKey: z.boolean().optional(),
+  status: z.boolean().optional(),
+  last_touch_at: z.boolean().optional(),
+  conversation_notes: z
+    .object({
+      select: z.record(z.boolean()),
+    })
+    .optional(),
+  sms_events: z
+    .object({
+      select: z.record(z.boolean()),
+      orderBy: z.record(z.enum(["asc", "desc"])).optional(),
+      take: z.number().optional(),
+    })
+    .optional(),
+  send_attempts: z
+    .object({
+      select: z.record(z.boolean()),
+      where: z.record(z.any()).optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Optimized SELECT pattern for SMS events list
+ */
+export const SmsEventsListSelectPattern = {
+  id: true,
+  direction: true,
+  body: true,
+  event_ts: true,
+  contact_id: true,
+  normalized_phone: true,
+} as const;
+
+/**
+ * Batch query patterns for concurrent operations
+ */
+export const BatchQueryPatterns = {
+  /**
+   * Fetch multiple conversations with optimized selects
+   */
+  conversationsWithRecentActivity: (conversationIds: string[]) => ({
+    where: { id: { in: conversationIds } },
+    select: {
+      id: true,
+      contactKey: true,
+      status: true,
+      last_touch_at: true,
+      sms_events: {
+        select: {
+          id: true,
+          direction: true,
+          event_ts: true,
+        },
+        orderBy: { event_ts: "desc" },
+        take: 5,
+      },
+    },
+  }),
+
+  /**
+   * Fetch send attempts for multiple conversations
+   */
+  sendAttemptsForConversations: (conversationIds: string[]) => ({
+    where: {
+      conversation_id: { in: conversationIds },
+      status: { in: ["failed", "blocked", "queued"] },
+    },
+    select: {
+      id: true,
+      conversation_id: true,
+      status: true,
+      created_at: true,
+      error_message: true,
+    },
+    orderBy: { created_at: "desc" },
+  }),
+} as const;

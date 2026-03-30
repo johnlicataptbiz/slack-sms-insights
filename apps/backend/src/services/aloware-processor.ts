@@ -1,4 +1,4 @@
-import { SMSMessage } from '../types';
+import { SMSMessage } from '../../types';
 
 export class AlowareProcessor {
   private validateSignature(signature: string, body: string) {

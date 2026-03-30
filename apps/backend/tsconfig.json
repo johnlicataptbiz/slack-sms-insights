@@ -7,11 +7,12 @@
   "compilerOptions": {
     "target": "esnext",
     "esModuleInterop": true,
-    "module": "NodeNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "outDir": "./dist",
     "strict": true,
     "composite": true
   },
-  "include": ["**/*.ts", "!tests/**", "!dist/**", "!node_modules/**"],
+  "include": ["**/*.ts"],
   "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*"],
 }

@@ -468,6 +468,7 @@ type InsightsSummaryQueryParams = {
   range?: 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
   tz?: string;
   rep?: 'jack' | 'brandon' | null;
+  realtime?: boolean;
 };
 
 const toInsightsSummarySearchParams = (params: InsightsSummaryQueryParams): URLSearchParams => {
@@ -495,10 +496,12 @@ export const useV2InsightsSummary = (params: InsightsSummaryQueryParams) => {
       assertInsightsSummaryV2Envelope(response);
       return response as ApiEnvelope<InsightsSummaryV2>;
     },
-    staleTime: 30 * 1000,
+    staleTime: params.realtime ? 10 * 1000 : 30 * 1000, // 10s for realtime, 30s otherwise
     gcTime: 5 * 60 * 1000,
     retry: 2,
     refetchOnWindowFocus: false,
+    refetchInterval: params.realtime ? 30 * 1000 : false, // Poll every 30s for realtime
+    refetchIntervalInBackground: false,
   });
 };
 

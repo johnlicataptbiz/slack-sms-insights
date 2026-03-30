@@ -24,6 +24,7 @@ export class HealthController extends BaseController {
       memory: process.memoryUsage(),
       version: process.version,
       database: dbStatus,
+      deployment: 'updated-2026-03-30',
     };
 
     this.sendSuccessResponse(res, healthData);

@@ -7,12 +7,12 @@ export class HealthController extends BaseController {
     const { res } = context;
 
     // Database health check
-    let dbStatus = 'unknown';
+    let dbStatus = false;
     try {
       await prisma.$queryRaw`SELECT 1`;
-      dbStatus = 'healthy';
+      dbStatus = true;
     } catch (error) {
-      dbStatus = 'unhealthy';
+      dbStatus = false;
       console.error('Database health check failed:', error);
     }
 

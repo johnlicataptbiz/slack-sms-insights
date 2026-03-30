@@ -7,6 +7,7 @@ import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApiRoute } from './api/routes.js';
+import { HealthController } from './src/controllers/health.controller.js';
 import registerListeners from './listeners/index.js';
 import { initDatabase } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
@@ -154,6 +155,13 @@ app.error(async (error) => {
         // Continue with request handling
         void (async () => {
           const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
+
+          // Handle health check
+          if (pathname === '/health') {
+            const controller = new HealthController();
+            await controller.execute({ req, res } as any);
+            return;
+          }
 
           // Handle API routes
           if (pathname.startsWith('/api/')) {

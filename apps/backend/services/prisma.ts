@@ -1,6 +1,7 @@
 import type { Prisma } from '@prisma/client';
 import { PrismaClient } from '@prisma/client';
 import { withAccelerate } from '@prisma/extension-accelerate';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 type PrismaMode = 'accelerate' | 'direct';
 
@@ -50,15 +51,9 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
     return (new PrismaClient(clientOptions) as PrismaClient).$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
-  // Direct connection - For Prisma 7, we need to provide an accelerateUrl even for direct connections
-  // or use an adapter. Since we don't have an adapter, we'll tell it to use accelerate mode
-  // but with the regular DATABASE_URL
-  if (config.url.startsWith('postgresql://')) {
-    // Convert to accelerate format for Prisma 7 compatibility
-    const accelerateUrl = config.url.replace('postgresql://', 'prisma+postgres://');
-    const clientOptions = { accelerateUrl } as unknown as Prisma.PrismaClientOptions;
-    return (new PrismaClient(clientOptions) as PrismaClient).$extends(withAccelerate()) as unknown as PrismaClient;
-  }
+  // Direct connection via pg driver adapter (required by Prisma 7's client engine).
+  const adapter = new PrismaPg({ connectionString: config.url });
+  return new PrismaClient({ adapter } as unknown as Prisma.PrismaClientOptions);
 
   // Fallback: try direct connection with minimal config
   return new PrismaClient({

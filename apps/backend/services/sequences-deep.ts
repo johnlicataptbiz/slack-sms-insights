@@ -121,7 +121,9 @@ export const getSequencesDeep = async (
     attributedByLabelRows,
     rawEventRows,
   ] = await Promise.all([
-    prisma.fact_booking_daily.findMany({
+    (async () => {
+      try {
+        return await prisma.fact_booking_daily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -138,7 +140,13 @@ export const getSequencesDeep = async (
         booking_rate_pct: true,
         diagnostic_booking_signals: true,
       },
-    }),
+    });
+      } catch (error) {
+        // Table may not exist in production yet
+        logger?.warn?.('sequences-deep: fact_booking_daily table not available', { error: error instanceof Error ? error.message : String(error) });
+        return [];
+      }
+    })(),
     prisma.fact_lead_quality_daily.findMany({
       where: {
         day: {

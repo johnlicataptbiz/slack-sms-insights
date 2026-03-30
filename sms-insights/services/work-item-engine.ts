@@ -65,8 +65,8 @@ export const upsertNeedsReplyWorkItem = async (
           where: { id: existing.id },
           data: {
             rep_id: existing.rep_id || conversation.current_rep_id,
-            severity: severity === 'high' || existing.severity === 'high' ? 'high' : 'med',
-            due_at: existing.due_at < dueAt ? existing.due_at : dueAt,
+            severity: severity === 'high' || (existing as any).severity === 'high' ? 'high' : 'med',
+            due_at: (existing as any).due_at < dueAt ? (existing as any).due_at : dueAt,
           },
         });
         return updated as unknown as WorkItemRow;

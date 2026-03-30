@@ -93,19 +93,19 @@ export const listOpenWorkItems = async (
     const items: WorkItemListRow[] = itemsRaw.map((wi: any) => ({
       id: wi.id,
       type: wi.type,
-      severity: wi.severity as any,
+      severity: (wi as any).severity,
       due_at: wi.due_at.toISOString(),
       created_at: wi.created_at.toISOString(),
       resolved_at: wi.resolved_at ? wi.resolved_at.toISOString() : null,
       rep_id: wi.rep_id,
-      conversation_id: wi.conversations.id,
-      contact_key: wi.conversations.contactKey,
-      contact_id: wi.conversations.contact_id,
-      contact_phone: wi.conversations.contact_phone,
-      last_inbound_at: wi.conversations.last_inbound_at ? wi.conversations.last_inbound_at.toISOString() : null,
-      last_outbound_at: wi.conversations.last_outbound_at ? wi.conversations.last_outbound_at.toISOString() : null,
-      last_touch_at: wi.conversations.last_touch_at ? wi.conversations.last_touch_at.toISOString() : null,
-      unreplied_inbound_count: wi.conversations.unreplied_inbound_count,
+      conversation_id: (wi as any).conversations.id,
+      contact_key: (wi as any).conversations.contactKey,
+      contact_id: (wi as any).conversations.contact_id,
+      contact_phone: (wi as any).conversations.contact_phone,
+      last_inbound_at: (wi as any).conversations.last_inbound_at ? (wi as any).conversations.last_inbound_at.toISOString() : null,
+      last_outbound_at: (wi as any).conversations.last_outbound_at ? (wi as any).conversations.last_outbound_at.toISOString() : null,
+      last_touch_at: (wi as any).conversations.last_touch_at ? (wi as any).conversations.last_touch_at.toISOString() : null,
+      unreplied_inbound_count: (wi as any).conversations.unreplied_inbound_count,
     }));
 
     const last = items.at(-1);

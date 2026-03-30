@@ -108,10 +108,10 @@ export const listOpenWorkItems = async (
     const hasMore = results.length > limit;
     const itemsRaw = hasMore ? results.slice(0, limit) : results;
 
-    const items: WorkItemListRow[] = itemsRaw.map((wi) => ({
+    const items: WorkItemListRow[] = itemsRaw.map((wi: any) => ({
       id: wi.id,
       type: wi.type,
-      severity: wi.severity as any,
+      severity: wi.severity,
       due_at: wi.due_at.toISOString(),
       created_at: wi.created_at.toISOString(),
       resolved_at: wi.resolved_at ? wi.resolved_at.toISOString() : null,

@@ -364,7 +364,7 @@ model sms_events {
   contact_phone          String?
   contact_name           String?
   aloware_user           String?
-  body                   String
+  body                   String?
   line                   String?
   sequence               String?
   raw                    Json?
@@ -395,6 +395,21 @@ model sms_events {
   @@index([sequence, event_ts(sort: Desc)], map: "idx_sms_events_sequence_event_ts")
   @@index([sequence_id, event_ts(sort: Desc)], map: "idx_sms_events_sequence_id_event_ts")
   @@index([sequence_version_id, event_ts(sort: Desc)], map: "idx_sms_events_sequence_version_event_ts")
+}
+
+model fact_booking_daily {
+  day                  DateTime @db.Date
+  sequence_id          String   @db.Uuid
+  rep_id               String
+  booked_total         Int      @default(0)
+  booked_jack          Int      @default(0)
+  unique_contacted     Int      @default(0)
+  booking_signals_sms  Int      @default(0)
+
+  @@id([day, sequence_id, rep_id])
+  @@index([day], map: "idx_fact_booking_daily_day")
+  @@index([sequence_id], map: "idx_fact_booking_daily_sequence_id")
+  @@index([rep_id], map: "idx_fact_booking_daily_rep_id")
 }
 
 model trend_alerts {

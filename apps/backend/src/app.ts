@@ -1,25 +1,22 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
 import compression from 'compression';
-
-// Import controllers
-import { HealthController } from './controllers/health.controller.js';
+import cors from 'cors';
+import express from 'express';
+import helmet from 'helmet';
 import { AlowareController } from './controllers/aloware.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
-
+// Import controllers
+import { HealthController } from './controllers/health.controller.js';
+// Import services
+import { connectPrisma } from './lib/prisma.js';
 // Import middleware
 import { errorHandler } from './middleware/error-handler.js';
 import { requestLogger } from './middleware/request-logger.js';
-
-// Import services
-import { connectPrisma } from './lib/prisma.js';
 
 export class App {
   private app: express.Application;
   private port: number;
 
-  constructor(port: number = 3000) {
+  constructor(port = 3000) {
     this.app = express();
     this.port = port;
     this.initializeMiddleware();
@@ -32,12 +29,15 @@ export class App {
     this.app.use(helmet());
 
     // CORS
-    this.app.use(cors({
-      origin: process.env.NODE_ENV === 'production'
-        ? process.env.FRONTEND_URL
-        : ['http://localhost:3000', 'http://localhost:5173'],
-      credentials: true
-    }));
+    this.app.use(
+      cors({
+        origin:
+          process.env.NODE_ENV === 'production'
+            ? process.env.FRONTEND_URL
+            : ['http://localhost:3000', 'http://localhost:5173'],
+        credentials: true,
+      }),
+    );
 
     // Compression
     this.app.use(compression());
@@ -62,7 +62,7 @@ export class App {
         logger: console,
         params: {},
         query: {},
-        body: undefined
+        body: undefined,
       };
       try {
         await healthController.execute(context);
@@ -80,7 +80,7 @@ export class App {
         logger: console,
         params: {},
         query: {},
-        body: undefined
+        body: undefined,
       };
       try {
         await authController.verify(context);
@@ -97,7 +97,7 @@ export class App {
         logger: console,
         params: {},
         query: {},
-        body: req.body
+        body: req.body,
       };
       try {
         await authController.login(context);
@@ -132,7 +132,7 @@ export class App {
       this.app.listen(this.port, () => {
         console.log(`🚀 Consolidated backend server running on port ${this.port}`);
         console.log(`📊 Health check available at http://localhost:${this.port}/api/health`);
-        console.log(`🔄 Migration status: P0 Complete - Ready for schema unification`);
+        console.log('🔄 Migration status: P0 Complete - Ready for schema unification');
       });
     } catch (error) {
       console.error('Failed to start server:', error);
@@ -147,7 +147,7 @@ export class App {
 
 // For development
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const port = parseInt(process.env.PORT || '3001', 10);
+  const port = Number.parseInt(process.env.PORT || '3001', 10);
   const app = new App(port);
   app.start().catch(console.error);
 }

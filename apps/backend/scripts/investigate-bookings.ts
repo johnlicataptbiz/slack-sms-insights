@@ -34,14 +34,13 @@ async function investigateBookings() {
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayString = yesterday.toISOString().split("T")[0];
+    const yesterdayString = yesterday.toISOString().split('T')[0];
 
     console.log(`Fetching sms_events for ${yesterdayString}...`);
 
-    const { rows } = await pool.query(
-      "SELECT event_ts, direction, body FROM sms_events WHERE DATE(event_ts) = $1",
-      [yesterdayString]
-    );
+    const { rows } = await pool.query('SELECT event_ts, direction, body FROM sms_events WHERE DATE(event_ts) = $1', [
+      yesterdayString,
+    ]);
 
     console.log(`Found ${rows.length} total sms_events for yesterday.`);
 
@@ -63,7 +62,6 @@ async function investigateBookings() {
       console.log('Sample booking signals:');
       console.log(JSON.stringify(bookingSignals, null, 2));
     }
-
   } catch (e) {
     if (e instanceof Error) {
       console.error('Error during investigation:', e.message);

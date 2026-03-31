@@ -23,12 +23,10 @@ async function testConnection() {
     // Check key tables
     console.log('📊 Checking key tables...\n');
     const tables = ['conversations', 'conversation_state', 'sms_events', 'booked_calls'];
-    
+
     for (const table of tables) {
       try {
-        const result = await prisma.$queryRawUnsafe<{ count: number }[]>(
-          `SELECT COUNT(*) as count FROM "${table}"`
-        );
+        const result = await prisma.$queryRawUnsafe<{ count: number }[]>(`SELECT COUNT(*) as count FROM "${table}"`);
         const count = Number(result[0]?.count || 0);
         console.log(`  ✅ ${table}: ${count.toLocaleString()} rows`);
       } catch (e) {
@@ -48,13 +46,13 @@ async function testConnection() {
       `);
       const qualCount = Number(qualResult[0]?.count || 0);
       console.log(`  ✅ Conversations with qualification data: ${qualCount.toLocaleString()}`);
-      
+
       const totalResult = await prisma.$queryRawUnsafe<{ count: number }[]>(
-        `SELECT COUNT(*) as count FROM conversation_state`
+        'SELECT COUNT(*) as count FROM conversation_state',
       );
       const totalCount = Number(totalResult[0]?.count || 0);
       console.log(`  📊 Total conversation states: ${totalCount.toLocaleString()}`);
-      
+
       if (qualCount > 0) {
         console.log(`  🎯 Qualification coverage: ${((qualCount / totalCount) * 100).toFixed(1)}%`);
       }
@@ -72,7 +70,7 @@ async function testConnection() {
         timezone: 'America/Chicago',
         minConversations: 1,
       });
-      console.log(`  ✅ Sequence qualification service working`);
+      console.log('  ✅ Sequence qualification service working');
       console.log(`  📊 Found ${qualData.length} sequences with qualification data`);
     } catch (e) {
       console.log(`  ⚠️  Sequence qualification service error: ${e instanceof Error ? e.message : String(e)}`);

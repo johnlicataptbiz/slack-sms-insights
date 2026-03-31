@@ -1,8 +1,80 @@
 {
-  "generatedAt": "2026-03-30T23:42:33.570Z",
+  "generatedAt": "2026-03-31T04:03:46.360Z",
   "daysIncluded": 365,
-  "totalCount": 504,
+  "totalCount": 512,
   "entries": [
+    {
+      "hash": "8169c03",
+      "date": "2026-03-30T21:24:30-05:00",
+      "message": "fix: address linting issues from branch analysis",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Address linting issues from branch analysis"
+    },
+    {
+      "hash": "30ea29f",
+      "date": "2026-03-30T21:15:58-05:00",
+      "message": "docs: update PROJECT_CONTEXT.md with branch review findings",
+      "author": "Jack Licata",
+      "type": "docs",
+      "category": "General",
+      "description": "Update PROJECT_CONTEXT.md with branch review findings"
+    },
+    {
+      "hash": "42332a8",
+      "date": "2026-03-30T21:10:27-05:00",
+      "message": "feat: implement project rescue recommendations",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Implement project rescue recommendations"
+    },
+    {
+      "hash": "048f3d7",
+      "date": "2026-03-30T20:36:02-05:00",
+      "message": "chore: remove legacy sms-insights backend directory",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Remove legacy sms-insights backend directory"
+    },
+    {
+      "hash": "e9d7698",
+      "date": "2026-03-30T20:31:18-05:00",
+      "message": "chore: comprehensive repository cleanup and deduplication",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Comprehensive repository cleanup and deduplication"
+    },
+    {
+      "hash": "3948acd",
+      "date": "2026-03-30T20:22:41-05:00",
+      "message": "chore: organize project folders - move scattered files to organized directories",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Organize project folders - move scattered files to organized directories"
+    },
+    {
+      "hash": "eb8e175",
+      "date": "2026-03-30T19:24:27-05:00",
+      "message": "feat: implement database resilience and fix Aloware webhook parsing",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement database resilience and fix Aloware webhook parsing"
+    },
+    {
+      "hash": "cb562c8",
+      "date": "2026-03-30T18:42:56-05:00",
+      "message": "Fix TypeScript errors in work-item services for deployment",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix TypeScript errors in work-item services for deployment"
+    },
     {
       "hash": "8f208dc",
       "date": "2026-03-30T18:39:47-05:00",

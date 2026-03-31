@@ -1,6 +1,6 @@
+import { listMessagesForConversation, updateConversationState } from '../services/inbox-store.js';
 import { getPrismaClient } from '../services/prisma.js';
 import { inferQualificationStateFromMessages } from '../services/qualification-inference.js';
-import { listMessagesForConversation, updateConversationState } from '../services/inbox-store.js';
 import 'dotenv/config';
 
 async function runBackfill() {
@@ -9,7 +9,7 @@ async function runBackfill() {
 
   // 1. Get all conversation states
   const states = await prisma.conversation_state.findMany({
-    orderBy: { updated_at: 'desc' }
+    orderBy: { updated_at: 'desc' },
   });
 
   console.log(`📊 Found ${states.length} conversations to analyze.`);
@@ -24,7 +24,9 @@ async function runBackfill() {
     const conversationId = state.conversation_id;
 
     if (i % 50 === 0 && i > 0) {
-      console.log(`⏳ Progress: ${i}/${states.length} (${updatedCount} updated, ${skippedCount} skipped, ${totalInboundFound} w/ inbound)`);
+      console.log(
+        `⏳ Progress: ${i}/${states.length} (${updatedCount} updated, ${skippedCount} skipped, ${totalInboundFound} w/ inbound)`,
+      );
     }
 
     try {
@@ -36,15 +38,11 @@ async function runBackfill() {
         continue;
       }
 
-      const inboundCount = messages.filter(m => m.direction === 'inbound').length;
+      const inboundCount = messages.filter((m) => m.direction === 'inbound').length;
       if (inboundCount > 0) totalInboundFound++;
 
       // 3. Run inference (allow overwrite known to get the BEST data from the new patterns)
-      const result = inferQualificationStateFromMessages(
-        state as any,
-        messages as any,
-        { allowOverwriteKnown: true }
-      );
+      const result = inferQualificationStateFromMessages(state as any, messages as any, { allowOverwriteKnown: true });
 
       if (result.changed) {
         if (updatedCount < 5) {
@@ -73,7 +71,7 @@ async function runBackfill() {
   process.exit(0);
 }
 
-runBackfill().catch(err => {
+runBackfill().catch((err) => {
   console.error('FATAL:', err);
   process.exit(1);
 });

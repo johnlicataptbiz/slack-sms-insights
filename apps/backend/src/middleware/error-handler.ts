@@ -1,5 +1,5 @@
-import type { Request, Response, NextFunction } from 'express';
 import type { Logger } from '@slack/bolt';
+import type { NextFunction, Request, Response } from 'express';
 
 interface ErrorResponse {
   success: false;
@@ -8,12 +8,7 @@ interface ErrorResponse {
   stack?: string;
 }
 
-export const errorHandler = (
-  error: Error,
-  req: Request,
-  res: Response,
-  next: NextFunction
-): void => {
+export const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction): void => {
   const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
   const errorResponse: ErrorResponse = {
     success: false,

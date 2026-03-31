@@ -28,7 +28,7 @@ async function main() {
   }
 
   if (errors.length > 0) {
-    const ids = errors.map(r => r.id);
+    const ids = errors.map((r) => r.id);
     const del = await prisma.daily_runs.deleteMany({ where: { id: { in: ids } } });
     console.log(`\nDeleted ${del.count} error row(s).`);
   } else {
@@ -52,10 +52,12 @@ async function main() {
 }
 
 main()
-  .catch(e => {
+  .catch((e) => {
     console.error('Script failed:', e);
     process.exit(1);
   })
   .finally(async () => {
-    try { await (prisma as any).$disconnect(); } catch {}
+    try {
+      await (prisma as any).$disconnect();
+    } catch {}
   });

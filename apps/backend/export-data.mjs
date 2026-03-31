@@ -1,6 +1,6 @@
-import { getPrismaClient } from './services/prisma.ts';
-import { writeFileSync } from 'fs';
 import { createObjectCsvWriter } from 'csv-writer';
+import { writeFileSync } from 'fs';
+import { getPrismaClient } from './services/prisma.ts';
 
 const prisma = getPrismaClient();
 
@@ -13,7 +13,7 @@ export async function exportConversations(options = {}) {
     startDate = null,
     endDate = null,
     limit = 1000,
-    outputFile = 'conversations_export.csv'
+    outputFile = 'conversations_export.csv',
   } = options;
 
   const where = {};
@@ -35,8 +35,8 @@ export async function exportConversations(options = {}) {
       sms_events: {
         orderBy: { event_ts: 'desc' },
         take: 5,
-      }
-    }
+      },
+    },
   });
 
   const csvWriter = createObjectCsvWriter({
@@ -59,10 +59,10 @@ export async function exportConversations(options = {}) {
       { id: 'has_work_items', title: 'Has Work Items' },
       { id: 'sms_count', title: 'SMS Count' },
       { id: 'lead_source', title: 'Lead Source' },
-    ]
+    ],
   });
 
-  const records = conversations.map(conv => ({
+  const records = conversations.map((conv) => ({
     id: conv.id,
     contactKey: conv.contactKey,
     contact_phone: conv.contact_phone || conv.inbox_contact_profiles?.[0]?.phone || 'N/A',
@@ -97,7 +97,7 @@ export async function exportSMSEvents(options = {}) {
     direction = null,
     sequence = null,
     limit = 5000,
-    outputFile = 'sms_events_export.csv'
+    outputFile = 'sms_events_export.csv',
   } = options;
 
   const where = {};
@@ -129,10 +129,10 @@ export async function exportSMSEvents(options = {}) {
       { id: 'body', title: 'Message Body' },
       { id: 'line', title: 'Line' },
       { id: 'conversation_id', title: 'Conversation ID' },
-    ]
+    ],
   });
 
-  const records = events.map(event => ({
+  const records = events.map((event) => ({
     id: event.id,
     event_ts: event.event_ts.toISOString(),
     direction: event.direction,
@@ -155,12 +155,7 @@ export async function exportSMSEvents(options = {}) {
  * Export booked calls with attribution data
  */
 export async function exportBookedCalls(options = {}) {
-  const {
-    startDate = null,
-    endDate = null,
-    limit = 500,
-    outputFile = 'booked_calls_export.csv'
-  } = options;
+  const { startDate = null, endDate = null, limit = 500, outputFile = 'booked_calls_export.csv' } = options;
 
   const where = {};
   if (startDate || endDate) {
@@ -178,11 +173,11 @@ export async function exportBookedCalls(options = {}) {
   // Get attribution data for these calls
   const attributions = await prisma.booked_call_attribution.findMany({
     where: {
-      booked_call_id: { in: calls.map(c => c.id) }
-    }
+      booked_call_id: { in: calls.map((c) => c.id) },
+    },
   });
 
-  const attributionMap = new Map(attributions.map(a => [a.booked_call_id, a]));
+  const attributionMap = new Map(attributions.map((a) => [a.booked_call_id, a]));
 
   const csvWriter = createObjectCsvWriter({
     path: outputFile,
@@ -198,10 +193,10 @@ export async function exportBookedCalls(options = {}) {
       { id: 'source_bucket', title: 'Source' },
       { id: 'conversation_id', title: 'Conversation ID' },
       { id: 'mapping_method', title: 'Mapping Method' },
-    ]
+    ],
   });
 
-  const records = calls.map(call => {
+  const records = calls.map((call) => {
     const attr = attributionMap.get(call.id);
     return {
       id: call.id,
@@ -227,10 +222,7 @@ export async function exportBookedCalls(options = {}) {
  * Export sequence performance metrics
  */
 export async function exportSequencePerformance(options = {}) {
-  const {
-    days = 30,
-    outputFile = 'sequence_performance_export.csv'
-  } = options;
+  const { days = 30, outputFile = 'sequence_performance_export.csv' } = options;
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -240,15 +232,15 @@ export async function exportSequencePerformance(options = {}) {
     include: {
       sms_events: {
         where: {
-          event_ts: { gte: startDate }
-        }
+          event_ts: { gte: startDate },
+        },
       },
       facts_sms: {
         where: {
-          day: { gte: startDate }
-        }
-      }
-    }
+          day: { gte: startDate },
+        },
+      },
+    },
   });
 
   const csvWriter = createObjectCsvWriter({
@@ -264,16 +256,16 @@ export async function exportSequencePerformance(options = {}) {
       { id: 'reply_rate', title: 'Reply Rate %' },
       { id: 'unique_contacts', title: 'Unique Contacts' },
       { id: 'avg_daily_volume', title: 'Avg Daily Volume' },
-    ]
+    ],
   });
 
-  const records = sequences.map(seq => {
-    const outbound = seq.sms_events.filter(e => e.direction === 'outbound').length;
-    const inbound = seq.sms_events.filter(e => e.direction === 'inbound').length;
+  const records = sequences.map((seq) => {
+    const outbound = seq.sms_events.filter((e) => e.direction === 'outbound').length;
+    const inbound = seq.sms_events.filter((e) => e.direction === 'inbound').length;
     const total = seq.sms_events.length;
     const replyRate = outbound > 0 ? ((inbound / outbound) * 100).toFixed(2) : '0.00';
-    
-    const uniqueContacts = new Set(seq.sms_events.map(e => e.contact_phone).filter(Boolean)).size;
+
+    const uniqueContacts = new Set(seq.sms_events.map((e) => e.contact_phone).filter(Boolean)).size;
     const avgDaily = (total / days).toFixed(1);
 
     return {
@@ -309,7 +301,7 @@ async function main() {
           status: args[1],
           startDate: args[2],
           endDate: args[3],
-          outputFile: args[4] || 'conversations_export.csv'
+          outputFile: args[4] || 'conversations_export.csv',
         });
         break;
 
@@ -318,7 +310,7 @@ async function main() {
           direction: args[1],
           startDate: args[2],
           endDate: args[3],
-          outputFile: args[4] || 'sms_events_export.csv'
+          outputFile: args[4] || 'sms_events_export.csv',
         });
         break;
 
@@ -326,14 +318,14 @@ async function main() {
         await exportBookedCalls({
           startDate: args[1],
           endDate: args[2],
-          outputFile: args[3] || 'booked_calls_export.csv'
+          outputFile: args[3] || 'booked_calls_export.csv',
         });
         break;
 
       case 'sequences':
         await exportSequencePerformance({
-          days: parseInt(args[1]) || 30,
-          outputFile: args[2] || 'sequence_performance_export.csv'
+          days: Number.parseInt(args[1]) || 30,
+          outputFile: args[2] || 'sequence_performance_export.csv',
         });
         break;
 

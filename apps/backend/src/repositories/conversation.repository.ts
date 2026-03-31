@@ -1,6 +1,6 @@
-import { PrismaClient, Conversation, ConversationStatus } from '@prisma/client';
-import { BaseRepository } from './base.repository.js';
+import type { Conversation, ConversationStatus, PrismaClient } from '@prisma/client';
 import { ConversationDetailSelectPattern } from '../schemas/db-results.js';
+import { BaseRepository } from './base.repository.js';
 
 export interface CreateConversationData {
   contactKey: string;
@@ -78,22 +78,17 @@ export class ConversationRepository extends BaseRepository {
     }
   }
 
-  async findMany(options: {
-    status?: ConversationStatus;
-    current_rep_id?: string;
-    limit?: number;
-    offset?: number;
-    orderBy?: 'createdAt' | 'updatedAt' | 'last_touch_at';
-    orderDirection?: 'asc' | 'desc';
-  } = {}): Promise<Conversation[]> {
-    const {
-      status,
-      current_rep_id,
-      limit = 50,
-      offset = 0,
-      orderBy = 'updatedAt',
-      orderDirection = 'desc',
-    } = options;
+  async findMany(
+    options: {
+      status?: ConversationStatus;
+      current_rep_id?: string;
+      limit?: number;
+      offset?: number;
+      orderBy?: 'createdAt' | 'updatedAt' | 'last_touch_at';
+      orderDirection?: 'asc' | 'desc';
+    } = {},
+  ): Promise<Conversation[]> {
+    const { status, current_rep_id, limit = 50, offset = 0, orderBy = 'updatedAt', orderDirection = 'desc' } = options;
 
     return this.prisma.conversation.findMany({
       where: {
@@ -113,10 +108,7 @@ export class ConversationRepository extends BaseRepository {
     });
   }
 
-  async count(options: {
-    status?: ConversationStatus;
-    current_rep_id?: string;
-  } = {}): Promise<number> {
+  async count(options: { status?: ConversationStatus; current_rep_id?: string } = {}): Promise<number> {
     const { status, current_rep_id } = options;
 
     return this.prisma.conversation.count({

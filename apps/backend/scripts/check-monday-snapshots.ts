@@ -10,7 +10,7 @@
  */
 
 import type { Logger } from '@slack/bolt';
-import { initDatabase, getPool } from '../services/db.js';
+import { getPool, initDatabase } from '../services/db.js';
 
 const logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = {
   debug: (msg: string, ...args: unknown[]) => console.debug(`[DEBUG] ${msg}`, ...args),

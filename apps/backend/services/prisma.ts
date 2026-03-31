@@ -53,7 +53,7 @@ const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   // Direct connection using datasourceUrl (fallback for older Prisma versions)
   return new PrismaClient({
     datasourceUrl: config.url,
-    log: ['error', 'warn']
+    log: ['error', 'warn'],
   });
 
   // Fallback: try direct connection with minimal config

@@ -12,7 +12,7 @@ const readline = require('readline');
 
 const rl = readline.createInterface({
   input: process.stdin,
-  output: process.stdout
+  output: process.stdout,
 });
 
 const question = (prompt) => new Promise((resolve) => rl.question(prompt, resolve));
@@ -124,14 +124,11 @@ async function main() {
 
     // Replace or add DATABASE_PUBLIC_URL
     if (envContent.includes('DATABASE_PUBLIC_URL=')) {
-      envContent = envContent.replace(
-        /DATABASE_PUBLIC_URL=.*/,
-        `DATABASE_PUBLIC_URL="${dbUrl}"`
-      );
+      envContent = envContent.replace(/DATABASE_PUBLIC_URL=.*/, `DATABASE_PUBLIC_URL="${dbUrl}"`);
     } else if (envContent.includes('DATABASE_URL=')) {
       envContent = envContent.replace(
         /DATABASE_URL=.*/,
-        `DATABASE_PUBLIC_URL="${dbUrl}"\nDATABASE_URL="file:./dev.db"`
+        `DATABASE_PUBLIC_URL="${dbUrl}"\nDATABASE_URL="file:./dev.db"`,
       );
     } else {
       envContent = `DATABASE_PUBLIC_URL="${dbUrl}"\n${envContent}`;

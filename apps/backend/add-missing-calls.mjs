@@ -1,6 +1,6 @@
-import { getPrismaClient } from './services/prisma.ts';
 import { getBookedCallAttributionSources } from './services/booked-calls.ts';
 import { queryBoardItems } from './services/monday-client.ts';
+import { getPrismaClient } from './services/prisma.ts';
 
 const prisma = getPrismaClient();
 
@@ -23,23 +23,23 @@ const colors = {
 
 async function addMissingCalls() {
   console.log(`\n${colors.bright}${colors.cyan}🔧 Adding the 9 Missing Calls to Monday${colors.reset}\n`);
-  
+
   const boardId = process.env.MONDAY_PERSONAL_BOARD_ID;
   const from = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
   const to = new Date();
-  
+
   // Get all Jack's calls from database
   const sources = await getBookedCallAttributionSources({ from, to });
-  const jackCalls = sources.filter(s => s.bucket === 'jack');
-  
+  const jackCalls = sources.filter((s) => s.bucket === 'jack');
+
   // Get all items on Monday board
   const { items } = await queryBoardItems(boardId);
-  
+
   // Find missing calls
   const missing = [];
   for (const call of jackCalls) {
     const contactName = call.contactName || '';
-    const exists = items.some(item => {
+    const exists = items.some((item) => {
       const itemNameLower = item.name.toLowerCase();
       const contactNameLower = contactName.toLowerCase();
       return contactNameLower && itemNameLower.includes(contactNameLower);
@@ -48,9 +48,9 @@ async function addMissingCalls() {
       missing.push(call);
     }
   }
-  
+
   console.log(`Found ${missing.length} calls to add\n`);
-  
+
   const mapLineToChannel = (line) => {
     if (!line) return 'Aloware SMS';
     const normalized = line.toLowerCase();
@@ -61,7 +61,7 @@ async function addMissingCalls() {
     if (normalized.includes('self')) return 'SELF BOOK';
     return 'Aloware SMS';
   };
-  
+
   const mapSourceToMondaySource = (firstConversion) => {
     if (!firstConversion) return 'Direct Outreach';
     const normalized = firstConversion.toLowerCase();
@@ -78,27 +78,27 @@ async function addMissingCalls() {
     if (normalized.includes('self book') || normalized.includes('meetings link')) return 'Signature Self Book';
     return 'Direct Outreach';
   };
-  
+
   const token = getMondayToken();
   let created = 0;
   let failed = 0;
-  
+
   for (const call of missing) {
     const contactName = call.contactName || 'Booked Call';
     const callDate = call.eventTs.substring(0, 10);
     const itemName = `${contactName} - ${callDate}`;
-    
+
     const columnValues = {
-      "date_mkznycfs": { "date": callDate },
-      "color_mm089dk3": { "label": "First Swing" },
-      "color_mkznwqh0": { "label": mapLineToChannel(call.line) },
-      "color_mkznd6kp": { "label": mapSourceToMondaySource(call.firstConversion) }
+      date_mkznycfs: { date: callDate },
+      color_mm089dk3: { label: 'First Swing' },
+      color_mkznwqh0: { label: mapLineToChannel(call.line) },
+      color_mkznd6kp: { label: mapSourceToMondaySource(call.firstConversion) },
     };
-    
+
     console.log(`${colors.blue}Creating:${colors.reset} ${itemName}`);
     console.log(`  Source: ${columnValues.color_mkznd6kp.label}`);
     console.log(`  Channel: ${columnValues.color_mkznwqh0.label}`);
-    
+
     try {
       const mutation = `
         mutation CreateItem($boardId: ID!, $itemName: String!, $columnValues: JSON!) {
@@ -107,7 +107,7 @@ async function addMissingCalls() {
           }
         }
       `;
-      
+
       const response = await fetch(MONDAY_API_URL, {
         method: 'POST',
         headers: {
@@ -119,13 +119,13 @@ async function addMissingCalls() {
           variables: {
             boardId,
             itemName,
-            columnValues: JSON.stringify(columnValues)
-          }
+            columnValues: JSON.stringify(columnValues),
+          },
         }),
       });
-      
+
       const result = await response.json();
-      
+
       if (result.errors) {
         console.log(`  ${colors.red}✗ Error:${colors.reset} ${result.errors[0].message}\n`);
         failed++;
@@ -133,7 +133,7 @@ async function addMissingCalls() {
         const newItemId = result.data.create_item.id;
         console.log(`  ${colors.green}✓ Created ID:${colors.reset} ${newItemId}\n`);
         created++;
-        
+
         // Mark as synced in database
         await prisma.monday_booked_call_pushes.upsert({
           where: {
@@ -141,7 +141,7 @@ async function addMissingCalls() {
               board_id: boardId,
               slack_channel_id: call.slackChannelId,
               slack_message_ts: call.slackMessageTs,
-            }
+            },
           },
           create: {
             board_id: boardId,
@@ -157,25 +157,24 @@ async function addMissingCalls() {
             monday_item_id: newItemId,
             status: 'synced',
             pushed_at: new Date(),
-          }
+          },
         });
       }
-      
+
       // Wait 3 seconds between calls to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 3000));
     } catch (error) {
       console.log(`  ${colors.red}✗ Exception:${colors.reset} ${error.message}\n`);
       failed++;
     }
   }
-  
+
   console.log(`\n${colors.bright}${colors.cyan}═══════════════════════════════════${colors.reset}`);
   console.log(`${colors.bright}${colors.green}✓ Successfully Created: ${created}${colors.reset}`);
   console.log(`${colors.bright}${colors.red}✗ Failed: ${failed}${colors.reset}`);
   console.log(`${colors.bright}Total Processed: ${created + failed}${colors.reset}`);
   console.log(`${colors.bright}${colors.cyan}═══════════════════════════════════${colors.reset}\n`);
-  
+
   await prisma.$disconnect();
 }
 

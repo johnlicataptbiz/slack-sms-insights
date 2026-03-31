@@ -1,13 +1,14 @@
 #!/usr/bin/env tsx
+
 /**
  * Push SMS sequence performance to Monday.com.
  *
  * The goal is to keep the board as a KPI dashboard, not a registry export.
  */
 
-import { getPrisma } from '../services/prisma.js';
 import { findColumnIdByTitle, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
 import { queryBoardColumns, upsertBookedCallItem } from '../services/monday-client.js';
+import { getPrisma } from '../services/prisma.js';
 
 const BOARD_ID = process.env.MONDAY_SMS_SEQUENCES_BOARD_ID || '18404367764';
 
@@ -50,7 +51,8 @@ const buildNotes = (sequence: SequenceMetrics): string => {
   return notes.join('\n');
 };
 
-const buildItemName = (sequence: SequenceMetrics): string => sequence.label || sequence.normalized_label || `Sequence ${sequence.sequence_id}`;
+const buildItemName = (sequence: SequenceMetrics): string =>
+  sequence.label || sequence.normalized_label || `Sequence ${sequence.sequence_id}`;
 
 const buildColumnValues = (
   sequence: SequenceMetrics,
@@ -67,7 +69,8 @@ const buildColumnValues = (
   if (columnsById.bookedCalls) values[columnsById.bookedCalls] = sequence.booked_calls;
   if (columnsById.bookingRate) values[columnsById.bookingRate] = Number(sequence.booking_rate_pct.toFixed(2));
   if (columnsById.trend) values[columnsById.trend] = { label: sequence.trend };
-  if (columnsById.lastUpdated) values[columnsById.lastUpdated] = { date: sequence.updated_at.toISOString().slice(0, 10) };
+  if (columnsById.lastUpdated)
+    values[columnsById.lastUpdated] = { date: sequence.updated_at.toISOString().slice(0, 10) };
   if (columnsById.notes) values[columnsById.notes] = buildNotes(sequence);
   return values;
 };
@@ -116,7 +119,11 @@ async function main() {
 
     const smsBySequence = new Map<string, { messagesSent: number; repliesReceived: number; updatedAt: Date }>();
     for (const row of smsFacts) {
-      const current = smsBySequence.get(row.sequence_id) || { messagesSent: 0, repliesReceived: 0, updatedAt: row.updated_at };
+      const current = smsBySequence.get(row.sequence_id) || {
+        messagesSent: 0,
+        repliesReceived: 0,
+        updatedAt: row.updated_at,
+      };
       current.messagesSent += row.messages_sent;
       current.repliesReceived += row.replies_received;
       if (row.updated_at > current.updatedAt) current.updatedAt = row.updated_at;
@@ -132,7 +139,11 @@ async function main() {
     }
 
     const summaries: SequenceMetrics[] = sequences.map((sequence) => {
-      const sms = smsBySequence.get(sequence.id) || { messagesSent: 0, repliesReceived: 0, updatedAt: sequence.updated_at };
+      const sms = smsBySequence.get(sequence.id) || {
+        messagesSent: 0,
+        repliesReceived: 0,
+        updatedAt: sequence.updated_at,
+      };
       const bookings = bookingsBySequence.get(sequence.id) || { bookedCalls: 0, updatedAt: sequence.updated_at };
       const messagesSent = sms.messagesSent;
       const repliesReceived = sms.repliesReceived;

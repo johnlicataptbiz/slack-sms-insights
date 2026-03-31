@@ -47,7 +47,6 @@ async function checkMeredithCall() {
     } else {
       console.log('\n❌ No Monday push record found');
     }
-
   } catch (error) {
     console.error('Error:', error);
   } finally {

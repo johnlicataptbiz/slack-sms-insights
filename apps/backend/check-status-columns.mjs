@@ -21,26 +21,26 @@ const log = {
 
 async function checkStatusColumns() {
   log.title('🔍 CHECKING MONDAY STATUS COLUMNS');
-  
+
   const boardId = process.env.MONDAY_PERSONAL_BOARD_ID || '';
   if (!boardId) {
     log.error('MONDAY_PERSONAL_BOARD_ID not configured');
     return;
   }
-  
+
   log.info(`Board ID: ${boardId}`);
-  
+
   const columns = await queryBoardColumns(boardId);
-  
+
   // Filter for status columns
-  const statusColumns = columns.filter(col => col.type === 'color' || col.type.includes('status'));
-  
+  const statusColumns = columns.filter((col) => col.type === 'color' || col.type.includes('status'));
+
   log.success(`Found ${statusColumns.length} status columns`);
-  
+
   for (const col of statusColumns) {
     log.data(`\n${colors.bright}${col.title}${colors.reset} [${col.id}]`);
     log.data(`  Type: ${col.type}`);
-    
+
     // Check if settings_str contains label information
     if (col.settings_str) {
       try {
@@ -62,7 +62,7 @@ async function checkStatusColumns() {
       }
     }
   }
-  
+
   // Show current mapping
   log.title('\n📋 CURRENT COLUMN MAPPING');
   const envMapping = process.env.MONDAY_PERSONAL_COLUMN_MAP_JSON;
@@ -73,18 +73,18 @@ async function checkStatusColumns() {
       log.data(`  sourceColumnId: ${mapping.sourceColumnId || 'NOT SET'}`);
       log.data(`  lineColumnId: ${mapping.lineColumnId || 'NOT SET'}`);
       log.data(`  stageColumnId: ${mapping.stageColumnId || 'NOT SET'}`);
-      
+
       // Match with actual columns
       if (mapping.sourceColumnId) {
-        const col = statusColumns.find(c => c.id === mapping.sourceColumnId);
+        const col = statusColumns.find((c) => c.id === mapping.sourceColumnId);
         log.data(`\n  ${colors.cyan}Source Column:${colors.reset} ${col ? col.title : 'NOT FOUND'}`);
       }
       if (mapping.lineColumnId) {
-        const col = statusColumns.find(c => c.id === mapping.lineColumnId);
+        const col = statusColumns.find((c) => c.id === mapping.lineColumnId);
         log.data(`  ${colors.cyan}Line Column:${colors.reset} ${col ? col.title : 'NOT FOUND'}`);
       }
       if (mapping.stageColumnId) {
-        const col = statusColumns.find(c => c.id === mapping.stageColumnId);
+        const col = statusColumns.find((c) => c.id === mapping.stageColumnId);
         log.data(`  ${colors.cyan}Stage Column:${colors.reset} ${col ? col.title : 'NOT FOUND'}`);
       }
     } catch (e) {

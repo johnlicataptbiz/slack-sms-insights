@@ -3,7 +3,7 @@
  * Seeds the new reps table from existing actor_directory data
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -16,7 +16,7 @@ interface ActorRow {
 }
 
 async function backfillReps() {
-  console.log("👥 Starting reps backfill...\n");
+  console.log('👥 Starting reps backfill...\n');
 
   try {
     // Get all actors
@@ -46,7 +46,7 @@ async function backfillReps() {
         data: {
           id: actor.canonical_name,
           name: actor.canonical_name,
-          team: actor.role || "unknown",
+          team: actor.role || 'unknown',
           role: actor.role || undefined,
           is_active: actor.active,
           specialties: actor.aliases.length > 0 ? actor.aliases : undefined,
@@ -59,7 +59,7 @@ async function backfillReps() {
     console.log(`⏭️  Skipped ${skipped} existing reps`);
 
     // Now add Slack user mappings if available
-    console.log("\n🔗 Checking for Slack user mappings...");
+    console.log('\n🔗 Checking for Slack user mappings...');
 
     // Get unique aloware_users from sms_events
     const slackUsers = await prisma.$queryRaw<Array<{ aloware_user: string | null }>>`
@@ -82,7 +82,7 @@ async function backfillReps() {
       const matchingRep = actors.find(
         (a) =>
           a.canonical_name.toLowerCase().includes(firstName) ||
-          firstName.includes(a.canonical_name.toLowerCase().split(/[\s_]/)[0])
+          firstName.includes(a.canonical_name.toLowerCase().split(/[\s_]/)[0]),
       );
 
       if (matchingRep) {
@@ -97,9 +97,9 @@ async function backfillReps() {
       }
     }
 
-    console.log("\n✨ Reps backfill complete!\n");
+    console.log('\n✨ Reps backfill complete!\n');
   } catch (error) {
-    console.error("❌ Backfill failed:", error);
+    console.error('❌ Backfill failed:', error);
     process.exit(1);
   } finally {
     await prisma.$disconnect();

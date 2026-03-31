@@ -69,9 +69,7 @@ const existingCommands = (features.slash_commands ?? []) as Array<{ command: str
 
 // Merge: keep existing commands that aren't in our list, then add ours
 const merged = [
-  ...existingCommands.filter(
-    (c) => !slashCommands.some((sc) => sc.command === c.command),
-  ),
+  ...existingCommands.filter((c) => !slashCommands.some((sc) => sc.command === c.command)),
   ...slashCommands,
 ];
 

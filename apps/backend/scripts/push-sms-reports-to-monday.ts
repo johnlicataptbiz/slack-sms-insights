@@ -8,7 +8,10 @@
 
 import { syncWeeklySummaryToMonday } from '../services/weekly-manager-summary.js';
 
-const weeksBack = Number.parseInt((process.argv.find((arg) => arg.startsWith('--weeks=')) || '').split('=')[1] || '4', 10);
+const weeksBack = Number.parseInt(
+  (process.argv.find((arg) => arg.startsWith('--weeks=')) || '').split('=')[1] || '4',
+  10,
+);
 
 const mondayWeekStart = (base: Date): string => {
   const date = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate()));

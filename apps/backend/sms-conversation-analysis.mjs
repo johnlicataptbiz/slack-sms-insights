@@ -18,7 +18,7 @@ async function runAnalysis() {
   try {
     // 1. Message Volume Analysis
     console.log('📊 1. MESSAGE VOLUME ANALYSIS');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     const messageVolume = await prisma.$queryRaw`
       SELECT
@@ -38,7 +38,7 @@ async function runAnalysis() {
 
     // 2. Sequence Performance Analysis
     console.log('\n📊 2. SEQUENCE PERFORMANCE ANALYSIS');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     const sequencePerformance = await prisma.$queryRaw`
       SELECT
@@ -73,7 +73,7 @@ async function runAnalysis() {
 
     // 3. Response Time Analysis
     console.log('\n📊 3. RESPONSE TIME ANALYSIS');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     const responseTimes = await prisma.$queryRaw`
       SELECT
@@ -96,7 +96,7 @@ async function runAnalysis() {
 
     // 4. Engagement Analysis
     console.log('\n📊 4. ENGAGEMENT ANALYSIS');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     const engagementRates = await prisma.$queryRaw`
       SELECT
@@ -126,7 +126,7 @@ async function runAnalysis() {
 
     // 5. Conversation Pattern Analysis
     console.log('\n📊 5. CONVERSATION PATTERN ANALYSIS');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     const conversationPatterns = await prisma.$queryRaw`
       WITH conversation_lengths AS (
@@ -157,7 +157,7 @@ async function runAnalysis() {
 
     // 6. Attribution Analysis
     console.log('\n📊 6. ATTRIBUTION ANALYSIS');
-    console.log('=' .repeat(50));
+    console.log('='.repeat(50));
 
     const attributionAnalysis = await prisma.$queryRaw`
       SELECT
@@ -180,7 +180,6 @@ async function runAnalysis() {
     console.log('• Real sequence data shows clear performance patterns');
     console.log('• Attribution conflicts indicate need for refinement');
     console.log('• Most conversations are single-message (no engagement)');
-
   } catch (error) {
     console.error('❌ Analysis failed:', error);
   } finally {

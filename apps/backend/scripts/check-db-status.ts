@@ -30,13 +30,13 @@ async function checkDatabaseStatus() {
     // Check for ptbizsms-specific tables
     const keyTables = [
       'lead_outcomes',
-      'lead_attribution', 
+      'lead_attribution',
       'monday_board_registry',
       'monday_call_snapshots',
       'sequence_version_decisions',
-      'conversion_examples'
+      'conversion_examples',
     ];
-    
+
     console.log('Checking for ptbizsms-specific tables:');
     for (const table of keyTables) {
       const exists = await prisma.$queryRaw<{ exists: boolean }[]>`
@@ -75,12 +75,12 @@ async function checkDatabaseStatus() {
          OR qualification_coaching_interest != 'unknown'
     `;
     const qualCount = Number(qualResult[0].count);
-    
+
     const totalResult = await prisma.$queryRaw<{ count: number }[]>`
       SELECT COUNT(*) as count FROM conversation_state
     `;
     const totalCount = Number(totalResult[0].count);
-    
+
     console.log(`  Conversations with qualification: ${qualCount.toLocaleString()}`);
     console.log(`  Total conversation states: ${totalCount.toLocaleString()}`);
     console.log(`  Coverage: ${((qualCount / totalCount) * 100).toFixed(1)}%`);

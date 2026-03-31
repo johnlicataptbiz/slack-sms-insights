@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * Migrate data from old Monday boards to redesigned boards
- * 
+ *
  * Usage: npx tsx scripts/migrate-boards-to-redesign.ts [--dry-run]
  */
 
@@ -142,13 +142,11 @@ async function getBoardColumns(boardId: string): Promise<BoardColumn[]> {
 
 function buildColumnMappings(oldColumns: BoardColumn[], newColumns: BoardColumn[]): ColumnMapping[] {
   const mappings: ColumnMapping[] = [];
-  
+
   for (const oldCol of oldColumns) {
     // Try to find matching column in new board by title
-    const newCol = newColumns.find(
-      (nc) => nc.title.toLowerCase() === oldCol.title.toLowerCase()
-    );
-    
+    const newCol = newColumns.find((nc) => nc.title.toLowerCase() === oldCol.title.toLowerCase());
+
     if (newCol) {
       mappings.push({
         oldColumnId: oldCol.id,
@@ -157,36 +155,36 @@ function buildColumnMappings(oldColumns: BoardColumn[], newColumns: BoardColumn[
       });
     }
   }
-  
+
   return mappings;
 }
 
 // Map old status labels to new board's default labels
 const STATUS_LABEL_MAP: Record<string, string> = {
   // Old -> New mapping for Status column
-  'Active': '0',        // Maps to first label
-  'Paused': '1',        // Maps to second label  
-  'Testing': '2',       // Maps to third label
-  'Archived': '2',      // Maps to third label
+  Active: '0', // Maps to first label
+  Paused: '1', // Maps to second label
+  Testing: '2', // Maps to third label
+  Archived: '2', // Maps to third label
   // Trend column
-  'Up': '0',
-  'Flat': '1',
-  'Down': '2',
+  Up: '0',
+  Flat: '1',
+  Down: '2',
   // Health column
-  'Good': '0',
-  'Watch': '1',
-  'Action': '2',
+  Good: '0',
+  Watch: '1',
+  Action: '2',
 };
 
 function mapStatusValue(value: string | null | undefined, columnTitle: string): string | null {
   if (!value) return null;
-  
+
   // Check if this is a status column that needs mapping
   const lowerTitle = columnTitle.toLowerCase();
   if (lowerTitle === 'status' || lowerTitle === 'trend' || lowerTitle === 'health') {
     return STATUS_LABEL_MAP[value] || value;
   }
-  
+
   return value;
 }
 
@@ -215,7 +213,11 @@ async function createItem(boardId: string, itemName: string): Promise<string | n
   return createResult.data?.create_item?.id || null;
 }
 
-async function patchItemColumns(boardId: string, itemId: string, columnValues: Record<string, unknown>): Promise<boolean> {
+async function patchItemColumns(
+  boardId: string,
+  itemId: string,
+  columnValues: Record<string, unknown>,
+): Promise<boolean> {
   if (dryRun) {
     console.log(`    [DRY RUN] Would patch columns for item ${itemId}`);
     return true;
@@ -230,10 +232,10 @@ async function patchItemColumns(boardId: string, itemId: string, columnValues: R
     }
   `;
 
-  const patchResult = await callMondayApi(patchQuery, { 
-    boardId, 
-    itemId, 
-    columnValues: JSON.stringify(columnValues) 
+  const patchResult = await callMondayApi(patchQuery, {
+    boardId,
+    itemId,
+    columnValues: JSON.stringify(columnValues),
   });
 
   if (patchResult.errors) {
@@ -257,7 +259,7 @@ async function migrateSmsReports(): Promise<void> {
   const newColumns = await getBoardColumns(NEW_BOARDS.reports);
 
   console.log(`   Found ${oldItems.length} items in old board`);
-  
+
   const mappings = buildColumnMappings(oldColumns, newColumns);
   console.log(`   Found ${mappings.length} column mappings`);
 
@@ -276,7 +278,7 @@ async function migrateSmsReports(): Promise<void> {
 
   for (const item of oldItems) {
     const columnValues: Record<string, unknown> = {};
-    
+
     for (const mapping of mappings) {
       const cv = item.column_values.find((v) => v.id === mapping.oldColumnId);
       if (cv && cv.text) {
@@ -286,7 +288,7 @@ async function migrateSmsReports(): Promise<void> {
 
     const itemName = item.name || `Report ${item.id}`;
     const newId = await createItem(NEW_BOARDS.reports, itemName);
-    
+
     if (newId) {
       // Patch columns in a second step
       await patchItemColumns(NEW_BOARDS.reports, newId, columnValues);
@@ -310,7 +312,7 @@ async function migrateSmsSequences(): Promise<void> {
   const newColumns = await getBoardColumns(NEW_BOARDS.sequences);
 
   console.log(`   Found ${oldItems.length} items in old board`);
-  
+
   const mappings = buildColumnMappings(oldColumns, newColumns);
   console.log(`   Found ${mappings.length} column mappings`);
 
@@ -318,7 +320,7 @@ async function migrateSmsSequences(): Promise<void> {
 
   for (const item of oldItems) {
     const columnValues: Record<string, unknown> = {};
-    
+
     for (const mapping of mappings) {
       const cv = item.column_values.find((v) => v.id === mapping.oldColumnId);
       if (cv && cv.text) {
@@ -332,7 +334,7 @@ async function migrateSmsSequences(): Promise<void> {
 
     const itemName = item.name || `Sequence ${item.id}`;
     const newId = await createItem(NEW_BOARDS.sequences, itemName);
-    
+
     if (newId) {
       // Patch columns in a second step
       await patchItemColumns(NEW_BOARDS.sequences, newId, columnValues);

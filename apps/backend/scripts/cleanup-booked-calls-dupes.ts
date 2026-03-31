@@ -66,7 +66,7 @@ async function cleanupBookedCalls() {
       LIMIT 10
     `);
     console.log('\nCounts by date after cleanup:');
-    byDate.rows.forEach(row => {
+    byDate.rows.forEach((row) => {
       const date = new Date(row.dt);
       const adjustedDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
       console.log(`  ${adjustedDate.toISOString().split('T')[0]}: ${row.cnt}`);

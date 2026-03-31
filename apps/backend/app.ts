@@ -7,7 +7,6 @@ import { createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApiRoute } from './api/routes.js';
-import { HealthController } from './src/controllers/health.controller.js';
 import registerListeners from './listeners/index.js';
 import { initDatabase } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
@@ -18,6 +17,7 @@ import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
 import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
+import { HealthController } from './src/controllers/health.controller.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
@@ -159,7 +159,7 @@ app.error(async (error) => {
           // Handle health check
           if (pathname === '/health') {
             const controller = new HealthController();
-            await controller.execute({ req, res } as any);
+            await controller.execute({ req, res } as unknown as Parameters<typeof controller.execute>[0]);
             return;
           }
 

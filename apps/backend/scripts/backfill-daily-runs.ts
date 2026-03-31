@@ -1,7 +1,6 @@
 import 'dotenv/config';
-import { closeDatabase, initDatabase } from '../services/db.js';
-import { getPool } from '../services/db.js';
 import { buildDailyReportSummary, isDailySnapshotReport } from '../services/daily-report-summary.js';
+import { closeDatabase, getPool, initDatabase } from '../services/db.js';
 
 type Args = {
   dryRun: boolean;
@@ -124,8 +123,12 @@ async function main() {
           `  timestamp:   ${row.timestamp}`,
           `  report_type: ${row.report_type}`,
           `  status:      ${row.status}`,
-          needsReportDate ? `  report_date: ${row.report_date ?? '(null)'} -> ${nextReportDate}` : '  report_date: (no change)',
-          needsSummary ? `  summary_text: ${JSON.stringify((row.summary_text ?? '').slice(0, 80))} -> ${JSON.stringify(nextSummary.slice(0, 80))}` : '  summary_text: (no change)',
+          needsReportDate
+            ? `  report_date: ${row.report_date ?? '(null)'} -> ${nextReportDate}`
+            : '  report_date: (no change)',
+          needsSummary
+            ? `  summary_text: ${JSON.stringify((row.summary_text ?? '').slice(0, 80))} -> ${JSON.stringify(nextSummary.slice(0, 80))}`
+            : '  summary_text: (no change)',
         ].join('\n'),
       );
       continue;
@@ -143,7 +146,10 @@ async function main() {
     }
 
     updateParams.push(row.id);
-    await pool.query(`UPDATE daily_runs SET ${updateFields.join(', ')} WHERE id = $${updateParams.length}`, updateParams);
+    await pool.query(
+      `UPDATE daily_runs SET ${updateFields.join(', ')} WHERE id = $${updateParams.length}`,
+      updateParams,
+    );
 
     updated++;
   }

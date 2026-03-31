@@ -125,4 +125,3 @@ main()
   .finally(async () => {
     await closeDatabase();
   });
-

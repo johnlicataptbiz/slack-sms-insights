@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import type { Logger } from '@slack/bolt';
 import { closeDatabase, initDatabase, initializeSchema } from '../services/db.js';
-import { getDefaultLrnBackfillOptions, runLrnBackfill, type LrnBackfillOptions } from '../services/lrn-refresh.js';
+import { getDefaultLrnBackfillOptions, type LrnBackfillOptions, runLrnBackfill } from '../services/lrn-refresh.js';
 
 const logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = {
   debug: (msg: string, ...args: unknown[]) => console.debug(`[DEBUG] ${msg}`, ...args),

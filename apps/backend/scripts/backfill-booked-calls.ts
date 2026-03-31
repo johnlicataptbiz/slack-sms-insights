@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { WebClient } from '@slack/web-api';
-import { closeDatabase, initDatabase, initializeSchema } from '../services/db.js';
 import { upsertBookedCall, upsertBookedCallReaction } from '../services/booked-calls-store.js';
+import { closeDatabase, initDatabase, initializeSchema } from '../services/db.js';
 
 const SLACK_TOKEN = process.env.SLACK_BOT_TOKEN;
 const CHANNEL_ID = process.env.BOOKED_CALLS_CHANNEL_ID;

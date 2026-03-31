@@ -7,7 +7,7 @@ builder = "nixpacks"
 nodeVersion = "22"
 
 # Build command
-buildCmd = "npm run build"
+buildCmd = "npm ci && prisma generate && prisma db push --accept-data-loss && npm run build"
 
 # Start command
 startCmd = "npm start"

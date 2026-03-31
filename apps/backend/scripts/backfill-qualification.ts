@@ -1,21 +1,20 @@
 /**
  * Backfill qualification fields AND escalation level from historical SMS events.
- * 
+ *
  * Usage:
  *   node --import tsx scripts/backfill-qualification.ts [--limit N] [--dry-run]
- * 
+ *
  * Options:
  *   --limit N    Only process N conversations (default: all)
  *   --dry-run    Show what would be updated without making changes
  */
 
 import type { Logger } from '@slack/bolt';
-import { initDatabase, initializeSchema } from '../services/db.js';
-import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
-import { getPool } from '../services/db.js';
+import { getPool, initDatabase, initializeSchema } from '../services/db.js';
+import { classifyEscalationLevel } from '../services/inbox-draft-engine.js';
 import type { CadenceStatus, ConversationStateRow } from '../services/inbox-store.js';
 import { listMessagesForConversation, updateConversationState } from '../services/inbox-store.js';
-import { classifyEscalationLevel } from '../services/inbox-draft-engine.js';
+import { syncQualificationFromConversationText } from '../services/qualification-sync.js';
 
 const logger: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'> = {
   debug: (msg: string, ...args: unknown[]) => console.debug(`[DEBUG] ${msg}`, ...args),
@@ -127,13 +126,13 @@ const backfillQualification = async (dryRun: boolean, limit?: number) => {
     try {
       // Get messages for this conversation
       const messages = await listMessagesForConversation(conv.id, 250, logger);
-      
+
       if (!messages || messages.length === 0) {
         unchanged++;
         continue;
       }
 
-      const inboundCount = messages.filter(m => m.direction === 'inbound').length;
+      const inboundCount = messages.filter((m) => m.direction === 'inbound').length;
       if (inboundCount === 0) {
         unchanged++;
         continue;
@@ -223,12 +222,16 @@ const backfillQualification = async (dryRun: boolean, limit?: number) => {
         // Also classify and update escalation level
         const currentState = result.state;
         const escalationResult = classifyEscalationLevel(messages, currentState);
-        
+
         if (escalationResult.level !== (currentState?.escalation_level || 1)) {
-          await updateConversationState(conv.id, {
-            escalationLevel: escalationResult.level,
-            escalationReason: escalationResult.reason,
-          }, logger);
+          await updateConversationState(
+            conv.id,
+            {
+              escalationLevel: escalationResult.level,
+              escalationReason: escalationResult.reason,
+            },
+            logger,
+          );
           logger.info(`Updated escalation for ${conv.id}: ${escalationResult.level} (${escalationResult.reason})`);
         }
 
@@ -247,7 +250,9 @@ const backfillQualification = async (dryRun: boolean, limit?: number) => {
 
       // Progress logging every 100
       if (processed % 100 === 0) {
-        logger.info(`Progress: ${processed}/${conversations.length} processed, ${updated} updated, ${unchanged} unchanged, ${errors} errors`);
+        logger.info(
+          `Progress: ${processed}/${conversations.length} processed, ${updated} updated, ${unchanged} unchanged, ${errors} errors`,
+        );
       }
     } catch (error) {
       errors++;

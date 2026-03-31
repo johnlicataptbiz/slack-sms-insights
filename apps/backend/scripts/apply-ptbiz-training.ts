@@ -6,6 +6,7 @@
  */
 
 import pg from 'pg';
+
 const { Pool } = pg;
 
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
@@ -19,148 +20,275 @@ const pool = new Pool({
 
 // ─── EMPLOYMENT PATTERNS (from PT Biz Core Client Definition + Language Playbook) ───
 const FULL_TIME_PATTERNS = [
-  'full time', 'full-time', 'fulltime',
-  'still working', 'day job', 'still employed',
-  'hospital', 'outpatient', 'inpatient',
-  'clinic director', 'staff pt', 'staff therapist',
-  'corporate pt', 'insurance clinic',
-  'w2', 'salary',
-  '20 patients a day', '30 patients', 'production model',
+  'full time',
+  'full-time',
+  'fulltime',
+  'still working',
+  'day job',
+  'still employed',
+  'hospital',
+  'outpatient',
+  'inpatient',
+  'clinic director',
+  'staff pt',
+  'staff therapist',
+  'corporate pt',
+  'insurance clinic',
+  'w2',
+  'salary',
+  '20 patients a day',
+  '30 patients',
+  'production model',
   'seeing patients all day',
 ];
 
 const PART_TIME_PATTERNS = [
-  'part time', 'part-time', 'parttime',
-  'side gig', 'side hustle', 'side business',
-  'building on the side', 'prn', 'per diem',
-  'evenings', 'weekends', 'after hours',
-  'just started', 'just launched',
-  '1-2 patients', 'few patients',
+  'part time',
+  'part-time',
+  'parttime',
+  'side gig',
+  'side hustle',
+  'side business',
+  'building on the side',
+  'prn',
+  'per diem',
+  'evenings',
+  'weekends',
+  'after hours',
+  'just started',
+  'just launched',
+  '1-2 patients',
+  'few patients',
 ];
 
 const SELF_EMPLOYED_PATTERNS = [
-  'own my own', 'my own practice', 'own practice',
-  'own clinic', 'clinic owner', 'practice owner',
-  'running my', 'opened my', 'started my clinic',
-  'self employed', 'self-employed',
-  'cash based', 'cash-based', 'cash practice',
-  'hybrid', 'concierge',
-  'year 1', 'year 2', 'year 3',
+  'own my own',
+  'my own practice',
+  'own practice',
+  'own clinic',
+  'clinic owner',
+  'practice owner',
+  'running my',
+  'opened my',
+  'started my clinic',
+  'self employed',
+  'self-employed',
+  'cash based',
+  'cash-based',
+  'cash practice',
+  'hybrid',
+  'concierge',
+  'year 1',
+  'year 2',
+  'year 3',
 ];
 
 // ─── REVENUE MIX PATTERNS ───────────────────────────────────────────────────
 const CASH_PATTERNS = [
-  'cash based', 'cash-based', 'cash pay', 'out of pocket',
-  'cash only', 'private pay', 'out of network', 'out-of-network',
-  'oon', 'no insurance', 'dropped insurance',
-  'concierge', '1:1', 'one on one', 'one-on-one',
-  'performance based', 'performance-based',
+  'cash based',
+  'cash-based',
+  'cash pay',
+  'out of pocket',
+  'cash only',
+  'private pay',
+  'out of network',
+  'out-of-network',
+  'oon',
+  'no insurance',
+  'dropped insurance',
+  'concierge',
+  '1:1',
+  'one on one',
+  'one-on-one',
+  'performance based',
+  'performance-based',
   'direct access',
 ];
 
 const INSURANCE_PATTERNS = [
-  'insurance', 'in-network', 'in network',
-  'medicare', 'medicaid', 'blue cross', 'aetna', 'united',
-  'takes insurance', 'billing', 'prior auth',
-  'reimbursement', 'eob', 'copay',
-  'traditional pt', 'traditional model',
+  'insurance',
+  'in-network',
+  'in network',
+  'medicare',
+  'medicaid',
+  'blue cross',
+  'aetna',
+  'united',
+  'takes insurance',
+  'billing',
+  'prior auth',
+  'reimbursement',
+  'eob',
+  'copay',
+  'traditional pt',
+  'traditional model',
 ];
 
 const HYBRID_PATTERNS = [
-  'hybrid', 'mix of', 'some insurance',
-  'cash and insurance', 'insurance and cash',
-  'trying to shift', 'moving toward cash',
-  'transitioning', 'weaning off insurance',
+  'hybrid',
+  'mix of',
+  'some insurance',
+  'cash and insurance',
+  'insurance and cash',
+  'trying to shift',
+  'moving toward cash',
+  'transitioning',
+  'weaning off insurance',
 ];
 
 // ─── COACHING INTEREST PATTERNS ──────────────────────────────────────────────
 const HIGH_INTEREST_PATTERNS = [
   // Urgency signals
-  'ready to go', 'ready now', 'as soon as possible', 'asap',
-  'this month', 'right now', 'immediately',
+  'ready to go',
+  'ready now',
+  'as soon as possible',
+  'asap',
+  'this month',
+  'right now',
+  'immediately',
   // Specific triggers (from sales framework section 1)
-  'turning away patients', 'maxed out', 'maxed my schedule',
-  'just quit my job', 'quit my job',
+  'turning away patients',
+  'maxed out',
+  'maxed my schedule',
+  'just quit my job',
+  'quit my job',
   'cant take any more patients',
-  'need help now', 'need this now',
+  'need help now',
+  'need this now',
   // Strong pain signals
-  'burning out', 'burned out', 'so frustrated',
-  'cant keep doing this', 'need to make a change',
-  'not making enough', 'leaving money',
+  'burning out',
+  'burned out',
+  'so frustrated',
+  'cant keep doing this',
+  'need to make a change',
+  'not making enough',
+  'leaving money',
   // Decision signals
-  'how do i sign up', 'how do i get started',
-  'what are the next steps', 'i want to join',
+  'how do i sign up',
+  'how do i get started',
+  'what are the next steps',
+  'i want to join',
   'tell me more about working with you',
   // Positive responses to outreach
-  'yes i would love', 'yes absolutely', 'definitely interested',
-  'very interested', 'sounds great', 'perfect',
-  'excited to learn', 'excited to connect',
+  'yes i would love',
+  'yes absolutely',
+  'definitely interested',
+  'very interested',
+  'sounds great',
+  'perfect',
+  'excited to learn',
+  'excited to connect',
 ];
 
 const MEDIUM_INTEREST_PATTERNS = [
-  'interested', 'would love to learn', 'tell me more',
-  'sounds interesting', 'worth exploring',
-  'open to it', 'open to that',
-  'could be good', 'might work',
-  'want to learn more', 'looking into it',
-  'exploring options', 'doing research',
+  'interested',
+  'would love to learn',
+  'tell me more',
+  'sounds interesting',
+  'worth exploring',
+  'open to it',
+  'open to that',
+  'could be good',
+  'might work',
+  'want to learn more',
+  'looking into it',
+  'exploring options',
+  'doing research',
   // Conditional
-  'if the price is right', 'depending on cost',
-  'i have questions', 'curious about',
+  'if the price is right',
+  'depending on cost',
+  'i have questions',
+  'curious about',
   // Soft scheduling agreement
-  'that works', 'that would work', 'let me check',
-  'should be able to', 'probably',
+  'that works',
+  'that would work',
+  'let me check',
+  'should be able to',
+  'probably',
 ];
 
 const LOW_INTEREST_PATTERNS = [
-  'not sure', 'just browsing', 'just looking',
-  'just exploring', 'not ready yet',
-  'maybe someday', 'not the right time',
-  'too busy right now', 'on hold',
-  'i need to think', 'need to think about it',
+  'not sure',
+  'just browsing',
+  'just looking',
+  'just exploring',
+  'not ready yet',
+  'maybe someday',
+  'not the right time',
+  'too busy right now',
+  'on hold',
+  'i need to think',
+  'need to think about it',
   // Price objections
-  'too expensive', 'cant afford', 'out of budget',
-  'what does it cost', 'how much is it',
+  'too expensive',
+  'cant afford',
+  'out of budget',
+  'what does it cost',
+  'how much is it',
   'investment concern',
 ];
 
 // ─── NICHE NORMALIZATION (from Clinic Owner Language Playbook + Core Client) ──
 const NICHE_MAPPINGS: Record<string, string[]> = {
-  'sports_ortho': [
-    'sports', 'ortho', 'orthopedic', 'musculoskeletal',
-    'athlete', 'athletes', 'sport', 'athletic',
-    'acl', 'rotator cuff', 'post-op', 'post op',
-    'return to sport', 'strength', 'performance',
-    'crossfit', 'weightlifting', 'powerlifting',
+  sports_ortho: [
+    'sports',
+    'ortho',
+    'orthopedic',
+    'musculoskeletal',
+    'athlete',
+    'athletes',
+    'sport',
+    'athletic',
+    'acl',
+    'rotator cuff',
+    'post-op',
+    'post op',
+    'return to sport',
+    'strength',
+    'performance',
+    'crossfit',
+    'weightlifting',
+    'powerlifting',
   ],
-  'pelvic_health': [
-    'pelvic', 'pelvic health', 'pelvic floor',
-    'womens health', 'postpartum', 'prenatal', 'pregnancy',
-    'incontinence', 'prolapse', 'pelvic pain',
+  pelvic_health: [
+    'pelvic',
+    'pelvic health',
+    'pelvic floor',
+    'womens health',
+    'postpartum',
+    'prenatal',
+    'pregnancy',
+    'incontinence',
+    'prolapse',
+    'pelvic pain',
   ],
-  'pediatrics': [
-    'pediatric', 'pediatrics', 'kids', 'children', 'child',
-    'school', 'developmental', 'autism',
+  pediatrics: ['pediatric', 'pediatrics', 'kids', 'children', 'child', 'school', 'developmental', 'autism'],
+  active_aging: [
+    'active aging',
+    'older adult',
+    'senior',
+    'elderly',
+    'geriatric',
+    '55+',
+    '60+',
+    'balance',
+    'fall prevention',
   ],
-  'active_aging': [
-    'active aging', 'older adult', 'senior', 'elderly',
-    'geriatric', '55+', '60+', 'balance', 'fall prevention',
+  runners: [
+    'running',
+    'runner',
+    'runners',
+    'marathon',
+    'triathlon',
+    'endurance',
+    'gait analysis',
+    'run dna',
+    'rundna',
+    'helix',
   ],
-  'runners': [
-    'running', 'runner', 'runners', 'marathon', 'triathlon',
-    'endurance', 'gait analysis', 'run dna', 'rundna', 'helix',
-  ],
-  'dance': [
-    'dance', 'dancer', 'ballet', 'cheer', 'gymnastics', 'performing arts',
-  ],
-  'general_wellness': [
-    'wellness', 'general', 'all ages', 'variety', 'mixed',
-    'functional medicine', 'holistic',
-  ],
-  'chiro': [
-    'chiro', 'chiropractor', 'chiropractic', 'dc', 'adjustment',
-    'spinal', 'spine',
-  ],
+  dance: ['dance', 'dancer', 'ballet', 'cheer', 'gymnastics', 'performing arts'],
+  general_wellness: ['wellness', 'general', 'all ages', 'variety', 'mixed', 'functional medicine', 'holistic'],
+  chiro: ['chiro', 'chiropractor', 'chiropractic', 'dc', 'adjustment', 'spinal', 'spine'],
 };
 
 async function inferEmployment(pool: pg.Pool) {
@@ -180,7 +308,9 @@ async function inferEmployment(pool: pg.Pool) {
     GROUP BY e.contact_phone
   `);
 
-  let ftCount = 0, ptCount = 0, seCount = 0;
+  let ftCount = 0,
+    ptCount = 0,
+    seCount = 0;
 
   for (const row of rows) {
     const text = row.messages.join(' ').toLowerCase();
@@ -200,12 +330,15 @@ async function inferEmployment(pool: pg.Pool) {
     }
 
     if (employment) {
-      await pool.query(`
+      await pool.query(
+        `
         UPDATE conversation_state
         SET qualification_full_or_part_time = $1, updated_at = NOW()
         WHERE conversation_id IN (SELECT id FROM conversations WHERE contact_phone = $2)
           AND (qualification_full_or_part_time IS NULL OR qualification_full_or_part_time = '')
-      `, [employment, row.contact_phone]);
+      `,
+        [employment, row.contact_phone],
+      );
     }
   }
 
@@ -222,7 +355,9 @@ async function inferRevenueMix(pool: pg.Pool) {
     GROUP BY e.contact_phone
   `);
 
-  let cashCount = 0, insCount = 0, hybridCount = 0;
+  let cashCount = 0,
+    insCount = 0,
+    hybridCount = 0;
 
   for (const row of rows) {
     const text = row.messages.join(' ').toLowerCase();
@@ -241,12 +376,15 @@ async function inferRevenueMix(pool: pg.Pool) {
     }
 
     if (revenueMix) {
-      await pool.query(`
+      await pool.query(
+        `
         UPDATE conversation_state
         SET qualification_revenue_mix = $1, updated_at = NOW()
         WHERE conversation_id IN (SELECT id FROM conversations WHERE contact_phone = $2)
           AND (qualification_revenue_mix IS NULL OR qualification_revenue_mix = '')
-      `, [revenueMix, row.contact_phone]);
+      `,
+        [revenueMix, row.contact_phone],
+      );
     }
   }
 
@@ -263,7 +401,9 @@ async function inferCoachingInterest(pool: pg.Pool) {
     GROUP BY e.contact_phone
   `);
 
-  let highCount = 0, medCount = 0, lowCount = 0;
+  let highCount = 0,
+    medCount = 0,
+    lowCount = 0;
 
   for (const row of rows) {
     const text = row.messages.join(' ').toLowerCase();
@@ -282,12 +422,15 @@ async function inferCoachingInterest(pool: pg.Pool) {
     }
 
     if (interest) {
-      await pool.query(`
+      await pool.query(
+        `
         UPDATE conversation_state
         SET qualification_coaching_interest = $1, updated_at = NOW()
         WHERE conversation_id IN (SELECT id FROM conversations WHERE contact_phone = $2)
           AND (qualification_coaching_interest IS NULL OR qualification_coaching_interest = '')
-      `, [interest, row.contact_phone]);
+      `,
+        [interest, row.contact_phone],
+      );
     }
   }
 
@@ -316,11 +459,14 @@ async function normalizeNiches(pool: pg.Pool) {
     }
 
     if (normalizedNiche && normalizedNiche !== row.niche) {
-      await pool.query(`
+      await pool.query(
+        `
         UPDATE inbox_contact_profiles
         SET niche = $1, updated_at = NOW()
         WHERE contact_id = $2
-      `, [normalizedNiche, row.contact_id]);
+      `,
+        [normalizedNiche, row.contact_id],
+      );
       updated++;
     }
   }
@@ -347,12 +493,15 @@ async function normalizeNiches(pool: pg.Pool) {
     }
 
     if (detectedNiche) {
-      const { rowCount } = await pool.query(`
+      const { rowCount } = await pool.query(
+        `
         UPDATE inbox_contact_profiles
         SET niche = $1, updated_at = NOW()
         WHERE phone = $2
           AND (niche IS NULL OR niche = '')
-      `, [detectedNiche, row.contact_phone]);
+      `,
+        [detectedNiche, row.contact_phone],
+      );
       if (rowCount && rowCount > 0) inferred++;
     }
   }
@@ -392,7 +541,7 @@ async function addPTBizTemplates(pool: pg.Pool) {
     },
     {
       title: 'Revenue Discovery',
-      body: "Are you guys fully cash-based, out-of-network, or still dealing with some insurance? And what does your current setup look like — solo or do you have a team?",
+      body: 'Are you guys fully cash-based, out-of-network, or still dealing with some insurance? And what does your current setup look like — solo or do you have a team?',
       category: 'discovery',
       tags: ['qualification', 'revenue-mix'],
     },
@@ -479,23 +628,23 @@ async function addPTBizTemplates(pool: pg.Pool) {
 
   for (const tmpl of templates) {
     // Check if already exists
-    const { rows } = await pool.query(
-      `SELECT id FROM message_templates WHERE name = $1`,
-      [tmpl.title],
-    );
+    const { rows } = await pool.query('SELECT id FROM message_templates WHERE name = $1', [tmpl.title]);
 
     if (rows.length > 0) {
       skipped++;
       continue;
     }
 
-    await pool.query(`
+    await pool.query(
+      `
       INSERT INTO message_templates (id, name, body, created_by, created_at)
       VALUES (
         gen_random_uuid(),
         $1, $2, 'ptbiz-training', NOW()
       )
-    `, [tmpl.title, tmpl.body]);
+    `,
+      [tmpl.title, tmpl.body],
+    );
     added++;
   }
 
@@ -537,7 +686,7 @@ async function updateConversionExamples(pool: pg.Pool) {
   for (const row of rows) {
     // Check if already exists
     const { rows: existing } = await pool.query(
-      `SELECT id FROM conversion_examples WHERE source_outbound_event_id = $1`,
+      'SELECT id FROM conversion_examples WHERE source_outbound_event_id = $1',
       [row.event_id],
     );
 
@@ -546,7 +695,8 @@ async function updateConversionExamples(pool: pg.Pool) {
       continue;
     }
 
-    await pool.query(`
+    await pool.query(
+      `
       INSERT INTO conversion_examples (
         id, source_outbound_event_id,
         booked_call_label, channel_marker, created_at
@@ -554,10 +704,9 @@ async function updateConversionExamples(pool: pg.Pool) {
         gen_random_uuid(),
         $1, 'pre_booking_message', $2, NOW()
       )
-    `, [
-      row.event_id,
-      row.sequence || 'manual',
-    ]);
+    `,
+      [row.event_id, row.sequence || 'manual'],
+    );
     added++;
   }
 
@@ -589,7 +738,8 @@ async function updateConversionExamples(pool: pg.Pool) {
   `);
 
   for (const row of highReplyMsgs) {
-    await pool.query(`
+    await pool.query(
+      `
       INSERT INTO conversion_examples (
         id, source_outbound_event_id,
         booked_call_label, channel_marker, created_at
@@ -597,10 +747,9 @@ async function updateConversionExamples(pool: pg.Pool) {
         gen_random_uuid(),
         $1, 'got_reply', $2, NOW()
       )
-    `, [
-      row.id,
-      row.sequence || 'manual',
-    ]);
+    `,
+      [row.id, row.sequence || 'manual'],
+    );
     added++;
   }
 
@@ -632,7 +781,6 @@ async function main() {
 
     console.log('\n=== FINAL STATS ===');
     console.table(stats[0]);
-
   } finally {
     await pool.end();
   }

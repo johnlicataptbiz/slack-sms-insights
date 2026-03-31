@@ -21,7 +21,7 @@ const mondayGraphQL = async (mutation) => {
     },
     body: JSON.stringify({ query: mutation }),
   });
-  
+
   const result = await response.json();
   if (!response.ok || result.errors?.length) {
     throw new Error(result.errors?.[0]?.message || `API error: ${response.status}`);
@@ -31,7 +31,7 @@ const mondayGraphQL = async (mutation) => {
 
 async function deleteIncompleteAutoSyncedItems() {
   console.log(`\n${colors.bright}🗑️  DELETING INCOMPLETE AUTO-SYNCED ITEMS${colors.reset}\n`);
-  
+
   const itemIds = [
     // March 4
     '11531770184', // Kali Jacobson
@@ -77,18 +77,18 @@ async function deleteIncompleteAutoSyncedItems() {
     '11531813937', // Nivedita Sinnarkar
     '11531791198', // Dominick Dauria
   ];
-  
+
   console.log(`Found ${itemIds.length} items to delete\n`);
   console.log('⚠️  WARNING: This will permanently delete these items from Monday.com!\n');
   console.log('Press Ctrl+C to cancel, or wait 5 seconds to proceed...\n');
-  
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
+
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
   console.log('Starting deletion...\n');
-  
+
   let deleted = 0;
   let failed = 0;
-  
+
   for (const itemId of itemIds) {
     try {
       const mutation = `
@@ -98,7 +98,7 @@ async function deleteIncompleteAutoSyncedItems() {
           }
         }
       `;
-      
+
       await mondayGraphQL(mutation);
       deleted++;
       console.log(`${colors.green}✓${colors.reset} Deleted item ${itemId}`);
@@ -107,7 +107,7 @@ async function deleteIncompleteAutoSyncedItems() {
       console.log(`${colors.red}✗${colors.reset} Failed to delete ${itemId}: ${error.message}`);
     }
   }
-  
+
   console.log(`\n${colors.bright}Summary:${colors.reset}`);
   console.log(`  Deleted: ${deleted}`);
   console.log(`  Failed: ${failed}`);

@@ -28,7 +28,7 @@ export abstract class BaseController {
     res: ServerResponse,
     params: Record<string, string>,
     query: Record<string, string>,
-    body?: any
+    body?: any,
   ): Promise<void> {
     const context: RequestContext = {
       req,
@@ -59,11 +59,7 @@ export abstract class BaseController {
     this.sendJsonResponse(res, { success: false, error: message }, statusCode);
   }
 
-  protected sendJsonResponse<T>(
-    res: ServerResponse,
-    data: ApiResponse<T>,
-    statusCode: number = 200
-  ): void {
+  protected sendJsonResponse<T>(res: ServerResponse, data: ApiResponse<T>, statusCode = 200): void {
     res.writeHead(statusCode, {
       'Content-Type': 'application/json',
       'X-Content-Type-Options': 'nosniff',
@@ -72,17 +68,20 @@ export abstract class BaseController {
     res.end(JSON.stringify(data));
   }
 
-  protected sendSuccessResponse<T>(res: ServerResponse, data: T, statusCode: number = 200): void {
+  protected sendSuccessResponse<T>(res: ServerResponse, data: T, statusCode = 200): void {
     this.sendJsonResponse(res, { success: true, data }, statusCode);
   }
 
-  protected sendErrorResponse(res: ServerResponse, message: string, statusCode: number = 400): void {
+  protected sendErrorResponse(res: ServerResponse, message: string, statusCode = 400): void {
     this.sendJsonResponse(res, { success: false, error: message }, statusCode);
   }
 }
 
 export class HttpError extends Error {
-  constructor(public statusCode: number, message: string) {
+  constructor(
+    public statusCode: number,
+    message: string,
+  ) {
     super(message);
     this.name = 'HttpError';
   }
@@ -101,7 +100,7 @@ export class ValidationError extends HttpError {
 }
 
 export class UnauthorizedError extends HttpError {
-  constructor(message: string = 'Unauthorized') {
+  constructor(message = 'Unauthorized') {
     super(401, message);
   }
 }

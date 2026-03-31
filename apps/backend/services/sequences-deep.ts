@@ -4,6 +4,7 @@ import {
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
 } from './booked-calls.js';
+
 import { getPrismaClient } from './prisma.js';
 import type { UnattributedAuditRow } from './sequence-booked-attribution.js';
 import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
@@ -122,28 +123,31 @@ export const getSequencesDeep = async (
     rawEventRows,
   ] = await Promise.all([
     (async () => {
+    (async () => {
       try {
         return await prisma.fact_booking_daily.findMany({
-      where: {
-        day: {
-          gte: new Date(`${fromDay}T00:00:00.000Z`),
-          lte: new Date(`${toDay}T00:00:00.000Z`),
-        },
-      },
-      select: {
-        sequence_id: true,
-        booked_total: true,
-        booked_jack: true,
-        booked_brandon: true,
-        booked_self: true,
-        booked_after_sms_reply: true,
-        booking_rate_pct: true,
-        diagnostic_booking_signals: true,
-      },
-    });
+          where: {
+            day: {
+              gte: new Date(`${fromDay}T00:00:00.000Z`),
+              lte: new Date(`${toDay}T00:00:00.000Z`),
+            },
+          },
+          select: {
+            sequence_id: true,
+            booked_total: true,
+            booked_jack: true,
+            booked_brandon: true,
+            booked_self: true,
+            booked_after_sms_reply: true,
+            booking_rate_pct: true,
+            diagnostic_booking_signals: true,
+          },
+        });
       } catch (error) {
         // Table may not exist in production yet
-        logger?.warn?.('sequences-deep: fact_booking_daily table not available', { error: error instanceof Error ? error.message : String(error) });
+        logger?.warn?.('sequences-deep: fact_booking_daily table not available', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         return [];
       }
     })(),
@@ -276,10 +280,18 @@ export const getSequencesDeep = async (
   const resolveSequenceId = (sequenceId: string): string =>
     manualSequenceId && backfillSequenceIds.has(sequenceId) ? manualSequenceId : sequenceId;
 
-  type Event = (typeof rawEventRows)[number] & {
-    _contactKey: string;
-    _seqId: string;
-  };
+interface SmsEventExtended {
+  event_ts: Date;
+  direction: string;
+  sequence_id: string | null;
+  body: string | null;
+  contact_id: string | null;
+  contact_phone: string | null;
+  _contactKey: string;
+  _seqId: string;
+}
+
+type Event = SmsEventExtended;
   const events: Event[] = [];
   for (const row of rawEventRows) {
     const contactKey = contactKeyFor(row);
@@ -290,7 +302,7 @@ export const getSequencesDeep = async (
       ...row,
       _contactKey: contactKey,
       _seqId: resolveSequenceId(resolvedSequenceId),
-    });
+    } as Event);
   }
 
   const eventsByContact = new Map<string, Event[]>();
@@ -300,29 +312,28 @@ export const getSequencesDeep = async (
     eventsByContact.set(event._contactKey, list);
   }
 
-  const summary = new Map<
-    string,
-    {
-      messagesSent: number;
-      inboundTexts: number;
-      repliesReceived: number;
-      optOuts: number;
-      bookingSignals: number;
-      bookedCalls: number;
-      bookedJack: number;
-      bookedBrandon: number;
-      bookedSelf: number;
-      bookedAfterReply: number;
-      qualityLeads: number;
-      qualityHighInterest: number;
-      qualityFullTime: number;
-      qualityMostlyCash: number;
-      qualityStep34: number;
-      uniqueContactedSet: Set<string>;
-      repliedSet: Set<string>;
-      optOutSet: Set<string>;
-    }
-  >();
+  interface SequenceSummary {
+    messagesSent: number;
+    inboundTexts: number;
+    repliesReceived: number;
+    optOuts: number;
+    bookingSignals: number;
+    bookedCalls: number;
+    bookedJack: number;
+    bookedBrandon: number;
+    bookedSelf: number;
+    bookedAfterReply: number;
+    qualityLeads: number;
+    qualityHighInterest: number;
+    qualityFullTime: number;
+    qualityMostlyCash: number;
+    qualityStep34: number;
+    uniqueContactedSet: Set<string>;
+    repliedSet: Set<string>;
+    optOutSet: Set<string>;
+  }
+
+  const summary = new Map<string, SequenceSummary>();
 
   const ensure = (sequenceId: string) => {
     let row = summary.get(sequenceId);

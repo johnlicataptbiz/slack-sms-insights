@@ -1,4 +1,5 @@
 import pg from 'pg';
+
 const { Pool } = pg;
 
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
@@ -44,7 +45,7 @@ async function main() {
 
   bookedConvos.forEach((convo, i) => {
     console.log(`\n${'='.repeat(60)}`);
-    console.log(`CONVERSATION ${i+1} (${convo.contact_phone})`);
+    console.log(`CONVERSATION ${i + 1} (${convo.contact_phone})`);
     console.log('='.repeat(60));
 
     convo.messages.forEach((msg: any) => {

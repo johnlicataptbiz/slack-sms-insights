@@ -5,7 +5,7 @@ export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
 
-  constructor(message: string, statusCode: number = 500, isOperational: boolean = true) {
+  constructor(message: string, statusCode = 500, isOperational = true) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
@@ -27,19 +27,19 @@ export class NotFoundError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Unauthorized') {
+  constructor(message = 'Unauthorized') {
     super(message, 401);
   }
 }
 
 export class ForbiddenError extends AppError {
-  constructor(message: string = 'Forbidden') {
+  constructor(message = 'Forbidden') {
     super(message, 403);
   }
 }
 
 export class ConflictError extends AppError {
-  constructor(message: string = 'Conflict') {
+  constructor(message = 'Conflict') {
     super(message, 409);
   }
 }
@@ -52,7 +52,7 @@ export async function handleError(
   error: unknown,
   req: IncomingMessage,
   res: ServerResponse,
-  logger: Logger
+  logger: Logger,
 ): Promise<void> {
   let statusCode = 500;
   let message = 'Internal server error';
@@ -78,9 +78,10 @@ export async function handleError(
   const errorResponse = {
     success: false,
     error: message,
-    ...(isDevelopment && error instanceof Error && {
-      stack: error.stack,
-    }),
+    ...(isDevelopment &&
+      error instanceof Error && {
+        stack: error.stack,
+      }),
   };
 
   res.writeHead(statusCode, {
@@ -92,6 +93,5 @@ export async function handleError(
 }
 
 export function createErrorHandler(logger: Logger) {
-  return (error: unknown, req: IncomingMessage, res: ServerResponse) =>
-    handleError(error, req, res, logger);
+  return (error: unknown, req: IncomingMessage, res: ServerResponse) => handleError(error, req, res, logger);
 }

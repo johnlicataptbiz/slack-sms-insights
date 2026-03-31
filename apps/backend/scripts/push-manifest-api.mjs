@@ -3,7 +3,7 @@
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +17,10 @@ for (const line of envLines) {
   if (!trimmed || trimmed.startsWith('#')) continue;
   const eq = trimmed.indexOf('=');
   if (eq === -1) continue;
-  env[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+  env[trimmed.slice(0, eq).trim()] = trimmed
+    .slice(eq + 1)
+    .trim()
+    .replace(/^["']|["']$/g, '');
 }
 
 // Load Slack CLI rotation token
@@ -68,10 +71,7 @@ const manifest = {
     ],
   },
   oauth_config: {
-    redirect_urls: [
-      'https://localhost:3000/api/oauth/callback',
-      'https://ptbizsms.com/api/oauth/callback',
-    ],
+    redirect_urls: ['https://localhost:3000/api/oauth/callback', 'https://ptbizsms.com/api/oauth/callback'],
     scopes: {
       bot: [
         'app_mentions:read',
@@ -154,7 +154,10 @@ const tokens = [
 
 let success = false;
 for (const [token, label] of tokens) {
-  if (!token) { console.log(`⏭  Skipping ${label} (not set)`); continue; }
+  if (!token) {
+    console.log(`⏭  Skipping ${label} (not set)`);
+    continue;
+  }
   success = await tryUpdate(token, label);
   if (success) break;
 }

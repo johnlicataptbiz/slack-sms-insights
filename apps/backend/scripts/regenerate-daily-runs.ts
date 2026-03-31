@@ -196,7 +196,9 @@ const run = async () => {
       if (isPlaceholder) placeholders += 1;
 
       if (args.dryRun) {
-        console.log(`[dry-run] ${day}: generated (${bundle.reportText.length} chars)${isPlaceholder ? ' [placeholder]' : ''}`);
+        console.log(
+          `[dry-run] ${day}: generated (${bundle.reportText.length} chars)${isPlaceholder ? ' [placeholder]' : ''}`,
+        );
         success += 1;
         continue;
       }

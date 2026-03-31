@@ -7,7 +7,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { ConversationDetailSelectPattern, BatchQueryPatterns } from './src/schemas/db-results.ts';
+import { BatchQueryPatterns, ConversationDetailSelectPattern } from './src/schemas/db-results.ts';
 
 const prisma = new PrismaClient({
   log: ['query'],
@@ -69,11 +69,9 @@ async function runBenchmarks() {
 
     // Test 4: Batch query pattern
     console.log('\n📊 Test 4: Batch Query Pattern');
-    const conversationIds = conversations.slice(0, 3).map(c => c.id);
+    const conversationIds = conversations.slice(0, 3).map((c) => c.id);
     await benchmarkQuery('  Batch send attempts for conversations', async () => {
-      return await prisma.send_attempts.findMany(
-        BatchQueryPatterns.sendAttemptsForConversations(conversationIds)
-      );
+      return await prisma.send_attempts.findMany(BatchQueryPatterns.sendAttemptsForConversations(conversationIds));
     });
 
     // Test 5: Foreign key relationship (Monday metrics)
@@ -98,7 +96,6 @@ async function runBenchmarks() {
     console.log('  - SMS event filters: 50-70% faster');
     console.log('  - Status-based queries: 40-60% faster');
     console.log('  - Foreign key joins: Improved consistency');
-
   } catch (error) {
     console.error('❌ Benchmark failed:', error);
   } finally {

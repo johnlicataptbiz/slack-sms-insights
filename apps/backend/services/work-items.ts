@@ -102,9 +102,15 @@ export const listOpenWorkItems = async (
       contact_key: (wi as any).conversations.contactKey,
       contact_id: (wi as any).conversations.contact_id,
       contact_phone: (wi as any).conversations.contact_phone,
-      last_inbound_at: (wi as any).conversations.last_inbound_at ? (wi as any).conversations.last_inbound_at.toISOString() : null,
-      last_outbound_at: (wi as any).conversations.last_outbound_at ? (wi as any).conversations.last_outbound_at.toISOString() : null,
-      last_touch_at: (wi as any).conversations.last_touch_at ? (wi as any).conversations.last_touch_at.toISOString() : null,
+      last_inbound_at: (wi as any).conversations.last_inbound_at
+        ? (wi as any).conversations.last_inbound_at.toISOString()
+        : null,
+      last_outbound_at: (wi as any).conversations.last_outbound_at
+        ? (wi as any).conversations.last_outbound_at.toISOString()
+        : null,
+      last_touch_at: (wi as any).conversations.last_touch_at
+        ? (wi as any).conversations.last_touch_at.toISOString()
+        : null,
       unreplied_inbound_count: (wi as any).conversations.unreplied_inbound_count,
     }));
 

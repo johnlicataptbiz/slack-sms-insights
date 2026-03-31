@@ -3,16 +3,16 @@ import { syncRecentSetterBookedCallsToMonday } from '../services/monday-personal
 
 const main = async () => {
   console.log('Testing personal Monday sync...');
-  
+
   // Check required environment variables
   const requiredEnvVars = [
     'MONDAY_API_TOKEN',
     'MONDAY_PERSONAL_BOARD_ID',
     'MONDAY_PERSONAL_SYNC_ENABLED',
     'MONDAY_OUTBOUND_ENABLED',
-    'MONDAY_AUTO_WRITE_ENABLED'
+    'MONDAY_AUTO_WRITE_ENABLED',
   ];
-  
+
   let hasErrors = false;
   for (const envVar of requiredEnvVars) {
     if (!process.env[envVar]) {
@@ -20,12 +20,12 @@ const main = async () => {
       hasErrors = true;
     }
   }
-  
+
   if (hasErrors) {
     console.error('Please set the required environment variables in your .env file');
     process.exit(1);
   }
-  
+
   // Test the sync function
   try {
     const result = await syncRecentSetterBookedCallsToMonday(console);

@@ -1,4 +1,5 @@
 import pg from 'pg';
+
 const { Pool } = pg;
 
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
@@ -42,8 +43,8 @@ async function main() {
     `);
     console.log('✅ Created audit_logs table');
 
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)`);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action)');
     console.log('✅ Created audit_logs indexes');
   } catch (e: any) {
     console.log('⚠️ audit_logs table may already exist:', e.message);
@@ -96,7 +97,7 @@ async function main() {
     `);
     console.log('✅ Created trend_alerts table');
 
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_trend_alerts_created_at ON trend_alerts(created_at DESC)`);
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_trend_alerts_created_at ON trend_alerts(created_at DESC)');
     console.log('✅ Created trend_alerts indexes');
   } catch (e: any) {
     console.log('⚠️ trend_alerts table issue:', e.message);
@@ -104,12 +105,15 @@ async function main() {
 
   // 5. Normalize line names - Jack
   try {
-    const jackResult = await pool.query(`
+    const jackResult = await pool.query(
+      `
       UPDATE sms_events
       SET line = $1
       WHERE (line LIKE '%817-580-9950%' OR line LIKE '%8175809950%')
         AND line != $1
-    `, ["Jack's Personal Line (+1 817-580-9950)"]);
+    `,
+      ["Jack's Personal Line (+1 817-580-9950)"],
+    );
     console.log(`✅ Normalized ${jackResult.rowCount || 0} Jack line entries`);
   } catch (e: any) {
     console.log('⚠️ Jack line normalization issue:', e.message);
@@ -117,12 +121,15 @@ async function main() {
 
   // 6. Normalize line names - Brandon
   try {
-    const brandonResult = await pool.query(`
+    const brandonResult = await pool.query(
+      `
       UPDATE sms_events
       SET line = $1
       WHERE (line LIKE '%678-820-3770%' OR line LIKE '%6788203770%')
         AND line != $1
-    `, ["Brandon's Personal Line (+1 678-820-3770)"]);
+    `,
+      ["Brandon's Personal Line (+1 678-820-3770)"],
+    );
     console.log(`✅ Normalized ${brandonResult.rowCount || 0} Brandon line entries`);
   } catch (e: any) {
     console.log('⚠️ Brandon line normalization issue:', e.message);

@@ -1,4 +1,5 @@
 #!/usr/bin/env tsx
+
 /**
  * Push SMS conversation summaries to Monday.com.
  *
@@ -6,9 +7,9 @@
  * so the board functions like a queue and not a raw event dump.
  */
 
-import { getPrisma } from '../services/prisma.js';
 import { findColumnIdByTitle, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
 import { queryBoardColumns, upsertBookedCallItem } from '../services/monday-client.js';
+import { getPrisma } from '../services/prisma.js';
 
 const BOARD_ID = process.env.MONDAY_SMS_EVENTS_BOARD_ID || '18404367751';
 
@@ -79,11 +80,15 @@ const buildItemName = (event: SummaryRow): string => {
   return `${name} • ${signalLabel(event.direction)} • ${date}`;
 };
 
-const buildColumnValueMap = (event: SummaryRow, columnsById: Record<string, string | null>): Record<string, unknown> => {
+const buildColumnValueMap = (
+  event: SummaryRow,
+  columnsById: Record<string, string | null>,
+): Record<string, unknown> => {
   const values: Record<string, unknown> = {};
   if (columnsById.signalType) values[columnsById.signalType] = { label: signalLabel(event.direction) };
   if (columnsById.nextStep) values[columnsById.nextStep] = { label: nextStepLabel(event.direction) };
-  if (columnsById.contactName) values[columnsById.contactName] = normalizeContactName(event.contact_name || event.contact_phone);
+  if (columnsById.contactName)
+    values[columnsById.contactName] = normalizeContactName(event.contact_name || event.contact_phone);
   if (columnsById.phone && event.contact_phone) {
     values[columnsById.phone] = { phone: event.contact_phone, countryShortName: 'US' };
   }
@@ -147,7 +152,11 @@ async function main() {
 
     const latestByConversation = new Map<string, SummaryRow>();
     for (const event of events as SummaryRow[]) {
-      const key = event.conversation_id || event.contact_id || event.contact_phone || `${event.slack_channel_id}:${event.slack_message_ts}`;
+      const key =
+        event.conversation_id ||
+        event.contact_id ||
+        event.contact_phone ||
+        `${event.slack_channel_id}:${event.slack_message_ts}`;
       if (!latestByConversation.has(key)) {
         latestByConversation.set(key, event);
       }

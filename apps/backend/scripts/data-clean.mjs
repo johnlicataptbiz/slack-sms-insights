@@ -31,19 +31,18 @@ const fixes = {
         OR contact_phone IN ('555-555-5555', '+15555555555');
     `);
     console.log(`✅ Flagged test msgs: ${flagged} rows`);
-  }
+  },
 };
 
 async function main() {
   console.log('🧹 Running SAFE Data Cleaning...\n');
-  
+
   await fixes.dedupeLines();
   await fixes.trimSpamBodies();
   await fixes.flagTestMessages();
-  
+
   console.log('\n✅ Cleaning COMPLETE!');
   console.log('🔄 Refresh Prisma Studio: npx prisma studio');
 }
 
 main().catch(console.error);
-

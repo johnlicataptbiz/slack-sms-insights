@@ -3,12 +3,12 @@
  * Creates unified activity timeline entries from existing SMS data
  */
 
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function backfillContactActivities() {
-  console.log("📋 Starting contact_activities backfill...\n");
+  console.log('📋 Starting contact_activities backfill...\n');
 
   try {
     // Get all SMS events grouped by contact
@@ -27,7 +27,7 @@ async function backfillContactActivities() {
         event_role: true,
       },
       orderBy: {
-        event_ts: "asc",
+        event_ts: 'asc',
       },
     });
 
@@ -38,7 +38,7 @@ async function backfillContactActivities() {
     const BATCH_SIZE = 100;
     const batch: {
       contact_key: string;
-      activity_type: "sms_inbound" | "sms_outbound";
+      activity_type: 'sms_inbound' | 'sms_outbound';
       reference_id: string;
       reference_type: string;
       rep_id: string | null;
@@ -57,7 +57,7 @@ async function backfillContactActivities() {
       const existing = await prisma.contactActivities.findFirst({
         where: {
           reference_id: event.id,
-          reference_type: "sms",
+          reference_type: 'sms',
         },
       });
 
@@ -69,9 +69,9 @@ async function backfillContactActivities() {
       // Create activity entry
       batch.push({
         contact_key: contactKey,
-        activity_type: event.direction === "inbound" ? "sms_inbound" : "sms_outbound",
+        activity_type: event.direction === 'inbound' ? 'sms_inbound' : 'sms_outbound',
         reference_id: event.id,
-        reference_type: "sms",
+        reference_type: 'sms',
         rep_id: event.aloware_user,
         summary: event.body ? event.body.substring(0, 200) : null,
         occurred_at: event.event_ts,
@@ -100,7 +100,7 @@ async function backfillContactActivities() {
     console.log(`⏭️  Skipped ${skipped} existing activities`);
 
     // Now add status change activities from conversation_state
-    console.log("\n📊 Processing conversation state changes...");
+    console.log('\n📊 Processing conversation state changes...');
 
     const conversations = await prisma.conversation.findMany({
       include: {
@@ -111,7 +111,7 @@ async function backfillContactActivities() {
     let stateChanges = 0;
     const stateBatch: {
       contact_key: string;
-      activity_type: "status_change";
+      activity_type: 'status_change';
       reference_id: string;
       reference_type: string;
       summary: string;
@@ -125,9 +125,9 @@ async function backfillContactActivities() {
       // Create qualification change activity
       stateBatch.push({
         contact_key: conv.contactKey,
-        activity_type: "status_change",
+        activity_type: 'status_change',
         reference_id: conv.id,
-        reference_type: "conversation",
+        reference_type: 'conversation',
         summary: `Conversation status: ${conv.status}`,
         metadata: {
           qualification_step: conv.conversation_state.qualification_progress_step,
@@ -150,9 +150,9 @@ async function backfillContactActivities() {
 
     console.log(`✅ Created ${stateChanges} state change activities`);
 
-    console.log("\n✨ Contact activities backfill complete!\n");
+    console.log('\n✨ Contact activities backfill complete!\n');
   } catch (error) {
-    console.error("❌ Backfill failed:", error);
+    console.error('❌ Backfill failed:', error);
     process.exit(1);
   } finally {
     await prisma.$disconnect();

@@ -35,7 +35,7 @@ export type Config = z.infer<typeof configSchema>;
 
 function loadConfig(): Config {
   const config = {
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: Number.parseInt(process.env.PORT || '3000', 10),
     nodeEnv: (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test',
     host: process.env.HOST || '0.0.0.0',
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * Build-time changelog generator
- * 
+ *
  * This script runs during the build process to generate a static changelog.json
  * file from git history. This is necessary because Railway deployments don't
  * include the .git directory, so we can't read commit history at runtime.
@@ -34,21 +34,21 @@ const TYPE_KEYWORDS: Record<ChangelogEntryType, string[]> = {
   style: ['style', 'ui', 'design', 'css', 'visual', 'layout', 'format', 'styling'],
   docs: ['docs', 'documentation', 'readme', 'comment', 'guide', 'doc'],
   chore: ['chore', 'deps', 'dependency', 'update', 'bump', 'upgrade', 'maint', 'maintenance'],
-  other: []
+  other: [],
 };
 
 // Category patterns for grouping
 const CATEGORY_PATTERNS: Record<string, string[]> = {
-  'Database': ['database', 'db', 'prisma', 'migration', 'schema', 'table', 'postgres', 'sql'],
-  'Dashboard': ['dashboard', 'v2', 'sequences', 'inbox', 'analytics', 'metrics', 'kpi', 'chart'],
+  Database: ['database', 'db', 'prisma', 'migration', 'schema', 'table', 'postgres', 'sql'],
+  Dashboard: ['dashboard', 'v2', 'sequences', 'inbox', 'analytics', 'metrics', 'kpi', 'chart'],
   'AI & ML': ['ai', 'ml', 'openai', 'gpt', 'draft', 'suggestion', 'inference', 'qualification', 'smart'],
-  'Integrations': ['slack', 'monday', 'aloware', 'integration', 'sync', 'webhook', 'api'],
-  'Authentication': ['auth', 'login', 'password', 'session', 'csrf', 'security', 'verify'],
-  'Performance': ['perf', 'performance', 'cache', 'speed', 'optimize', 'fast', 'slow'],
-  'Infrastructure': ['deploy', 'railway', 'vercel', 'docker', 'infra', 'build', 'ci', 'cd'],
+  Integrations: ['slack', 'monday', 'aloware', 'integration', 'sync', 'webhook', 'api'],
+  Authentication: ['auth', 'login', 'password', 'session', 'csrf', 'security', 'verify'],
+  Performance: ['perf', 'performance', 'cache', 'speed', 'optimize', 'fast', 'slow'],
+  Infrastructure: ['deploy', 'railway', 'vercel', 'docker', 'infra', 'build', 'ci', 'cd'],
   'Bug Fixes': ['fix', 'bug', 'error', 'crash', 'broken', 'issue', 'problem'],
   'UI/UX': ['ui', 'ux', 'design', 'layout', 'style', 'component', 'modal', 'panel', 'button'],
-  'Data Pipeline': ['pipeline', 'ingest', 'backfill', 'etl', 'sync', 'import', 'export']
+  'Data Pipeline': ['pipeline', 'ingest', 'backfill', 'etl', 'sync', 'import', 'export'],
 };
 
 /**
@@ -56,7 +56,7 @@ const CATEGORY_PATTERNS: Record<string, string[]> = {
  */
 function determineType(message: string): ChangelogEntryType {
   const lowerMessage = message.toLowerCase();
-  
+
   for (const [type, keywords] of Object.entries(TYPE_KEYWORDS)) {
     for (const keyword of keywords) {
       if (lowerMessage.includes(keyword)) {
@@ -64,7 +64,7 @@ function determineType(message: string): ChangelogEntryType {
       }
     }
   }
-  
+
   return 'other';
 }
 
@@ -73,7 +73,7 @@ function determineType(message: string): ChangelogEntryType {
  */
 function determineCategory(message: string): string {
   const lowerMessage = message.toLowerCase();
-  
+
   for (const [category, patterns] of Object.entries(CATEGORY_PATTERNS)) {
     for (const pattern of patterns) {
       if (lowerMessage.includes(pattern)) {
@@ -81,7 +81,7 @@ function determineCategory(message: string): string {
       }
     }
   }
-  
+
   return 'General';
 }
 
@@ -93,52 +93,52 @@ function formatDescription(message: string): string {
   let cleaned = message
     .replace(/^(feat|fix|docs|style|refactor|test|chore|ci|build|perf)(\([^)]*\))?:\s*/i, '')
     .replace(/^[:\s]+/, '');
-  
+
   // Capitalize first letter
   cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-  
+
   // Truncate if too long
   if (cleaned.length > 100) {
     cleaned = cleaned.substring(0, 97) + '...';
   }
-  
+
   return cleaned;
 }
 
 /**
  * Generate changelog from git history
  */
-function generateChangelog(days: number = 365): ChangelogEntry[] {
+function generateChangelog(days = 365): ChangelogEntry[] {
   try {
     // Get git log with format: hash|date|author|message
     const format = '%H|%aI|%an|%s';
     const since = days > 0 ? `--since="${days} days ago"` : '';
     const command = `git log ${since} --pretty=format:"${format}" --no-merges`;
-    
-    const output = execSync(command, { 
+
+    const output = execSync(command, {
       encoding: 'utf-8',
-      cwd: resolve(__dirname, '../..') // Run from repo root
+      cwd: resolve(__dirname, '../..'), // Run from repo root
     });
-    
+
     if (!output.trim()) {
       console.warn('[changelog-generator] No git history found');
       return [];
     }
-    
+
     const entries: ChangelogEntry[] = [];
     const lines = output.trim().split('\n');
-    
+
     for (const line of lines) {
       const parts = line.split('|');
       if (parts.length < 4) continue;
-      
+
       const [hash, date, author, ...messageParts] = parts;
       const message = messageParts.join('|'); // Rejoin in case message had pipes
-      
+
       const type = determineType(message);
       const category = determineCategory(message);
       const description = formatDescription(message);
-      
+
       entries.push({
         hash: hash.substring(0, 7), // Short hash
         date,
@@ -146,10 +146,10 @@ function generateChangelog(days: number = 365): ChangelogEntry[] {
         author,
         type,
         category,
-        description
+        description,
       });
     }
-    
+
     return entries;
   } catch (error) {
     console.error('[changelog-generator] Error generating changelog:', error);
@@ -162,35 +162,38 @@ function generateChangelog(days: number = 365): ChangelogEntry[] {
  */
 function main() {
   console.log('[changelog-generator] Generating changelog.json...');
-  
+
   // Generate 365 days of history
   const entries = generateChangelog(365);
-  
+
   if (entries.length === 0) {
     console.warn('[changelog-generator] No entries generated, skipping file creation');
     process.exit(0);
   }
-  
+
   // Write to file
   const outputPath = resolve(__dirname, '../changelog.json');
   const data = {
     generatedAt: new Date().toISOString(),
     daysIncluded: 365,
     totalCount: entries.length,
-    entries
+    entries,
   };
-  
+
   writeFileSync(outputPath, JSON.stringify(data, null, 2));
-  
+
   console.log(`[changelog-generator] Generated ${entries.length} entries`);
   console.log(`[changelog-generator] Written to: ${outputPath}`);
-  
+
   // Print summary
-  const typeCounts = entries.reduce((acc, entry) => {
-    acc[entry.type] = (acc[entry.type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-  
+  const typeCounts = entries.reduce(
+    (acc, entry) => {
+      acc[entry.type] = (acc[entry.type] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
   console.log('[changelog-generator] Summary by type:');
   for (const [type, count] of Object.entries(typeCounts)) {
     console.log(`  - ${type}: ${count}`);

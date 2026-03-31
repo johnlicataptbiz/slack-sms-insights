@@ -71,7 +71,7 @@ async function findBoardByName(boardName: string): Promise<string | null> {
   return null;
 }
 
-async function createBoard(boardName: string, boardKind: string = 'public'): Promise<string> {
+async function createBoard(boardName: string, boardKind = 'public'): Promise<string> {
   const query = `
     mutation ($boardName: String!, $boardKind: BoardKind!) {
       create_board(board_name: $boardName, board_kind: $boardKind) {
@@ -168,13 +168,37 @@ async function setupPersonalBookedCallsBoard(boardId: string): Promise<void> {
   await createColumn(boardId, 'Date Held', 'date');
   await createColumn(boardId, 'Setter', 'text');
   await createColumn(boardId, 'Advisor', 'text');
-  await createColumn(boardId, 'Swing', 'status', buildStatusDefaults(['First Swing', 'Second Swing', 'Third Swing', 'Closed Won', 'Closed Lost']));
-  await createColumn(boardId, 'Channel', 'status', buildStatusDefaults(['Circle DM', 'Aloware SMS', 'Email Marketing', 'Instagram DM', 'Game Plan Call', 'SELF BOOK']));
-  await createColumn(boardId, 'Source', 'status', buildStatusDefaults([
-    'Circle Group', 'Book Buyer', 'Start-Up Checklist', 'Raise Your Rates',
-    'Stand Alone Space Setup Guide', 'Marketing Email', 'Direct Outreach',
-    'Social Media', 'Hiring Guide', 'Webinar', 'Workshop Playbook', 'Signature Self Book'
-  ]));
+  await createColumn(
+    boardId,
+    'Swing',
+    'status',
+    buildStatusDefaults(['First Swing', 'Second Swing', 'Third Swing', 'Closed Won', 'Closed Lost']),
+  );
+  await createColumn(
+    boardId,
+    'Channel',
+    'status',
+    buildStatusDefaults(['Circle DM', 'Aloware SMS', 'Email Marketing', 'Instagram DM', 'Game Plan Call', 'SELF BOOK']),
+  );
+  await createColumn(
+    boardId,
+    'Source',
+    'status',
+    buildStatusDefaults([
+      'Circle Group',
+      'Book Buyer',
+      'Start-Up Checklist',
+      'Raise Your Rates',
+      'Stand Alone Space Setup Guide',
+      'Marketing Email',
+      'Direct Outreach',
+      'Social Media',
+      'Hiring Guide',
+      'Webinar',
+      'Workshop Playbook',
+      'Signature Self Book',
+    ]),
+  );
   await createColumn(boardId, 'Slack Link', 'link');
   await createColumn(boardId, 'Notes', 'long_text');
 }

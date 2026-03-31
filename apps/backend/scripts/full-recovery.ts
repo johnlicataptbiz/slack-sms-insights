@@ -15,13 +15,13 @@
  *   DATABASE_URL=... npx tsx scripts/full-recovery.ts [--skip-cleanup] [--skip-backfill] [--dry-run]
  */
 
-import { execSync } from "child_process";
-import { config as loadEnv } from "dotenv";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
+import { execSync } from 'child_process';
+import { config as loadEnv } from 'dotenv';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const PROJECT_ROOT = resolve(SCRIPT_DIR, "..");
+const PROJECT_ROOT = resolve(SCRIPT_DIR, '..');
 
 interface RecoveryOptions {
   skipCleanup: boolean;
@@ -35,53 +35,46 @@ interface RecoveryOptions {
 function parseArgs(): RecoveryOptions {
   const args = process.argv.slice(2);
   return {
-    skipCleanup: args.includes("--skip-cleanup"),
-    skipBackfill: args.includes("--skip-backfill"),
-    skipSync: args.includes("--skip-sync"),
-    skipFixes: args.includes("--skip-fixes"),
-    dryRun: args.includes("--dry-run"),
-    verbose: args.includes("--verbose") || args.includes("-v"),
+    skipCleanup: args.includes('--skip-cleanup'),
+    skipBackfill: args.includes('--skip-backfill'),
+    skipSync: args.includes('--skip-sync'),
+    skipFixes: args.includes('--skip-fixes'),
+    dryRun: args.includes('--dry-run'),
+    verbose: args.includes('--verbose') || args.includes('-v'),
   };
 }
 
-function log(
-  message: string,
-  level: "info" | "success" | "warning" | "error" = "info",
-) {
+function log(message: string, level: 'info' | 'success' | 'warning' | 'error' = 'info') {
   const timestamp = new Date().toISOString();
   const icons = {
-    info: "ℹ️",
-    success: "✅",
-    warning: "⚠️",
-    error: "❌",
+    info: 'ℹ️',
+    success: '✅',
+    warning: '⚠️',
+    error: '❌',
   };
   console.log(`${icons[level]} [${timestamp}] ${message}`);
 }
 
-function runCommand(
-  command: string,
-  description: string,
-  options: RecoveryOptions,
-): boolean {
-  log(`${description}...`, "info");
+function runCommand(command: string, description: string, options: RecoveryOptions): boolean {
+  log(`${description}...`, 'info');
 
   if (options.verbose) {
-    log(`Command: ${command}`, "info");
+    log(`Command: ${command}`, 'info');
   }
 
   if (options.dryRun) {
-    log(`[DRY-RUN] Would execute: ${command}`, "warning");
+    log(`[DRY-RUN] Would execute: ${command}`, 'warning');
     return true;
   }
 
   try {
     const result = execSync(command, {
       cwd: PROJECT_ROOT,
-      encoding: "utf-8",
-      stdio: "pipe",
+      encoding: 'utf-8',
+      stdio: 'pipe',
       env: process.env,
     });
-    log(`${description} completed successfully`, "success");
+    log(`${description} completed successfully`, 'success');
     if (result?.trim()) {
       console.log(result);
     }
@@ -91,7 +84,7 @@ function runCommand(
       stdout?: string | Buffer;
       stderr?: string | Buffer;
     };
-    log(`${description} failed: ${execError.message}`, "error");
+    log(`${description} failed: ${execError.message}`, 'error');
     if (options.verbose) {
       if (execError.stdout) {
         console.log(String(execError.stdout));
@@ -110,15 +103,9 @@ async function runStep(
   commands: Array<{ command: string; description: string }>,
   options: RecoveryOptions,
 ): Promise<boolean> {
-  log(
-    `\n═══════════════════════════════════════════════════════════════`,
-    "info",
-  );
-  log(`STEP ${stepNumber}: ${stepName}`, "info");
-  log(
-    `═══════════════════════════════════════════════════════════════\n`,
-    "info",
-  );
+  log('\n═══════════════════════════════════════════════════════════════', 'info');
+  log(`STEP ${stepNumber}: ${stepName}`, 'info');
+  log('═══════════════════════════════════════════════════════════════\n', 'info');
 
   let allSuccess = true;
   for (const { command, description } of commands) {
@@ -126,10 +113,7 @@ async function runStep(
     if (!success) {
       allSuccess = false;
       if (!options.dryRun) {
-        log(
-          `Step ${stepNumber} failed. Continuing with next steps...`,
-          "warning",
-        );
+        log(`Step ${stepNumber} failed. Continuing with next steps...`, 'warning');
       }
     }
   }
@@ -140,27 +124,18 @@ async function runStep(
 async function main(): Promise<boolean> {
   const options = parseArgs();
 
-  loadEnv({ path: resolve(PROJECT_ROOT, ".env") });
+  loadEnv({ path: resolve(PROJECT_ROOT, '.env') });
 
   if (!process.env.DATABASE_URL) {
-    log("DATABASE_URL is not set. Recovery commands may fail.", "warning");
+    log('DATABASE_URL is not set. Recovery commands may fail.', 'warning');
   }
 
-  log(
-    "\n╔═══════════════════════════════════════════════════════════════╗",
-    "info",
-  );
-  log(
-    "║           PTBIZSMS FULL RECOVERY PROCESS                      ║",
-    "info",
-  );
-  log(
-    "╚═══════════════════════════════════════════════════════════════╝\n",
-    "info",
-  );
+  log('\n╔═══════════════════════════════════════════════════════════════╗', 'info');
+  log('║           PTBIZSMS FULL RECOVERY PROCESS                      ║', 'info');
+  log('╚═══════════════════════════════════════════════════════════════╝\n', 'info');
 
   if (options.dryRun) {
-    log("⚠️  DRY RUN MODE - No changes will be applied\n", "warning");
+    log('⚠️  DRY RUN MODE - No changes will be applied\n', 'warning');
   }
 
   const results: Record<string, boolean> = {};
@@ -168,11 +143,11 @@ async function main(): Promise<boolean> {
   // Step 1: Database Status Check
   results.step1 = await runStep(
     1,
-    "DATABASE STATUS CHECK",
+    'DATABASE STATUS CHECK',
     [
       {
-        command: "npx tsx scripts/check-db-status.ts",
-        description: "Checking database connection and data volumes",
+        command: 'npx tsx scripts/check-db-status.ts',
+        description: 'Checking database connection and data volumes',
       },
     ],
     options,
@@ -182,26 +157,25 @@ async function main(): Promise<boolean> {
   if (!options.skipCleanup) {
     results.step2 = await runStep(
       2,
-      "CLEANUP OPERATIONS",
+      'CLEANUP OPERATIONS',
       [
         {
-          command:
-            "npx tsx scripts/cleanup-daily-runs.ts --apply --days-back 90",
-          description: "Cleaning up duplicate daily runs (90 days)",
+          command: 'npx tsx scripts/cleanup-daily-runs.ts --apply --days-back 90',
+          description: 'Cleaning up duplicate daily runs (90 days)',
         },
         {
-          command: "npx tsx scripts/cleanup-error-runs.ts --apply",
-          description: "Cleaning up error runs",
+          command: 'npx tsx scripts/cleanup-error-runs.ts --apply',
+          description: 'Cleaning up error runs',
         },
         {
-          command: "npx tsx scripts/cleanup-booked-calls-dupes.ts --apply",
-          description: "Cleaning up duplicate booked calls",
+          command: 'npx tsx scripts/cleanup-booked-calls-dupes.ts --apply',
+          description: 'Cleaning up duplicate booked calls',
         },
       ],
       options,
     );
   } else {
-    log("⏭️  Skipping cleanup operations (--skip-cleanup)", "warning");
+    log('⏭️  Skipping cleanup operations (--skip-cleanup)', 'warning');
     results.step2 = true;
   }
 
@@ -209,33 +183,33 @@ async function main(): Promise<boolean> {
   if (!options.skipBackfill) {
     results.step3 = await runStep(
       3,
-      "BACKFILL OPERATIONS",
+      'BACKFILL OPERATIONS',
       [
         {
-          command: "npx tsx scripts/backfill-slack-events.ts",
-          description: "Backfilling Slack SMS events",
+          command: 'npx tsx scripts/backfill-slack-events.ts',
+          description: 'Backfilling Slack SMS events',
         },
         {
-          command: "npx tsx scripts/backfill-booked-calls.ts",
-          description: "Backfilling booked call records",
+          command: 'npx tsx scripts/backfill-booked-calls.ts',
+          description: 'Backfilling booked call records',
         },
         {
-          command: "npx tsx scripts/backfill-contact-profiles.ts",
-          description: "Backfilling contact profiles",
+          command: 'npx tsx scripts/backfill-contact-profiles.ts',
+          description: 'Backfilling contact profiles',
         },
         {
-          command: "npx tsx scripts/backfill-contact-profiles-lrn.ts",
-          description: "Backfilling contact profiles with LRN data",
+          command: 'npx tsx scripts/backfill-contact-profiles-lrn.ts',
+          description: 'Backfilling contact profiles with LRN data',
         },
         {
-          command: "npx tsx scripts/backfill-qualification.ts",
-          description: "Backfilling qualification data from conversations",
+          command: 'npx tsx scripts/backfill-qualification.ts',
+          description: 'Backfilling qualification data from conversations',
         },
       ],
       options,
     );
   } else {
-    log("⏭️  Skipping backfill operations (--skip-backfill)", "warning");
+    log('⏭️  Skipping backfill operations (--skip-backfill)', 'warning');
     results.step3 = true;
   }
 
@@ -243,30 +217,29 @@ async function main(): Promise<boolean> {
   if (!options.skipFixes) {
     results.step4 = await runStep(
       4,
-      "DATA FIXES AND ENRICHMENT",
+      'DATA FIXES AND ENRICHMENT',
       [
         {
-          command: "npx tsx scripts/apply-all-fixes.ts",
-          description:
-            "Applying all data fixes (employment, interest, revenue)",
+          command: 'npx tsx scripts/apply-all-fixes.ts',
+          description: 'Applying all data fixes (employment, interest, revenue)',
         },
         {
-          command: "npx tsx scripts/final-fixes.ts",
-          description: "Applying final fixes and templates",
+          command: 'npx tsx scripts/final-fixes.ts',
+          description: 'Applying final fixes and templates',
         },
         {
-          command: "npx tsx scripts/refresh-booked-call-attribution.ts",
-          description: "Refreshing booked call attribution",
+          command: 'npx tsx scripts/refresh-booked-call-attribution.ts',
+          description: 'Refreshing booked call attribution',
         },
         {
-          command: "npx tsx scripts/recompute-all-qualifications.ts",
-          description: "Recomputing all qualifications",
+          command: 'npx tsx scripts/recompute-all-qualifications.ts',
+          description: 'Recomputing all qualifications',
         },
       ],
       options,
     );
   } else {
-    log("⏭️  Skipping data fixes (--skip-fixes)", "warning");
+    log('⏭️  Skipping data fixes (--skip-fixes)', 'warning');
     results.step4 = true;
   }
 
@@ -274,93 +247,76 @@ async function main(): Promise<boolean> {
   if (!options.skipSync) {
     results.step5 = await runStep(
       5,
-      "MONDAY.COM SYNC OPERATIONS",
+      'MONDAY.COM SYNC OPERATIONS',
       [
         {
-          command: "npx tsx scripts/sync-monday.ts",
-          description: "Syncing records to Monday.com",
+          command: 'npx tsx scripts/sync-monday.ts',
+          description: 'Syncing records to Monday.com',
         },
         {
-          command: "npx tsx scripts/check-monday-lead-normalization.ts",
-          description: "Checking Monday lead normalization",
+          command: 'npx tsx scripts/check-monday-lead-normalization.ts',
+          description: 'Checking Monday lead normalization',
         },
         {
-          command: "npx tsx scripts/rebuild-monday-governed-analytics.ts",
-          description: "Rebuilding Monday governed analytics",
+          command: 'npx tsx scripts/rebuild-monday-governed-analytics.ts',
+          description: 'Rebuilding Monday governed analytics',
         },
       ],
       options,
     );
   } else {
-    log("⏭️  Skipping Monday sync operations (--skip-sync)", "warning");
+    log('⏭️  Skipping Monday sync operations (--skip-sync)', 'warning');
     results.step5 = true;
   }
 
   // Step 6: Verification and Health Checks
   results.step6 = await runStep(
     6,
-    "VERIFICATION AND HEALTH CHECKS",
+    'VERIFICATION AND HEALTH CHECKS',
     [
       {
-        command: "npx tsx scripts/check-db-status.ts",
-        description: "Re-checking database health and volumes",
+        command: 'npx tsx scripts/check-db-status.ts',
+        description: 'Re-checking database health and volumes',
       },
       {
-        command: "npx tsx scripts/verify-sales-metrics.ts",
-        description: "Verifying sales metrics integrity",
+        command: 'npx tsx scripts/verify-sales-metrics.ts',
+        description: 'Verifying sales metrics integrity',
       },
       {
-        command: "npx tsx scripts/check-booked-calls.ts",
-        description: "Validating booked calls consistency",
+        command: 'npx tsx scripts/check-booked-calls.ts',
+        description: 'Validating booked calls consistency',
       },
       {
-        command: "npx tsx scripts/check-qual-counts.ts",
-        description: "Validating qualification counts",
+        command: 'npx tsx scripts/check-qual-counts.ts',
+        description: 'Validating qualification counts',
       },
     ],
     options,
   );
 
   const orderedResults: Array<{ key: string; label: string }> = [
-    { key: "step1", label: "Database status check" },
-    { key: "step2", label: "Cleanup operations" },
-    { key: "step3", label: "Backfill operations" },
-    { key: "step4", label: "Data fixes and enrichment" },
-    { key: "step5", label: "Monday.com sync operations" },
-    { key: "step6", label: "Verification and health checks" },
+    { key: 'step1', label: 'Database status check' },
+    { key: 'step2', label: 'Cleanup operations' },
+    { key: 'step3', label: 'Backfill operations' },
+    { key: 'step4', label: 'Data fixes and enrichment' },
+    { key: 'step5', label: 'Monday.com sync operations' },
+    { key: 'step6', label: 'Verification and health checks' },
   ];
 
-  log(
-    "\n╔═══════════════════════════════════════════════════════════════╗",
-    "info",
-  );
-  log(
-    "║                 RECOVERY SUMMARY                              ║",
-    "info",
-  );
-  log(
-    "╚═══════════════════════════════════════════════════════════════╝",
-    "info",
-  );
+  log('\n╔═══════════════════════════════════════════════════════════════╗', 'info');
+  log('║                 RECOVERY SUMMARY                              ║', 'info');
+  log('╚═══════════════════════════════════════════════════════════════╝', 'info');
 
   for (const { key, label } of orderedResults) {
     const passed = results[key] === true;
-    log(
-      `${label.padEnd(36)} ${passed ? "✅ PASS" : "❌ FAIL"}`,
-      passed ? "success" : "error",
-    );
+    log(`${label.padEnd(36)} ${passed ? '✅ PASS' : '❌ FAIL'}`, passed ? 'success' : 'error');
   }
 
-  const overallSuccess = orderedResults.every(
-    ({ key }) => results[key] === true,
-  );
+  const overallSuccess = orderedResults.every(({ key }) => results[key] === true);
   if (overallSuccess) {
-    log("Full recovery process completed successfully.", "success");
+    log('Full recovery process completed successfully.', 'success');
   } else {
-    log(
-      "Full recovery process completed with one or more failures. Review logs above.",
-      "warning",
-    );
+    log('Full recovery process completed with one or more failures. Review logs above.', 'warning');
   }
 
   return overallSuccess;
@@ -371,9 +327,6 @@ main()
     process.exit(success ? 0 : 1);
   })
   .catch((error) => {
-    log(
-      `Unhandled error in full recovery: ${error instanceof Error ? error.message : String(error)}`,
-      "error",
-    );
+    log(`Unhandled error in full recovery: ${error instanceof Error ? error.message : String(error)}`, 'error');
     process.exit(1);
   });

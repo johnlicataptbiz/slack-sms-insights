@@ -29,8 +29,14 @@ async function main() {
     console.log('  No matching error runs found — already deleted or IDs changed.');
   } else {
     for (const r of before) {
-      console.log(`  [${r.status}] id=${r.id}  ts=${r.timestamp?.toISOString().slice(0, 19)}  reportDate=${r.report_date?.toISOString().slice(0, 10) ?? 'null'}`);
-      console.log(`    err: ${String(r.error_message ?? '').slice(0, 100).replace(/\n/g, ' ')}`);
+      console.log(
+        `  [${r.status}] id=${r.id}  ts=${r.timestamp?.toISOString().slice(0, 19)}  reportDate=${r.report_date?.toISOString().slice(0, 10) ?? 'null'}`,
+      );
+      console.log(
+        `    err: ${String(r.error_message ?? '')
+          .slice(0, 100)
+          .replace(/\n/g, ' ')}`,
+      );
     }
   }
 
@@ -51,7 +57,9 @@ async function main() {
 
   for (const r of remaining) {
     const icon = r.status === 'success' ? '✅' : r.status === 'error' ? '❌' : '⏳';
-    console.log(`  ${icon} ${r.timestamp?.toISOString().slice(0, 19)}  reportDate=${r.report_date?.toISOString().slice(0, 10) ?? 'null'}  [${r.status}]`);
+    console.log(
+      `  ${icon} ${r.timestamp?.toISOString().slice(0, 19)}  reportDate=${r.report_date?.toISOString().slice(0, 10) ?? 'null'}  [${r.status}]`,
+    );
   }
 
   // 4. Check for missing report dates in the last 7 days
@@ -69,11 +77,7 @@ async function main() {
     select: { report_date: true, timestamp: true },
   });
 
-  const coveredDates = new Set(
-    successfulRuns
-      .map(r => r.report_date?.toISOString().slice(0, 10))
-      .filter(Boolean)
-  );
+  const coveredDates = new Set(successfulRuns.map((r) => r.report_date?.toISOString().slice(0, 10)).filter(Boolean));
 
   console.log(`  Covered report dates: ${[...coveredDates].sort().join(', ')}`);
 
@@ -85,7 +89,7 @@ async function main() {
     expectedDates.push(d.toISOString().slice(0, 10));
   }
 
-  const missingDates = expectedDates.filter(d => !coveredDates.has(d));
+  const missingDates = expectedDates.filter((d) => !coveredDates.has(d));
   if (missingDates.length === 0) {
     console.log('  ✅ No missing dates — all last 7 days are covered.');
   } else {
@@ -97,10 +101,12 @@ async function main() {
 }
 
 main()
-  .catch(e => {
+  .catch((e) => {
     console.error('Script failed:', e);
     process.exit(1);
   })
   .finally(async () => {
-    try { await (prisma as any).$disconnect(); } catch {}
+    try {
+      await (prisma as any).$disconnect();
+    } catch {}
   });

@@ -95,6 +95,9 @@ async function run(): Promise<void> {
 }
 
 run().catch((error) => {
-  console.error('❌ Failed to fetch outcome keyword analytics:', error instanceof Error ? error.message : String(error));
+  console.error(
+    '❌ Failed to fetch outcome keyword analytics:',
+    error instanceof Error ? error.message : String(error),
+  );
   process.exit(1);
 });

@@ -1,4 +1,5 @@
 import pg from 'pg';
+
 const { Pool } = pg;
 
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
@@ -16,19 +17,37 @@ async function main() {
   // 1. Add more templates
   const templates = [
     { name: 'Quick Call CTA', body: 'Hey {name}! What time works for a quick 15-min call today or tomorrow?' },
-    { name: 'Follow Up - No Response', body: 'Hey {name}, just circling back - did you get a chance to look at that? Happy to hop on a quick call if easier!' },
-    { name: 'Value Add', body: 'Hey {name}! Quick thought - been seeing a lot of practices like yours [specific result]. Would love to share how. Free for a call?' },
-    { name: 'Re-engage Cold', body: 'Hey {name}! Been a minute - wanted to check in. Still focused on growing the cash side of your practice?' },
-    { name: 'Soft Close', body: 'Hey {name}, sounds like this could be a fit. Want to grab 15 min to see if we can help?' },
-    { name: 'Objection - Busy', body: 'Totally get it {name}! What if we did just 10 min this week? I can work around your schedule.' },
-    { name: 'Objection - Not Interested', body: "No worries at all! Mind if I ask what you are focused on instead? Always curious what is working for practices like yours." }
+    {
+      name: 'Follow Up - No Response',
+      body: 'Hey {name}, just circling back - did you get a chance to look at that? Happy to hop on a quick call if easier!',
+    },
+    {
+      name: 'Value Add',
+      body: 'Hey {name}! Quick thought - been seeing a lot of practices like yours [specific result]. Would love to share how. Free for a call?',
+    },
+    {
+      name: 'Re-engage Cold',
+      body: 'Hey {name}! Been a minute - wanted to check in. Still focused on growing the cash side of your practice?',
+    },
+    {
+      name: 'Soft Close',
+      body: 'Hey {name}, sounds like this could be a fit. Want to grab 15 min to see if we can help?',
+    },
+    {
+      name: 'Objection - Busy',
+      body: 'Totally get it {name}! What if we did just 10 min this week? I can work around your schedule.',
+    },
+    {
+      name: 'Objection - Not Interested',
+      body: 'No worries at all! Mind if I ask what you are focused on instead? Always curious what is working for practices like yours.',
+    },
   ];
 
   for (const t of templates) {
     try {
       await pool.query(
         'INSERT INTO message_templates (id, name, body, category, created_by, created_at) VALUES ($1, $2, $3, $4, $5, NOW()) ON CONFLICT (id) DO NOTHING',
-        ['tpl-' + t.name.toLowerCase().replace(/\s+/g, '-'), t.name, t.body, 'outbound', 'system']
+        ['tpl-' + t.name.toLowerCase().replace(/\s+/g, '-'), t.name, t.body, 'outbound', 'system'],
       );
     } catch (e) {
       // Ignore duplicates
@@ -148,9 +167,21 @@ async function main() {
 
   console.log('\n3. Current qualification coverage:');
   console.log('   Total:', stats[0].total);
-  console.log('   Employment known:', stats[0].emp_known, '(' + Math.round(100 * stats[0].emp_known / stats[0].total) + '%)');
-  console.log('   Revenue known:', stats[0].rev_known, '(' + Math.round(100 * stats[0].rev_known / stats[0].total) + '%)');
-  console.log('   Interest known:', stats[0].int_known, '(' + Math.round(100 * stats[0].int_known / stats[0].total) + '%)');
+  console.log(
+    '   Employment known:',
+    stats[0].emp_known,
+    '(' + Math.round((100 * stats[0].emp_known) / stats[0].total) + '%)',
+  );
+  console.log(
+    '   Revenue known:',
+    stats[0].rev_known,
+    '(' + Math.round((100 * stats[0].rev_known) / stats[0].total) + '%)',
+  );
+  console.log(
+    '   Interest known:',
+    stats[0].int_known,
+    '(' + Math.round((100 * stats[0].int_known) / stats[0].total) + '%)',
+  );
 
   await pool.end();
 }

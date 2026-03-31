@@ -14,22 +14,46 @@ const manifest = {
     app_home: { home_tab_enabled: true, messages_tab_enabled: false, messages_tab_read_only_enabled: true },
     bot_user: { display_name: 'Aloware SMS Insights', always_online: true },
     slash_commands: [
-      { command: '/ask', description: 'Ask the SMS Insights bot a question', usage_hint: '[question]', should_escape: false },
-      { command: '/sms-report', description: 'Generate a daily SMS report', usage_hint: '[today|yesterday|YYYY-MM-DD]', should_escape: false },
-      { command: '/sms-scoreboard', description: 'Post the weekly setter scoreboard', usage_hint: '', should_escape: false },
+      {
+        command: '/ask',
+        description: 'Ask the SMS Insights bot a question',
+        usage_hint: '[question]',
+        should_escape: false,
+      },
+      {
+        command: '/sms-report',
+        description: 'Generate a daily SMS report',
+        usage_hint: '[today|yesterday|YYYY-MM-DD]',
+        should_escape: false,
+      },
+      {
+        command: '/sms-scoreboard',
+        description: 'Post the weekly setter scoreboard',
+        usage_hint: '',
+        should_escape: false,
+      },
     ],
   },
   oauth_config: {
     redirect_urls: ['https://ptbizsms.com/api/oauth/callback'],
     scopes: {
-      bot: ['app_mentions:read','channels:history','chat:write','commands','groups:history','reactions:read'],
+      bot: ['app_mentions:read', 'channels:history', 'chat:write', 'commands', 'groups:history', 'reactions:read'],
     },
   },
   settings: {
     socket_mode_enabled: true,
     org_deploy_enabled: false,
     interactivity: { is_enabled: true },
-    event_subscriptions: { bot_events: ['app_home_opened','app_mention','message.channels','message.groups','reaction_added','reaction_removed'] },
+    event_subscriptions: {
+      bot_events: [
+        'app_home_opened',
+        'app_mention',
+        'message.channels',
+        'message.groups',
+        'reaction_added',
+        'reaction_removed',
+      ],
+    },
     token_rotation_enabled: false,
   },
 };

@@ -1,6 +1,6 @@
+import { z } from 'zod';
 import type { RequestContext } from './base.controller.js';
 import { BaseController } from './base.controller.js';
-import { z } from 'zod';
 
 const LoginRequestSchema = z.object({
   password: z.string().min(1, 'Password is required'),
@@ -13,7 +13,7 @@ export class AuthController extends BaseController {
     // For now, just return success - session management would be added later
     this.sendSuccessResponse(context.res, {
       success: true,
-      message: 'Session verified'
+      message: 'Session verified',
     });
   }
 
@@ -27,7 +27,7 @@ export class AuthController extends BaseController {
         // For now, just return success - session management would be added later
         this.sendSuccessResponse(res, {
           success: true,
-          message: 'Login successful'
+          message: 'Login successful',
         });
       } else {
         this.sendErrorResponse(res, 'Invalid password', 401);

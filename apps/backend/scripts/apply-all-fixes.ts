@@ -1,4 +1,5 @@
 import pg from 'pg';
+
 const { Pool } = pg;
 
 const databaseUrl = (process.env.DATABASE_URL || '').trim();
@@ -123,9 +124,15 @@ async function main() {
     FROM conversation_state
   `);
   const q = qual.rows[0];
-  console.log(`Employment known: ${q.emp_known}/${q.total} (${(Number(q.emp_known)/Number(q.total)*100).toFixed(1)}%)`);
-  console.log(`Interest known: ${q.interest_known}/${q.total} (${(Number(q.interest_known)/Number(q.total)*100).toFixed(1)}%)`);
-  console.log(`Revenue known: ${q.revenue_known}/${q.total} (${(Number(q.revenue_known)/Number(q.total)*100).toFixed(1)}%)`);
+  console.log(
+    `Employment known: ${q.emp_known}/${q.total} (${((Number(q.emp_known) / Number(q.total)) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `Interest known: ${q.interest_known}/${q.total} (${((Number(q.interest_known) / Number(q.total)) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `Revenue known: ${q.revenue_known}/${q.total} (${((Number(q.revenue_known) / Number(q.total)) * 100).toFixed(1)}%)`,
+  );
 
   const ttb = await pool.query('SELECT COUNT(*) as c FROM booked_calls WHERE first_sms_touch_at IS NOT NULL');
   console.log(`Time-to-booking data: ${ttb.rows[0].c} bookings`);

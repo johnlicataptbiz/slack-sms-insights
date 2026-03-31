@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { config } from '../config/index.js';
 
 export abstract class BaseRepository {
@@ -8,19 +8,13 @@ export abstract class BaseRepository {
     this.prisma = prisma;
   }
 
-  protected async executeWithTransaction<T>(
-    operation: (tx: PrismaClient) => Promise<T>
-  ): Promise<T> {
+  protected async executeWithTransaction<T>(operation: (tx: PrismaClient) => Promise<T>): Promise<T> {
     return this.prisma.$transaction(async (tx) => {
       return operation(tx as PrismaClient);
     });
   }
 
-  protected async executeWithRetry<T>(
-    operation: () => Promise<T>,
-    maxRetries: number = 3,
-    delay: number = 1000
-  ): Promise<T> {
+  protected async executeWithRetry<T>(operation: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> {
     let lastError: Error;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -34,8 +28,8 @@ export abstract class BaseRepository {
         }
 
         // Exponential backoff
-        const waitTime = delay * Math.pow(2, attempt - 1);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
+        const waitTime = delay * 2 ** (attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
 

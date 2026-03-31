@@ -69,7 +69,13 @@ export const insertSmsEvent = async (
       contact_phone: event.contactPhone ?? null,
       contact_name: event.contactName ?? null,
       aloware_user: event.alowareUser ?? null,
-      body: event.body ?? '',
+      body: (() => {
+        if (typeof event.body === 'string') return event.body;
+        if (typeof event.body === 'object' && event.body != null && 'body' in event.body) {
+          return String(event.body.body ?? '');
+        }
+        return JSON.stringify(event.body ?? '') || '';
+      })(),
       line: event.line ?? null,
       sequence: event.sequence ?? null,
       sequence_id: sequenceId,

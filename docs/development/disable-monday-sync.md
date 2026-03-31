@@ -63,7 +63,7 @@ Once you have resolved the underlying issue (e.g., corrected column mappings, ve
 1. Test a **single call** manually using the sync manager script before scaling back up:
    ```bash
    cd sms-insights
-   npx tsx monday-sync-manager.mjs
+   railway run node --import tsx monday-sync-manager.mjs sync
    ```
 2. Confirm the entry in Monday.com looks correct (all columns populated).
 3. Re-enable the flags in Railway:

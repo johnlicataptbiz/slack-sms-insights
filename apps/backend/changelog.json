@@ -1,8 +1,44 @@
 {
-  "generatedAt": "2026-03-31T05:01:42.029Z",
+  "generatedAt": "2026-03-31T06:22:10.900Z",
   "daysIncluded": 365,
-  "totalCount": 516,
+  "totalCount": 520,
   "entries": [
+    {
+      "hash": "47a3169",
+      "date": "2026-03-31T01:06:45-05:00",
+      "message": "fix: complete KPI facts pipeline with text pattern filtering",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Complete KPI facts pipeline with text pattern filtering"
+    },
+    {
+      "hash": "89f9488",
+      "date": "2026-03-31T01:02:35-05:00",
+      "message": "fix: resolve TS syntax errors in insights-summary with raw SQL fallbacks",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Resolve TS syntax errors in insights-summary with raw SQL fallbacks"
+    },
+    {
+      "hash": "322dfd3",
+      "date": "2026-03-31T00:49:24-05:00",
+      "message": "fix(insights-summary): resolve TS syntax errors with raw SQL queries + Prisma config",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Resolve TS syntax errors with raw SQL queries + Prisma config"
+    },
+    {
+      "hash": "f791d96",
+      "date": "2026-03-31T00:01:49-05:00",
+      "message": "fix(sms-insights): fixed services + local prisma",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fixed services + local prisma"
+    },
     {
       "hash": "eba3908",
       "date": "2026-03-30T23:53:45-05:00",

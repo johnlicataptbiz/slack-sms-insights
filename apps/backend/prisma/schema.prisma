@@ -5,3 +5,230 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum SmsDirection {
+  inbound
+  outbound
+  unknown
+}
+
+enum TcpaConsentStatus {
+  OPTED_IN
+  OPTED_OUT
+  PENDING
+  UNKNOWN
+}
+
+enum ConversationStatus {
+  open
+  closed
+  archived
+}
+
+model Conversation {
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contactKey              String                   @unique @map("contact_key")
+  contact_id              String?
+  contact_phone           String?
+  current_rep_id          String?
+  last_inbound_at         DateTime?                @db.Timestamptz(6)
+  last_outbound_at        DateTime?                @db.Timestamptz(6)
+  last_touch_at           DateTime?                @db.Timestamptz(6)
+  unreplied_inbound_count Int                      @default(0)
+  nextFollowupAt          DateTime?                @map("next_followup_due_at") @db.Timestamptz(6)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  status                  ConversationStatus       @default(open)
+  first_engagement_at     DateTime?                @db.Timestamptz(6)
+  metadata_updated_at     DateTime?                @default(now()) @db.Timestamptz(6)
+  has_active_consent      Boolean                  @default(false)
+  consent_verified_at     DateTime?                @db.Timestamptz(6)
+  is_opted_out            Boolean                  @default(false)
+  opted_out_at            DateTime?                @db.Timestamptz(6)
+  opted_out_reason        String?
+  is_dnc_flagged          Boolean                  @default(false)
+  dnc_checked_at          DateTime?                @db.Timestamptz(6)
+
+  sms_events              SmsEvent[]
+
+}
+
+model SmsEvent {
+  id                     String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slack_team_id          String
+  slack_channel_id       String
+  slack_message_ts       String
+  event_ts               DateTime             @db.Timestamptz(6)
+  direction              SmsDirection
+  contact_id             String?
+  contact_phone          String?
+  contact_name           String?
+  aloware_user           String?
+  body                   String?
+  line                   String?
+  sequence               String?
+  raw                    Json?
+  created_at             DateTime             @default(now()) @db.Timestamptz(6)
+  conversation_id        String?              @db.Uuid
+  sequence_id            String?              @db.Uuid
+  normalized_contact_key String?
+  normalized_phone       String?
+  sequence_version_id    String?              @db.Uuid
+  event_role             String?
+  recorded_at            DateTime?            @default(now()) @db.Timestamptz(6)
+  last_modified_at       DateTime?            @default(now()) @db.Timestamptz(6)
+  was_compliant          Boolean               @default(true)
+  compliance_notes       String?
+  delivery_status        String?
+  delivery_timestamp     DateTime?             @db.Timestamptz(6)
+  carrier_code           String?
+  carrier_message        String?
+  contains_opt_out_keyword Boolean             @default(false)
+  message_type           String?
+  campaign_id            String?
+
+  conversation           Conversation? @relation(fields: [conversation_id], references: [id])
+
+  @@unique([slack_channel_id, slack_message_ts])
+  @@index([conversation_id])
+  @@index([event_ts])
+}
+
+model MondayColumnMapping {
+  board_id     String   @id
+  mapping_json Json
+  updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model MondayCallSnapshots {
+  board_id    String
+  item_id     String
+  item_name   String?
+  updated_at  DateTime  @db.Timestamptz(6)
+  call_date   DateTime? @db.Date
+  setter      String?
+  stage       String?
+  disposition String?
+  is_booked   Boolean   @default(false)
+  contact_key String?
+  raw         Json?
+  synced_at   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@id([board_id, item_id])
+}
+
+model MondayWeeklyReports {
+  week_start      DateTime @id @db.Date
+  source_board_id String?
+  summary_json    Json
+  monday_item_id  String?
+  synced_at       DateTime @default(now()) @db.Timestamptz(6)
+}
+
+model MondayBookedCallPushes {
+  board_id         String
+  slack_channel_id String
+  slack_message_ts String
+  setter_bucket    String
+  monday_item_id   String?
+  error            String?
+  payload_json     Json?
+  pushed_at        DateTime?                  @db.Timestamptz(6)
+  updated_at       DateTime                   @default(now()) @updatedAt @db.Timestamptz(6)
+  status           String @default("pending")
+
+  @@id([board_id, slack_channel_id, slack_message_ts])
+}
+
+model MondaySyncState {
+  board_id     String            @id
+  cursor       String?
+  last_sync_at DateTime?         @db.Timestamptz(6)
+  status       String?
+  error        String?
+  updated_at   DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model SequenceAliases {
+  raw_label         String            @id
+  normalized_label  String
+  sequence_id       String            @db.Uuid
+  created_at        DateTime          @default(now()) @db.Timestamptz(6)
+}
+
+model SequenceRegistry {
+  id                 String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label              String
+  normalized_label   String            @unique
+  status             String            @default("active")
+  is_manual_bucket   Boolean           @default(false)
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model SetterFeedbackDedupe {
+  channel_id String
+  thread_ts  String
+  message_ts String?
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([channel_id, thread_ts])
+}
+
+model UserSendPreferences {
+  user_id             String   @id
+  default_line_id     Int?
+  default_from_number String?
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+}
+
+model WorkItems {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id String   @db.Uuid
+  rep_id          String?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  due_at          DateTime @db.Timestamptz(6)
+  resolved_at     DateTime? @db.Timestamptz(6)
+  resolution      String?
+  source_event_id String?  @db.Uuid
+  type            String   @default("needs_reply")
+  severity        String   @default("med")
+
+  @@index([conversation_id])
+}
+
+model FactBookingDaily {
+  day              DateTime @db.Date
+  sequence_id      String   @db.Uuid
+  rep_id           String
+  booked_total     Int      @default(0)
+  booked_jack      Int      @default(0)
+  booked_brandon   Int      @default(0)
+  booked_self      Int      @default(0)
+  booked_after_sms_reply Int @default(0)
+
+  @@id([day, sequence_id, rep_id])
+}
+
+model FactMondayHealthDaily {
+  day                   DateTime @id @db.Date
+  board_id              String
+  board_class           String
+  sync_status           String?
+  is_stale              Boolean
+  source_coverage_pct   Float
+  campaign_coverage_pct Float
+  set_by_coverage_pct   Float
+  touchpoints_coverage_pct Float
+  snapshot_count        Int
+  lead_attribution_count Int
+  metric_fact_count     Int
+
+  @@index([day])
+}
+
+model SmsEvents {
+  id String @id
+  // Minimal model for compatibility
+}

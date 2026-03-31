@@ -43,8 +43,8 @@ export class App {
     this.app.use(compression());
 
     // Body parsing
-    this.app.use(json({ limit: '10mb' }));
-    this.app.use(urlencoded({ extended: true }));
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true }));
 
     // Request logging
     this.app.use(requestLogger);

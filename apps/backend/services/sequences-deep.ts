@@ -111,20 +111,9 @@ export const getSequencesDeep = async (
   const toDay = params.to.toISOString().slice(0, 10);
   const scanFrom = new Date(params.from.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-  const [
-    bookingRows,
-    leadRows,
-    sequenceRows,
-    mondayRows,
-    manualBucketRows,
-    attributionStats,
-    mondayBookedTotalRows,
-    attributedByLabelRows,
-    rawEventRows,
-  ] = await Promise.all([
-    (async () => {
-(async () => {
-  let bookingRows = [];
+  const warnings: string[] = [];
+
+  let bookingRows: any[] = [];
   try {
     bookingRows = await prisma.fact_booking_daily.findMany({
       where: {
@@ -140,53 +129,17 @@ export const getSequencesDeep = async (
         booked_brandon: true,
         booked_self: true,
         booked_after_sms_reply: true,
-        booking_rate_pct: true,
         diagnostic_booking_signals: true,
       },
     });
-  } catch (error) {
-    // Table may not exist in production yet
-    logger?.warn?.('sequences-deep: fact_booking_daily table not available', {
-      error: error instanceof Error ? error.message : String(error),
-    });
+  } catch (e) {
+    warnings.push('fact_booking_daily unavailable');
+    logger?.warn?.('sequences-deep: fact_booking_daily unavailable', e);
   }
-  return bookingRows;
-})(),
-          where: {
-            day: {
-              gte: new Date(`${fromDay}T00:00:00.000Z`),
-              lte: new Date(`${toDay}T00:00:00.000Z`),
-            },
-          },
-          select: {
-            sequence_id: true,
-            booked_total: true,
-            booked_jack: true,
-            booked_brandon: true,
-            booked_self: true,
-            booked_after_sms_reply: true,
-            booking_rate_pct: true,
-            diagnostic_booking_signals: true,
-          },
-        });
-      } catch (error) {
-        // Table may not exist in production yet
-        logger?.warn?.('sequences-deep: fact_booking_daily table not available', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return [];
-      }
-    })(),
-(async () => {
+
   let leadRows: any[] = [];
   try {
-    leadRows = await prisma.$queryRaw`SELECT 1 as dummy` as any[];
-  } catch {
-    // Stub for lead quality facts
-  }
-  return leadRows;
-})(),
-$queryRaw`SELECT 1 as dummy` as any[],
+    leadRows = await prisma.fact_lead_quality_daily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -202,8 +155,15 @@ $queryRaw`SELECT 1 as dummy` as any[],
         progress_step_3_count: true,
         progress_step_4_count: true,
       },
-    }),
-    prisma.sequence_registry.findMany({
+    });
+  } catch (e) {
+    warnings.push('fact_lead_quality_daily unavailable');
+    logger?.warn?.('sequences-deep: fact_lead_quality_daily unavailable', e);
+  }
+
+  let sequenceRows: any[] = [];
+  try {
+    sequenceRows = await prisma.sequence_registry.findMany({
       where: params.status ? { status: params.status } : undefined,
       select: {
         id: true,
@@ -215,8 +175,15 @@ $queryRaw`SELECT 1 as dummy` as any[],
         is_manual_bucket: true,
       },
       orderBy: { label: 'asc' },
-    }),
-    prisma.fact_monday_health_daily.findMany({
+    });
+  } catch (e) {
+    warnings.push('sequence_registry unavailable');
+    logger?.warn?.('sequences-deep: sequence_registry unavailable', e);
+  }
+
+  let mondayRows: any[] = [];
+  try {
+    mondayRows = await prisma.fact_monday_health_daily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -232,12 +199,25 @@ $queryRaw`SELECT 1 as dummy` as any[],
         set_by_coverage_pct: true,
         touchpoints_coverage_pct: true,
       },
-    }),
-    prisma.sequence_registry.findMany({
+    });
+  } catch (e) {
+    warnings.push('fact_monday_health_daily unavailable');
+    logger?.warn?.('sequences-deep: fact_monday_health_daily unavailable', e);
+  }
+
+  let manualBucketRows: any[] = [];
+  try {
+    manualBucketRows = await prisma.sequence_registry.findMany({
       where: { is_manual_bucket: true },
       select: { id: true },
-    }),
-    prisma.$queryRawUnsafe<Array<{ total: number; mapped_conversation: number }>>(
+    });
+  } catch (e) {
+    warnings.push('manual_bucket unavailable');
+  }
+
+  let attributionStats: any = [];
+  try {
+    attributionStats = await prisma.$queryRawUnsafe<Array<{ total: number; mapped_conversation: number }>>(
       `
       SELECT
         COUNT(*)::int AS total,
@@ -248,8 +228,14 @@ $queryRaw`SELECT 1 as dummy` as any[],
       `,
       params.from.toISOString(),
       params.to.toISOString(),
-    ),
-    prisma.$queryRawUnsafe<Array<{ monday_booked_total: number }>>(
+    );
+  } catch (e) {
+    warnings.push('attribution_stats unavailable');
+  }
+
+  let mondayBookedTotalRows: any = [];
+  try {
+    mondayBookedTotalRows = await prisma.$queryRawUnsafe<Array<{ monday_booked_total: number }>>(
       `
       SELECT COUNT(*)::int AS monday_booked_total
       FROM monday_call_snapshots
@@ -261,8 +247,14 @@ $queryRaw`SELECT 1 as dummy` as any[],
       fromDay,
       toDay,
       salesTeamBoardId,
-    ),
-    prisma.$queryRawUnsafe<
+    );
+  } catch (e) {
+    warnings.push('monday_booked_total unavailable');
+  }
+
+  let attributedByLabelRows: any = [];
+  try {
+    attributedByLabelRows = await prisma.$queryRawUnsafe<
       Array<{
         sequence_label: string;
         booked_total: number;
@@ -290,8 +282,14 @@ $queryRaw`SELECT 1 as dummy` as any[],
       `,
       params.from.toISOString(),
       params.to.toISOString(),
-    ),
-    prisma.sms_events.findMany({
+    );
+  } catch (e) {
+    warnings.push('attributed_by_label unavailable');
+  }
+
+  let rawEventRows: any[] = [];
+  try {
+    rawEventRows = await prisma.sms_events.findMany({
       where: {
         event_ts: { gte: scanFrom, lte: params.to },
         direction: { in: ['inbound', 'outbound'] },
@@ -305,28 +303,31 @@ $queryRaw`SELECT 1 as dummy` as any[],
         contact_id: true,
         contact_phone: true,
       },
-    }),
-  ]);
+    });
+  } catch (e) {
+    warnings.push('sms_events unavailable');
+    logger?.warn?.('sequences-deep: sms_events unavailable', e);
+  }
 
-  const manualSequenceId = sequenceRows.find((row) => row.is_manual_bucket)?.id || null;
+  const manualSequenceId = sequenceRows.find((row: any) => row.is_manual_bucket)?.id || null;
   const backfillSequenceIds = new Set(
-    sequenceRows.filter((row) => isMondayBackfillLabel(row.label)).map((row) => row.id),
+    sequenceRows.filter((row: any) => isMondayBackfillLabel(row.label)).map((row: any) => row.id),
   );
   const resolveSequenceId = (sequenceId: string): string =>
     manualSequenceId && backfillSequenceIds.has(sequenceId) ? manualSequenceId : sequenceId;
 
-interface SmsEventExtended {
-  event_ts: Date;
-  direction: string;
-  sequence_id: string | null;
-  body: string | null;
-  contact_id: string | null;
-  contact_phone: string | null;
-  _contactKey: string;
-  _seqId: string;
-}
+  interface SmsEventExtended {
+    event_ts: Date;
+    direction: string;
+    sequence_id: string | null;
+    body: string | null;
+    contact_id: string | null;
+    contact_phone: string | null;
+    _contactKey: string;
+    _seqId: string;
+  }
 
-type Event = SmsEventExtended;
+  type Event = SmsEventExtended;
   const events: Event[] = [];
   for (const row of rawEventRows) {
     const contactKey = contactKeyFor(row);
@@ -478,7 +479,6 @@ type Event = SmsEventExtended;
     if (!matchedSequenceId) continue;
     const stat = ensure(resolveSequenceId(matchedSequenceId));
 
-    // Fallback attribution: only fill gaps where fact_booking_daily is 0 for this sequence in range.
     if (stat.bookedCalls === 0 && row.booked_total > 0) {
       stat.bookedCalls = row.booked_total;
       stat.bookedJack = row.booked_jack;
@@ -488,8 +488,8 @@ type Event = SmsEventExtended;
   }
 
   const sequences = sequenceRows
-    .filter((row) => !backfillSequenceIds.has(row.id))
-    .map((row) => {
+    .filter((row: any) => !backfillSequenceIds.has(row.id))
+    .map((row: any) => {
       const stat = summary.get(row.id);
       const messagesSent = stat?.messagesSent || 0;
       const uniqueContacted = stat?.uniqueContactedSet.size || 0;
@@ -535,10 +535,10 @@ type Event = SmsEventExtended;
     .filter((row) => row.messagesSent > 0 || row.bookedCalls > 0 || row.leadQuality.leadsCount > 0)
     .sort((a, b) => b.bookedCalls - a.bookedCalls || b.messagesSent - a.messagesSent);
 
-  const boards = new Set(mondayRows.map((row) => row.board_id)).size;
-  const staleBoards = mondayRows.filter((row) => row.is_stale).length;
-  const erroredBoards = mondayRows.filter((row) => row.sync_status === 'error').length;
-  const manualBucketIds = new Set(manualBucketRows.map((row) => row.id));
+  const boards = new Set(mondayRows.map((row: any) => row.board_id)).size;
+  const staleBoards = mondayRows.filter((row: any) => row.is_stale).length;
+  const erroredBoards = mondayRows.filter((row: any) => row.sync_status === 'error').length;
+  const manualBucketIds = new Set(manualBucketRows.map((row: any) => row.id));
   const slackBookedTotal = bookingRows.reduce((sum, row) => sum + row.booked_total, 0);
   const manualDirectBooked = bookingRows
     .filter((row) => (row.sequence_id && manualBucketIds.has(row.sequence_id)) || false)
@@ -548,12 +548,13 @@ type Event = SmsEventExtended;
   const attributionTotal = stats.total || 0;
   const attributionMappedConversation = stats.mapped_conversation || 0;
   const mondayBookedTotal = mondayBookedTotalRows?.[0]?.monday_booked_total || 0;
+
   const bookedCallSources = await getBookedCallAttributionSources({
     from: params.from,
     to: params.to,
-  });
-  const smsReplyLinks = await getBookedCallSmsReplyLinks(bookedCallSources);
-  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(bookedCallSources, undefined, smsReplyLinks);
+  }).catch(() => []);
+  const smsReplyLinks = await getBookedCallSmsReplyLinks(bookedCallSources).catch(() => []);
+  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(bookedCallSources, undefined, smsReplyLinks).catch(() => new Map());
   const sequenceAttribution = attributeSlackBookedCallsToSequences(
     sequences.map((row) => ({
       label: row.label,
@@ -569,7 +570,7 @@ type Event = SmsEventExtended;
     bookedCallSources,
     smsReplyLinks,
     smsSequenceLookup,
-  );
+  ).catch(() => ({ totals: { matchedCalls: 0, unattributedCalls: 0, manualCalls: 0, bookedAfterSmsReply: 0, smsPhoneMatchedCalls: 0, fuzzyTextMatchedCalls: 0 }, unattributedAuditRows: [] }));
 
   if (mondayRows.length === 0) {
     logger?.warn?.('sequences-deep: no monday health rows in requested window');
@@ -581,6 +582,7 @@ type Event = SmsEventExtended;
       to: params.to.toISOString(),
       timeZone: params.timeZone,
     },
+    ...(warnings.length > 0 && { warnings }),
     unattributedAuditRows: sequenceAttribution.unattributedAuditRows,
     sequences,
     monday: {
@@ -589,19 +591,19 @@ type Event = SmsEventExtended;
       erroredBoards,
       avgSourceCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce((sum, row) => sum + row.source_coverage_pct, 0) / mondayRows.length
+          ? mondayRows.reduce((sum, row: any) => sum + row.source_coverage_pct, 0) / mondayRows.length
           : 0,
       avgCampaignCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce((sum, row) => sum + row.campaign_coverage_pct, 0) / mondayRows.length
+          ? mondayRows.reduce((sum, row: any) => sum + row.campaign_coverage_pct, 0) / mondayRows.length
           : 0,
       avgSetByCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce((sum, row) => sum + row.set_by_coverage_pct, 0) / mondayRows.length
+          ? mondayRows.reduce((sum, row: any) => sum + row.set_by_coverage_pct, 0) / mondayRows.length
           : 0,
       avgTouchpointsCoveragePct:
         mondayRows.length > 0
-          ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length
+          ? mondayRows.reduce((sum, row: any) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length
           : 0,
     },
     verification: {

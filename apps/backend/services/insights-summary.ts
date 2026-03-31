@@ -74,7 +74,7 @@ export const getInsightsSummary = async (
   }
 
   try {
-    bookingRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_booking_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`, fromDay, toDay, ...(params.rep ? [params.rep] : []));
+bookingRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_booking_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`, fromDay, toDay, ...(params.rep ? [params.rep] : []));
   } catch (e) {
     warnings.push('fact_booking_daily unavailable');
     logger?.warn?.('insights-summary: fact_booking_daily unavailable', e);

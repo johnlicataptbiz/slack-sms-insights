@@ -4,17 +4,50 @@ Use this runbook whenever you need to immediately stop automatic writes to Monda
 
 ## How the Safety Gates Work
 
-Automatic Monday.com writes require **all three** of the following variables to be `true`:
+There are three separate automatic write paths, each controlled by its own set of feature flags:
+
+### Path 1 — Weekly summary writeback
+
+Writes the weekly manager report to a Monday.com board row.
 
 | Variable | Purpose |
 |----------|---------|
-| `MONDAY_AUTO_WRITE_ENABLED` | Master safety gate — must be `true` for any write job to run |
+| `MONDAY_AUTO_WRITE_ENABLED` | Master safety gate — must be `true` for this job to run |
+| `MONDAY_OUTBOUND_ENABLED` | Allows outbound writes to Monday.com |
+| `MONDAY_WRITEBACK_ENABLED` | Enables the weekly summary writeback specifically |
+
+> **Code reference:** `sms-insights/services/weekly-manager-summary.ts` — `syncWeeklySummaryToMonday` returns `{ status: 'skipped' }` immediately if any of the three flags is falsy.
+
+### Path 2 — Personal board booked-call sync
+
+Pushes recently booked calls to the setter's personal Monday.com board.
+
+| Variable | Purpose |
+|----------|---------|
+| `MONDAY_AUTO_WRITE_ENABLED` | Master safety gate — must be `true` for this job to run |
 | `MONDAY_OUTBOUND_ENABLED` | Allows outbound writes to Monday.com |
 | `MONDAY_PERSONAL_SYNC_ENABLED` | Enables the personal board booked-call sync specifically |
 
-Setting any one of these to `false` is enough to halt automatic syncs. Setting `MONDAY_AUTO_WRITE_ENABLED=false` is the single most effective kill-switch.
-
 > **Code reference:** `sms-insights/services/monday-personal-writeback.ts` — `syncRecentSetterBookedCallsToMonday` returns `{ status: 'skipped' }` immediately if any of the three flags is falsy.
+
+### Path 3 — SMS board sync
+
+Syncs SMS events to a dedicated Monday.com SMS board. This path uses a **completely separate** set of flags and is not affected by `MONDAY_AUTO_WRITE_ENABLED`.
+
+| Variable | Purpose |
+|----------|---------|
+| `MONDAY_SMS_SYNC_ENABLED` | Enables SMS board sync |
+| `MONDAY_SMS_WRITEBACK_ENABLED` | Enables writing back SMS event data |
+| `MONDAY_SMS_OUTBOUND_ENABLED` | Allows outbound writes for the SMS path |
+| `MONDAY_SMS_AUTO_WRITE_ENABLED` | Auto-write safety gate for the SMS path |
+
+> **Code reference:** `sms-insights/services/monday-sms-sync.ts` — `syncMondaySmsBoard` checks `MONDAY_SMS_SYNC_ENABLED` as its primary gate.
+
+---
+
+### Quick kill-switch
+
+`MONDAY_AUTO_WRITE_ENABLED=false` stops **Paths 1 and 2** immediately. To also stop the SMS path, set `MONDAY_SMS_AUTO_WRITE_ENABLED=false` (or `MONDAY_SMS_SYNC_ENABLED=false`).
 
 ---
 
@@ -25,18 +58,24 @@ Setting any one of these to `false` is enough to halt automatic syncs. Setting `
 1. Go to [Railway dashboard](https://railway.app) and select your project.
 2. Select the **sms-insights** service.
 3. Open the **Variables** tab.
-4. Set the following variables to `false`:
+4. To stop **Paths 1 and 2** (weekly summary + personal sync), set:
    - `MONDAY_AUTO_WRITE_ENABLED` → `false`
-   - `MONDAY_PERSONAL_SYNC_ENABLED` → `false`
-   - `MONDAY_OUTBOUND_ENABLED` → `false`
-5. Click **Deploy** to apply the changes.
+5. To also stop **Path 3** (SMS sync), additionally set:
+   - `MONDAY_SMS_AUTO_WRITE_ENABLED` → `false`
+   - `MONDAY_SMS_SYNC_ENABLED` → `false`
+6. Click **Deploy** to apply the changes.
 
 ### Option 2: Railway CLI
 
+Stop Paths 1 and 2 (weekly summary + personal sync):
 ```bash
 railway variables set MONDAY_AUTO_WRITE_ENABLED=false
-railway variables set MONDAY_PERSONAL_SYNC_ENABLED=false
-railway variables set MONDAY_OUTBOUND_ENABLED=false
+```
+
+Stop Path 3 (SMS sync) as well:
+```bash
+railway variables set MONDAY_SMS_AUTO_WRITE_ENABLED=false
+railway variables set MONDAY_SMS_SYNC_ENABLED=false
 ```
 
 Then redeploy:
@@ -49,7 +88,7 @@ railway redeploy
 
 ## What Disabling Does
 
-- **Stops** all automatic syncing of booked calls to Monday.com boards.
+- **Stops** all automatic writes to Monday.com boards (weekly summary, personal booked-call sync, and/or SMS sync depending on which flags you set).
 - **Prevents** new entries (complete or incomplete) from being created.
 - **Preserves** all existing data — no rows are modified or deleted.
 - The service continues to run normally for all other features (Slack bot, SMS tracking, etc.).
@@ -66,11 +105,15 @@ Once you have resolved the underlying issue (e.g., corrected column mappings, ve
    railway run node --import tsx monday-sync-manager.mjs sync
    ```
 2. Confirm the entry in Monday.com looks correct (all columns populated).
-3. Re-enable the flags in Railway:
+3. Re-enable the flags in Railway for the paths you disabled:
    ```bash
+   # Paths 1 and 2 (weekly summary + personal sync)
    railway variables set MONDAY_AUTO_WRITE_ENABLED=true
-   railway variables set MONDAY_PERSONAL_SYNC_ENABLED=true
-   railway variables set MONDAY_OUTBOUND_ENABLED=true
+
+   # Path 3 (SMS sync) — only if you also disabled it
+   railway variables set MONDAY_SMS_AUTO_WRITE_ENABLED=true
+   railway variables set MONDAY_SMS_SYNC_ENABLED=true
+
    railway redeploy
    ```
 

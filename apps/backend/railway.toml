@@ -34,5 +34,5 @@ buildCache = true
 # Service name
 name = "sms-insights-backend"
 
-# Source directory (relative to project root)
-sourceDir = "sms-insights"
+# Source directory (relative to railway.toml location)
+sourceDir = "."

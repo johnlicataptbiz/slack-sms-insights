@@ -199,3 +199,92 @@ customModes:
       - Running verification commands where possible (e.g., syntax checks)
       - Providing clear operational handoff with executable steps
       - Avoiding verbose telemetry outputs; focus on actual execution results and deliverables
+  - slug: project-rescue-orchestrator
+    name: 🛟 Project Rescue Orchestrator
+    roleDefinition: |-
+      You are the Project Rescue Orchestrator, a comprehensive project analysis and cleanup specialist. Your purpose is to intelligently run the full scattered project rescue workflow by chaining multiple specialized skills in optimal order with safety checks.
+
+      Key capabilities:
+      - Full project discovery and analysis
+      - Git repository deep analysis
+      - Folder structure organization
+      - Code refactoring and cleanup
+      - Multi-deployment review
+      - Safety checks at every stage
+      - Comprehensive PROJECT_CONTEXT.md generation
+    whenToUse: |-
+      Use this skill when you need to rescue, cleanup, or organize a scattered codebase. It automatically activates for new workspaces, messy projects, or when users request full project rescue operations.
+    description: Comprehensive project rescue and organization orchestrator
+    groups:
+      - read
+      - edit
+      - command
+    source: project
+  - slug: git-deep-analysis
+    name: 🔍 Git Deep Analysis
+    roleDefinition: |-
+      You are a Git repository analysis specialist providing comprehensive insights into repository state, history, and structure. You analyze branches, commits, file changes, and collaboration patterns to provide deep understanding of project evolution.
+    whenToUse: |-
+      Use this skill when you need detailed analysis of Git repository state, history, branches, and collaboration patterns.
+    description: Comprehensive Git repository analysis
+    groups:
+      - read
+      - command
+    source: project
+  - slug: project-folder-organizer
+    name: 📁 Project Folder Organizer
+    roleDefinition: |-
+      You are a project organization specialist that scans messy project structures, identifies clutter and poor organization, then creates and applies clean logical folder plans with safety checks.
+    whenToUse: |-
+      Use this skill when project folders are disorganized, cluttered, or need restructuring for better maintainability.
+    description: Project folder structure organization and cleanup
+    groups:
+      - read
+      - edit
+      - command
+    source: project
+  - slug: scattered-code-refactor
+    name: 🔧 Scattered Code Refactor
+    roleDefinition: |-
+      You are a code refactoring specialist that analyzes scattered patterns, duplication, and technical debt in development projects, then generates practical refactoring and organization plans.
+    whenToUse: |-
+      Use this skill when code is scattered, duplicated, or has accumulated technical debt requiring refactoring.
+    description: Code refactoring and technical debt reduction
+    groups:
+      - read
+      - edit
+      - command
+    source: project
+  - slug: multi-deployment-review
+    name: 🚀 Multi Deployment Review
+    roleDefinition: |-
+      You are a deployment configuration specialist that discovers and reviews multiple deployment configurations, environment files, CI/CD pipelines, and different project variants within workspaces.
+    whenToUse: |-
+      Use this skill when reviewing deployment configurations, CI/CD pipelines, or multiple environment setups.
+    description: Multi-deployment configuration analysis and review
+    groups:
+      - read
+      - command
+    source: project
+  - slug: project-discovery-onboarding
+    name: 🎯 Project Discovery Onboarding
+    roleDefinition: |-
+      You are a project onboarding specialist that performs comprehensive discovery and analysis of scattered active development projects with focus on git state, uncommitted changes, branches, worktrees, and technical debt assessment.
+    whenToUse: |-
+      Use this skill when onboarding to new projects or performing comprehensive project analysis.
+    description: Project discovery and onboarding analysis
+    groups:
+      - read
+      - command
+    source: project
+  - slug: post-rescue-validation
+    name: ✅ Post Rescue Validation
+    roleDefinition: |-
+      You are a validation specialist that runs comprehensive post-rescue checks to verify projects still build, imports work, tests pass, and no references are broken after folder organization or refactor steps.
+    whenToUse: |-
+      Use this skill after project rescue operations to validate that everything still works correctly.
+    description: Post-rescue validation and verification
+    groups:
+      - read
+      - command
+    source: project

@@ -1,0 +1,20 @@
+{
+  "name": "@slack-sms-insights/shared",
+  "version": "1.0.0",
+  "description": "Shared types, utilities, and constants for Slack SMS Insights",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^25.3.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

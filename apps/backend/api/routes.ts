@@ -612,21 +612,14 @@ const isDraftEngineEnabled = (): boolean => parseBooleanFlag(process.env.AI_DRAF
 const isStrictLintEnabled = (): boolean => parseBooleanFlag(process.env.AI_DRAFT_STRICT_LINT_ENABLED, true);
 
 const handleAuthVerify: RequestHandler = async (req, res, _logger, origin) => {
-  sendJson(
-    res,
-    200,
-    {
-      ok: true,
-      user: req.user || null,
-      authMode: req.authMode || null,
-      csrfToken: req.authMode === 'session' ? req.session?.csrfToken || null : null,
-    },
-    origin,
-  );
+  const result = await authService.verify(req);
+  sendJson(res, 200, result, origin);
 };
 
 const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => {
-  let body: { password?: string; stayLoggedIn?: boolean } = {};
+  const result = await authService.login(req);
+  sendJson(res, 200, result, origin);
+};
   try {
     body = (await parseJsonBody(req)) as {
       password?: string;
@@ -714,7 +707,9 @@ const handleAuthPassword: RequestHandler = async (req, res, _logger, origin) => 
 };
 
 const handleAuthLogout: RequestHandler = async (req, res, _logger, origin) => {
-  const cookies = parseCookies(req.headers.cookie);
+  const result = await authService.logout(req);
+  sendJson(res, 200, result, origin);
+};
   const existingSession = (cookies[SESSION_COOKIE_NAME] || '').trim();
   if (existingSession) {
     destroyDashboardSession(existingSession);
@@ -2497,11 +2492,7 @@ type VerifiedSlackUser = {
   email?: string;
 };
 
-const getVerifiedSlackUser = (req: ApiRequest): VerifiedSlackUser => {
-  const user = req.user;
-  if (!user || typeof user !== 'object') return {};
-  return user as VerifiedSlackUser;
-};
+const getVerifiedSlackUser = (req: ApiRequest): VerifiedSlackUser => slackService.getVerifiedSlackUser(req);
 
 const isEmploymentStatus = (value: string): value is 'full_time' | 'part_time' | 'unknown' => {
   return value === 'full_time' || value === 'part_time' || value === 'unknown';
@@ -4779,7 +4770,7 @@ const handlePostMondaySmsSync: RequestHandler = async (req, res, logger, origin)
   }
 
   try {
-    const result = await syncMondaySmsBoard(boardId, logger, { force });
+    const result = await mondayService.syncSms(boardId, logger, { force });
     sendJson(res, 200, { result }, origin);
   } catch (error) {
     logger?.error('Failed to sync Monday SMS board:', error);
@@ -4810,9 +4801,7 @@ const handlePostMondaySmsSequencesSync: RequestHandler = async (req, res, logger
   }
 
   try {
-    const result = await syncMondaySmsSequencesBoard(boardId, logger, {
-      force,
-    });
+    const result = await mondayService.syncSmsSequences(boardId, logger, { force });
     sendJson(res, 200, { result }, origin);
   } catch (error) {
     logger?.error('Failed to sync Monday SMS Sequences board:', error);
@@ -4843,7 +4832,7 @@ const handlePostMondaySmsReportsSync: RequestHandler = async (req, res, logger, 
   }
 
   try {
-    const result = await syncMondaySmsReportsBoard(boardId, logger, { force });
+    const result = await mondayService.syncSmsReports(boardId, logger, { force });
     sendJson(res, 200, { result }, origin);
   } catch (error) {
     logger?.error('Failed to sync Monday SMS Reports board:', error);
@@ -4928,7 +4917,7 @@ const handleGetMondayBoardCatalogV2: RequestHandler = async (req, res, logger, o
     ? Math.max(1, Math.min(240, staleThresholdHoursRaw))
     : 24;
   try {
-    const data = await listMondayBoardCatalog({ staleThresholdHours }, logger);
+    const data = await mondayService.getBoardCatalog({ staleThresholdHours }, logger);
     sendJson(
       res,
       200,

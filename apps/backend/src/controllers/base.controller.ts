@@ -1,5 +1,4 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Logger } from '@slack/bolt';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -11,16 +10,16 @@ export interface ApiResponse<T = any> {
 export interface RequestContext {
   req: IncomingMessage;
   res: ServerResponse;
-  logger: Logger;
+  logger: Console;
   params: Record<string, string>;
   query: Record<string, string>;
   body?: any;
 }
 
 export abstract class BaseController {
-  protected logger: Logger;
+  protected logger: Console;
 
-  constructor(logger: Logger) {
+  constructor(logger: Console) {
     this.logger = logger;
   }
 

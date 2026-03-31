@@ -64,6 +64,21 @@ export const getInsightsSummary = async (
   let smsRows: any[] = [];
   try {
     smsRows = await prisma.fact_sms_daily.findMany({
+      where: {
+        day: {
+          gte: new Date(`${fromDay}T00:00:00.000Z`),
+          lte: new Date(`${toDay}T00:00:00.000Z`),
+        },
+        ...(params.rep ? { rep_id: params.rep } : {}),
+      },
+      select: {
+        rep_id: true,
+        messages_sent: true,
+        unique_contacted: true,
+        replies_received: true,
+        opt_outs: true,
+      },
+    });
     where: {
       day: {
         gte: new Date(`${fromDay}T00:00:00.000Z`),

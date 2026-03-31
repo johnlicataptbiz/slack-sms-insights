@@ -69,7 +69,16 @@ export const insertSmsEvent = async (
       contact_phone: event.contactPhone ?? null,
       contact_name: event.contactName ?? null,
       aloware_user: event.alowareUser ?? null,
-body: (typeof event.body === 'string' ? event.body : JSON.stringify(event.body ?? { id: 'unknown' })),
+body: (() => {
+  try {
+    if (typeof event.body === 'string') return event.body;
+    if (event.body == null) return null;
+    return JSON.stringify(event.body);
+  } catch (e) {
+    logger?.warn?.('sms-event-store: body serialization failed', { error: String(e), sample: String(event.body ?? '').slice(0, 100) });
+    return '';
+  }
+})(),
       line: event.line ?? null,
       sequence: event.sequence ?? null,
       sequence_id: sequenceId,

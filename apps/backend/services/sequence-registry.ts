@@ -34,11 +34,11 @@ export const resolveSequenceId = async (
     });
 
     if (!registry) {
-      registry = await tx.sequence_registry.create({
-        data: {
-          label: trimmed,
-          normalized_label: normalized,
-        },
+registry = await tx.sequence_registry.create({
+data: {
+  label: trimmed,
+  normalized_label: normalized,
+},
       });
     }
 

@@ -1,8 +1,17 @@
 {
-  "generatedAt": "2026-03-31T04:45:57.386Z",
+  "generatedAt": "2026-03-31T04:53:14.164Z",
   "daysIncluded": 365,
-  "totalCount": 514,
+  "totalCount": 515,
   "entries": [
+    {
+      "hash": "1984557",
+      "date": "2026-03-30T23:45:59-05:00",
+      "message": "fix: force body stringify sms-event-store",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Force body stringify sms-event-store"
+    },
     {
       "hash": "cdfaf54",
       "date": "2026-03-30T23:40:55-05:00",

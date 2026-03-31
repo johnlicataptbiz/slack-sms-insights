@@ -97,7 +97,7 @@ export const refreshKpiFacts = async (
   const prisma = getPrisma();
   const salesTeamBoardId = (process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID).trim();
 
-  const manual = await prisma.sequence_registry.upsert({
+  const manual = await prisma.sequenceRegistry.upsert({
     where: { normalized_label: 'no sequence manual direct' },
     update: { is_manual_bucket: true },
     create: {
@@ -107,7 +107,7 @@ export const refreshKpiFacts = async (
     },
     select: { id: true },
   });
-  const mondayBackfill = await prisma.sequence_registry.upsert({
+  const mondayBackfill = await prisma.sequenceRegistry.upsert({
     where: { normalized_label: 'monday backfill sequence unresolved' },
     update: { is_manual_bucket: false },
     create: {
@@ -117,7 +117,7 @@ export const refreshKpiFacts = async (
     },
     select: { id: true },
   });
-  const socialMediaBackfill = await prisma.sequence_registry.upsert({
+  const socialMediaBackfill = await prisma.sequenceRegistry.upsert({
     where: { normalized_label: 'social media monday backfill' },
     update: { is_manual_bucket: false },
     create: {
@@ -134,7 +134,7 @@ export const refreshKpiFacts = async (
     socialLinkedInBackfill,
     socialOrganicBackfill,
   ] = await Promise.all([
-    prisma.sequence_registry.upsert({
+    prisma.sequenceRegistry.upsert({
       where: { normalized_label: 'social media instagram monday backfill' },
       update: { is_manual_bucket: false },
       create: {
@@ -144,7 +144,7 @@ export const refreshKpiFacts = async (
       },
       select: { id: true },
     }),
-    prisma.sequence_registry.upsert({
+    prisma.sequenceRegistry.upsert({
       where: { normalized_label: 'social media facebook ads monday backfill' },
       update: { is_manual_bucket: false },
       create: {
@@ -154,7 +154,7 @@ export const refreshKpiFacts = async (
       },
       select: { id: true },
     }),
-    prisma.sequence_registry.upsert({
+    prisma.sequenceRegistry.upsert({
       where: { normalized_label: 'social media facebook group monday backfill' },
       update: { is_manual_bucket: false },
       create: {
@@ -164,7 +164,7 @@ export const refreshKpiFacts = async (
       },
       select: { id: true },
     }),
-    prisma.sequence_registry.upsert({
+    prisma.sequenceRegistry.upsert({
       where: { normalized_label: 'social media linkedin monday backfill' },
       update: { is_manual_bucket: false },
       create: {
@@ -174,7 +174,7 @@ export const refreshKpiFacts = async (
       },
       select: { id: true },
     }),
-    prisma.sequence_registry.upsert({
+    prisma.sequenceRegistry.upsert({
       where: { normalized_label: 'social media organic monday backfill' },
       update: { is_manual_bucket: false },
       create: {

@@ -92,7 +92,7 @@ export const getSequencesDeep = async (
 
   let bookingRows: any[] = [];
   try {
-    bookingRows = await prisma.fact_booking_daily.findMany({
+    bookingRows = await prisma.factBookingDaily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -116,7 +116,7 @@ export const getSequencesDeep = async (
 
   let sequenceRows: any[] = [];
   try {
-    sequenceRows = await prisma.sequence_registry.findMany({
+    sequenceRows = await prisma.sequenceRegistry.findMany({
       where: params.status ? { status: params.status } : undefined,
       select: {
         id: true,
@@ -136,7 +136,7 @@ export const getSequencesDeep = async (
 
   let mondayRows: any[] = [];
   try {
-    mondayRows = await prisma.fact_monday_health_daily.findMany({
+    mondayRows = await prisma.factMondayHealthDaily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -160,7 +160,7 @@ export const getSequencesDeep = async (
 
   let rawEventRows: any[] = [];
   try {
-    rawEventRows = await prisma.sms_events.findMany({
+    rawEventRows = await prisma.smsEvents.findMany({
       where: {
         event_ts: { gte: scanFrom, lte: params.to },
         direction: { in: ['inbound', 'outbound'] },

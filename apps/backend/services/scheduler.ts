@@ -12,9 +12,10 @@ export const scheduleDailyReport = async (app: App) => {
   const botUserId = (await app.client.auth.test()).user_id;
 
   if (!userToken || !botUserId) {
-    app.logger.warn('Scheduler skipped: SLACK_USER_TOKEN or bot ID missing.');
+    console.warn('Scheduler skipped: SLACK_USER_TOKEN or bot ID missing.');
     return;
   }
+
 
   // Calculate 6:00 AM CT in UTC
   // CT is currently UTC-6 (Standard Time) or UTC-5 (Daylight Time).
@@ -62,16 +63,20 @@ export const scheduleDailyReport = async (app: App) => {
     const scheduled = await app.client.chat.scheduledMessages.list({
       token: userToken,
       channel: DAILY_REPORT_CHANNEL_ID,
+      latest: (Date.now() / 1000).toString(),
+      oldest: ((Date.now() - 24*60*60*1000) / 1000).toString(),
     });
+
 
     const alreadyScheduled = (scheduled.scheduled_messages || []).some((m) => {
       return m.post_at === postTimeSeconds && m.text?.includes('daily report');
     });
 
     if (alreadyScheduled) {
-      app.logger.info(`Daily report already scheduled for ${nextRun.toLocaleString()}`);
+      console.info(`Daily report already scheduled for ${nextRun.toLocaleString()}`);
       return;
     }
+
 
     // Schedule the mention
     await app.client.chat.scheduleMessage({
@@ -81,8 +86,9 @@ export const scheduleDailyReport = async (app: App) => {
       text: `<@${botUserId}> daily report`,
     });
 
-    app.logger.info(`Successfully scheduled daily report for ${nextRun.toLocaleString()}`);
+    console.info(`Successfully scheduled daily report for ${nextRun.toLocaleString()}`);
   } catch (error) {
-    app.logger.error('Failed to schedule daily report:', error);
+    console.error('Failed to schedule daily report:', error);
   }
+
 };

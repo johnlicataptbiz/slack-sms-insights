@@ -23,8 +23,6 @@ export type WorkItemListRow = {
   unreplied_inbound_count: number;
 };
 
-// No longer need getDbOrThrow as getPrisma handles error states or lazy initialization.
-
 export type WorkItemCursor = {
   dueAt: string;
   id: string;
@@ -35,10 +33,10 @@ export type ListOpenWorkItemsParams = {
   repId?: string;
   severity?: 'low' | 'med' | 'high';
   overdueOnly?: boolean;
-  dueBefore?: string; // ISO timestamp
+  dueBefore?: string;
   limit: number;
-  offset?: number; // legacy
-  cursor?: WorkItemCursor; // new
+  offset?: number;
+  cursor?: WorkItemCursor;
 };
 
 export type ListOpenWorkItemsResult = {
@@ -76,10 +74,10 @@ export const listOpenWorkItems = async (
     if (params.overdueOnly) where.due_at = { lt: new Date() };
     if (params.dueBefore) where.due_at = { lt: new Date(params.dueBefore) };
 
-    const results = await prisma.work_items.findMany({
+const results = await prisma.workItems.findMany({
       where,
-      include: {
-        conversations: true,
+include: {
+        conversation: true
       },
       orderBy: [{ due_at: 'asc' }, { id: 'asc' }],
       take: limit + 1,
@@ -93,25 +91,25 @@ export const listOpenWorkItems = async (
     const items: WorkItemListRow[] = itemsRaw.map((wi: any) => ({
       id: wi.id,
       type: wi.type,
-      severity: (wi as any).severity,
+      severity: wi.severity,
       due_at: wi.due_at.toISOString(),
       created_at: wi.created_at.toISOString(),
       resolved_at: wi.resolved_at ? wi.resolved_at.toISOString() : null,
       rep_id: wi.rep_id,
-      conversation_id: (wi as any).conversations.id,
-      contact_key: (wi as any).conversations.contactKey,
-      contact_id: (wi as any).conversations.contact_id,
-      contact_phone: (wi as any).conversations.contact_phone,
-      last_inbound_at: (wi as any).conversations.last_inbound_at
-        ? (wi as any).conversations.last_inbound_at.toISOString()
+      conversation_id: wi.conversation.id,
+      contact_key: wi.conversation.contactKey,
+      contact_id: wi.conversation.contact_id,
+      contact_phone: wi.conversation.contact_phone,
+      last_inbound_at: wi.conversation.last_inbound_at
+        ? wi.conversation.last_inbound_at.toISOString()
         : null,
-      last_outbound_at: (wi as any).conversations.last_outbound_at
-        ? (wi as any).conversations.last_outbound_at.toISOString()
+      last_outbound_at: wi.conversation.last_outbound_at
+        ? wi.conversation.last_outbound_at.toISOString()
         : null,
-      last_touch_at: (wi as any).conversations.last_touch_at
-        ? (wi as any).conversations.last_touch_at.toISOString()
+      last_touch_at: wi.conversation.last_touch_at
+        ? wi.conversation.last_touch_at.toISOString()
         : null,
-      unreplied_inbound_count: (wi as any).conversations.unreplied_inbound_count,
+      unreplied_inbound_count: wi.conversation.unreplied_inbound_count,
     }));
 
     const last = items.at(-1);
@@ -130,7 +128,7 @@ export const resolveWorkItem = async (
 ): Promise<boolean> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.work_items.updateMany({
+    const result = await prisma.workItems.updateMany({
       where: { id, resolved_at: null },
       data: { resolved_at: new Date() },
     });
@@ -156,7 +154,7 @@ export const assignWorkItem = async (
 ): Promise<boolean> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.work_items.update({
+    const result = await prisma.workItems.update({
       where: { id },
       data: { rep_id: repId },
       select: { id: true, rep_id: true },
@@ -178,3 +176,4 @@ export const assignWorkItem = async (
 
 export const encodeWorkItemCursor = (cursor: WorkItemCursor): string => encodeCursor(cursor);
 export const decodeWorkItemCursor = (cursor: string): WorkItemCursor => decodeCursor(cursor);
+

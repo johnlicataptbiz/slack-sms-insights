@@ -1,24 +1,25 @@
-import { prisma } from '../lib/prisma.js';
+import { getPrismaClient } from '../lib/prisma.js';
 import type { RequestContext } from './base.controller.js';
 import { BaseController } from './base.controller.js';
 
 export class HealthController extends BaseController {
+  constructor(logger: Console) {
+    super(logger);
+  }
+
   async execute(context: RequestContext): Promise<void> {
     const { res } = context;
 
-    // Database health check (optional for basic health)
     let dbStatus = 'unknown';
     try {
-      // Only attempt DB check if Prisma is available
-      const { prisma } = await import('../lib/prisma.js');
+      const prisma = getPrismaClient();
       await prisma.$queryRaw`SELECT 1`;
       dbStatus = 'healthy';
     } catch (error) {
       dbStatus = 'unavailable';
-      console.log('Database health check skipped or failed (expected during migration)');
+      context.logger.warn('Database health check failed (expected during migration)');
     }
 
-    // Health check response with basic system info
     const healthData = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -26,10 +27,10 @@ export class HealthController extends BaseController {
       memory: process.memoryUsage(),
       version: process.version,
       database: dbStatus,
-      deployment: 'consolidated-backend-2026-03-31',
-      migration: 'p0-complete',
+      deployment: 'consolidated-backend-v7.6.0',
     };
 
     this.sendSuccessResponse(res, healthData);
   }
 }
+

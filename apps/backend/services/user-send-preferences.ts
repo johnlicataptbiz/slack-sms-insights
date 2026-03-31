@@ -17,7 +17,7 @@ export const getUserSendPreferences = async (
 ): Promise<UserSendPreferencesRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.user_send_preferences.findUnique({
+const result = await prisma.userSendPreferences.findUnique({
       where: { user_id: userId },
     });
 
@@ -39,7 +39,7 @@ export const upsertUserSendPreferences = async (
   const prisma = getPrisma();
 
   try {
-    const result = await prisma.user_send_preferences.upsert({
+const result = await prisma.userSendPreferences.upsert({
       where: { user_id: params.userId },
       create: {
         user_id: params.userId,
@@ -59,3 +59,4 @@ export const upsertUserSendPreferences = async (
     throw err;
   }
 };
+

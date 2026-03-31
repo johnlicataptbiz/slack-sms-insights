@@ -9,7 +9,10 @@ export const securityMiddleware = [
   }),
 ];
 
+import { z } from 'zod';
+type ZodSchema = z.ZodSchema;
 export const validateRequest = (schema: ZodSchema) => {
+import type { NextFunction, Request, Response } from 'express';
   return (req: Request, res: Response, next: NextFunction) => {
     // Zod validation implementation
   };

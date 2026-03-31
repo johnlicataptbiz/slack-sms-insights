@@ -24,17 +24,17 @@ export const resolveSequenceId = async (
   if (!normalized) return null;
 
   return await prisma.$transaction(async (tx) => {
-    const existingAlias = await tx.sequence_aliases.findUnique({
+    const existingAlias = await tx.sequenceAliases.findUnique({
       where: { raw_label: trimmed },
     });
     if (existingAlias) return existingAlias.sequence_id;
 
-    let registry = await tx.sequence_registry.findUnique({
+    let registry = await tx.sequenceRegistry.findUnique({
       where: { normalized_label: normalized },
     });
 
     if (!registry) {
-registry = await tx.sequence_registry.create({
+    registry = await tx.sequenceRegistry.create({
 data: {
   label: trimmed,
   normalized_label: normalized,
@@ -42,7 +42,7 @@ data: {
       });
     }
 
-    await tx.sequence_aliases.upsert({
+    await tx.sequenceAliases.upsert({
       where: { raw_label: trimmed },
       update: {
         normalized_label: normalized,

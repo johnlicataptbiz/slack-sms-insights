@@ -4,20 +4,19 @@ import express from 'express';
 import helmet from 'helmet';
 import { AlowareController } from './controllers/aloware.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
-// Import controllers
 import { HealthController } from './controllers/health.controller.js';
-// Import services
 import { connectPrisma } from './lib/prisma.js';
-// Import middleware
 import { errorHandler } from './middleware/error-handler.js';
 import { requestLogger } from './middleware/request-logger.js';
 
 export class App {
-  private app: express.Application;
+  public app: express.Application;
+  public readonly logger: Console;
   private port: number;
 
-  constructor(port = 3000) {
+  constructor(port = 3000, logger = console) {
     this.app = express();
+    this.logger = logger;
     this.port = port;
     this.initializeMiddleware();
     this.initializeRoutes();
@@ -25,28 +24,16 @@ export class App {
   }
 
   private initializeMiddleware(): void {
-    // Security middleware
     this.app.use(helmet());
-
-    // CORS
-    this.app.use(
-      cors({
-        origin:
-          process.env.NODE_ENV === 'production'
-            ? process.env.FRONTEND_URL
-            : ['http://localhost:3000', 'http://localhost:5173'],
-        credentials: true,
-      }),
-    );
-
-    // Compression
+    this.app.use(cors({
+      origin: process.env.NODE_ENV === 'production' 
+        ? process.env.FRONTEND_URL 
+        : ['http://localhost:3000', 'http://localhost:5173'],
+      credentials: true,
+    }));
     this.app.use(compression());
-
-    // Body parsing
-    this.app.use(json({ limit: '10mb' }));
-    this.app.use(urlencoded({ extended: true }));
-
-    // Request logging
+    this.app.use(express.json({ limit: '10mb' }));
+    this.app.use(express.urlencoded({ extended: true }));
     this.app.use(requestLogger);
   }
 
@@ -55,62 +42,46 @@ export class App {
 
     // Health check
     router.get('/health', async (req, res) => {
-      const healthController = new HealthController(console);
+      const controller = new HealthController(this.logger);
       const context = {
         req,
         res,
-        logger: console,
+        logger: this.logger,
         params: {},
         query: {},
         body: undefined,
       };
       try {
-        await healthController.execute(context);
+        await controller.execute(context);
       } catch (error) {
+        this.logger.error('Health check failed:', error);
         res.status(500).json({ error: 'Health check failed' });
       }
     });
 
-    // Auth endpoints
-    const authController = new AuthController(console);
+    // Auth routes
+    const authController = new AuthController(this.logger);
     router.get('/auth/verify', async (req, res) => {
-      const context = {
-        req,
-        res,
-        logger: console,
-        params: {},
-        query: {},
-        body: undefined,
-      };
+      const context = { req, res, logger: this.logger, params: {}, query: {}, body: undefined };
       try {
         await authController.verify(context);
       } catch (error) {
-        console.error('Auth verify error:', error);
+        this.logger.error('Auth verify error:', error);
         res.status(500).json({ error: 'Auth verification failed' });
       }
     });
 
     router.post('/auth/login', async (req, res) => {
-      const context = {
-        req,
-        res,
-        logger: console,
-        params: {},
-        query: {},
-        body: req.body,
-      };
+      const context = { req, res, logger: this.logger, params: {}, query: {}, body: req.body };
       try {
         await authController.login(context);
       } catch (error) {
-        console.error('Auth login error:', error);
+        this.logger.error('Auth login error:', error);
         res.status(500).json({ error: 'Login failed' });
       }
     });
 
-    // API routes
     this.app.use('/api', router);
-
-    // Webhook routes (will be migrated from legacy)
     this.app.use('/webhooks', router);
   }
 
@@ -120,22 +91,19 @@ export class App {
 
   public async start(): Promise<void> {
     try {
-      // Attempt database connection (don't fail if unavailable during migration)
       try {
         await connectPrisma();
-        console.log('✅ Database connection established');
+        this.logger.log('✅ Database connection established');
       } catch (dbError) {
-        console.log('⚠️ Database connection deferred (expected during migration)');
+        this.logger.warn('⚠️ Database connection deferred (expected during migration)');
       }
 
-      // Start server
       this.app.listen(this.port, () => {
-        console.log(`🚀 Consolidated backend server running on port ${this.port}`);
-        console.log(`📊 Health check available at http://localhost:${this.port}/api/health`);
-        console.log('🔄 Migration status: P0 Complete - Ready for schema unification');
+        this.logger.log(`🚀 Server running on port ${this.port}`);
+        this.logger.log(`📊 Health: http://localhost:${this.port}/api/health`);
       });
     } catch (error) {
-      console.error('Failed to start server:', error);
+      this.logger.error('Failed to start server:', error);
       process.exit(1);
     }
   }
@@ -145,9 +113,9 @@ export class App {
   }
 }
 
-// For development
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number.parseInt(process.env.PORT || '3001', 10);
   const app = new App(port);
   app.start().catch(console.error);
 }
+

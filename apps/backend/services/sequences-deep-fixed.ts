@@ -6,13 +6,13 @@ const getPrisma = () => getPrismaClient();
 const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
 const isMondayBackfillLabel = (label: string): boolean => label.toLowerCase().includes('monday backfill');
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
-  /\\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\\b/i;
-const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\\/\\/)?vip\\.physicaltherapybiz\\.com\\/call-booked(?:[\\/\\?#][^\\s]*)?\\/i;
-const CANCELLATION_PATTERN = /\\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\\b/i;
+  /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
+const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
+const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
 
 const contactKeyFor = (event: { contact_id: string | null; contact_phone: string | null }): string | null => {
   if (event.contact_id) return `contact:${event.contact_id}`;
-  if (event.contact_phone) return `phone:${event.contact_phone.replace(/\\D/g, '')}`;
+  if (event.contact_phone) return `phone:${event.contact_phone.replace(/\D/g, '')}`;
   return null;
 };
 
@@ -92,7 +92,7 @@ export const getSequencesDeep = async (
 
   let bookingRows: any[] = [];
   try {
-    bookingRows = await prisma.fact_booking_daily.findMany({
+    bookingRows = await prisma.factBookingDaily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -111,12 +111,12 @@ export const getSequencesDeep = async (
     });
   } catch (e) {
     warnings.push('fact_booking_daily unavailable');
-    logger?.warn?.('sequences-deep: fact_booking_daily unavailable', e);
+    logger?.warn?.('sequences-deep-fixed: fact_booking_daily unavailable', e);
   }
 
   let sequenceRows: any[] = [];
   try {
-    sequenceRows = await prisma.sequence_registry.findMany({
+    sequenceRows = await prisma.sequenceRegistry.findMany({
       where: params.status ? { status: params.status } : undefined,
       select: {
         id: true,
@@ -131,12 +131,12 @@ export const getSequencesDeep = async (
     });
   } catch (e) {
     warnings.push('sequence_registry unavailable');
-    logger?.warn?.('sequences-deep: sequence_registry unavailable', e);
+    logger?.warn?.('sequences-deep-fixed: sequence_registry unavailable', e);
   }
 
   let mondayRows: any[] = [];
   try {
-    mondayRows = await prisma.fact_monday_health_daily.findMany({
+    mondayRows = await prisma.factMondayHealthDaily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -155,12 +155,12 @@ export const getSequencesDeep = async (
     });
   } catch (e) {
     warnings.push('fact_monday_health_daily unavailable');
-    logger?.warn?.('sequences-deep: fact_monday_health_daily unavailable', e);
+    logger?.warn?.('sequences-deep-fixed: fact_monday_health_daily unavailable', e);
   }
 
   let rawEventRows: any[] = [];
   try {
-    rawEventRows = await prisma.sms_events.findMany({
+    rawEventRows = await prisma.smsEvents.findMany({
       where: {
         event_ts: { gte: scanFrom, lte: params.to },
         direction: { in: ['inbound', 'outbound'] },
@@ -177,7 +177,7 @@ export const getSequencesDeep = async (
     });
   } catch (e) {
     warnings.push('sms_events unavailable');
-    logger?.warn?.('sequences-deep: sms_events unavailable', e);
+    logger?.warn?.('sequences-deep-fixed: sms_events unavailable', e);
   }
 
   const manualSequenceId = sequenceRows?.find((row: any) => row.is_manual_bucket)?.id || null;
@@ -212,7 +212,6 @@ export const getSequencesDeep = async (
     } as SmsEventExtended);
   }
 
-  // Simplified analytics logic with graceful fallbacks
   interface SequenceSummary {
     messagesSent: number;
     inboundTexts: number;
@@ -232,7 +231,6 @@ export const getSequencesDeep = async (
     return row;
   };
 
-  // Basic outbound counting
   for (const event of events) {
     if (event.event_ts < params.from || event.direction !== 'outbound') continue;
     const stat = ensure(event._seqId);
@@ -240,7 +238,6 @@ export const getSequencesDeep = async (
     stat.uniqueContacted += 1;
   }
 
-  // Basic inbound counting
   for (const event of events) {
     if (event.event_ts < params.from || event.direction !== 'inbound') continue;
     const stat = ensure(event._seqId);
@@ -265,7 +262,7 @@ export const getSequencesDeep = async (
         inboundTexts: stat?.inboundTexts || 0,
         repliesReceived: stat?.repliesReceived || 0,
         replyRatePct: stat ? (stat.repliesReceived / stat.uniqueContacted) * 100 : 0,
-        bookedCalls: 0, // Fallback
+        bookedCalls: 0,
         bookingRatePct: 0,
         optOuts: stat?.optOuts || 0,
         optOutRatePct: stat ? (stat.optOuts / stat.messagesSent) * 100 : 0,

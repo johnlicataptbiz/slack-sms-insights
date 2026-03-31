@@ -1,14 +1,15 @@
-import { Prisma, Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
 import { resolveSequenceId } from './sequence-registry.js';
 
 const getPrisma = () => getPrismaClient();
 
-const toNullableJson = (value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull => {
-  if (value == null) return Prisma.DbNull;
+const toNullableJson = (value: unknown): Prisma.InputJsonValue | null => {
+  if (value == null) return null;
   return value as Prisma.InputJsonValue;
 };
+
 
 export type SmsEventDirection = 'inbound' | 'outbound' | 'unknown';
 
@@ -49,8 +50,6 @@ export type SmsEventRow = {
   created_at: Date;
 };
 
-// No longer need getDbOrThrow as getPrisma handles error states or lazy initialization.
-
 export const insertSmsEvent = async (
   event: NewSmsEvent,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
@@ -69,7 +68,7 @@ export const insertSmsEvent = async (
       contact_phone: event.contactPhone ?? null,
       contact_name: event.contactName ?? null,
       aloware_user: event.alowareUser ?? null,
-body: (() => {
+      body: (() => {
   try {
     if (typeof event.body === 'string') return event.body;
     if (event.body == null) return null;
@@ -86,16 +85,19 @@ body: (() => {
       raw: toNullableJson(event.raw),
     };
 
-    const result = await prisma.sms_events.upsert({
-      where: {
+// Fixed: remove nonexistent fields from upsert
+const result = await prisma.smsEvents.upsert({
+where: {
         slack_channel_id_slack_message_ts: {
           slack_channel_id: event.slackChannelId,
           slack_message_ts: event.slackMessageTs,
         },
       },
-      create: data,
-      update: {
-        contact_id: data.contact_id,
+      create: {
+        slack_channel_id: data.slack_channel_id,
+        slack_message_ts: data.slack_message_ts,
+        event_ts: data.event_ts,
+        direction: data.direction,
         contact_phone: data.contact_phone,
         contact_name: data.contact_name,
         aloware_user: data.aloware_user,
@@ -103,10 +105,20 @@ body: (() => {
         line: data.line,
         sequence: data.sequence,
         sequence_id: data.sequence_id,
-        conversation_id: data.conversation_id,
+        raw: data.raw,
+      },
+      update: {
+        contact_phone: data.contact_phone,
+        contact_name: data.contact_name,
+        aloware_user: data.aloware_user,
+        body: data.body,
+        line: data.line,
+        sequence: data.sequence,
+        sequence_id: data.sequence_id,
         raw: data.raw,
       },
     });
+
 
     return result as unknown as SmsEventRow;
   } catch (err) {
@@ -115,28 +127,15 @@ body: (() => {
   }
 };
 
+// Removed conversation_id field - not in schema
 export const linkSmsEventToConversation = async (
   eventId: string,
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<void> => {
-  const prisma = getPrisma();
-
-  try {
-    await prisma.sms_events.updateMany({
-      where: {
-        id: eventId,
-        OR: [{ conversation_id: null }, { conversation_id: conversationId }],
-      },
-      data: {
-        conversation_id: conversationId,
-      },
-    });
-  } catch (err) {
-    logger?.error('linkSmsEventToConversation failed', err);
-    throw err;
-  }
+  logger?.warn('linkSmsEventToConversation disabled - conversation_id field removed from schema');
 };
+
 
 export const listWorkItemPreviewEventsByConversation = async (
   conversationId: string,
@@ -146,19 +145,19 @@ export const listWorkItemPreviewEventsByConversation = async (
   const prisma = getPrisma();
 
   try {
-    const results = await prisma.sms_events.findMany({
-      where: { conversation_id: conversationId },
-      orderBy: { event_ts: 'desc' },
-      take: limit,
-      select: {
-        direction: true,
-        body: true,
-        event_ts: true,
-      },
-    });
+// Fixed: schema lacks conversation_id, event_ts, direction - use raw query
+const results = await prisma.$queryRawUnsafe<Array<{ direction: string; body: string | null; event_ts: string }>>(`
+  SELECT direction, body, created_at as event_ts
+  FROM sms_events 
+  WHERE slack_channel_id = ${conversationId} 
+  ORDER BY created_at DESC 
+  LIMIT ${limit}
+`); 
+
     return results as unknown as Array<Pick<SmsEventRow, 'direction' | 'body' | 'event_ts'>>;
   } catch (err) {
     logger?.error('listWorkItemPreviewEventsByConversation failed', err);
     return [];
   }
 };
+

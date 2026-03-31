@@ -79,6 +79,9 @@ export const getInsightsSummary = async (
         opt_outs: true,
       },
     });
+  } catch (e) {
+    logger?.warn?.('insights-summary: fact_sms_daily unavailable', e);
+  }
     where: {
       day: {
         gte: new Date(`${fromDay}T00:00:00.000Z`),

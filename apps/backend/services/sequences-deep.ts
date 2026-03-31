@@ -123,8 +123,35 @@ export const getSequencesDeep = async (
     rawEventRows,
   ] = await Promise.all([
     (async () => {
-    (async () => {
-      bookingRows: await prisma.$queryRaw`SELECT 1 as dummy` as any[],
+(async () => {
+  let bookingRows = [];
+  try {
+    bookingRows = await prisma.fact_booking_daily.findMany({
+      where: {
+        day: {
+          gte: new Date(`${fromDay}T00:00:00.000Z`),
+          lte: new Date(`${toDay}T00:00:00.000Z`),
+        },
+      },
+      select: {
+        sequence_id: true,
+        booked_total: true,
+        booked_jack: true,
+        booked_brandon: true,
+        booked_self: true,
+        booked_after_sms_reply: true,
+        booking_rate_pct: true,
+        diagnostic_booking_signals: true,
+      },
+    });
+  } catch (error) {
+    // Table may not exist in production yet
+    logger?.warn?.('sequences-deep: fact_booking_daily table not available', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+  return bookingRows;
+})(),
           where: {
             day: {
               gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -150,8 +177,15 @@ export const getSequencesDeep = async (
         return [];
       }
     })(),
-    let leadRows: any[] = [];
-      try {
+(async () => {
+  let leadRows: any[] = [];
+  try {
+    leadRows = await prisma.$queryRaw`SELECT 1 as dummy` as any[];
+  } catch {
+    // Stub for lead quality facts
+  }
+  return leadRows;
+})(),
 $queryRaw`SELECT 1 as dummy` as any[],
       where: {
         day: {

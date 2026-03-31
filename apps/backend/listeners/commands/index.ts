@@ -117,7 +117,7 @@ const register = (app: App) => {
 
       // Add context hint if this was a multi-turn conversation
       const context = buildConversationPrompt(command.user_id, command.channel_id);
-      if (context && context.includes('\n\nAssistant:')) {
+      if (context?.includes('\n\nAssistant:')) {
         // This is now a multi-turn conversation
         await respond('_I\'ll remember this context for our next exchange. Say "clear" to start fresh._');
       }

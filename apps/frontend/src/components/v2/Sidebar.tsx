@@ -1,3 +1,5 @@
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   BarChart3,
   ChevronLeft,
@@ -10,8 +12,6 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
 interface SidebarProps {
   className?: string;
@@ -42,8 +42,17 @@ export function Sidebar({ className }: SidebarProps) {
       )}
     >
       <div className="flex h-16 items-center justify-between px-4 border-b">
-        {!collapsed && <span className="text-lg font-bold tracking-tight text-primary">SMS Insights</span>}
-        <Button variant="ghost" size="icon" onClick={toggleSidebar} className={cn('ml-auto', collapsed && 'mx-auto')}>
+        {!collapsed && (
+          <span className="text-lg font-bold tracking-tight text-primary">
+            SMS Insights
+          </span>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className={cn('ml-auto', collapsed && 'mx-auto')}
+        >
           {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
         </Button>
       </div>
@@ -56,7 +65,9 @@ export function Sidebar({ className }: SidebarProps) {
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground',
-                isActive ? 'bg-accent text-accent-foreground' : 'text-muted-foreground',
+                isActive
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground',
                 collapsed && 'justify-center px-2',
               )
             }
@@ -68,7 +79,12 @@ export function Sidebar({ className }: SidebarProps) {
       </nav>
 
       <div className="p-4 border-t">
-        <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
+        <div
+          className={cn(
+            'flex items-center gap-3',
+            collapsed && 'justify-center',
+          )}
+        >
           <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs">
             JD
           </div>

@@ -4,7 +4,8 @@ type Props = {
   points: SalesTrendPoint[];
 };
 
-const max = (values: number[]): number => values.reduce((m, v) => (v > m ? v : m), 0);
+const max = (values: number[]): number =>
+  values.reduce((m, v) => (v > m ? v : m), 0);
 
 export function SalesTrendChart({ points }: Props) {
   const maxSent = max(points.map((p) => p.messagesSent));

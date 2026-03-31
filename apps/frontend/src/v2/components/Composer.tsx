@@ -3,14 +3,14 @@
  * React 19: useActionState for send action, useFormStatus for button state
  */
 
-import { useActionState, useRef, useState } from 'react';
-import { useFormStatus } from 'react-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type { MutationHandlers } from '@/v2/hooks/useInboxMutations';
 import type { UseInboxStateReturn } from '@/v2/hooks/useInboxState';
+import { useActionState, useRef, useState } from 'react';
+import { useFormStatus } from 'react-dom';
 
 const SMS_CHAR_LIMIT = 160;
 const SMS_MULTIPART_LIMIT = 306;
@@ -145,7 +145,11 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
 
       {/* Main form — enables useFormStatus in SendButton */}
       <form action={sendAction} className="flex flex-col gap-3">
-        <input type="hidden" name="message" value={state.uiState.composerText} />
+        <input
+          type="hidden"
+          name="message"
+          value={state.uiState.composerText}
+        />
         <Textarea
           ref={textareaRef}
           value={state.uiState.composerText}
@@ -193,7 +197,9 @@ export function Composer({ state, mutations, isLoading }: ComposerProps) {
       {/* Templates */}
       {showTemplates && (
         <div className="space-y-1.5 border-t pt-2 animate-template-expand">
-          <p className="text-xs font-semibold text-muted-foreground">Quick templates</p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            Quick templates
+          </p>
           {QUICK_TEMPLATES.map((template, idx) => (
             <button
               key={template}

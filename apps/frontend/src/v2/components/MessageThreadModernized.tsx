@@ -10,9 +10,16 @@
  * - React 19 ref as prop (no forwardRef needed!)
  */
 
-import { Suspense, use, useActionState, useCallback, useOptimistic, useRef } from 'react';
-import { useFormStatus } from 'react-dom';
 import { cn } from '@/lib/utils';
+import {
+  Suspense,
+  use,
+  useActionState,
+  useCallback,
+  useOptimistic,
+  useRef,
+} from 'react';
+import { useFormStatus } from 'react-dom';
 
 // ============================================
 // TYPES
@@ -40,7 +47,9 @@ interface Conversation {
 
 interface MessageThreadProps {
   conversationPromise: Promise<Conversation>;
-  onSendMessage: (text: string) => Promise<{ success: boolean; message: Message }>;
+  onSendMessage: (
+    text: string,
+  ) => Promise<{ success: boolean; message: Message }>;
   ref?: React.Ref<HTMLDivElement>;
 }
 
@@ -90,7 +99,12 @@ function MessageBubble({ message, isOptimistic }: MessageBubbleProps) {
   const isInbound = message.direction === 'inbound';
 
   return (
-    <div className={cn('flex gap-2 mb-4', isInbound ? 'flex-row' : 'flex-row-reverse')}>
+    <div
+      className={cn(
+        'flex gap-2 mb-4',
+        isInbound ? 'flex-row' : 'flex-row-reverse',
+      )}
+    >
       {/* Status indicator */}
       <div className="flex items-end">
         <div
@@ -109,11 +123,18 @@ function MessageBubble({ message, isOptimistic }: MessageBubbleProps) {
       <div
         className={cn(
           'max-w-xs px-4 py-2 rounded-lg',
-          isInbound ? 'bg-neutral-100 text-neutral-900 rounded-bl-none' : 'bg-blue-500 text-white rounded-br-none',
+          isInbound
+            ? 'bg-neutral-100 text-neutral-900 rounded-bl-none'
+            : 'bg-blue-500 text-white rounded-br-none',
         )}
       >
         <p className="text-sm break-words">{message.text}</p>
-        <p className={cn('text-xs mt-1', isInbound ? 'text-neutral-600' : 'text-blue-100')}>
+        <p
+          className={cn(
+            'text-xs mt-1',
+            isInbound ? 'text-neutral-600' : 'text-blue-100',
+          )}
+        >
           {new Date(message.timestamp).toLocaleTimeString()}
         </p>
       </div>
@@ -196,16 +217,19 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
 
 function CharacterCounter({ ref }: { ref: React.Ref<HTMLTextAreaElement> }) {
   // Get current value (React 19 pattern - can access ref in event handlers)
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    // Just count characters as user types
-    const charCount = e.currentTarget.value.length;
-    // SMS typically has 160 character limit
-    if (charCount > 160) {
-      e.currentTarget.style.borderColor = 'rgb(239, 68, 68)';
-    } else {
-      e.currentTarget.style.borderColor = '';
-    }
-  }, []);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      // Just count characters as user types
+      const charCount = e.currentTarget.value.length;
+      // SMS typically has 160 character limit
+      if (charCount > 160) {
+        e.currentTarget.style.borderColor = 'rgb(239, 68, 68)';
+      } else {
+        e.currentTarget.style.borderColor = '';
+      }
+    },
+    [],
+  );
 
   return (
     <div className="text-xs text-neutral-600">
@@ -230,7 +254,10 @@ function MessageThreadSkeleton() {
       {/* Messages skeleton */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className={cn('flex gap-2', i % 2 === 0 && 'flex-row-reverse')}>
+          <div
+            key={i}
+            className={cn('flex gap-2', i % 2 === 0 && 'flex-row-reverse')}
+          >
             <div className="w-24 h-16 bg-neutral-200 rounded-lg animate-pulse" />
           </div>
         ))}
@@ -249,11 +276,21 @@ function MessageThreadSkeleton() {
 // MAIN COMPONENT WITH SUSPENSE
 // ============================================
 
-export function MessageThread({ conversationPromise, onSendMessage, ref }: MessageThreadProps) {
+export function MessageThread({
+  conversationPromise,
+  onSendMessage,
+  ref,
+}: MessageThreadProps) {
   return (
-    <div ref={ref} className="flex flex-col h-full bg-white rounded-lg border border-neutral-200">
+    <div
+      ref={ref}
+      className="flex flex-col h-full bg-white rounded-lg border border-neutral-200"
+    >
       <Suspense fallback={<MessageThreadSkeleton />}>
-        <MessageThreadContent conversationPromise={conversationPromise} onSendMessage={onSendMessage} />
+        <MessageThreadContent
+          conversationPromise={conversationPromise}
+          onSendMessage={onSendMessage}
+        />
       </Suspense>
     </div>
   );
@@ -265,10 +302,15 @@ export function MessageThread({ conversationPromise, onSendMessage, ref }: Messa
 
 interface MessageThreadContentProps {
   conversationPromise: Promise<Conversation>;
-  onSendMessage: (text: string) => Promise<{ success: boolean; message: Message }>;
+  onSendMessage: (
+    text: string,
+  ) => Promise<{ success: boolean; message: Message }>;
 }
 
-function MessageThreadContent({ conversationPromise, onSendMessage }: MessageThreadContentProps) {
+function MessageThreadContent({
+  conversationPromise,
+  onSendMessage,
+}: MessageThreadContentProps) {
   // React 19 use() hook: unwraps the promise and suspends if not ready
   const conversation = use(conversationPromise);
 
@@ -326,7 +368,9 @@ function MessageThreadContent({ conversationPromise, onSendMessage }: MessageThr
     <>
       {/* Header */}
       <div className="border-b border-neutral-200 p-4">
-        <h3 className="font-semibold text-neutral-900">{conversation.contactName}</h3>
+        <h3 className="font-semibold text-neutral-900">
+          {conversation.contactName}
+        </h3>
         <p className="text-sm text-neutral-600">{conversation.contactPhone}</p>
       </div>
 
@@ -334,7 +378,13 @@ function MessageThreadContent({ conversationPromise, onSendMessage }: MessageThr
       <div className="flex-1 overflow-y-auto p-4">
         {optimisticMessages.map((message) => {
           const isOptimistic = message.id.startsWith('temp-');
-          return <MessageBubble key={message.id} message={message} isOptimistic={isOptimistic} />;
+          return (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isOptimistic={isOptimistic}
+            />
+          );
         })}
         <div ref={messagesEndRef} />
       </div>

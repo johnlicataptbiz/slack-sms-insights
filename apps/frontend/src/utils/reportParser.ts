@@ -67,7 +67,10 @@ export function parseReport(reportText: string): ParsedReport {
     if (currentRep) {
       const outboundMatch = line.match(OUTBOUND_CONV_PATTERN);
       if (outboundMatch) {
-        currentRep.outboundConversations = Number.parseInt(outboundMatch[1] || '0', 10);
+        currentRep.outboundConversations = Number.parseInt(
+          outboundMatch[1] || '0',
+          10,
+        );
         continue;
       }
 
@@ -117,17 +120,28 @@ export function parseReport(reportText: string): ParsedReport {
         existing.repliesReceived += seq.repliesReceived;
         existing.booked += seq.booked;
         existing.optOuts += seq.optOuts;
-        existing.replyRate = existing.messagesSent > 0 ? (existing.repliesReceived / existing.messagesSent) * 100 : 0;
+        existing.replyRate =
+          existing.messagesSent > 0
+            ? (existing.repliesReceived / existing.messagesSent) * 100
+            : 0;
       } else {
         sequenceMap.set(seq.label, { ...seq });
       }
     }
   }
 
-  const allSequences = Array.from(sequenceMap.values()).sort((a, b) => b.messagesSent - a.messagesSent);
+  const allSequences = Array.from(sequenceMap.values()).sort(
+    (a, b) => b.messagesSent - a.messagesSent,
+  );
 
-  const totalMessagesSent = allSequences.reduce((sum, s) => sum + s.messagesSent, 0);
-  const totalRepliesReceived = allSequences.reduce((sum, s) => sum + s.repliesReceived, 0);
+  const totalMessagesSent = allSequences.reduce(
+    (sum, s) => sum + s.messagesSent,
+    0,
+  );
+  const totalRepliesReceived = allSequences.reduce(
+    (sum, s) => sum + s.repliesReceived,
+    0,
+  );
 
   // Use rep-level "Core Metrics" for total bookings and opt-outs because sequence-level
   // totals only include bookings/opt-outs attributed to sequences that had outbound messages
@@ -142,7 +156,10 @@ export function parseReport(reportText: string): ParsedReport {
     totalRepliesReceived,
     totalBooked,
     totalOptOuts,
-    overallReplyRate: totalMessagesSent > 0 ? (totalRepliesReceived / totalMessagesSent) * 100 : 0,
+    overallReplyRate:
+      totalMessagesSent > 0
+        ? (totalRepliesReceived / totalMessagesSent) * 100
+        : 0,
     reps,
     allSequences,
   };

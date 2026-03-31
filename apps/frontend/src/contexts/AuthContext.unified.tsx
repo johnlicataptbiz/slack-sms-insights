@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import type React from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 
 interface User {
   id: string;
@@ -9,7 +16,11 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (credentials: { email?: string; password?: string; slackCode?: string }) => Promise<void>;
+  login: (credentials: {
+    email?: string;
+    password?: string;
+    slackCode?: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   isLoading: boolean;
   authMethod: 'slack' | 'password' | null;
@@ -32,7 +43,9 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [authMethod, setAuthMethod] = useState<'slack' | 'password' | null>(null);
+  const [authMethod, setAuthMethod] = useState<'slack' | 'password' | null>(
+    null,
+  );
 
   useEffect(() => {
     // Check for existing session
@@ -57,7 +70,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (credentials: { email?: string; password?: string; slackCode?: string }) => {
+  const login = async (credentials: {
+    email?: string;
+    password?: string;
+    slackCode?: string;
+  }) => {
     setIsLoading(true);
     try {
       let endpoint = '/api/auth/login';
@@ -121,9 +138,5 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     authMethod,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

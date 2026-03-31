@@ -31,7 +31,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // SSE headers
   res.statusCode = 200;
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader(
+    'Cache-Control',
+    'no-store, no-cache, must-revalidate, proxy-revalidate',
+  );
   res.setHeader('Connection', 'keep-alive');
   // Helps some proxies (including Vercel/NGINX) not buffer SSE
   res.setHeader('X-Accel-Buffering', 'no');
@@ -42,7 +45,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization',
+    );
   }
 
   // Flush headers early
@@ -65,7 +71,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!upstreamRes.ok || !upstreamRes.body) {
       res.write(`event: error\n`);
-      res.write(`data: ${JSON.stringify({ error: 'Upstream stream failed', status: upstreamRes.status })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ error: 'Upstream stream failed', status: upstreamRes.status })}\n\n`,
+      );
       res.end();
       return;
     }

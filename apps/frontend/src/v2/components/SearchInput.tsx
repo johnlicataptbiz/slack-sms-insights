@@ -1,6 +1,6 @@
 import {
-  autoUpdate,
   FloatingPortal,
+  autoUpdate,
   flip,
   offset,
   shift,
@@ -118,7 +118,9 @@ export function SearchInput({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
-          setSelectedIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev));
+          setSelectedIndex((prev) =>
+            prev < suggestions.length - 1 ? prev + 1 : prev,
+          );
           break;
         case 'ArrowUp':
           e.preventDefault();
@@ -142,13 +144,22 @@ export function SearchInput({
           break;
       }
     },
-    [showSuggestions, suggestions, selectedIndex, handleSuggestionClick, onSearch, value],
+    [
+      showSuggestions,
+      suggestions,
+      selectedIndex,
+      handleSuggestionClick,
+      onSearch,
+      value,
+    ],
   );
 
   // Auto-scroll selected suggestion into view
   useEffect(() => {
     if (selectedIndex >= 0 && suggestionsRef.current) {
-      const selectedElement = suggestionsRef.current.children[selectedIndex] as HTMLElement;
+      const selectedElement = suggestionsRef.current.children[
+        selectedIndex
+      ] as HTMLElement;
       selectedElement?.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex]);
@@ -160,7 +171,14 @@ export function SearchInput({
           {isLoading ? (
             <span className="V2SearchInput__spinner" />
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
@@ -177,7 +195,9 @@ export function SearchInput({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          onFocus={() => setShowSuggestions(value.length > 0 && suggestions.length > 0)}
+          onFocus={() =>
+            setShowSuggestions(value.length > 0 && suggestions.length > 0)
+          }
           placeholder={placeholder}
           autoFocus={autoFocus}
           aria-label={ariaLabel}
@@ -188,8 +208,20 @@ export function SearchInput({
         />
 
         {showClearButton && value && (
-          <button type="button" className="V2SearchInput__clear" onClick={handleClear} aria-label="Clear search">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <button
+            type="button"
+            className="V2SearchInput__clear"
+            onClick={handleClear}
+            aria-label="Clear search"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -200,7 +232,11 @@ export function SearchInput({
       <AnimatePresence>
         {showSuggestions && suggestions.length > 0 && (
           <FloatingPortal>
-            <div ref={refs.setFloating} style={floatingStyles} {...getFloatingProps()}>
+            <div
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps()}
+            >
               <motion.ul
                 ref={suggestionsRef}
                 id="search-suggestions"
@@ -215,7 +251,9 @@ export function SearchInput({
                   <li
                     key={suggestion}
                     className={`V2SearchInput__suggestion ${
-                      index === selectedIndex ? 'V2SearchInput__suggestion--selected' : ''
+                      index === selectedIndex
+                        ? 'V2SearchInput__suggestion--selected'
+                        : ''
                     }`}
                     onClick={() => handleSuggestionClick(suggestion)}
                     role="option"

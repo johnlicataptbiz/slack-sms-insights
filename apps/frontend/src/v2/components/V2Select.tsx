@@ -32,9 +32,16 @@ export function V2Select({
   const resolvedValue = value && value.length > 0 ? value : null;
 
   return (
-    <Select.Root {...(resolvedValue ? { value: resolvedValue } : {})} onValueChange={onValueChange} disabled={disabled}>
+    <Select.Root
+      {...(resolvedValue ? { value: resolvedValue } : {})}
+      onValueChange={onValueChange}
+      disabled={disabled}
+    >
       <Select.Trigger
-        className={cn('V2Select__trigger tw-field tw-focus-ring', triggerClassName)}
+        className={cn(
+          'V2Select__trigger tw-field tw-focus-ring',
+          triggerClassName,
+        )}
         aria-label={ariaLabel}
       >
         <Select.Value placeholder={placeholder} />

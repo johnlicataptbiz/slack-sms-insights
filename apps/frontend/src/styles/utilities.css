@@ -13,7 +13,8 @@
   color: hsl(var(--foreground));
   padding-inline: var(--spacing-control-x);
   padding-block: var(--spacing-control-y);
-  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color
+    120ms ease;
 }
 
 @utility tw-field-sm {
@@ -26,7 +27,12 @@
 @utility tw-focus-ring {
   &:focus-visible {
     outline: none;
-    border-color: color-mix(in srgb, hsl(var(--ring)) 70%, hsl(var(--border)) 30%);
-    box-shadow: 0 0 0 3px color-mix(in srgb, hsl(var(--ring)) 26%, transparent 74%);
+    border-color: color-mix(
+      in srgb,
+      hsl(var(--ring)) 70%,
+      hsl(var(--border)) 30%
+    );
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, hsl(var(--ring)) 26%, transparent 74%);
   }
 }

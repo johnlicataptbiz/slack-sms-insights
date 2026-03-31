@@ -1,6 +1,6 @@
 import {
-  autoUpdate,
   FloatingPortal,
+  autoUpdate,
   flip,
   offset,
   shift,
@@ -11,11 +11,18 @@ import {
   useInteractions,
   useRole,
 } from '@floating-ui/react';
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import { AlertTriangle, ArrowRight, Inbox as InboxIcon, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
+import { AnimatePresence, type Variants, motion } from 'framer-motion';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Inbox as InboxIcon,
+  Loader2,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 
-import { V2_TERM_DEFINITIONS, type V2TermKey } from '../copy';
+import { type V2TermKey, V2_TERM_DEFINITIONS } from '../copy';
 import {
   alertVariants,
   badgeVariants,
@@ -63,7 +70,13 @@ export function V2Sparkline({
   const linePath = `M${points.join(' L')}`;
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} className="V2Sparkline" aria-hidden="true">
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className="V2Sparkline"
+      aria-hidden="true"
+    >
       <motion.path
         d={areaPath}
         fill={fill}
@@ -90,7 +103,11 @@ export function V2Sparkline({
 }
 
 // ─── Page Header ─────────────────────────────────────────────────────────────
-export function V2PageHeader({ title, subtitle, right }: { title: string; subtitle: string; right?: ReactNode }) {
+export function V2PageHeader({
+  title,
+  subtitle,
+  right,
+}: { title: string; subtitle: string; right?: ReactNode }) {
   return (
     <motion.header
       className="V2PageHeader"
@@ -195,7 +212,12 @@ export function V2MetricCard({
   trend?: 'up' | 'down' | 'flat' | undefined;
   glow?: boolean | 'positive' | 'critical';
 }) {
-  const trendIcon = trend === 'up' ? <TrendingUp size={12} /> : trend === 'down' ? <TrendingDown size={12} /> : null;
+  const trendIcon =
+    trend === 'up' ? (
+      <TrendingUp size={12} />
+    ) : trend === 'down' ? (
+      <TrendingDown size={12} />
+    ) : null;
   const [isHovered, setIsHovered] = useState(false);
 
   const glowClass = glow
@@ -219,7 +241,11 @@ export function V2MetricCard({
     >
       <div
         className="V2MetricCard__header"
-        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+        }}
       >
         <motion.p
           className="V2MetricCard__label"
@@ -233,7 +259,13 @@ export function V2MetricCard({
         {sparkline && sparkline.length >= 2 ? (
           <V2Sparkline
             data={sparkline}
-            stroke={tone === 'positive' ? '#13b981' : tone === 'critical' ? '#ef4c62' : '#11b8d6'}
+            stroke={
+              tone === 'positive'
+                ? '#13b981'
+                : tone === 'critical'
+                  ? '#ef4c62'
+                  : '#11b8d6'
+            }
             fill={
               tone === 'positive'
                 ? 'rgba(19, 185, 129, 0.12)'
@@ -282,9 +314,17 @@ export function V2MetricCard({
 }
 
 // ─── Animated List ───────────────────────────────────────────────────────────
-export function V2AnimatedList({ children, className }: { children: ReactNode; className?: string }) {
+export function V2AnimatedList({
+  children,
+  className,
+}: { children: ReactNode; className?: string }) {
   return (
-    <motion.div className={className} variants={listContainerVariants} initial="hidden" animate="visible">
+    <motion.div
+      className={className}
+      variants={listContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {children}
     </motion.div>
   );
@@ -336,7 +376,8 @@ export function V2ProgressBar({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+          background:
+            'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
           borderRadius: 999,
         }}
         animate={{
@@ -366,7 +407,11 @@ export function V2State({
   const iconVariants: Variants = {
     loading: {
       rotate: 360,
-      transition: { duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: 'linear' as const },
+      transition: {
+        duration: 1.5,
+        repeat: Number.POSITIVE_INFINITY,
+        ease: 'linear' as const,
+      },
     },
     error: {
       scale: [1, 1.1, 1],
@@ -374,7 +419,11 @@ export function V2State({
     },
     empty: {
       y: [0, -5, 0],
-      transition: { duration: 2, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' as const },
+      transition: {
+        duration: 2,
+        repeat: Number.POSITIVE_INFINITY,
+        ease: 'easeInOut' as const,
+      },
     },
   };
 
@@ -385,7 +434,11 @@ export function V2State({
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
     >
-      <motion.span className="V2State__icon" variants={iconVariants} animate={kind}>
+      <motion.span
+        className="V2State__icon"
+        variants={iconVariants}
+        animate={kind}
+      >
         {kind === 'loading' ? (
           <Loader2 size={24} />
         ) : kind === 'error' ? (
@@ -398,7 +451,11 @@ export function V2State({
       {kind === 'error' && (
         <div className="V2State__actions">
           {onRetry && (
-            <button type="button" className="V2State__btn V2State__btn--primary" onClick={onRetry}>
+            <button
+              type="button"
+              className="V2State__btn V2State__btn--primary"
+              onClick={onRetry}
+            >
               Try again
             </button>
           )}
@@ -454,8 +511,8 @@ export function V2RiskAlert({
       <div className="V2RiskAlert__content">
         <h3 className="V2RiskAlert__title">{title}</h3>
         <p className="V2RiskAlert__text">
-          {count} sequence{count === 1 ? '' : 's'} with opt-out rate ≥ 6% detected. Review immediately to prevent list
-          damage.
+          {count} sequence{count === 1 ? '' : 's'} with opt-out rate ≥ 6%
+          detected. Review immediately to prevent list damage.
         </p>
       </div>
       {onAction ? (
@@ -474,7 +531,10 @@ export function V2RiskAlert({
 }
 
 // ─── Term Tooltip ────────────────────────────────────────────────────────────
-export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) {
+export function V2Term({
+  term,
+  label,
+}: { term: V2TermKey; label?: ReactNode }) {
   const id = useId();
   const definition = V2_TERM_DEFINITIONS[term];
   const text = label ?? definition.label;
@@ -490,7 +550,12 @@ export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) 
   const focus = useFocus(context);
   const dismiss = useDismiss(context);
   const role = useRole(context, { role: 'tooltip' });
-  const { getReferenceProps, getFloatingProps } = useInteractions([hover, focus, dismiss, role]);
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    hover,
+    focus,
+    dismiss,
+    role,
+  ]);
 
   return (
     <span className="V2Term">
@@ -508,7 +573,9 @@ export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) 
           className="V2Term__badge"
           aria-hidden="true"
           animate={{
-            backgroundColor: isOpen ? 'var(--v2-accent)' : 'rgba(17, 184, 214, 0.15)',
+            backgroundColor: isOpen
+              ? 'var(--v2-accent)'
+              : 'rgba(17, 184, 214, 0.15)',
             color: isOpen ? '#ffffff' : 'var(--v2-accent)',
           }}
           transition={{ duration: 0.15 }}
@@ -519,7 +586,12 @@ export function V2Term({ term, label }: { term: V2TermKey; label?: ReactNode }) 
       <AnimatePresence>
         {isOpen && (
           <FloatingPortal>
-            <div id={id} ref={refs.setFloating} style={floatingStyles} {...getFloatingProps()}>
+            <div
+              id={id}
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps()}
+            >
               <motion.span
                 className="V2Term__tooltip"
                 variants={tooltipVariants}
@@ -565,10 +637,22 @@ export function V2StatBar({
           />
         ))}
       </div>
-      <motion.div className="V2StatBar__legend" variants={listContainerVariants} initial="hidden" animate="visible">
+      <motion.div
+        className="V2StatBar__legend"
+        variants={listContainerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         {segments.map((seg, i) => (
-          <motion.div key={i} className="V2StatBar__legendItem" variants={listItemVariants}>
-            <span className="V2StatBar__dot" style={{ background: seg.color }} />
+          <motion.div
+            key={i}
+            className="V2StatBar__legendItem"
+            variants={listItemVariants}
+          >
+            <span
+              className="V2StatBar__dot"
+              style={{ background: seg.color }}
+            />
             <span className="V2StatBar__label">{seg.label}</span>
             <span className="V2StatBar__value">{seg.value}</span>
           </motion.div>
@@ -579,13 +663,24 @@ export function V2StatBar({
 }
 
 // ─── Pipeline Visual ─────────────────────────────────────────────────────────
-export function V2PipelineVisual({ stages }: { stages: { label: string; value: number; color?: string }[] }) {
+export function V2PipelineVisual({
+  stages,
+}: { stages: { label: string; value: number; color?: string }[] }) {
   const max = Math.max(...stages.map((s) => s.value), 1);
 
   return (
-    <motion.div className="V2PipelineVisual" variants={listContainerVariants} initial="hidden" animate="visible">
+    <motion.div
+      className="V2PipelineVisual"
+      variants={listContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {stages.map((stage, i) => (
-        <motion.div key={i} className="V2PipelineVisual__stage" variants={listItemVariants}>
+        <motion.div
+          key={i}
+          className="V2PipelineVisual__stage"
+          variants={listItemVariants}
+        >
           <div className="V2PipelineVisual__head">
             <span className="V2PipelineVisual__label">{stage.label}</span>
             <motion.div
@@ -603,7 +698,11 @@ export function V2PipelineVisual({ stages }: { stages: { label: string; value: n
               style={{ background: stage.color || 'var(--v2-accent)' }}
               initial={{ width: 0 }}
               animate={{ width: `${(stage.value / max) * 100}%` }}
-              transition={{ duration: 0.6, delay: i * 0.1, ease: easing.smooth }}
+              transition={{
+                duration: 0.6,
+                delay: i * 0.1,
+                ease: easing.smooth,
+              }}
             />
           </div>
         </motion.div>
@@ -615,7 +714,12 @@ export function V2PipelineVisual({ stages }: { stages: { label: string; value: n
 // ─── Action List ─────────────────────────────────────────────────────────────
 export function V2ActionList({ actions }: { actions: string[] }) {
   return (
-    <motion.ul className="V2ActionList" variants={listContainerVariants} initial="hidden" animate="visible">
+    <motion.ul
+      className="V2ActionList"
+      variants={listContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {actions.map((action, i) => (
         <motion.li
           key={i}
@@ -626,7 +730,11 @@ export function V2ActionList({ actions }: { actions: string[] }) {
           <motion.span
             className="V2ActionList__icon"
             animate={{ x: [0, 3, 0] }}
-            transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, repeatDelay: 2 }}
+            transition={{
+              duration: 1.5,
+              repeat: Number.POSITIVE_INFINITY,
+              repeatDelay: 2,
+            }}
           >
             <ArrowRight size={14} />
           </motion.span>
@@ -638,8 +746,17 @@ export function V2ActionList({ actions }: { actions: string[] }) {
 }
 
 // ─── Health Indicator ────────────────────────────────────────────────────────
-export function V2HealthIndicator({ value, threshold, label }: { value: number; threshold: number; label: string }) {
-  const status = value >= threshold ? 'critical' : value >= threshold / 2 ? 'warning' : 'healthy';
+export function V2HealthIndicator({
+  value,
+  threshold,
+  label,
+}: { value: number; threshold: number; label: string }) {
+  const status =
+    value >= threshold
+      ? 'critical'
+      : value >= threshold / 2
+        ? 'warning'
+        : 'healthy';
 
   return (
     <motion.div
@@ -700,15 +817,21 @@ export function V2MiniTrend({
         </div>
         <div className="V2MiniTrend__stat">
           <span className="V2MiniTrend__label">Reply</span>
-          <span className="V2MiniTrend__value V2MiniTrend__value--accent">{replyRate.toFixed(1)}%</span>
+          <span className="V2MiniTrend__value V2MiniTrend__value--accent">
+            {replyRate.toFixed(1)}%
+          </span>
         </div>
         <div className="V2MiniTrend__stat">
           <span className="V2MiniTrend__label">Sets</span>
-          <span className="V2MiniTrend__value V2MiniTrend__value--positive">{booked}</span>
+          <span className="V2MiniTrend__value V2MiniTrend__value--positive">
+            {booked}
+          </span>
         </div>
         <div className="V2MiniTrend__stat">
           <span className="V2MiniTrend__label">Opt-outs</span>
-          <span className="V2MiniTrend__value V2MiniTrend__value--critical">{optOuts}</span>
+          <span className="V2MiniTrend__value V2MiniTrend__value--critical">
+            {optOuts}
+          </span>
         </div>
       </div>
     </motion.article>
@@ -725,7 +848,8 @@ export function V2Skeleton({
   height?: string | number;
   variant?: 'text' | 'circular' | 'rectangular';
 }) {
-  const borderRadius = variant === 'circular' ? '50%' : variant === 'text' ? '4px' : '8px';
+  const borderRadius =
+    variant === 'circular' ? '50%' : variant === 'text' ? '4px' : '8px';
 
   return (
     <motion.div
@@ -790,7 +914,11 @@ export function V2HeroSummary({
             transition={{ delay: 0.4 }}
             style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}
           >
-            {primaryChange.isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+            {primaryChange.isPositive ? (
+              <TrendingUp size={14} />
+            ) : (
+              <TrendingDown size={14} />
+            )}
             {Math.abs(primaryChange.value).toFixed(1)}%
           </motion.span>
         )}
@@ -806,7 +934,9 @@ export function V2HeroSummary({
           >
             <span className="V2HeroSummary__metricValue">{metric.value}</span>
             <span className="V2HeroSummary__metricLabel">{metric.label}</span>
-            {metric.meta && <span className="V2HeroSummary__metricMeta">{metric.meta}</span>}
+            {metric.meta && (
+              <span className="V2HeroSummary__metricMeta">{metric.meta}</span>
+            )}
           </motion.div>
         ))}
       </div>
@@ -839,7 +969,9 @@ export function V2TabNav({
           onClick={() => onChange(tab.key)}
         >
           {tab.label}
-          {tab.count !== undefined && <span className="V2TabNav__count">{tab.count}</span>}
+          {tab.count !== undefined && (
+            <span className="V2TabNav__count">{tab.count}</span>
+          )}
         </button>
       ))}
     </motion.nav>
@@ -870,7 +1002,11 @@ export function V2Badge({
 }
 
 // ─── Floating Action Button ──────────────────────────────────────────────────
-export function V2FloatingButton({ onClick, icon, label }: { onClick: () => void; icon: ReactNode; label: string }) {
+export function V2FloatingButton({
+  onClick,
+  icon,
+  label,
+}: { onClick: () => void; icon: ReactNode; label: string }) {
   return (
     <motion.button
       type="button"

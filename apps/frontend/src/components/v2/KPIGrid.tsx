@@ -1,7 +1,7 @@
-import { Calendar, MessageSquare, Phone, Users } from 'lucide-react';
-import { Line, LineChart, ResponsiveContainer, Tooltip } from 'recharts';
 import type { SalesMetricsV2 } from '@/api/v2-types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, MessageSquare, Phone, Users } from 'lucide-react';
+import { Line, LineChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface KPIGridProps {
   data: SalesMetricsV2;
@@ -47,12 +47,18 @@ export function KPIGrid({ data }: KPIGridProps) {
       {metrics.map((metric, index) => (
         <Card key={index}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{metric.title}</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              {metric.title}
+            </CardTitle>
             <metric.icon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metric.value.toLocaleString()}</div>
-            {metric.subValue && <p className="text-xs text-muted-foreground">{metric.subValue}</p>}
+            <div className="text-2xl font-bold">
+              {metric.value.toLocaleString()}
+            </div>
+            {metric.subValue && (
+              <p className="text-xs text-muted-foreground">{metric.subValue}</p>
+            )}
             <div className="h-[80px] mt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={metric.trend}>
@@ -63,8 +69,12 @@ export function KPIGrid({ data }: KPIGridProps) {
                           <div className="rounded-lg border bg-background p-2 shadow-sm">
                             <div className="grid grid-cols-2 gap-2">
                               <div className="flex flex-col">
-                                <span className="text-[0.70rem] uppercase text-muted-foreground">Value</span>
-                                <span className="font-bold text-muted-foreground">{payload[0].value}</span>
+                                <span className="text-[0.70rem] uppercase text-muted-foreground">
+                                  Value
+                                </span>
+                                <span className="font-bold text-muted-foreground">
+                                  {payload[0].value}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -73,7 +83,13 @@ export function KPIGrid({ data }: KPIGridProps) {
                       return null;
                     }}
                   />
-                  <Line type="monotone" dataKey="value" stroke={metric.color} strokeWidth={2} dot={false} />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke={metric.color}
+                    strokeWidth={2}
+                    dot={false}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </div>

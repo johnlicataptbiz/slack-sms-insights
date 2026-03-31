@@ -52,6 +52,8 @@ describe('CompliancePanel', () => {
 
     render(<CompliancePanel compliance={emptyData} />);
 
-    expect(screen.queryByText('Highest Opt-Out Sequences')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Highest Opt-Out Sequences'),
+    ).not.toBeInTheDocument();
   });
 });

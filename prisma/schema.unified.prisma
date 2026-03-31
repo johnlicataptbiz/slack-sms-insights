@@ -1081,10 +1081,10 @@ model SequenceRegistry {
   sequence_aliases           SequenceAlias[]
 
   @@index([status], map: "idx_sequence_registry_status")
+  is_manual_bucket Boolean @default(false)
   @@map("sequence_registry")
 }
 
-model SequenceVersionDecision {
   sequence_label String                @id
   updated_by     String?
   updated_at     DateTime              @default(now()) @db.Timestamptz(6)

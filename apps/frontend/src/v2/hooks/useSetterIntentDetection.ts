@@ -42,18 +42,21 @@ export const useSetterIntentDetection = (
   const [error, setError] = useState<Error | null>(null);
 
   // Check cache validity
-  const getCachedResult = useCallback((messageId: string): DetectionResult | null => {
-    const cached = intentCache.get(messageId);
-    if (!cached) return null;
+  const getCachedResult = useCallback(
+    (messageId: string): DetectionResult | null => {
+      const cached = intentCache.get(messageId);
+      if (!cached) return null;
 
-    const age = Date.now() - cached.timestamp;
-    if (age > CACHE_TTL_MS) {
-      intentCache.delete(messageId);
-      return null;
-    }
+      const age = Date.now() - cached.timestamp;
+      if (age > CACHE_TTL_MS) {
+        intentCache.delete(messageId);
+        return null;
+      }
 
-    return cached.result;
-  }, []);
+      return cached.result;
+    },
+    [],
+  );
 
   // Detect intent using GPT-4
   const detectIntent = useCallback(async () => {
@@ -87,7 +90,9 @@ export const useSetterIntentDetection = (
       });
 
       if (!response.ok) {
-        throw new Error(`Inbox intent detection failed: ${response.statusText}`);
+        throw new Error(
+          `Inbox intent detection failed: ${response.statusText}`,
+        );
       }
 
       const detectionResult: DetectionResult = await response.json();
@@ -108,7 +113,8 @@ export const useSetterIntentDetection = (
       setResult({
         intent: null,
         confidence: 0,
-        reasoning: 'Intent detection unavailable - manual qualification required',
+        reasoning:
+          'Intent detection unavailable - manual qualification required',
         tags: [],
       });
     } finally {
@@ -141,7 +147,9 @@ export const useSetterIntentDetection = (
 };
 
 // Helper function for manual regex fallback if API fails catastrophically
-export const detectIntentRegex = (text: string): { intent: Intent; confidence: number } => {
+export const detectIntentRegex = (
+  text: string,
+): { intent: Intent; confidence: number } => {
   const lower = text.toLowerCase();
 
   // Objection patterns
@@ -150,7 +158,11 @@ export const detectIntentRegex = (text: string): { intent: Intent; confidence: n
   }
 
   // Coaching interest patterns
-  if (/interested|tell me more|how does|pricing|when|start|available|open/.test(lower)) {
+  if (
+    /interested|tell me more|how does|pricing|when|start|available|open/.test(
+      lower,
+    )
+  ) {
     return { intent: 'coaching_interest', confidence: 0.8 };
   }
 

@@ -457,7 +457,12 @@ export type QualificationStateV2 = {
   fullOrPartTime: 'full_time' | 'part_time' | 'unknown';
   niche: string | null;
   revenueMix: 'mostly_cash' | 'mostly_insurance' | 'balanced' | 'unknown';
-  deliveryModel: 'brick_and_mortar' | 'mobile' | 'online' | 'hybrid' | 'unknown';
+  deliveryModel:
+    | 'brick_and_mortar'
+    | 'mobile'
+    | 'online'
+    | 'hybrid'
+    | 'unknown';
   coachingInterest: 'high' | 'medium' | 'low' | 'unknown';
   progressStep: number;
 };
@@ -478,7 +483,11 @@ export type InboxConversationV2 = {
   contactPhone: string | null;
   repId: string | null;
   ownerLabel?: string | null;
-  ownerSource?: 'rep' | 'latest_outbound_user' | 'latest_outbound_line' | 'unknown';
+  ownerSource?:
+    | 'rep'
+    | 'latest_outbound_user'
+    | 'latest_outbound_line'
+    | 'unknown';
   status: 'open' | 'closed' | 'dnc';
   dnc: boolean;
   lastInboundAt: string | null;
@@ -756,7 +765,11 @@ export type ScoreboardV2 = {
   compliance: {
     optOutRateWeeklyPct: number;
     optOutRateMonthlyPct: number;
-    topOptOutSequences: Array<{ label: string; optOuts: number; optOutRatePct: number }>;
+    topOptOutSequences: Array<{
+      label: string;
+      optOuts: number;
+      optOutRatePct: number;
+    }>;
   };
   provenance: {
     attributionModel: 'sequence_initiated_conversation';
@@ -832,7 +845,11 @@ export type InsightsSummaryV2 = {
     replyDropoffPct: number;
     bookingDropoffPct: number;
   };
-  risks: Array<{ key: string; severity: 'critical' | 'warning' | 'info'; message: string }>;
+  risks: Array<{
+    key: string;
+    severity: 'critical' | 'warning' | 'info';
+    message: string;
+  }>;
   mondayHealth: {
     boards: number;
     staleBoards: number;
@@ -925,7 +942,12 @@ export type SequenceVersionHistoryV2 = {
 
 // ─── Phase 3: Inbox Analytics Types ──────────────────────────────────────────
 
-export type CallOutcomeV2 = 'not_a_fit' | 'too_early' | 'budget' | 'joined' | 'ghosted';
+export type CallOutcomeV2 =
+  | 'not_a_fit'
+  | 'too_early'
+  | 'budget'
+  | 'joined'
+  | 'ghosted';
 
 export const CALL_OUTCOME_LABELS: Record<CallOutcomeV2, string> = {
   not_a_fit: 'Not a Fit',
@@ -966,7 +988,14 @@ export type SetterAssistPerformanceRowV2 = {
 
 // ─── Changelog Types ─────────────────────────────────────────────────────────
 
-export type ChangelogEntryType = 'feature' | 'fix' | 'refactor' | 'style' | 'docs' | 'chore' | 'other';
+export type ChangelogEntryType =
+  | 'feature'
+  | 'fix'
+  | 'refactor'
+  | 'style'
+  | 'docs'
+  | 'chore'
+  | 'other';
 
 export type ChangelogEntry = {
   hash: string;

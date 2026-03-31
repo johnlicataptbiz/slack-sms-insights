@@ -1,5 +1,5 @@
-import type React from 'react';
 import { cn } from '@/lib/utils';
+import type React from 'react';
 
 interface SuspenseLoaderProps {
   className?: string;
@@ -13,11 +13,27 @@ const sizeClasses = {
   lg: 'w-12 h-12',
 };
 
-export const SuspenseLoader: React.FC<SuspenseLoaderProps> = ({ className, size = 'md', message = 'Loading...' }) => {
+export const SuspenseLoader: React.FC<SuspenseLoaderProps> = ({
+  className,
+  size = 'md',
+  message = 'Loading...',
+}) => {
   return (
-    <div className={cn('flex flex-col items-center justify-center gap-2', className)}>
-      <div className={cn('animate-spin rounded-full border-2 border-gray-300 border-t-blue-600', sizeClasses[size])} />
-      {message && <p className="text-sm text-muted-foreground animate-pulse">{message}</p>}
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center gap-2',
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          'animate-spin rounded-full border-2 border-gray-300 border-t-blue-600',
+          sizeClasses[size],
+        )}
+      />
+      {message && (
+        <p className="text-sm text-muted-foreground animate-pulse">{message}</p>
+      )}
     </div>
   );
 };

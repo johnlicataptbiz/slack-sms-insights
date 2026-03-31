@@ -76,7 +76,10 @@ export const useInboxSubscription = ({
         console.log('[Inbox WS] Connection closed');
         if (shouldReconnectRef.current) {
           // Exponential backoff reconnection: 1s, 2s, 4s, 8s, max 30s
-          const delay = Math.min((wsRef.current?.reconnectAttempts || 0) * 1000 + 1000, 30000);
+          const delay = Math.min(
+            (wsRef.current?.reconnectAttempts || 0) * 1000 + 1000,
+            30000,
+          );
           reconnectTimeoutRef.current = setTimeout(connect, delay);
         }
       };

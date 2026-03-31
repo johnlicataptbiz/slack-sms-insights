@@ -1,6 +1,6 @@
 import {
-  autoUpdate,
   FloatingPortal,
+  autoUpdate,
   flip,
   offset,
   shift,
@@ -25,12 +25,21 @@ import {
 import type { EmojiClickData } from 'emoji-picker-react';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import Linkify from 'linkify-react';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels';
+import {
+  Group,
+  Panel,
+  Separator,
+  useDefaultLayout,
+} from 'react-resizable-panels';
 import { z } from 'zod';
-import type { AlowareSequenceSyncV2, CallOutcomeV2, QualificationStateV2 } from '../../api/v2-types';
+import type {
+  AlowareSequenceSyncV2,
+  CallOutcomeV2,
+  QualificationStateV2,
+} from '../../api/v2-types';
 import { CALL_OUTCOME_LABELS } from '../../api/v2-types';
 import {
   useManualMondayBookedCall,
@@ -152,12 +161,25 @@ const containsPodcastLink = (text: string): boolean => {
   return PODCAST_LINK_PATTERNS.some((pattern) => lower.includes(pattern));
 };
 
-type SetterIntent = 'ready' | 'pricing' | 'timing' | 'insurance' | 'skeptical' | 'how_to' | 'unknown';
+type SetterIntent =
+  | 'ready'
+  | 'pricing'
+  | 'timing'
+  | 'insurance'
+  | 'skeptical'
+  | 'how_to'
+  | 'unknown';
 
-const inferSetterIntent = (messageBody: string | null | undefined): SetterIntent => {
+const inferSetterIntent = (
+  messageBody: string | null | undefined,
+): SetterIntent => {
   const text = (messageBody || '').toLowerCase();
   if (!text) return 'unknown';
-  if (/\b(book|let's do|lets do|ready|i'm in|im in|sign me up|call me)\b/.test(text)) {
+  if (
+    /\b(book|let's do|lets do|ready|i'm in|im in|sign me up|call me)\b/.test(
+      text,
+    )
+  ) {
     return 'ready';
   }
   if (/\b(price|pricing|cost|expensive|afford|budget)\b/.test(text)) {
@@ -179,7 +201,10 @@ const inferSetterIntent = (messageBody: string | null | undefined): SetterIntent
 };
 
 const createClientIdempotencyKey = (): string => {
-  if (typeof globalThis.crypto !== 'undefined' && typeof globalThis.crypto.randomUUID === 'function') {
+  if (
+    typeof globalThis.crypto !== 'undefined' &&
+    typeof globalThis.crypto.randomUUID === 'function'
+  ) {
     return `inbox-${globalThis.crypto.randomUUID()}`;
   }
   return `inbox-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -198,7 +223,8 @@ const getSmsSegmentInfo = (text: string) => {
   const singleLimit = isUnicode ? 70 : 160;
   const multiLimit = isUnicode ? 67 : 153;
   const segments = len <= singleLimit ? 1 : Math.ceil(len / multiLimit);
-  const charsRemaining = segments === 1 ? singleLimit - len : segments * multiLimit - len;
+  const charsRemaining =
+    segments === 1 ? singleLimit - len : segments * multiLimit - len;
   return { segments, charsRemaining, isUnicode };
 };
 
@@ -377,7 +403,9 @@ const matchMention = (value: string, caret: number) => {
 const filterMentions = (config: MentionConfig, query: string) => {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return config.data;
-  return config.data.filter((item) => item.display.toLowerCase().includes(normalized));
+  return config.data.filter((item) =>
+    item.display.toLowerCase().includes(normalized),
+  );
 };
 
 type MentionTextareaProps = {
@@ -388,7 +416,13 @@ type MentionTextareaProps = {
   inputRef?: (element: HTMLTextAreaElement | null) => void;
 };
 
-const MentionTextarea = ({ value, onChange, placeholder, className, inputRef }: MentionTextareaProps) => {
+const MentionTextarea = ({
+  value,
+  onChange,
+  placeholder,
+  className,
+  inputRef,
+}: MentionTextareaProps) => {
   const [active, setActive] = useState<null | {
     trigger: '@' | '/';
     query: string;
@@ -400,7 +434,9 @@ const MentionTextarea = ({ value, onChange, placeholder, className, inputRef }: 
 
   const suggestions = useMemo(() => {
     if (!active) return [];
-    const config = mentionConfigs.find((item) => item.trigger === active.trigger);
+    const config = mentionConfigs.find(
+      (item) => item.trigger === active.trigger,
+    );
     if (!config) return [];
     return filterMentions(config, active.query).slice(0, 6);
   }, [active]);
@@ -442,7 +478,9 @@ const MentionTextarea = ({ value, onChange, placeholder, className, inputRef }: 
       setActiveIndex((prev) => (prev + 1) % suggestions.length);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setActiveIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+      setActiveIndex(
+        (prev) => (prev - 1 + suggestions.length) % suggestions.length,
+      );
     } else if (event.key === 'Enter' || event.key === 'Tab') {
       event.preventDefault();
       const selectedSuggestion = suggestions[activeIndex];
@@ -501,12 +539,24 @@ const snoozeSchema = z.object({
 });
 
 const noteSchema = z.object({
-  text: z.string().trim().min(1, 'Note cannot be empty').max(1000, 'Note is too long'),
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Note cannot be empty')
+    .max(1000, 'Note is too long'),
 });
 
 const templateSchema = z.object({
-  name: z.string().trim().min(1, 'Template name is required').max(100, 'Template name is too long'),
-  body: z.string().trim().min(1, 'Template body is required').max(1600, 'Template body is too long'),
+  name: z
+    .string()
+    .trim()
+    .min(1, 'Template name is required')
+    .max(100, 'Template name is too long'),
+  body: z
+    .string()
+    .trim()
+    .min(1, 'Template body is required')
+    .max(1600, 'Template body is too long'),
 });
 
 type AssignFormValues = z.infer<typeof assignSchema>;
@@ -519,9 +569,27 @@ export default function InboxV2() {
 
   // Consolidated state management - replaces 40+ useState declarations
   const inboxState = useInboxState();
-  const { filters, uiState, qualificationState, escalationState, selectionState, setFlashMessage } = inboxState;
-  const { selectedConversationId, isComposerModalOpen, composerText, sendStatus } = uiState;
-  const { updateFilters, updateUIState, updateQualification, updateEscalation, updateSelectionState } = inboxState;
+  const {
+    filters,
+    uiState,
+    qualificationState,
+    escalationState,
+    selectionState,
+    setFlashMessage,
+  } = inboxState;
+  const {
+    selectedConversationId,
+    isComposerModalOpen,
+    composerText,
+    sendStatus,
+  } = uiState;
+  const {
+    updateFilters,
+    updateUIState,
+    updateQualification,
+    updateEscalation,
+    updateSelectionState,
+  } = inboxState;
 
   // Refs for DOM elements and locks
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -536,21 +604,25 @@ export default function InboxV2() {
 
   // Local state for items not yet consolidated into useInboxState
   const [crmNotesCopied, setCrmNotesCopied] = useState(false);
-  const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] = useState<string | null>(null);
+  const [draftPrefillDoneForConversation, setDraftPrefillDoneForConversation] =
+    useState<string | null>(null);
   const [justSentMessage, setJustSentMessage] = useState<{
     text: string;
     timestamp: string;
     confirmed?: boolean;
   } | null>(null);
   const [sequenceIdInput, setSequenceIdInput] = useState('');
-  const [lastSequenceSync, setLastSequenceSync] = useState<AlowareSequenceSyncV2 | null>(null);
+  const [lastSequenceSync, setLastSequenceSync] =
+    useState<AlowareSequenceSyncV2 | null>(null);
   const [manualLine, setManualLine] = useState('');
   const [manualNotes, setManualNotes] = useState('');
   const [manualSetter, setManualSetter] = useState<'jack' | 'brandon'>('jack');
   const [manualContactNameInput, setManualContactNameInput] = useState('');
   const [manualContactPhoneInput, setManualContactPhoneInput] = useState('');
   const [objectionTagInput, setObjectionTagInput] = useState('');
-  const [guardrailChecks, setGuardrailChecks] = useState<Record<string, boolean>>({});
+  const [guardrailChecks, setGuardrailChecks] = useState<
+    Record<string, boolean>
+  >({});
   const assignForm = useForm<AssignFormValues>({
     resolver: zodResolver(assignSchema),
     defaultValues: { ownerLabel: '' },
@@ -571,9 +643,14 @@ export default function InboxV2() {
 
   // Refs and state dependencies for queries
 
-  const qualificationProgressLive = computeQualificationProgress(qualificationState);
-  const qualificationTone = qualificationToneForProgress(qualificationProgressLive);
-  const qualificationProgressPct = Math.round((qualificationProgressLive / 4) * 100);
+  const qualificationProgressLive =
+    computeQualificationProgress(qualificationState);
+  const qualificationTone = qualificationToneForProgress(
+    qualificationProgressLive,
+  );
+  const qualificationProgressPct = Math.round(
+    (qualificationProgressLive / 4) * 100,
+  );
   const escalationTone = escalationToneForLevel(escalationState.level);
   const escalationProgressPct = Math.round((escalationState.level / 4) * 100);
   const qualificationFields = [
@@ -634,14 +711,24 @@ export default function InboxV2() {
 
   // Analytics calculations
   const totalConversations = conversations.length;
-  const unreadCount = conversations.filter((c) => c.openNeedsReplyCount > 0).length;
-  const urgentCount = conversations.filter((c) => c.escalation.level <= 2 && c.openNeedsReplyCount > 0).length;
-  const jackCount = conversations.filter((c) => displaySetterName(c.ownerLabel) === 'Jack').length;
-  const brandonCount = conversations.filter((c) => displaySetterName(c.ownerLabel) === 'Brandon').length;
+  const unreadCount = conversations.filter(
+    (c) => c.openNeedsReplyCount > 0,
+  ).length;
+  const urgentCount = conversations.filter(
+    (c) => c.escalation.level <= 2 && c.openNeedsReplyCount > 0,
+  ).length;
+  const jackCount = conversations.filter(
+    (c) => displaySetterName(c.ownerLabel) === 'Jack',
+  ).length;
+  const brandonCount = conversations.filter(
+    (c) => displaySetterName(c.ownerLabel) === 'Brandon',
+  ).length;
   const unassignedCount = conversations.filter((c) => !c.ownerLabel).length;
 
   // More meaningful health metrics instead of opaque score
-  const criticalCount = conversations.filter((c) => c.escalation.level === 1 && c.openNeedsReplyCount > 0).length;
+  const criticalCount = conversations.filter(
+    (c) => c.escalation.level === 1 && c.openNeedsReplyCount > 0,
+  ).length;
   const staleCount = conversations.filter((c) => {
     const lastMsg = parseDateValue(c.lastMessage.createdAt || '');
     if (!lastMsg) return false;
@@ -666,8 +753,12 @@ export default function InboxV2() {
         return bAt - aAt;
       }
       if (filters.sortMode === 'urgent') {
-        const aPriority = (a.escalation.level <= 2 ? 5 : 0) + Math.min(a.openNeedsReplyCount, 4);
-        const bPriority = (b.escalation.level <= 2 ? 5 : 0) + Math.min(b.openNeedsReplyCount, 4);
+        const aPriority =
+          (a.escalation.level <= 2 ? 5 : 0) +
+          Math.min(a.openNeedsReplyCount, 4);
+        const bPriority =
+          (b.escalation.level <= 2 ? 5 : 0) +
+          Math.min(b.openNeedsReplyCount, 4);
         const delta = bPriority - aPriority;
         if (delta !== 0) return delta;
         return bAt - aAt;
@@ -677,7 +768,8 @@ export default function InboxV2() {
     return rows;
   }, [conversations, filters.sortMode]);
   const selectedConversationIndex = useMemo(
-    () => sortedConversations.findIndex((row) => row.id === selectedConversationId),
+    () =>
+      sortedConversations.findIndex((row) => row.id === selectedConversationId),
     [sortedConversations, selectedConversationId],
   );
 
@@ -695,10 +787,15 @@ export default function InboxV2() {
     if (!element) return;
 
     const maybeLoadNextPage = () => {
-      if (!listQuery.hasNextPage || listQuery.isFetchingNextPage || listQuery.isLoading) {
+      if (
+        !listQuery.hasNextPage ||
+        listQuery.isFetchingNextPage ||
+        listQuery.isLoading
+      ) {
         return;
       }
-      const distanceFromBottom = element.scrollHeight - element.scrollTop - element.clientHeight;
+      const distanceFromBottom =
+        element.scrollHeight - element.scrollTop - element.clientHeight;
       if (distanceFromBottom < 320) {
         void listQuery.fetchNextPage();
       }
@@ -719,7 +816,10 @@ export default function InboxV2() {
   const composerLayoutStorageId = isNarrowComposerViewport
     ? 'v2-inbox-composer-layout-vertical'
     : 'v2-inbox-composer-layout-horizontal';
-  const { defaultLayout: composerSavedLayout, onLayoutChanged: onComposerLayoutChanged } = useDefaultLayout({
+  const {
+    defaultLayout: composerSavedLayout,
+    onLayoutChanged: onComposerLayoutChanged,
+  } = useDefaultLayout({
     id: composerLayoutStorageId,
     panelIds: ['composer-primary', 'composer-sidebar'],
   });
@@ -749,12 +849,14 @@ export default function InboxV2() {
     ],
   });
   const templateDismiss = useDismiss(templateFloatingContext);
-  const { getReferenceProps: getTemplateReferenceProps, getFloatingProps } = useInteractions([templateDismiss]);
+  const { getReferenceProps: getTemplateReferenceProps, getFloatingProps } =
+    useInteractions([templateDismiss]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const mediaQuery = window.matchMedia('(max-width: 900px)');
-    const onChange = () => updateUIState({ isNarrowComposerViewport: mediaQuery.matches });
+    const onChange = () =>
+      updateUIState({ isNarrowComposerViewport: mediaQuery.matches });
     onChange();
     mediaQuery.addEventListener('change', onChange);
     return () => mediaQuery.removeEventListener('change', onChange);
@@ -785,16 +887,27 @@ export default function InboxV2() {
       return;
     }
 
-    if (uiState.selectedConversationId && !conversations.some((row) => row.id === uiState.selectedConversationId)) {
+    if (
+      uiState.selectedConversationId &&
+      !conversations.some((row) => row.id === uiState.selectedConversationId)
+    ) {
       inboxState.selectConversation(conversations[0]?.id || null);
     }
-  }, [conversations, uiState.selectedConversationId, uiState.isComposerModalOpen]);
+  }, [
+    conversations,
+    uiState.selectedConversationId,
+    uiState.isComposerModalOpen,
+  ]);
 
-  const detailQuery = useV2InboxConversationDetail(uiState.selectedConversationId, {
-    forceSync: uiState.isComposerModalOpen && Boolean(uiState.selectedConversationId),
-    // FIXED: Removed aggressive 7-second polling - was causing message race conditions
-    // Messages now only fetch when explicitly requested or on conversation change
-  });
+  const detailQuery = useV2InboxConversationDetail(
+    uiState.selectedConversationId,
+    {
+      forceSync:
+        uiState.isComposerModalOpen && Boolean(uiState.selectedConversationId),
+      // FIXED: Removed aggressive 7-second polling - was causing message race conditions
+      // Messages now only fetch when explicitly requested or on conversation change
+    },
+  );
 
   const generateDraftMutation = useV2GenerateDraft();
   const generateCrmNotesMutation = useV2GenerateCrmNotes();
@@ -821,8 +934,10 @@ export default function InboxV2() {
   const incrementGuardrailOverrideMutation = useV2IncrementGuardrailOverride();
 
   const detail = detailQuery.data?.data || null;
-  const manualContactNameFromDetail = detail?.contactCard.name || detail?.conversation.contactName || '';
-  const manualContactPhoneFromDetail = detail?.contactCard.phone || detail?.conversation.contactPhone || '';
+  const manualContactNameFromDetail =
+    detail?.contactCard.name || detail?.conversation.contactName || '';
+  const manualContactPhoneFromDetail =
+    detail?.contactCard.phone || detail?.conversation.contactPhone || '';
   useEffect(() => {
     setManualContactNameInput(manualContactNameFromDetail);
   }, [manualContactNameFromDetail]);
@@ -899,8 +1014,12 @@ export default function InboxV2() {
     };
   }, [inferredIntent]);
   const detailDrafts = Array.isArray(detail?.drafts) ? detail.drafts : [];
-  const detailMondayTrail = Array.isArray(detail?.mondayTrail) ? detail.mondayTrail : [];
-  const contactTags = Array.isArray(detailContactCard?.tags) ? detailContactCard.tags : [];
+  const detailMondayTrail = Array.isArray(detail?.mondayTrail)
+    ? detail.mondayTrail
+    : [];
+  const contactTags = Array.isArray(detailContactCard?.tags)
+    ? detailContactCard.tags
+    : [];
   const sendConfig = sendConfigQuery.data?.data || null;
   const lineOptions = sendConfig?.lines || [];
   const lineSelectOptions: V2SelectOption[] = [
@@ -915,19 +1034,28 @@ export default function InboxV2() {
   const noteText = noteForm.watch('text');
   const newTemplateName = templateForm.watch('name');
   const newTemplateBody = templateForm.watch('body');
-  const selectedLineOption = lineOptions.find((option) => option.key === uiState.selectedLineKey) || null;
-  const lineSelectionRequired = Boolean(sendConfig?.requiresSelection) && !selectedLineOption;
+  const selectedLineOption =
+    lineOptions.find((option) => option.key === uiState.selectedLineKey) ||
+    null;
+  const lineSelectionRequired =
+    Boolean(sendConfig?.requiresSelection) && !selectedLineOption;
   const savedDefaultSummary = sendConfig?.defaultSelection
     ? formatSendLineLabel(sendConfig.defaultSelection)
     : 'No saved default line';
 
   useEffect(() => {
     if (!sendConfig) return;
-    if (selectedLineKey && lineOptions.some((option) => option.key === selectedLineKey)) return;
+    if (
+      selectedLineKey &&
+      lineOptions.some((option) => option.key === selectedLineKey)
+    )
+      return;
 
     if (
       sendConfig.defaultSelection?.key &&
-      lineOptions.some((option) => option.key === sendConfig.defaultSelection?.key)
+      lineOptions.some(
+        (option) => option.key === sendConfig.defaultSelection?.key,
+      )
     ) {
       updateUIState({ selectedLineKey: sendConfig.defaultSelection.key });
       return;
@@ -958,7 +1086,12 @@ export default function InboxV2() {
       localObjectionTags: detailConversation.objectionTags ?? [],
       localCallOutcome: detailConversation.callOutcome ?? null,
     });
-  }, [assignForm, detailConversation?.id, detailContactCard?.sequenceId, detailQuery.dataUpdatedAt]);
+  }, [
+    assignForm,
+    detailConversation?.id,
+    detailContactCard?.sequenceId,
+    detailQuery.dataUpdatedAt,
+  ]);
 
   useEffect(() => {
     setDraftPrefillDoneForConversation(null);
@@ -990,12 +1123,26 @@ export default function InboxV2() {
       setSelectedDraftId(latestDraft.id);
     }
     setDraftPrefillDoneForConversation(selectedConversationId);
-  }, [detailDrafts, composerText, selectedConversationId, draftPrefillDoneForConversation]);
+  }, [
+    detailDrafts,
+    composerText,
+    selectedConversationId,
+    draftPrefillDoneForConversation,
+  ]);
 
   useEffect(() => {
-    if (!uiState.isComposerModalOpen || !uiState.selectedConversationId || !detail) return;
+    if (
+      !uiState.isComposerModalOpen ||
+      !uiState.selectedConversationId ||
+      !detail
+    )
+      return;
     window.requestAnimationFrame(() => composerRef.current?.focus());
-  }, [uiState.isComposerModalOpen, uiState.selectedConversationId, detailConversation?.id]);
+  }, [
+    uiState.isComposerModalOpen,
+    uiState.selectedConversationId,
+    detailConversation?.id,
+  ]);
 
   // Auto-scroll chat thread to bottom whenever messages load or a new message is sent
   useEffect(() => {
@@ -1017,7 +1164,10 @@ export default function InboxV2() {
   }, [uiState.isComposerModalOpen]);
 
   const selectConversationAtIndex = (index: number) => {
-    const bounded = Math.max(0, Math.min(index, sortedConversations.length - 1));
+    const bounded = Math.max(
+      0,
+      Math.min(index, sortedConversations.length - 1),
+    );
     const row = sortedConversations[bounded];
     if (!row) return;
     setSelectedConversationId(row.id);
@@ -1042,7 +1192,8 @@ export default function InboxV2() {
     (event) => {
       event.preventDefault();
       if (sortedConversations.length === 0) return;
-      const start = selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
+      const start =
+        selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
       selectConversationAtIndex(start + 1);
     },
     { enableOnFormTags: false },
@@ -1054,7 +1205,8 @@ export default function InboxV2() {
     (event) => {
       event.preventDefault();
       if (sortedConversations.length === 0) return;
-      const start = selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
+      const start =
+        selectedConversationIndex < 0 ? 0 : selectedConversationIndex;
       selectConversationAtIndex(start - 1);
     },
     { enableOnFormTags: false },
@@ -1087,17 +1239,22 @@ export default function InboxV2() {
       updateUIState({ selectedDraftId: result.data.id });
       setDraftPrefillDoneForConversation(selectedConversationId);
       if (result.data.generationMode === 'contextual_fallback') {
-        const firstWarning = result.data.generationWarnings[0] || 'AI generation unavailable';
+        const firstWarning =
+          result.data.generationWarnings[0] || 'AI generation unavailable';
         setFlashMessage(`Draft generated in fallback mode. ${firstWarning}`);
         return;
       }
       if (result.data.lint.passed) {
         setFlashMessage('Draft generated and passed quality check.');
       } else {
-        setFlashMessage('Draft generated with quality issues. Review before sending.');
+        setFlashMessage(
+          'Draft generated with quality issues. Review before sending.',
+        );
       }
     } catch (error) {
-      setFlashMessage(`Draft generation failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Draft generation failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1154,7 +1311,11 @@ export default function InboxV2() {
 
   const onSend = async () => {
     if (sendLockRef.current) return;
-    if (!uiState.selectedConversationId || uiState.composerText.trim().length === 0) return;
+    if (
+      !uiState.selectedConversationId ||
+      uiState.composerText.trim().length === 0
+    )
+      return;
     if (lineSelectionRequired) {
       setFlashMessage('Select a send line before sending.');
       return;
@@ -1164,7 +1325,9 @@ export default function InboxV2() {
 
     // Phase 2: Stage Gating
     if (containsCallLink(messageText) && escalationState.level <= 1) {
-      setFlashMessage('Set the escalation stage to L2 or higher before sending a call link.');
+      setFlashMessage(
+        'Set the escalation stage to L2 or higher before sending a call link.',
+      );
       return;
     }
 
@@ -1175,14 +1338,21 @@ export default function InboxV2() {
       let lastCallLinkOutboundIdx = -1;
       for (let i = msgs.length - 1; i >= 0; i--) {
         const message = msgs[i];
-        if (message && message.direction === 'outbound' && message.body && containsCallLink(message.body)) {
+        if (
+          message &&
+          message.direction === 'outbound' &&
+          message.body &&
+          containsCallLink(message.body)
+        ) {
           lastCallLinkOutboundIdx = i;
           break;
         }
       }
       if (lastCallLinkOutboundIdx !== -1) {
         // Check if there's any inbound reply AFTER that outbound call link
-        const hasReplyAfter = msgs.slice(lastCallLinkOutboundIdx + 1).some((m) => m.direction === 'inbound');
+        const hasReplyAfter = msgs
+          .slice(lastCallLinkOutboundIdx + 1)
+          .some((m) => m.direction === 'inbound');
         if (!hasReplyAfter) {
           // Show the banner and block send — user must dismiss or it stays visible
           updateUIState({ showDoublePitchWarning: true });
@@ -1206,7 +1376,10 @@ export default function InboxV2() {
       composerText: `${uiState.composerText}${emojiData.emoji}`,
     });
     updateUIState({
-      sendStatus: uiState.sendStatus === 'sent' || uiState.sendStatus === 'error' ? 'idle' : uiState.sendStatus,
+      sendStatus:
+        uiState.sendStatus === 'sent' || uiState.sendStatus === 'error'
+          ? 'idle'
+          : uiState.sendStatus,
     });
     pendingIdempotencyRef.current = null;
     window.requestAnimationFrame(() => composerRef.current?.focus());
@@ -1241,7 +1414,8 @@ export default function InboxV2() {
   useHotkeys(
     'mod+shift+a',
     (event) => {
-      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId)
+        return;
       event.preventDefault();
       void onUpdateStatus('closed');
     },
@@ -1252,7 +1426,8 @@ export default function InboxV2() {
   useHotkeys(
     'mod+shift+s',
     (event) => {
-      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId) return;
+      if (!uiState.isComposerModalOpen || !uiState.selectedConversationId)
+        return;
       event.preventDefault();
       const snoozedUntil = addHours(new Date(), 24).toISOString();
       void snoozeMutation
@@ -1261,7 +1436,11 @@ export default function InboxV2() {
           snoozedUntil,
         })
         .then(() => setFlashMessage('Snoozed for 24 hours.'))
-        .catch((error) => setFlashMessage(`Snooze failed: ${String((error as Error)?.message || error)}`));
+        .catch((error) =>
+          setFlashMessage(
+            `Snooze failed: ${String((error as Error)?.message || error)}`,
+          ),
+        );
     },
     { enableOnFormTags: true },
     [isComposerModalOpen, selectedConversationId],
@@ -1296,12 +1475,17 @@ export default function InboxV2() {
         key: idempotencyKey,
       };
 
-      const sendFromNumber = selectedLineOption?.lineId == null ? selectedLineOption?.fromNumber || null : null;
+      const sendFromNumber =
+        selectedLineOption?.lineId == null
+          ? selectedLineOption?.fromNumber || null
+          : null;
       const result = await sendMutation.mutateAsync({
         conversationId: selectedConversationId,
         body: messageText,
         idempotencyKey,
-        ...(selectedLineOption?.lineId != null ? { lineId: selectedLineOption.lineId } : {}),
+        ...(selectedLineOption?.lineId != null
+          ? { lineId: selectedLineOption.lineId }
+          : {}),
         ...(sendFromNumber ? { fromNumber: sendFromNumber } : {}),
         ...(selectedDraftId ? { draftId: selectedDraftId } : {}),
       });
@@ -1344,7 +1528,9 @@ export default function InboxV2() {
       } else {
         inboxState.updateUIState({ sendStatus: 'error' });
         setJustSentMessage(null);
-        toast.error(`Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`);
+        toast.error(
+          `Send blocked: ${humanizeAlowareError(result.data.reason)} · ${lineSummary}`,
+        );
       }
     } catch (error) {
       inboxState.updateUIState({ sendStatus: 'error' });
@@ -1365,12 +1551,18 @@ export default function InboxV2() {
     try {
       const defaultFromNumber = selectedLineOption.fromNumber || null;
       await setDefaultLineMutation.mutateAsync({
-        ...(selectedLineOption?.lineId != null ? { lineId: selectedLineOption.lineId } : {}),
+        ...(selectedLineOption?.lineId != null
+          ? { lineId: selectedLineOption.lineId }
+          : {}),
         ...(defaultFromNumber ? { fromNumber: defaultFromNumber } : {}),
       });
-      setFlashMessage(`Default send line saved: ${formatSendLineLabel(selectedLineOption)}`);
+      setFlashMessage(
+        `Default send line saved: ${formatSendLineLabel(selectedLineOption)}`,
+      );
     } catch (error) {
-      setFlashMessage(`Failed to save default line: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Failed to save default line: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1380,7 +1572,9 @@ export default function InboxV2() {
       await setDefaultLineMutation.mutateAsync({ clear: true });
       setFlashMessage('Default send line cleared.');
     } catch (error) {
-      setFlashMessage(`Failed to clear default line: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Failed to clear default line: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1408,7 +1602,9 @@ export default function InboxV2() {
       await detailQuery.refetch();
       setFlashMessage('Qualification saved and verified.');
     } catch (error) {
-      setFlashMessage(`Qualification update failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Qualification update failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1426,7 +1622,9 @@ export default function InboxV2() {
       await detailQuery.refetch();
       setFlashMessage('Stage saved and verified.');
     } catch (error) {
-      setFlashMessage(`Escalation update failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Escalation update failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1446,7 +1644,9 @@ export default function InboxV2() {
         setFlashMessage(`Aloware sync: ${describeSequenceSync(sync)}`);
       }
     } catch (error) {
-      toast.error(`Status update failed: ${String((error as Error)?.message || error)}`);
+      toast.error(
+        `Status update failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1466,7 +1666,9 @@ export default function InboxV2() {
       setLastSequenceSync(sync);
       setFlashMessage(`Sequence enroll: ${describeSequenceSync(sync)}`);
     } catch (error) {
-      setFlashMessage(`Sequence enroll failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Sequence enroll failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1480,7 +1682,9 @@ export default function InboxV2() {
       setLastSequenceSync(sync);
       setFlashMessage(`Sequence disenroll: ${describeSequenceSync(sync)}`);
     } catch (error) {
-      setFlashMessage(`Sequence disenroll failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Sequence disenroll failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1489,7 +1693,9 @@ export default function InboxV2() {
   const onAddObjectionTag = async () => {
     const tag = objectionTagInput.trim();
     if (!tag || !selectedConversationId) return;
-    const next = localObjectionTags.includes(tag) ? localObjectionTags : [...localObjectionTags, tag];
+    const next = localObjectionTags.includes(tag)
+      ? localObjectionTags
+      : [...localObjectionTags, tag];
     setLocalObjectionTags(next);
     setObjectionTagInput('');
     try {
@@ -1498,7 +1704,9 @@ export default function InboxV2() {
         tags: next,
       });
     } catch (error) {
-      setFlashMessage(`Objection tag update failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Objection tag update failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1512,7 +1720,9 @@ export default function InboxV2() {
         tags: next,
       });
     } catch (error) {
-      setFlashMessage(`Objection tag update failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Objection tag update failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1525,17 +1735,23 @@ export default function InboxV2() {
         outcome,
       });
     } catch (error) {
-      setFlashMessage(`Call outcome update failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Call outcome update failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
   const onIncrementGuardrailOverride = async () => {
     if (!selectedConversationId) return;
     try {
-      await incrementGuardrailOverrideMutation.mutateAsync(selectedConversationId);
+      await incrementGuardrailOverrideMutation.mutateAsync(
+        selectedConversationId,
+      );
       setFlashMessage('Override recorded.');
     } catch (error) {
-      setFlashMessage(`Guardrail override failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Guardrail override failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1551,7 +1767,9 @@ export default function InboxV2() {
       });
       noteForm.reset({ text: '' });
     } catch (error) {
-      setFlashMessage(`Note failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Note failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1570,7 +1788,9 @@ export default function InboxV2() {
       snoozeForm.reset({ snoozedUntil: '' });
       setFlashMessage('Conversation snoozed.');
     } catch (error) {
-      setFlashMessage(`Snooze failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Snooze failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1584,7 +1804,9 @@ export default function InboxV2() {
       snoozeForm.reset({ snoozedUntil: '' });
       setFlashMessage('Snooze cleared.');
     } catch (error) {
-      setFlashMessage(`Clear snooze failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Clear snooze failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1600,7 +1822,9 @@ export default function InboxV2() {
       await detailQuery.refetch();
       setFlashMessage(`Assigned to: ${ownerLabel || 'Unassigned'}`);
     } catch (error) {
-      setFlashMessage(`Assign failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Assign failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1619,7 +1843,9 @@ export default function InboxV2() {
       });
       templateForm.reset({ name: '', body: '' });
     } catch (error) {
-      setFlashMessage(`Template save failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Template save failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1627,7 +1853,9 @@ export default function InboxV2() {
     try {
       await deleteTemplateMutation.mutateAsync(id);
     } catch (error) {
-      setFlashMessage(`Template delete failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Template delete failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1641,7 +1869,8 @@ export default function InboxV2() {
       return;
     }
     try {
-      const eventTs = detail.conversation.lastTouchAt || detail.conversation.lastInboundAt;
+      const eventTs =
+        detail.conversation.lastTouchAt || detail.conversation.lastInboundAt;
       await manualMutation.mutateAsync({
         contactName: manualContactNameInput.trim(),
         contactPhone: manualContactPhoneInput.trim() || null,
@@ -1655,7 +1884,9 @@ export default function InboxV2() {
       setManualLine('');
       setManualNotes('');
     } catch (error) {
-      setFlashMessage(`Manual Monday push failed: ${String((error as Error)?.message || error)}`);
+      setFlashMessage(
+        `Manual Monday push failed: ${String((error as Error)?.message || error)}`,
+      );
     }
   };
 
@@ -1669,7 +1900,8 @@ export default function InboxV2() {
     { id: 'cash', label: 'Cash Intent — Expressed desire to go cash-pay' },
     {
       id: 'revenue',
-      label: 'Revenue Ambition — Mentioned revenue goal or frustration with current income',
+      label:
+        'Revenue Ambition — Mentioned revenue goal or frustration with current income',
     },
     {
       id: 'frustration',
@@ -1677,7 +1909,8 @@ export default function InboxV2() {
     },
     {
       id: 'complexity',
-      label: 'Complexity — Has a complex case (multiple staff, insurance transition)',
+      label:
+        'Complexity — Has a complex case (multiple staff, insurance transition)',
     },
     { id: 'engagement', label: 'Engagement — Replied 3+ times in this thread' },
     {
@@ -1686,7 +1919,8 @@ export default function InboxV2() {
     },
   ];
 
-  const checkedGuardrailsCount = Object.values(guardrailChecks).filter(Boolean).length;
+  const checkedGuardrailsCount =
+    Object.values(guardrailChecks).filter(Boolean).length;
   const canPassGuardrails = checkedGuardrailsCount >= 2;
 
   const canOverrideGuardrails = checkedGuardrailsCount >= 1;
@@ -1701,7 +1935,9 @@ export default function InboxV2() {
       }
       // Log override
       try {
-        await incrementGuardrailOverrideMutation.mutateAsync(selectedConversationId);
+        await incrementGuardrailOverrideMutation.mutateAsync(
+          selectedConversationId,
+        );
       } catch (error) {
         console.error('Failed to log override', error);
       }
@@ -1720,29 +1956,54 @@ export default function InboxV2() {
         <div className="V2Inbox__filterGroup">
           <button
             className={`V2Inbox__filterChip ${filters.statusFilter === 'open' ? 'is-active' : ''}`}
-            onClick={() => updateFilters({ statusFilter: filters.statusFilter === 'open' ? '' : 'open' })}
+            onClick={() =>
+              updateFilters({
+                statusFilter: filters.statusFilter === 'open' ? '' : 'open',
+              })
+            }
           >
-            <span className="V2Inbox__filterDot" style={{ background: '#13b981' }} />
+            <span
+              className="V2Inbox__filterDot"
+              style={{ background: '#13b981' }}
+            />
             Open
           </button>
           <button
             className={`V2Inbox__filterChip ${filters.statusFilter === 'closed' ? 'is-active' : ''}`}
-            onClick={() => updateFilters({ statusFilter: filters.statusFilter === 'closed' ? '' : 'closed' })}
+            onClick={() =>
+              updateFilters({
+                statusFilter: filters.statusFilter === 'closed' ? '' : 'closed',
+              })
+            }
           >
-            <span className="V2Inbox__filterDot" style={{ background: '#56607a' }} />
+            <span
+              className="V2Inbox__filterDot"
+              style={{ background: '#56607a' }}
+            />
             Closed
           </button>
           <button
             className={`V2Inbox__filterChip ${filters.statusFilter === 'dnc' ? 'is-active' : ''}`}
-            onClick={() => updateFilters({ statusFilter: filters.statusFilter === 'dnc' ? '' : 'dnc' })}
+            onClick={() =>
+              updateFilters({
+                statusFilter: filters.statusFilter === 'dnc' ? '' : 'dnc',
+              })
+            }
           >
-            <span className="V2Inbox__filterDot" style={{ background: '#ef4c62' }} />
+            <span
+              className="V2Inbox__filterDot"
+              style={{ background: '#ef4c62' }}
+            />
             DNC
           </button>
         </div>
 
         <div className="V2Inbox__searchBox">
-          <svg className="V2Inbox__searchIcon" viewBox="0 0 20 20" fill="currentColor">
+          <svg
+            className="V2Inbox__searchIcon"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
             <path
               fillRule="evenodd"
               d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
@@ -1761,7 +2022,11 @@ export default function InboxV2() {
         <div className="V2Inbox__filterGroup">
           <button
             className={`V2Inbox__ownerChip ${filters.ownerFilter === 'jack' ? 'is-active' : ''}`}
-            onClick={() => updateFilters({ ownerFilter: filters.ownerFilter === 'jack' ? 'all' : 'jack' })}
+            onClick={() =>
+              updateFilters({
+                ownerFilter: filters.ownerFilter === 'jack' ? 'all' : 'jack',
+              })
+            }
             style={{ '--owner-color': '#11b8d6' } as React.CSSProperties}
           >
             <span className="V2Inbox__ownerAvatar">J</span>
@@ -1769,7 +2034,12 @@ export default function InboxV2() {
           </button>
           <button
             className={`V2Inbox__ownerChip ${filters.ownerFilter === 'brandon' ? 'is-active' : ''}`}
-            onClick={() => updateFilters({ ownerFilter: filters.ownerFilter === 'brandon' ? 'all' : 'brandon' })}
+            onClick={() =>
+              updateFilters({
+                ownerFilter:
+                  filters.ownerFilter === 'brandon' ? 'all' : 'brandon',
+              })
+            }
             style={{ '--owner-color': '#13b981' } as React.CSSProperties}
           >
             <span className="V2Inbox__ownerAvatar">B</span>
@@ -1779,7 +2049,8 @@ export default function InboxV2() {
             className={`V2Inbox__ownerChip ${filters.ownerFilter === 'unassigned' ? 'is-active' : ''}`}
             onClick={() =>
               updateFilters({
-                ownerFilter: filters.ownerFilter === 'unassigned' ? 'all' : 'unassigned',
+                ownerFilter:
+                  filters.ownerFilter === 'unassigned' ? 'all' : 'unassigned',
               })
             }
           >
@@ -1788,7 +2059,9 @@ export default function InboxV2() {
           </button>
         </div>
 
-        <div className={`V2Inbox__needsReplyToggle ${needsReplyOnly ? 'is-active' : ''}`}>
+        <div
+          className={`V2Inbox__needsReplyToggle ${needsReplyOnly ? 'is-active' : ''}`}
+        >
           <button
             id="needs-reply-switch"
             type="button"
@@ -1798,7 +2071,9 @@ export default function InboxV2() {
             style={{
               width: '36px',
               height: '20px',
-              background: needsReplyOnly ? 'var(--v2-accent, #11b8d6)' : 'rgba(86, 96, 122, 0.4)',
+              background: needsReplyOnly
+                ? 'var(--v2-accent, #11b8d6)'
+                : 'rgba(86, 96, 122, 0.4)',
               borderRadius: '999px',
               border: 'none',
               cursor: 'pointer',
@@ -1819,17 +2094,25 @@ export default function InboxV2() {
                 borderRadius: '50%',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
                 transition: 'transform 0.2s',
-                transform: needsReplyOnly ? 'translateX(18px)' : 'translateX(3px)',
+                transform: needsReplyOnly
+                  ? 'translateX(18px)'
+                  : 'translateX(3px)',
               }}
             />
           </button>
-          <label htmlFor="needs-reply-switch" style={{ cursor: 'pointer', userSelect: 'none' }}>
+          <label
+            htmlFor="needs-reply-switch"
+            style={{ cursor: 'pointer', userSelect: 'none' }}
+          >
             Needs Reply
           </label>
         </div>
       </div>
 
-      <section className="V2Inbox__commandDeck" aria-label="Inbox quick actions">
+      <section
+        className="V2Inbox__commandDeck"
+        aria-label="Inbox quick actions"
+      >
         <button
           type="button"
           className="V2Inbox__commandCard V2Inbox__commandCard--urgent"
@@ -1883,7 +2166,9 @@ export default function InboxV2() {
         </div>
       </section>
 
-      {flashMessage ? <div className="V2Inbox__flash">{flashMessage}</div> : null}
+      {flashMessage ? (
+        <div className="V2Inbox__flash">{flashMessage}</div>
+      ) : null}
 
       {/* Success Toast */}
       {sendStatus === 'sent' && (
@@ -1905,7 +2190,13 @@ export default function InboxV2() {
                   className="V2Inbox__sortSelect"
                   value={sortMode}
                   onChange={(event) =>
-                    setSortMode(event.target.value as 'recent' | 'oldest' | 'urgent' | 'needs_reply')
+                    setSortMode(
+                      event.target.value as
+                        | 'recent'
+                        | 'oldest'
+                        | 'urgent'
+                        | 'needs_reply',
+                    )
                   }
                 >
                   <option value="recent">Most recent</option>
@@ -1924,7 +2215,11 @@ export default function InboxV2() {
           {listQuery.isLoading ? (
             <div className="V2Inbox__skeletonList">
               {[...Array(5)].map((_, i) => (
-                <div key={i} className="V2Inbox__skeletonRow" style={{ animationDelay: `${i * 100}ms` }} />
+                <div
+                  key={i}
+                  className="V2Inbox__skeletonRow"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                />
               ))}
             </div>
           ) : listQuery.isError ? (
@@ -1956,8 +2251,11 @@ export default function InboxV2() {
                     if (!conversation) return null;
                     const isActive = selectedConversationId === conversation.id;
                     const hasUnread = conversation.openNeedsReplyCount > 0;
-                    const isUrgent = conversation.escalation.level <= 2 && hasUnread;
-                    const setterName = displaySetterName(conversation.ownerLabel);
+                    const isUrgent =
+                      conversation.escalation.level <= 2 && hasUnread;
+                    const setterName = displaySetterName(
+                      conversation.ownerLabel,
+                    );
                     const setterColor = getSetterColor(conversation.ownerLabel);
 
                     return (
@@ -1987,46 +2285,77 @@ export default function InboxV2() {
                           {/* Row 1: name + time */}
                           <div className="V2Inbox__convRow">
                             <div className="V2Inbox__convNameWrap">
-                              {hasUnread && <span className="V2Inbox__convPip" />}
+                              {hasUnread && (
+                                <span className="V2Inbox__convPip" />
+                              )}
                               <span className="V2Inbox__convName">
                                 {conversation.contactName ||
-                                  formatPhoneDisplay(conversation.contactPhone) ||
+                                  formatPhoneDisplay(
+                                    conversation.contactPhone,
+                                  ) ||
                                   conversation.contactKey}
-                                {conversation.dnc && <span className="V2Inbox__dncBadge">DNC</span>}
-                                {conversation.mondayBooked && <span className="V2Inbox__mondayBadge">📅 Booked</span>}
+                                {conversation.dnc && (
+                                  <span className="V2Inbox__dncBadge">DNC</span>
+                                )}
+                                {conversation.mondayBooked && (
+                                  <span className="V2Inbox__mondayBadge">
+                                    📅 Booked
+                                  </span>
+                                )}
                               </span>
                             </div>
                             <span className="V2Inbox__convTime">
                               <time
-                                dateTime={conversation.lastMessage.createdAt || undefined}
-                                title={fmtDateTime(conversation.lastMessage.createdAt)}
+                                dateTime={
+                                  conversation.lastMessage.createdAt ||
+                                  undefined
+                                }
+                                title={fmtDateTime(
+                                  conversation.lastMessage.createdAt,
+                                )}
                               >
-                                {timeAgo(conversation.lastMessage.createdAt) || 'just now'}
+                                {timeAgo(conversation.lastMessage.createdAt) ||
+                                  'just now'}
                               </time>
-                              <small>{formatListTimestamp(conversation.lastMessage.createdAt)}</small>
+                              <small>
+                                {formatListTimestamp(
+                                  conversation.lastMessage.createdAt,
+                                )}
+                              </small>
                             </span>
                           </div>
 
                           {/* Row 2: direction + preview */}
                           <p className="V2Inbox__convPreview">
-                            <span className="V2Inbox__convDir" data-dir={conversation.lastMessage.direction}>
-                              {conversation.lastMessage.direction === 'inbound' ? '←' : '→'}
+                            <span
+                              className="V2Inbox__convDir"
+                              data-dir={conversation.lastMessage.direction}
+                            >
+                              {conversation.lastMessage.direction === 'inbound'
+                                ? '←'
+                                : '→'}
                             </span>
-                            {shorten(conversation.lastMessage.body, 85) || <em>No preview</em>}
+                            {shorten(conversation.lastMessage.body, 85) || (
+                              <em>No preview</em>
+                            )}
                           </p>
 
                           {/* Row 3: tags */}
                           <div className="V2Inbox__convTags">
                             <span
                               className="V2Inbox__convEscTag"
-                              data-tone={escalationToneForLevel(conversation.escalation.level)}
+                              data-tone={escalationToneForLevel(
+                                conversation.escalation.level,
+                              )}
                             >
                               L{conversation.escalation.level}
                             </span>
                             {setterName && (
                               <span
                                 className="V2Inbox__convOwnerTag"
-                                style={{ '--c': setterColor } as React.CSSProperties}
+                                style={
+                                  { '--c': setterColor } as React.CSSProperties
+                                }
                               >
                                 <span className="V2Inbox__convOwnerDot" />
                                 {setterName}
@@ -2076,8 +2405,11 @@ export default function InboxV2() {
             >
               <h3 className="V2Inbox__analyticsTitle">Inbox Overview</h3>
               {listQuery.dataUpdatedAt ? (
-                <span style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>
-                  Updated {timeAgo(new Date(listQuery.dataUpdatedAt).toISOString())}
+                <span
+                  style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}
+                >
+                  Updated{' '}
+                  {timeAgo(new Date(listQuery.dataUpdatedAt).toISOString())}
                 </span>
               ) : null}
             </div>
@@ -2113,7 +2445,11 @@ export default function InboxV2() {
                   >
                     {criticalCount} critical
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>(L1 + needs reply)</span>
+                  <span
+                    style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}
+                  >
+                    (L1 + needs reply)
+                  </span>
                 </div>
               ) : null}
 
@@ -2139,7 +2475,11 @@ export default function InboxV2() {
                   >
                     {staleCount} stale
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>(48h+ no reply)</span>
+                  <span
+                    style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}
+                  >
+                    (48h+ no reply)
+                  </span>
                 </div>
               ) : null}
 
@@ -2165,48 +2505,64 @@ export default function InboxV2() {
                   >
                     {unassignedCount} unassigned
                   </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}>(need owner)</span>
+                  <span
+                    style={{ fontSize: '0.75rem', color: 'var(--v2-text-dim)' }}
+                  >
+                    (need owner)
+                  </span>
                 </div>
               ) : null}
 
-              {criticalCount === 0 && staleCount === 0 && unassignedCount === 0 && totalConversations > 0 && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.625rem',
-                    background: 'rgba(19, 185, 129, 0.1)',
-                    borderRadius: '6px',
-                    border: '1px solid rgba(19, 185, 129, 0.2)',
-                  }}
-                >
-                  <span style={{ fontSize: '1rem' }}>✅</span>
-                  <span
+              {criticalCount === 0 &&
+                staleCount === 0 &&
+                unassignedCount === 0 &&
+                totalConversations > 0 && (
+                  <div
                     style={{
-                      fontSize: '0.85rem',
-                      color: 'var(--v2-positive)',
-                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      padding: '0.625rem',
+                      background: 'rgba(19, 185, 129, 0.1)',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(19, 185, 129, 0.2)',
                     }}
                   >
-                    All caught up
-                  </span>
-                </div>
-              )}
+                    <span style={{ fontSize: '1rem' }}>✅</span>
+                    <span
+                      style={{
+                        fontSize: '0.85rem',
+                        color: 'var(--v2-positive)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      All caught up
+                    </span>
+                  </div>
+                )}
             </div>
 
             <div className="V2Inbox__statGrid">
               <div className="V2Inbox__statCard">
-                <span className="V2Inbox__statValue" style={{ color: unreadCount > 0 ? '#f59d0d' : '#13b981' }}>
+                <span
+                  className="V2Inbox__statValue"
+                  style={{ color: unreadCount > 0 ? '#f59d0d' : '#13b981' }}
+                >
                   {unreadCount}
                 </span>
                 <span className="V2Inbox__statLabel">Needs Reply</span>
               </div>
               <div className="V2Inbox__statCard">
-                <span className="V2Inbox__statValue" style={{ color: urgentCount > 0 ? '#ef4c62' : '#13b981' }}>
+                <span
+                  className="V2Inbox__statValue"
+                  style={{ color: urgentCount > 0 ? '#ef4c62' : '#13b981' }}
+                >
                   {urgentCount}
                 </span>
-                <span className="V2Inbox__statLabel" title="L1-L2 escalation + needs reply">
+                <span
+                  className="V2Inbox__statLabel"
+                  title="L1-L2 escalation + needs reply"
+                >
                   Urgent
                 </span>
               </div>
@@ -2275,8 +2631,8 @@ export default function InboxV2() {
                 marginBottom: '1rem',
               }}
             >
-              You&apos;re sending a call link at L{escalationState.level}. Confirm at least 2 buying signals before
-              proceeding.
+              You&apos;re sending a call link at L{escalationState.level}.
+              Confirm at least 2 buying signals before proceeding.
             </AlertDialog.Description>
 
             <div
@@ -2330,7 +2686,8 @@ export default function InboxV2() {
                     margin: 0,
                   }}
                 >
-                  ⚠ Not enough signals. Consider sending a podcast episode first.
+                  ⚠ Not enough signals. Consider sending a podcast episode
+                  first.
                 </p>
               </div>
             )}
@@ -2362,7 +2719,11 @@ export default function InboxV2() {
                     className="V2Inbox__button V2Inbox__button--primary"
                     onClick={onConfirmGuardrails}
                     disabled={!canOverrideGuardrails}
-                    title={!canOverrideGuardrails ? 'Check at least 1 signal to override' : 'Override and send'}
+                    title={
+                      !canOverrideGuardrails
+                        ? 'Check at least 1 signal to override'
+                        : 'Override and send'
+                    }
                   >
                     Override &amp; Send
                   </button>
@@ -2375,7 +2736,10 @@ export default function InboxV2() {
 
       {/* Composer Modal - Unchanged */}
       {isComposerModalOpen ? (
-        <div className="V2Inbox__composerBackdrop" onClick={() => setIsComposerModalOpen(false)}>
+        <div
+          className="V2Inbox__composerBackdrop"
+          onClick={() => setIsComposerModalOpen(false)}
+        >
           <section
             className="V2Inbox__composerModal"
             role="dialog"
@@ -2393,9 +2757,9 @@ export default function InboxV2() {
                         detailContactCard?.contactKey}
                     </h3>
                     <p className="V2Inbox__composerMeta">
-                      {formatPhoneDisplay(detailContactCard?.phone) || 'n/a'} · Owner:{' '}
-                      {detailConversation?.ownerLabel || 'Unassigned'} · Stage: L
-                      {detailConversation?.escalation.level ?? '?'}
+                      {formatPhoneDisplay(detailContactCard?.phone) || 'n/a'} ·
+                      Owner: {detailConversation?.ownerLabel || 'Unassigned'} ·
+                      Stage: L{detailConversation?.escalation.level ?? '?'}
                     </p>
                     <div className="V2Inbox__statusRow">
                       <span
@@ -2531,7 +2895,11 @@ export default function InboxV2() {
                 >
                   {detailQuery.isFetching ? '↻ Syncing…' : '↻ Refresh'}
                 </button>
-                <button type="button" className="V2Inbox__composerClose" onClick={() => setIsComposerModalOpen(false)}>
+                <button
+                  type="button"
+                  className="V2Inbox__composerClose"
+                  onClick={() => setIsComposerModalOpen(false)}
+                >
                   ✕
                 </button>
               </div>
@@ -2539,43 +2907,61 @@ export default function InboxV2() {
 
             <div className="V2Inbox__composerModalBody">
               {!selectedConversationId ? (
-                <V2State kind="empty">Select a conversation to open it.</V2State>
+                <V2State kind="empty">
+                  Select a conversation to open it.
+                </V2State>
               ) : detailQuery.isLoading ? (
                 <div style={{ padding: '1.5rem' }}>
                   <SkeletonText lines={6} />
                 </div>
               ) : detailQuery.isError || !detail ? (
-                <V2State kind="error" onRetry={() => void detailQuery.refetch()}>
+                <V2State
+                  kind="error"
+                  onRetry={() => void detailQuery.refetch()}
+                >
                   Failed to load messages. Check your connection and try again.
                 </V2State>
               ) : (
                 <Group
                   className="V2Inbox__composerPanels"
                   id="v2-inbox-composer-group"
-                  orientation={isNarrowComposerViewport ? 'vertical' : 'horizontal'}
+                  orientation={
+                    isNarrowComposerViewport ? 'vertical' : 'horizontal'
+                  }
                   defaultLayout={composerDefaultLayout}
                   onLayoutChanged={onComposerLayoutChanged}
                 >
-                  <Panel id="composer-primary" minSize={isNarrowComposerViewport ? '260px' : '45%'}>
+                  <Panel
+                    id="composer-primary"
+                    minSize={isNarrowComposerViewport ? '260px' : '45%'}
+                  >
                     <div className="V2Inbox__composerPrimary">
                       {/* Conversation Thread - Chat Style */}
                       <div className="V2Inbox__chatThread" ref={chatThreadRef}>
                         {/* FIXED: Use deduplicatedMessages instead of detailMessages to prevent duplicate rendering */}
                         {deduplicatedMessages.map((message) => {
                           const leadLabel =
-                            detailContactCard?.name || formatPhoneDisplay(detailContactCard?.phone) || 'Lead';
+                            detailContactCard?.name ||
+                            formatPhoneDisplay(detailContactCard?.phone) ||
+                            'Lead';
                           // For outbound messages: prefer inferring from message body (e.g., "Jack with PT Biz")
                           // Fall back to alowareUser field, then to default setter
-                          const defaultSetter = displaySetterName(detailConversation?.ownerLabel) || 'Setter';
+                          const defaultSetter =
+                            displaySetterName(detailConversation?.ownerLabel) ||
+                            'Setter';
                           let speaker: string;
                           if (message.direction === 'inbound') {
                             speaker = leadLabel;
                           } else {
                             // Try to infer from message body for sequence messages
-                            const bodySenderMatch = message.body?.match(/^Hey.*?,\s*(\w+(?:\s+\w+)?)\s+with\s+PT/i);
+                            const bodySenderMatch = message.body?.match(
+                              /^Hey.*?,\s*(\w+(?:\s+\w+)?)\s+with\s+PT/i,
+                            );
                             const bodySender = bodySenderMatch?.[1] || null;
                             speaker =
-                              displaySetterName(bodySender) || displaySetterName(message.alowareUser) || defaultSetter;
+                              displaySetterName(bodySender) ||
+                              displaySetterName(message.alowareUser) ||
+                              defaultSetter;
                           }
                           return (
                             <article
@@ -2583,8 +2969,12 @@ export default function InboxV2() {
                               className={`V2Inbox__chatMessage V2Inbox__chatMessage--${message.direction}`}
                             >
                               <div className="V2Inbox__chatMessageHeader">
-                                <span className="V2Inbox__chatSpeaker">{speaker}</span>
-                                <time className="V2Inbox__chatTime">{fmtDateTime(message.createdAt)}</time>
+                                <span className="V2Inbox__chatSpeaker">
+                                  {speaker}
+                                </span>
+                                <time className="V2Inbox__chatTime">
+                                  {fmtDateTime(message.createdAt)}
+                                </time>
                               </div>
                               <p className="V2Inbox__chatBody">
                                 <Linkify
@@ -2597,34 +2987,51 @@ export default function InboxV2() {
                                   {message.body || '(empty)'}
                                 </Linkify>
                               </p>
-                              {Array.isArray(message.linkPreviews) && message.linkPreviews.length > 0 ? (
+                              {Array.isArray(message.linkPreviews) &&
+                              message.linkPreviews.length > 0 ? (
                                 <div className="V2Inbox__chatPreviews">
-                                  {message.linkPreviews.slice(0, 2).map((preview) => (
-                                    <a
-                                      key={`${message.id}-${preview.url}`}
-                                      className="V2Inbox__chatPreviewCard"
-                                      href={preview.url}
-                                      target="_blank"
-                                      rel="noreferrer noopener"
-                                    >
-                                      {preview.image ? (
-                                        <img
-                                          className="V2Inbox__chatPreviewImage"
-                                          src={preview.image}
-                                          alt={preview.title || preview.hostname || 'Link preview'}
-                                        />
-                                      ) : null}
-                                      <div className="V2Inbox__chatPreviewBody">
-                                        <strong>
-                                          {preview.title || preview.siteName || preview.hostname || preview.url}
-                                        </strong>
-                                        {preview.description ? (
-                                          <small>{shorten(preview.description, 120)}</small>
+                                  {message.linkPreviews
+                                    .slice(0, 2)
+                                    .map((preview) => (
+                                      <a
+                                        key={`${message.id}-${preview.url}`}
+                                        className="V2Inbox__chatPreviewCard"
+                                        href={preview.url}
+                                        target="_blank"
+                                        rel="noreferrer noopener"
+                                      >
+                                        {preview.image ? (
+                                          <img
+                                            className="V2Inbox__chatPreviewImage"
+                                            src={preview.image}
+                                            alt={
+                                              preview.title ||
+                                              preview.hostname ||
+                                              'Link preview'
+                                            }
+                                          />
                                         ) : null}
-                                        <span>{preview.hostname || preview.url}</span>
-                                      </div>
-                                    </a>
-                                  ))}
+                                        <div className="V2Inbox__chatPreviewBody">
+                                          <strong>
+                                            {preview.title ||
+                                              preview.siteName ||
+                                              preview.hostname ||
+                                              preview.url}
+                                          </strong>
+                                          {preview.description ? (
+                                            <small>
+                                              {shorten(
+                                                preview.description,
+                                                120,
+                                              )}
+                                            </small>
+                                          ) : null}
+                                          <span>
+                                            {preview.hostname || preview.url}
+                                          </span>
+                                        </div>
+                                      </a>
+                                    ))}
                                 </div>
                               ) : null}
                             </article>
@@ -2638,7 +3045,9 @@ export default function InboxV2() {
                           >
                             <div className="V2Inbox__chatMessageHeader">
                               <span className="V2Inbox__chatSpeaker">You</span>
-                              <time className="V2Inbox__chatTime">{fmtDateTime(justSentMessage.timestamp)}</time>
+                              <time className="V2Inbox__chatTime">
+                                {fmtDateTime(justSentMessage.timestamp)}
+                              </time>
                             </div>
                             <p className="V2Inbox__chatBody">
                               <Linkify
@@ -2652,7 +3061,9 @@ export default function InboxV2() {
                               </Linkify>
                             </p>
                             <span className="V2Inbox__sendingIndicator">
-                              {!justSentMessage.confirmed ? 'Sending…' : '✓ Sent'}
+                              {!justSentMessage.confirmed
+                                ? 'Sending…'
+                                : '✓ Sent'}
                             </span>
                           </article>
                         )}
@@ -2665,7 +3076,9 @@ export default function InboxV2() {
                             <p>Setter Assist</p>
                             <span>{setterAssistSummary.label}</span>
                           </div>
-                          <p className="V2Inbox__setterAssistAction">{setterAssistSummary.action}</p>
+                          <p className="V2Inbox__setterAssistAction">
+                            {setterAssistSummary.action}
+                          </p>
                         </div>
                         {crmNotesText ? (
                           <div className="V2Inbox__crmNotesCard">
@@ -2706,7 +3119,10 @@ export default function InboxV2() {
                               color: '#f59d0d',
                             }}
                           >
-                            <span>⚠ Call link already sent — no reply yet. Try a follow-up question instead.</span>
+                            <span>
+                              ⚠ Call link already sent — no reply yet. Try a
+                              follow-up question instead.
+                            </span>
                             <button
                               type="button"
                               style={{
@@ -2735,8 +3151,13 @@ export default function InboxV2() {
                               setComposerText(nextText);
                               pendingIdempotencyRef.current = null;
                               if (selectedDraftId) {
-                                const selectedDraft = detailDrafts.find((draft) => draft.id === selectedDraftId);
-                                if (!selectedDraft || selectedDraft.text !== nextText) {
+                                const selectedDraft = detailDrafts.find(
+                                  (draft) => draft.id === selectedDraftId,
+                                );
+                                if (
+                                  !selectedDraft ||
+                                  selectedDraft.text !== nextText
+                                ) {
                                   setSelectedDraftId(null);
                                 }
                               }
@@ -2748,7 +3169,10 @@ export default function InboxV2() {
                               type="button"
                               className="V2Inbox__button V2Inbox__button--secondary V2Inbox__button--small"
                               onClick={onGenerateDraft}
-                              disabled={generateDraftMutation.isPending || sendMutation.isPending}
+                              disabled={
+                                generateDraftMutation.isPending ||
+                                sendMutation.isPending
+                              }
                               title="Generate AI draft"
                             >
                               {generateDraftMutation.isPending ? '...' : '✨'}
@@ -2757,10 +3181,15 @@ export default function InboxV2() {
                               type="button"
                               className="V2Inbox__button V2Inbox__button--secondary V2Inbox__button--small"
                               onClick={onGenerateCrmNotes}
-                              disabled={generateCrmNotesMutation.isPending || sendMutation.isPending}
+                              disabled={
+                                generateCrmNotesMutation.isPending ||
+                                sendMutation.isPending
+                              }
                               title="Generate CRM notes from full thread and copy"
                             >
-                              {generateCrmNotesMutation.isPending ? '...' : 'CRM'}
+                              {generateCrmNotesMutation.isPending
+                                ? '...'
+                                : 'CRM'}
                             </button>
                             <button
                               type="button"
@@ -2786,7 +3215,8 @@ export default function InboxV2() {
 
                         <div className="V2Inbox__chatFooter">
                           {(() => {
-                            const { segments, charsRemaining, isUnicode } = getSmsSegmentInfo(composerText);
+                            const { segments, charsRemaining, isUnicode } =
+                              getSmsSegmentInfo(composerText);
                             const warn = segments >= 2;
                             const danger = segments >= 4;
                             return (
@@ -2816,7 +3246,11 @@ export default function InboxV2() {
                               <V2Select
                                 triggerClassName="V2Inbox__chatLineSelect"
                                 value={selectedLineKey || LINE_NONE_VALUE}
-                                onValueChange={(value) => setSelectedLineKey(value === LINE_NONE_VALUE ? '' : value)}
+                                onValueChange={(value) =>
+                                  setSelectedLineKey(
+                                    value === LINE_NONE_VALUE ? '' : value,
+                                  )
+                                }
                                 options={lineSelectOptions}
                                 ariaLabel="Select send line"
                               />
@@ -2830,7 +3264,9 @@ export default function InboxV2() {
                                     setSelectedDraftId(null);
                                     return;
                                   }
-                                  const draft = detailDrafts.find((d) => d.id === value);
+                                  const draft = detailDrafts.find(
+                                    (d) => d.id === value,
+                                  );
                                   if (!draft) return;
                                   setComposerText(draft.text);
                                   setSelectedDraftId(draft.id);
@@ -2856,7 +3292,8 @@ export default function InboxV2() {
                                 title="Insert template"
                                 ref={templateFloatingRefs.setReference}
                                 {...getTemplateReferenceProps({
-                                  onClick: () => setShowTemplates((prev) => !prev),
+                                  onClick: () =>
+                                    setShowTemplates((prev) => !prev),
                                   'aria-expanded': showTemplates,
                                   'aria-haspopup': 'dialog',
                                 })}
@@ -2873,13 +3310,19 @@ export default function InboxV2() {
                                       'aria-label': 'Templates menu',
                                     })}
                                   >
-                                    {templatesQuery.data && templatesQuery.data.length > 0 ? (
+                                    {templatesQuery.data &&
+                                    templatesQuery.data.length > 0 ? (
                                       templatesQuery.data.map((tpl) => (
-                                        <div key={tpl.id} className="V2Inbox__templateItem">
+                                        <div
+                                          key={tpl.id}
+                                          className="V2Inbox__templateItem"
+                                        >
                                           <button
                                             type="button"
                                             className="V2Inbox__templateInsert"
-                                            onClick={() => onInsertTemplate(tpl.body)}
+                                            onClick={() =>
+                                              onInsertTemplate(tpl.body)
+                                            }
                                             title={tpl.body}
                                           >
                                             {tpl.name}
@@ -2887,7 +3330,9 @@ export default function InboxV2() {
                                           <button
                                             type="button"
                                             className="V2Inbox__templateDelete"
-                                            onClick={() => void onDeleteTemplate(tpl.id)}
+                                            onClick={() =>
+                                              void onDeleteTemplate(tpl.id)
+                                            }
                                             title="Delete template"
                                           >
                                             ✕
@@ -2895,7 +3340,9 @@ export default function InboxV2() {
                                         </div>
                                       ))
                                     ) : (
-                                      <p className="V2Inbox__templateEmpty">No templates saved yet.</p>
+                                      <p className="V2Inbox__templateEmpty">
+                                        No templates saved yet.
+                                      </p>
                                     )}
                                     <div className="V2Inbox__templateCreate">
                                       <input
@@ -2903,7 +3350,11 @@ export default function InboxV2() {
                                         className="V2Inbox__templateNameInput"
                                         value={newTemplateName}
                                         onChange={(e) =>
-                                          templateForm.setValue('name', e.target.value, { shouldValidate: true })
+                                          templateForm.setValue(
+                                            'name',
+                                            e.target.value,
+                                            { shouldValidate: true },
+                                          )
                                         }
                                         placeholder="Template name…"
                                       />
@@ -2911,21 +3362,29 @@ export default function InboxV2() {
                                         className="V2Inbox__templateBodyInput"
                                         value={newTemplateBody}
                                         onChange={(newValue) =>
-                                          templateForm.setValue('body', newValue, { shouldValidate: true })
+                                          templateForm.setValue(
+                                            'body',
+                                            newValue,
+                                            { shouldValidate: true },
+                                          )
                                         }
                                         placeholder="Message body... use / for variables and @ for owner tags"
                                       />
                                       <button
                                         type="button"
                                         className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                                        onClick={() => void submitCreateTemplate()}
+                                        onClick={() =>
+                                          void submitCreateTemplate()
+                                        }
                                         disabled={
                                           createTemplateMutation.isPending ||
                                           !newTemplateName.trim() ||
                                           !newTemplateBody.trim()
                                         }
                                       >
-                                        {createTemplateMutation.isPending ? 'Saving…' : '+ Save Template'}
+                                        {createTemplateMutation.isPending
+                                          ? 'Saving…'
+                                          : '+ Save Template'}
                                       </button>
                                     </div>
                                   </div>
@@ -2936,14 +3395,22 @@ export default function InboxV2() {
                               <button
                                 type="button"
                                 className="V2Inbox__button V2Inbox__button--small"
-                                onClick={() => setIsEmojiPickerOpen((prev) => !prev)}
+                                onClick={() =>
+                                  setIsEmojiPickerOpen((prev) => !prev)
+                                }
                                 title="Insert emoji"
                               >
                                 😀
                               </button>
                               {isEmojiPickerOpen ? (
                                 <div className="V2Inbox__emojiPopover">
-                                  <Suspense fallback={<div className="V2Inbox__emojiLoading">Loading…</div>}>
+                                  <Suspense
+                                    fallback={
+                                      <div className="V2Inbox__emojiLoading">
+                                        Loading…
+                                      </div>
+                                    }
+                                  >
                                     <LazyEmojiPicker
                                       width={300}
                                       height={360}
@@ -2959,7 +3426,9 @@ export default function InboxV2() {
                               type="button"
                               className="V2Inbox__chatClear"
                               onClick={onClearDraft}
-                              disabled={!selectedDraftId && composerText.length === 0}
+                              disabled={
+                                !selectedDraftId && composerText.length === 0
+                              }
                               title="Clear message"
                             >
                               Clear
@@ -2977,7 +3446,10 @@ export default function InboxV2() {
                     title="Resize composer panels"
                   />
 
-                  <Panel id="composer-sidebar" minSize={isNarrowComposerViewport ? '180px' : '22%'}>
+                  <Panel
+                    id="composer-sidebar"
+                    minSize={isNarrowComposerViewport ? '180px' : '22%'}
+                  >
                     {/* Sidebar: Tabbed with Radix Tabs */}
                     <Tabs.Root
                       defaultValue="qualify"
@@ -3103,8 +3575,12 @@ export default function InboxV2() {
                           >
                             <p className="V2Panel__title">Qualification</p>
                             <div className="V2Inbox__stateTop">
-                              <span className="V2Inbox__stateBadge">{qualificationProgressLive} of 4 fields</span>
-                              <span className="V2Inbox__stateHint">{qualificationProgressPct}% complete</span>
+                              <span className="V2Inbox__stateBadge">
+                                {qualificationProgressLive} of 4 fields
+                              </span>
+                              <span className="V2Inbox__stateHint">
+                                {qualificationProgressPct}% complete
+                              </span>
                             </div>
                             <div className="V2Inbox__stateMeter">
                               <span
@@ -3137,7 +3613,8 @@ export default function InboxV2() {
                                   onValueChange={(value) =>
                                     setQualificationState((prev) => ({
                                       ...prev,
-                                      fullOrPartTime: value as QualificationStateV2['fullOrPartTime'],
+                                      fullOrPartTime:
+                                        value as QualificationStateV2['fullOrPartTime'],
                                     }))
                                   }
                                   options={FULL_OR_PART_TIME_OPTIONS}
@@ -3165,7 +3642,8 @@ export default function InboxV2() {
                                   onValueChange={(value) =>
                                     setQualificationState((prev) => ({
                                       ...prev,
-                                      revenueMix: value as QualificationStateV2['revenueMix'],
+                                      revenueMix:
+                                        value as QualificationStateV2['revenueMix'],
                                     }))
                                   }
                                   options={REVENUE_MIX_OPTIONS}
@@ -3179,7 +3657,8 @@ export default function InboxV2() {
                                   onValueChange={(value) =>
                                     setQualificationState((prev) => ({
                                       ...prev,
-                                      coachingInterest: value as QualificationStateV2['coachingInterest'],
+                                      coachingInterest:
+                                        value as QualificationStateV2['coachingInterest'],
                                     }))
                                   }
                                   options={COACHING_INTEREST_OPTIONS}
@@ -3192,7 +3671,9 @@ export default function InboxV2() {
                                 onClick={onSaveQualification}
                                 disabled={qualificationMutation.isPending}
                               >
-                                {qualificationMutation.isPending ? 'Saving…' : 'Save Qualification'}
+                                {qualificationMutation.isPending
+                                  ? 'Saving…'
+                                  : 'Save Qualification'}
                               </button>
                             </div>
                           </div>
@@ -3206,12 +3687,17 @@ export default function InboxV2() {
                             <p className="V2Panel__title">Escalation Stage</p>
                             <div className="V2Inbox__stateTop">
                               <span className="V2Inbox__stateBadge">
-                                L{escalationState.level} · {escalationLevelSubtitle(escalationState.level)}
+                                L{escalationState.level} ·{' '}
+                                {escalationLevelSubtitle(escalationState.level)}
                               </span>
-                              <span className="V2Inbox__stateHint">{escalationProgressPct}%</span>
+                              <span className="V2Inbox__stateHint">
+                                {escalationProgressPct}%
+                              </span>
                             </div>
                             <div className="V2Inbox__stateMeter">
-                              <span style={{ width: `${escalationProgressPct}%` }} />
+                              <span
+                                style={{ width: `${escalationProgressPct}%` }}
+                              />
                             </div>
                             <div className="V2Inbox__levelRail">
                               {([1, 2, 3, 4] as const).map((level) => (
@@ -3225,11 +3711,16 @@ export default function InboxV2() {
                                 </button>
                               ))}
                             </div>
-                            <label className="V2Control" style={{ marginTop: '0.5rem' }}>
+                            <label
+                              className="V2Control"
+                              style={{ marginTop: '0.5rem' }}
+                            >
                               <span>Override Reason</span>
                               <textarea
                                 value={escalationState.reason}
-                                onChange={(e) => updateEscalation({ reason: e.target.value })}
+                                onChange={(e) =>
+                                  updateEscalation({ reason: e.target.value })
+                                }
                                 rows={2}
                                 placeholder="Why are you overriding? (optional)"
                               />
@@ -3241,7 +3732,9 @@ export default function InboxV2() {
                               onClick={onOverrideEscalation}
                               disabled={escalationMutation.isPending}
                             >
-                              {escalationMutation.isPending ? 'Saving…' : 'Save Stage'}
+                              {escalationMutation.isPending
+                                ? 'Saving…'
+                                : 'Save Stage'}
                             </button>
                           </div>
                         </Tabs.Content>
@@ -3271,23 +3764,33 @@ export default function InboxV2() {
                                   Loading…
                                 </p>
                               )}
-                              {notesQuery.data && notesQuery.data.length === 0 && (
-                                <p
-                                  style={{
-                                    fontSize: '0.75rem',
-                                    color: 'var(--v2-muted)',
-                                  }}
-                                >
-                                  No notes yet.
-                                </p>
-                              )}
+                              {notesQuery.data &&
+                                notesQuery.data.length === 0 && (
+                                  <p
+                                    style={{
+                                      fontSize: '0.75rem',
+                                      color: 'var(--v2-muted)',
+                                    }}
+                                  >
+                                    No notes yet.
+                                  </p>
+                                )}
                               {notesQuery.data?.map((note) => (
-                                <div key={note.id} className="V2Inbox__noteItem">
+                                <div
+                                  key={note.id}
+                                  className="V2Inbox__noteItem"
+                                >
                                   <div className="V2Inbox__noteHeader">
-                                    <span className="V2Inbox__noteAuthor">{note.author}</span>
-                                    <span className="V2Inbox__noteTime">{fmtDateTime(note.createdAt)}</span>
+                                    <span className="V2Inbox__noteAuthor">
+                                      {note.author}
+                                    </span>
+                                    <span className="V2Inbox__noteTime">
+                                      {fmtDateTime(note.createdAt)}
+                                    </span>
                                   </div>
-                                  <p className="V2Inbox__noteBody">{note.text}</p>
+                                  <p className="V2Inbox__noteBody">
+                                    {note.text}
+                                  </p>
                                 </div>
                               ))}
                             </div>
@@ -3303,7 +3806,10 @@ export default function InboxV2() {
                                 rows={2}
                                 placeholder="Add a note… (⌘↵ to save)"
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                                  if (
+                                    e.key === 'Enter' &&
+                                    (e.metaKey || e.ctrlKey)
+                                  ) {
                                     e.preventDefault();
                                     void submitAddNote();
                                   }
@@ -3313,9 +3819,14 @@ export default function InboxV2() {
                                 type="button"
                                 className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
                                 onClick={() => void submitAddNote()}
-                                disabled={addNoteMutation.isPending || noteText.trim().length === 0}
+                                disabled={
+                                  addNoteMutation.isPending ||
+                                  noteText.trim().length === 0
+                                }
                               >
-                                {addNoteMutation.isPending ? 'Saving…' : '+ Note'}
+                                {addNoteMutation.isPending
+                                  ? 'Saving…'
+                                  : '+ Note'}
                               </button>
                             </div>
                           </div>
@@ -3324,7 +3835,9 @@ export default function InboxV2() {
                         {/* ── Contact Tab ── */}
                         <Tabs.Content value="contact">
                           <div className="V2Panel V2Inbox__sidePanel">
-                            <p className="V2Panel__title">Aloware Contact Sync</p>
+                            <p className="V2Panel__title">
+                              Aloware Contact Sync
+                            </p>
                             <p
                               className="V2Panel__caption"
                               style={{
@@ -3341,7 +3854,8 @@ export default function InboxV2() {
                                 fontSize: '0.75rem',
                                 marginBottom: '0.6rem',
                                 color:
-                                  (lastSequenceSync?.status || null) === 'synced'
+                                  (lastSequenceSync?.status || null) ===
+                                  'synced'
                                     ? 'var(--v2-positive)'
                                     : 'var(--v2-muted)',
                               }}
@@ -3354,7 +3868,9 @@ export default function InboxV2() {
                               <input
                                 type="text"
                                 value={sequenceIdInput}
-                                onChange={(e) => setSequenceIdInput(e.target.value)}
+                                onChange={(e) =>
+                                  setSequenceIdInput(e.target.value)
+                                }
                                 placeholder="e.g. 12345"
                               />
                             </label>
@@ -3371,9 +3887,14 @@ export default function InboxV2() {
                                 type="button"
                                 className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
                                 onClick={onEnrollToSequence}
-                                disabled={sequenceEnrollMutation.isPending || !sequenceIdInput.trim()}
+                                disabled={
+                                  sequenceEnrollMutation.isPending ||
+                                  !sequenceIdInput.trim()
+                                }
                               >
-                                {sequenceEnrollMutation.isPending ? 'Enrolling…' : 'Enroll'}
+                                {sequenceEnrollMutation.isPending
+                                  ? 'Enrolling…'
+                                  : 'Enroll'}
                               </button>
                               <button
                                 type="button"
@@ -3381,17 +3902,23 @@ export default function InboxV2() {
                                 onClick={onDisenrollFromSequence}
                                 disabled={sequenceDisenrollMutation.isPending}
                               >
-                                {sequenceDisenrollMutation.isPending ? 'Disenrolling…' : 'Disenroll'}
+                                {sequenceDisenrollMutation.isPending
+                                  ? 'Disenrolling…'
+                                  : 'Disenroll'}
                               </button>
                             </div>
 
                             <div className="V2Inbox__manualMonday">
                               <div className="V2Inbox__manualHeader">
-                                <p className="V2Inbox__manualTitle">Manual Monday push</p>
+                                <p className="V2Inbox__manualTitle">
+                                  Manual Monday push
+                                </p>
                                 <button
                                   type="button"
                                   className="V2Inbox__manualToggle"
-                                  onClick={() => setManualPanelOpen((prev) => !prev)}
+                                  onClick={() =>
+                                    setManualPanelOpen((prev) => !prev)
+                                  }
                                 >
                                   {manualPanelOpen ? 'Close' : 'Open form'}
                                 </button>
@@ -3409,7 +3936,11 @@ export default function InboxV2() {
                                     <input
                                       type="text"
                                       value={manualContactNameInput}
-                                      onChange={(event) => setManualContactNameInput(event.target.value)}
+                                      onChange={(event) =>
+                                        setManualContactNameInput(
+                                          event.target.value,
+                                        )
+                                      }
                                       placeholder="First and last name"
                                       required
                                     />
@@ -3419,7 +3950,11 @@ export default function InboxV2() {
                                     <input
                                       type="text"
                                       value={manualContactPhoneInput}
-                                      onChange={(event) => setManualContactPhoneInput(event.target.value)}
+                                      onChange={(event) =>
+                                        setManualContactPhoneInput(
+                                          event.target.value,
+                                        )
+                                      }
                                       placeholder="(optional)"
                                     />
                                   </label>
@@ -3428,7 +3963,9 @@ export default function InboxV2() {
                                     <input
                                       type="text"
                                       value={manualLine}
-                                      onChange={(event) => setManualLine(event.target.value)}
+                                      onChange={(event) =>
+                                        setManualLine(event.target.value)
+                                      }
                                       placeholder="Slack line or fallback"
                                     />
                                   </label>
@@ -3437,7 +3974,9 @@ export default function InboxV2() {
                                     <textarea
                                       rows={2}
                                       value={manualNotes}
-                                      onChange={(event) => setManualNotes(event.target.value)}
+                                      onChange={(event) =>
+                                        setManualNotes(event.target.value)
+                                      }
                                       placeholder="Add context for Monday…"
                                     />
                                   </label>
@@ -3446,7 +3985,11 @@ export default function InboxV2() {
                                     <select
                                       value={manualSetter}
                                       onChange={(event) =>
-                                        setManualSetter(event.target.value === 'brandon' ? 'brandon' : 'jack')
+                                        setManualSetter(
+                                          event.target.value === 'brandon'
+                                            ? 'brandon'
+                                            : 'jack',
+                                        )
                                       }
                                     >
                                       <option value="jack">Jack</option>
@@ -3456,9 +3999,14 @@ export default function InboxV2() {
                                   <button
                                     type="submit"
                                     className="V2Inbox__button V2Inbox__button--small V2Inbox__button--primary"
-                                    disabled={manualMutation.isPending || !manualContactNameInput.trim()}
+                                    disabled={
+                                      manualMutation.isPending ||
+                                      !manualContactNameInput.trim()
+                                    }
                                   >
-                                    {manualMutation.isPending ? 'Pushing…' : 'Send to Monday'}
+                                    {manualMutation.isPending
+                                      ? 'Pushing…'
+                                      : 'Send to Monday'}
                                   </button>
                                 </form>
                               )}
@@ -3475,16 +4023,23 @@ export default function InboxV2() {
                               }}
                             >
                               <div>
-                                <strong>Lead Source:</strong> {detailContactCard?.leadSource || 'n/a'}
+                                <strong>Lead Source:</strong>{' '}
+                                {detailContactCard?.leadSource || 'n/a'}
                               </div>
                               <div>
-                                <strong>Current Sequence:</strong> {detailContactCard?.sequenceId || 'n/a'}
+                                <strong>Current Sequence:</strong>{' '}
+                                {detailContactCard?.sequenceId || 'n/a'}
                               </div>
                               <div>
-                                <strong>Disposition:</strong> {detailContactCard?.dispositionStatusId || 'n/a'}
+                                <strong>Disposition:</strong>{' '}
+                                {detailContactCard?.dispositionStatusId ||
+                                  'n/a'}
                               </div>
                               <div>
-                                <strong>Tags:</strong> {contactTags.length > 0 ? contactTags.join(', ') : 'n/a'}
+                                <strong>Tags:</strong>{' '}
+                                {contactTags.length > 0
+                                  ? contactTags.join(', ')
+                                  : 'n/a'}
                               </div>
                               <div>
                                 <strong>Text Authorized:</strong>{' '}
@@ -3503,26 +4058,35 @@ export default function InboxV2() {
                                     : 'no'}
                               </div>
                               <div>
-                                <strong>Carrier / Line:</strong> {detailContactCard?.lrnCarrier || 'n/a'} /{' '}
+                                <strong>Carrier / Line:</strong>{' '}
+                                {detailContactCard?.lrnCarrier || 'n/a'} /{' '}
                                 {detailContactCard?.lrnLineType || 'n/a'}
                               </div>
                               <div>
-                                <strong>Unread:</strong> {detailContactCard?.unreadCount ?? 0}
+                                <strong>Unread:</strong>{' '}
+                                {detailContactCard?.unreadCount ?? 0}
                               </div>
                               <div>
-                                <strong>SMS In/Out:</strong> {detailContactCard?.inboundSmsCount ?? 0}/
+                                <strong>SMS In/Out:</strong>{' '}
+                                {detailContactCard?.inboundSmsCount ?? 0}/
                                 {detailContactCard?.outboundSmsCount ?? 0}
                               </div>
                               <div>
-                                <strong>Calls In/Out:</strong> {detailContactCard?.inboundCallCount ?? 0}/
+                                <strong>Calls In/Out:</strong>{' '}
+                                {detailContactCard?.inboundCallCount ?? 0}/
                                 {detailContactCard?.outboundCallCount ?? 0}
                               </div>
                               <div>
                                 <strong>Last Engagement:</strong>{' '}
-                                {fmtDateTime(detailContactCard?.lastEngagementAt || null)}
+                                {fmtDateTime(
+                                  detailContactCard?.lastEngagementAt || null,
+                                )}
                               </div>
                               <div>
-                                <strong>LRN Checked:</strong> {fmtDateTime(detailContactCard?.lrnLastCheckedAt || null)}
+                                <strong>LRN Checked:</strong>{' '}
+                                {fmtDateTime(
+                                  detailContactCard?.lrnLastCheckedAt || null,
+                                )}
                               </div>
                             </div>
                           </div>
@@ -3531,7 +4095,9 @@ export default function InboxV2() {
                         {/* ── Outcome Tab ── */}
                         <Tabs.Content value="outcome">
                           <div className="V2Panel V2Inbox__sidePanel">
-                            <p className="V2Panel__title">Call Outcome &amp; Objections</p>
+                            <p className="V2Panel__title">
+                              Call Outcome &amp; Objections
+                            </p>
 
                             <p
                               className="V2Panel__caption"
@@ -3543,21 +4109,33 @@ export default function InboxV2() {
                               Call Outcome
                             </p>
                             <div className="V2Inbox__outcomeChips">
-                              {(['not_a_fit', 'too_early', 'budget', 'joined', 'ghosted'] as CallOutcomeV2[]).map(
-                                (outcome) => (
-                                  <button
-                                    key={outcome}
-                                    type="button"
-                                    className={`V2Inbox__outcomeChip${localCallOutcome === outcome ? ' is-active' : ''}`}
-                                    data-outcome={outcome}
-                                    onClick={() => void onSetCallOutcome(localCallOutcome === outcome ? null : outcome)}
-                                    disabled={updateCallOutcomeMutation.isPending}
-                                    title={CALL_OUTCOME_LABELS[outcome]}
-                                  >
-                                    {CALL_OUTCOME_LABELS[outcome]}
-                                  </button>
-                                ),
-                              )}
+                              {(
+                                [
+                                  'not_a_fit',
+                                  'too_early',
+                                  'budget',
+                                  'joined',
+                                  'ghosted',
+                                ] as CallOutcomeV2[]
+                              ).map((outcome) => (
+                                <button
+                                  key={outcome}
+                                  type="button"
+                                  className={`V2Inbox__outcomeChip${localCallOutcome === outcome ? ' is-active' : ''}`}
+                                  data-outcome={outcome}
+                                  onClick={() =>
+                                    void onSetCallOutcome(
+                                      localCallOutcome === outcome
+                                        ? null
+                                        : outcome,
+                                    )
+                                  }
+                                  disabled={updateCallOutcomeMutation.isPending}
+                                  title={CALL_OUTCOME_LABELS[outcome]}
+                                >
+                                  {CALL_OUTCOME_LABELS[outcome]}
+                                </button>
+                              ))}
                             </div>
 
                             <p
@@ -3582,13 +4160,20 @@ export default function InboxV2() {
                                 </span>
                               )}
                               {localObjectionTags.map((tag) => (
-                                <span key={tag} className="V2Inbox__objectionTagChip">
+                                <span
+                                  key={tag}
+                                  className="V2Inbox__objectionTagChip"
+                                >
                                   {tag}
                                   <button
                                     type="button"
                                     className="V2Inbox__objectionTagRemove"
-                                    onClick={() => void onRemoveObjectionTag(tag)}
-                                    disabled={updateObjectionTagsMutation.isPending}
+                                    onClick={() =>
+                                      void onRemoveObjectionTag(tag)
+                                    }
+                                    disabled={
+                                      updateObjectionTagsMutation.isPending
+                                    }
                                     title="Remove tag"
                                   >
                                     ✕
@@ -3601,18 +4186,24 @@ export default function InboxV2() {
                                 type="text"
                                 className="V2Inbox__assignInput"
                                 value={objectionTagInput}
-                                onChange={(e) => setObjectionTagInput(e.target.value)}
+                                onChange={(e) =>
+                                  setObjectionTagInput(e.target.value)
+                                }
                                 placeholder="Add tag… (e.g. price, timing)"
                                 title="Add objection tag"
                                 onKeyDown={(e) => {
-                                  if (e.key === 'Enter') void onAddObjectionTag();
+                                  if (e.key === 'Enter')
+                                    void onAddObjectionTag();
                                 }}
                               />
                               <button
                                 type="button"
                                 className="V2Inbox__button V2Inbox__button--small"
                                 onClick={onAddObjectionTag}
-                                disabled={updateObjectionTagsMutation.isPending || !objectionTagInput.trim()}
+                                disabled={
+                                  updateObjectionTagsMutation.isPending ||
+                                  !objectionTagInput.trim()
+                                }
                               >
                                 + Tag
                               </button>
@@ -3623,10 +4214,14 @@ export default function InboxV2() {
                                 type="button"
                                 className="V2Inbox__button V2Inbox__button--small V2Inbox__button--danger"
                                 onClick={onIncrementGuardrailOverride}
-                                disabled={incrementGuardrailOverrideMutation.isPending}
+                                disabled={
+                                  incrementGuardrailOverrideMutation.isPending
+                                }
                                 title="Record that a guardrail was overridden for this conversation"
                               >
-                                {incrementGuardrailOverrideMutation.isPending ? '…' : '⚠ Log Override'}
+                                {incrementGuardrailOverrideMutation.isPending
+                                  ? '…'
+                                  : '⚠ Log Override'}
                               </button>
                               <p
                                 style={{
@@ -3635,17 +4230,24 @@ export default function InboxV2() {
                                   marginTop: '0.25rem',
                                 }}
                               >
-                                Overrides: {detail?.conversation.guardrailOverrideCount ?? 0}
+                                Overrides:{' '}
+                                {detail?.conversation.guardrailOverrideCount ??
+                                  0}
                               </p>
                             </div>
                           </div>
 
                           {detail && detailMondayTrail.length > 0 && (
                             <div className="V2Panel V2Inbox__sidePanel">
-                              <p className="V2Panel__title">📅 Monday Booked Calls</p>
+                              <p className="V2Panel__title">
+                                📅 Monday Booked Calls
+                              </p>
                               <div className="V2Inbox__mondayTrail">
                                 {detailMondayTrail.map((snap) => (
-                                  <div key={snap.itemId} className="V2Inbox__mondayTrailRow">
+                                  <div
+                                    key={snap.itemId}
+                                    className="V2Inbox__mondayTrailRow"
+                                  >
                                     <div className="V2Inbox__mondayTrailName">
                                       {snap.itemName || '—'}
                                       {snap.isBooked && (
@@ -3655,12 +4257,20 @@ export default function InboxV2() {
                                       )}
                                     </div>
                                     <div className="V2Inbox__mondayTrailMeta">
-                                      {snap.stage && <span className="V2Inbox__mondayTrailStage">{snap.stage}</span>}
+                                      {snap.stage && (
+                                        <span className="V2Inbox__mondayTrailStage">
+                                          {snap.stage}
+                                        </span>
+                                      )}
                                       {snap.callDate && (
-                                        <span className="V2Inbox__mondayTrailDate">{snap.callDate}</span>
+                                        <span className="V2Inbox__mondayTrailDate">
+                                          {snap.callDate}
+                                        </span>
                                       )}
                                       {snap.disposition && (
-                                        <span className="V2Inbox__mondayTrailDisp">{snap.disposition}</span>
+                                        <span className="V2Inbox__mondayTrailDisp">
+                                          {snap.disposition}
+                                        </span>
                                       )}
                                     </div>
                                   </div>
@@ -3688,7 +4298,11 @@ export default function InboxV2() {
                                 <span>Active Line</span>
                                 <V2Select
                                   value={selectedLineKey || LINE_NONE_VALUE}
-                                  onValueChange={(value) => setSelectedLineKey(value === LINE_NONE_VALUE ? '' : value)}
+                                  onValueChange={(value) =>
+                                    setSelectedLineKey(
+                                      value === LINE_NONE_VALUE ? '' : value,
+                                    )
+                                  }
                                   options={lineSelectOptions}
                                   ariaLabel="Active send line"
                                 />
@@ -3705,7 +4319,10 @@ export default function InboxV2() {
                                   type="button"
                                   className="V2Inbox__button V2Inbox__button--primary V2Inbox__button--small"
                                   onClick={onSaveDefaultLine}
-                                  disabled={setDefaultLineMutation.isPending || !selectedLineOption}
+                                  disabled={
+                                    setDefaultLineMutation.isPending ||
+                                    !selectedLineOption
+                                  }
                                 >
                                   Save as Default
                                 </button>

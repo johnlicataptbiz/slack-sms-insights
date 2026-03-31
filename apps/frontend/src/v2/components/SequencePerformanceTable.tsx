@@ -47,7 +47,10 @@ const parseVersionParts = (value: string): number[] | null => {
   return parts.length > 0 ? parts : null;
 };
 
-const compareVersionParts = (a: number[] | null, b: number[] | null): number => {
+const compareVersionParts = (
+  a: number[] | null,
+  b: number[] | null,
+): number => {
   if (!a && !b) return 0;
   if (!a) return -1;
   if (!b) return 1;
@@ -78,7 +81,9 @@ function StatDelta({ current, previous, isPct = true }: StatDeltaProps) {
   const symbol = isPositive ? '+' : '';
 
   return (
-    <span className={`V2Delta ${isPositive ? 'V2Delta--positive' : 'V2Delta--negative'}`}>
+    <span
+      className={`V2Delta ${isPositive ? 'V2Delta--positive' : 'V2Delta--negative'}`}
+    >
       {symbol}
       {isPct ? diff.toFixed(1) : diff.toLocaleString()}
       {isPct ? '%' : ''}
@@ -93,7 +98,13 @@ interface SequencePerformanceTableProps {
   mode?: string;
 }
 
-type SortKey = 'label' | 'messagesSent' | 'replyRatePct' | 'canonicalBookedCalls' | 'bookingRatePct' | 'optOutRatePct';
+type SortKey =
+  | 'label'
+  | 'messagesSent'
+  | 'replyRatePct'
+  | 'canonicalBookedCalls'
+  | 'bookingRatePct'
+  | 'optOutRatePct';
 type SortOrder = 'asc' | 'desc';
 
 interface ColumnVisibility {
@@ -151,7 +162,9 @@ function TableControls({
   leadMagnets,
 }: TableControlsProps) {
   const hasActiveFilters =
-    filters.minReplyRate !== null || filters.minBookings !== null || filters.leadMagnetFilter !== null;
+    filters.minReplyRate !== null ||
+    filters.minBookings !== null ||
+    filters.leadMagnetFilter !== null;
 
   const clearFilters = () => {
     onFilterChange({
@@ -202,7 +215,12 @@ function TableControls({
       <div className="V2TableControls__filters">
         <select
           value={filters.leadMagnetFilter || ''}
-          onChange={(e) => onFilterChange({ ...filters, leadMagnetFilter: e.target.value || null })}
+          onChange={(e) =>
+            onFilterChange({
+              ...filters,
+              leadMagnetFilter: e.target.value || null,
+            })
+          }
           className="V2TableControls__select"
         >
           <option value="">All Lead Magnets</option>
@@ -217,7 +235,12 @@ function TableControls({
           type="number"
           placeholder="Min reply %"
           value={filters.minReplyRate || ''}
-          onChange={(e) => onFilterChange({ ...filters, minReplyRate: e.target.value ? Number(e.target.value) : null })}
+          onChange={(e) =>
+            onFilterChange({
+              ...filters,
+              minReplyRate: e.target.value ? Number(e.target.value) : null,
+            })
+          }
           className="V2TableControls__filterInput"
           min="0"
           max="100"
@@ -227,7 +250,12 @@ function TableControls({
           type="number"
           placeholder="Min bookings"
           value={filters.minBookings || ''}
-          onChange={(e) => onFilterChange({ ...filters, minBookings: e.target.value ? Number(e.target.value) : null })}
+          onChange={(e) =>
+            onFilterChange({
+              ...filters,
+              minBookings: e.target.value ? Number(e.target.value) : null,
+            })
+          }
           className="V2TableControls__filterInput"
           min="0"
         />
@@ -244,7 +272,9 @@ function TableControls({
         {Object.entries(columnVisibility).map(([key, visible]) => (
           <button
             key={key}
-            onClick={() => onColumnVisibilityChange(key as keyof ColumnVisibility)}
+            onClick={() =>
+              onColumnVisibilityChange(key as keyof ColumnVisibility)
+            }
             className={`V2TableControls__chip ${visible ? 'is-active' : ''}`}
             title={key}
           >
@@ -280,7 +310,14 @@ interface PaginationProps {
   totalItems: number;
 }
 
-function Pagination({ page, totalPages, pageSize, onPageChange, onPageSizeChange, totalItems }: PaginationProps) {
+function Pagination({
+  page,
+  totalPages,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  totalItems,
+}: PaginationProps) {
   const startItem = (page - 1) * pageSize + 1;
   const endItem = Math.min(page * pageSize, totalItems);
 
@@ -291,7 +328,11 @@ function Pagination({ page, totalPages, pageSize, onPageChange, onPageSizeChange
       </div>
 
       <div className="V2Pagination__controls">
-        <button onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="V2Pagination__btn">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={page <= 1}
+          className="V2Pagination__btn"
+        >
           ← Prev
         </button>
 
@@ -299,7 +340,11 @@ function Pagination({ page, totalPages, pageSize, onPageChange, onPageSizeChange
           Page {page} of {totalPages}
         </span>
 
-        <button onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="V2Pagination__btn">
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={page >= totalPages}
+          className="V2Pagination__btn"
+        >
           Next →
         </button>
       </div>
@@ -332,28 +377,33 @@ function SequenceFamilyGroup({
   unattributedAuditRows?: UnattributedAuditRow[];
   columnVisibility: ColumnVisibility;
 }) {
-  const { sortedVersions, avgReplyRate, avgBookingRate, hasMultipleVersions } = useMemo(() => {
-    const sorted = [...familyRows].sort((a, b) => {
-      const aVer = parseVersionParts(extractVersionDisplay(a.label) || a.version);
-      const bVer = parseVersionParts(extractVersionDisplay(b.label) || b.version);
-      return compareVersionParts(bVer, aVer);
-    });
+  const { sortedVersions, avgReplyRate, avgBookingRate, hasMultipleVersions } =
+    useMemo(() => {
+      const sorted = [...familyRows].sort((a, b) => {
+        const aVer = parseVersionParts(
+          extractVersionDisplay(a.label) || a.version,
+        );
+        const bVer = parseVersionParts(
+          extractVersionDisplay(b.label) || b.version,
+        );
+        return compareVersionParts(bVer, aVer);
+      });
 
-    const contacts = familyRows.reduce((s, r) => s + r.uniqueContacted, 0);
-    const replied = familyRows.reduce((s, r) => s + r.repliesReceived, 0);
-    const booked = familyRows.reduce((s, r) => s + r.canonicalBookedCalls, 0);
-    const sent = familyRows.reduce((s, r) => s + r.messagesSent, 0);
-    const replyRate = sent > 0 ? (replied / sent) * 100 : 0;
-    const bookingRate = contacts > 0 ? (booked / contacts) * 100 : 0;
-    const multipleVersions = familyRows.length > 1;
+      const contacts = familyRows.reduce((s, r) => s + r.uniqueContacted, 0);
+      const replied = familyRows.reduce((s, r) => s + r.repliesReceived, 0);
+      const booked = familyRows.reduce((s, r) => s + r.canonicalBookedCalls, 0);
+      const sent = familyRows.reduce((s, r) => s + r.messagesSent, 0);
+      const replyRate = sent > 0 ? (replied / sent) * 100 : 0;
+      const bookingRate = contacts > 0 ? (booked / contacts) * 100 : 0;
+      const multipleVersions = familyRows.length > 1;
 
-    return {
-      sortedVersions: sorted,
-      avgReplyRate: replyRate,
-      avgBookingRate: bookingRate,
-      hasMultipleVersions: multipleVersions,
-    };
-  }, [familyRows]);
+      return {
+        sortedVersions: sorted,
+        avgReplyRate: replyRate,
+        avgBookingRate: bookingRate,
+        hasMultipleVersions: multipleVersions,
+      };
+    }, [familyRows]);
 
   // Find the "Champion" (best booking rate with enough volume)
   const championLabel = useMemo(() => {
@@ -380,21 +430,45 @@ function SequenceFamilyGroup({
     >
       {/* Group Header */}
       <div
-        style={{ padding: '1.25rem', borderBottom: '1px solid var(--v2-border)', background: 'rgba(255,255,255,0.02)' }}
+        style={{
+          padding: '1.25rem',
+          borderBottom: '1px solid var(--v2-border)',
+          background: 'rgba(255,255,255,0.02)',
+        }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+          }}
+        >
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>{family}</h3>
+            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700 }}>
+              {family}
+            </h3>
             <span style={{ fontSize: '0.8rem', color: 'var(--v2-text-dim)' }}>
               {familyRows.length} Iterations in Family
             </span>
           </div>
           <div style={{ display: 'flex', gap: '2rem' }}>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--v2-accent)' }}>
+              <div
+                style={{
+                  fontSize: '1.2rem',
+                  fontWeight: 800,
+                  color: 'var(--v2-accent)',
+                }}
+              >
                 {fmtPct(avgReplyRate)}
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase' }}>
+              <div
+                style={{
+                  fontSize: '0.65rem',
+                  color: 'var(--v2-text-dim)',
+                  textTransform: 'uppercase',
+                }}
+              >
                 Avg Reply
               </div>
             </div>
@@ -403,12 +477,21 @@ function SequenceFamilyGroup({
                 style={{
                   fontSize: '1.2rem',
                   fontWeight: 800,
-                  color: avgBookingRate > 0 ? 'var(--v2-positive)' : 'var(--v2-text-dim)',
+                  color:
+                    avgBookingRate > 0
+                      ? 'var(--v2-positive)'
+                      : 'var(--v2-text-dim)',
                 }}
               >
                 {fmtPct(avgBookingRate)}
               </div>
-              <div style={{ fontSize: '0.65rem', color: 'var(--v2-text-dim)', textTransform: 'uppercase' }}>
+              <div
+                style={{
+                  fontSize: '0.65rem',
+                  color: 'var(--v2-text-dim)',
+                  textTransform: 'uppercase',
+                }}
+              >
                 Avg Booked
               </div>
             </div>
@@ -417,7 +500,10 @@ function SequenceFamilyGroup({
       </div>
 
       {/* Rows */}
-      <table className="V2Table" style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <table
+        className="V2Table"
+        style={{ width: '100%', borderCollapse: 'collapse' }}
+      >
         <thead>
           <tr
             style={{
@@ -428,39 +514,66 @@ function SequenceFamilyGroup({
               borderBottom: '1px solid var(--v2-border)',
             }}
           >
-            {columnVisibility.version && <th style={{ padding: '0.75rem 1.25rem' }}>Version / Status</th>}
+            {columnVisibility.version && (
+              <th style={{ padding: '0.75rem 1.25rem' }}>Version / Status</th>
+            )}
             {columnVisibility.volume && <th>Volume</th>}
             {columnVisibility.replyRate && <th>Reply Rate</th>}
             {columnVisibility.bookingRate && <th>Booking Rate</th>}
             {columnVisibility.optOuts && <th>Opt-Outs</th>}
-            {columnVisibility.gaps && <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>Gaps</th>}
+            {columnVisibility.gaps && (
+              <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>
+                Gaps
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
           {sortedVersions.map((row, idx) => {
             const prevVersion = sortedVersions[idx + 1];
-            const versionLabel = extractVersionDisplay(row.label) || row.version || 'v?';
+            const versionLabel =
+              extractVersionDisplay(row.label) || row.version || 'v?';
             const isExperimental = idx === 0 && hasMultipleVersions;
             const isChampion = row.label === championLabel;
 
             // Link Gaps
-            const gaps = unattributedAuditRows.filter((g) => g.bestFuzzyCandidate === row.label);
+            const gaps = unattributedAuditRows.filter(
+              (g) => g.bestFuzzyCandidate === row.label,
+            );
 
             return (
               <tr
                 key={row.label}
-                style={{ borderBottom: idx < sortedVersions.length - 1 ? '1px solid var(--v2-border)' : 'none' }}
+                style={{
+                  borderBottom:
+                    idx < sortedVersions.length - 1
+                      ? '1px solid var(--v2-border)'
+                      : 'none',
+                }}
               >
                 {columnVisibility.version && (
                   <td style={{ padding: '1rem 1.25rem' }}>
                     <div className="V2ExperimentMeta">
-                      <span className="V2ExperimentMeta__version">{versionLabel}</span>
+                      <span className="V2ExperimentMeta__version">
+                        {versionLabel}
+                      </span>
                       <div style={{ display: 'flex', gap: '4px' }}>
-                        {isChampion && <span className="V2Badge V2Badge--champion">Champion</span>}
-                        {isExperimental && <span className="V2Badge V2Badge--experimental">Latest</span>}
-                        {row.uniqueContacted > 0 && row.uniqueContacted < 50 && (
-                          <span className="V2Badge V2Badge--confidenceLow">Low Sample</span>
+                        {isChampion && (
+                          <span className="V2Badge V2Badge--champion">
+                            Champion
+                          </span>
                         )}
+                        {isExperimental && (
+                          <span className="V2Badge V2Badge--experimental">
+                            Latest
+                          </span>
+                        )}
+                        {row.uniqueContacted > 0 &&
+                          row.uniqueContacted < 50 && (
+                            <span className="V2Badge V2Badge--confidenceLow">
+                              Low Sample
+                            </span>
+                          )}
                       </div>
                     </div>
                   </td>
@@ -469,9 +582,21 @@ function SequenceFamilyGroup({
                   <td>
                     <div style={{ fontWeight: 500 }}>
                       {fmtInt(row.uniqueContacted)}{' '}
-                      <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.75rem' }}>leads</span>
+                      <span
+                        style={{
+                          color: 'var(--v2-text-dim)',
+                          fontSize: '0.75rem',
+                        }}
+                      >
+                        leads
+                      </span>
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>
+                    <div
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--v2-text-dim)',
+                      }}
+                    >
                       {fmtInt(row.messagesSent)} msgs
                     </div>
                   </td>
@@ -481,13 +606,26 @@ function SequenceFamilyGroup({
                     <div className="V2StatComparison">
                       <span
                         className="V2Table__cell--main-metric"
-                        style={{ color: row.replyRatePct >= 10 ? 'var(--v2-positive)' : 'inherit' }}
+                        style={{
+                          color:
+                            row.replyRatePct >= 10
+                              ? 'var(--v2-positive)'
+                              : 'inherit',
+                        }}
                       >
                         {fmtPct(row.replyRatePct)}
                       </span>
-                      <StatDelta current={row.replyRatePct} previous={prevVersion?.replyRatePct ?? 0} />
+                      <StatDelta
+                        current={row.replyRatePct}
+                        previous={prevVersion?.replyRatePct ?? 0}
+                      />
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>
+                    <div
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--v2-text-dim)',
+                      }}
+                    >
                       {fmtInt(row.repliesReceived)} interactions
                     </div>
                   </td>
@@ -497,23 +635,43 @@ function SequenceFamilyGroup({
                     <div className="V2StatComparison">
                       <span
                         className="V2Table__cell--main-metric"
-                        style={{ color: row.bookingRatePct >= 2 ? 'var(--v2-positive)' : 'inherit' }}
+                        style={{
+                          color:
+                            row.bookingRatePct >= 2
+                              ? 'var(--v2-positive)'
+                              : 'inherit',
+                        }}
                       >
                         {fmtPct(row.bookingRatePct)}
                       </span>
-                      <StatDelta current={row.bookingRatePct} previous={prevVersion?.bookingRatePct ?? 0} />
+                      <StatDelta
+                        current={row.bookingRatePct}
+                        previous={prevVersion?.bookingRatePct ?? 0}
+                      />
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)', display: 'flex', gap: '8px' }}>
+                    <div
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--v2-text-dim)',
+                        display: 'flex',
+                        gap: '8px',
+                      }}
+                    >
                       <span>{fmtInt(row.canonicalBookedCalls)} calls</span>
                       {(row.canonicalBookedJack > 0 ||
                         row.canonicalBookedBrandon > 0 ||
                         row.canonicalBookedSelf > 0) && (
-                        <span style={{ color: 'var(--v2-text-dim)', opacity: 0.8 }}>
+                        <span
+                          style={{ color: 'var(--v2-text-dim)', opacity: 0.8 }}
+                        >
                           (
                           {[
-                            row.canonicalBookedJack > 0 && `J:${row.canonicalBookedJack}`,
-                            row.canonicalBookedBrandon > 0 && `B:${row.canonicalBookedBrandon}`,
-                            row.canonicalBookedSelf > 0 && `S:${row.canonicalBookedSelf}`,
+                            row.canonicalBookedJack > 0 &&
+                              `J:${row.canonicalBookedJack}`,
+                            row.canonicalBookedBrandon > 0 &&
+                              `B:${row.canonicalBookedBrandon}`,
+                            row.canonicalBookedSelf > 0 &&
+                              `S:${row.canonicalBookedSelf}`,
                           ]
                             .filter(Boolean)
                             .join(' ')}
@@ -525,10 +683,24 @@ function SequenceFamilyGroup({
                 )}
                 {columnVisibility.optOuts && (
                   <td>
-                    <div style={{ color: row.optOutRatePct >= 6 ? 'var(--v2-warning)' : 'inherit' }}>
+                    <div
+                      style={{
+                        color:
+                          row.optOutRatePct >= 6
+                            ? 'var(--v2-warning)'
+                            : 'inherit',
+                      }}
+                    >
                       {fmtPct(row.optOutRatePct)}
                     </div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--v2-text-dim)' }}>{row.optOuts} total</div>
+                    <div
+                      style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--v2-text-dim)',
+                      }}
+                    >
+                      {row.optOuts} total
+                    </div>
                   </td>
                 )}
                 {columnVisibility.gaps && (
@@ -541,7 +713,14 @@ function SequenceFamilyGroup({
                         ⚠️ {gaps.length} Gaps
                       </div>
                     ) : (
-                      <span style={{ color: 'var(--v2-text-dim)', fontSize: '0.8rem' }}>—</span>
+                      <span
+                        style={{
+                          color: 'var(--v2-text-dim)',
+                          fontSize: '0.8rem',
+                        }}
+                      >
+                        —
+                      </span>
                     )}
                   </td>
                 )}
@@ -583,8 +762,26 @@ export function SequencePerformanceTable({
   });
 
   // Load column visibility from localStorage
-  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(() => {
-    if (typeof window === 'undefined') {
+  const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(
+    () => {
+      if (typeof window === 'undefined') {
+        return {
+          version: true,
+          volume: true,
+          replyRate: true,
+          bookingRate: true,
+          optOuts: true,
+          gaps: true,
+        };
+      }
+      try {
+        const saved = localStorage.getItem(columnVisibilityStorageKey);
+        if (saved) {
+          return { ...JSON.parse(saved) };
+        }
+      } catch {
+        // Ignore parse errors
+      }
       return {
         version: true,
         volume: true,
@@ -593,24 +790,8 @@ export function SequencePerformanceTable({
         optOuts: true,
         gaps: true,
       };
-    }
-    try {
-      const saved = localStorage.getItem(columnVisibilityStorageKey);
-      if (saved) {
-        return { ...JSON.parse(saved) };
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return {
-      version: true,
-      volume: true,
-      replyRate: true,
-      bookingRate: true,
-      optOuts: true,
-      gaps: true,
-    };
-  });
+    },
+  );
 
   // Debounce search input
   useEffect(() => {
@@ -623,7 +804,10 @@ export function SequencePerformanceTable({
   // Persist column visibility to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(columnVisibilityStorageKey, JSON.stringify(columnVisibility));
+      localStorage.setItem(
+        columnVisibilityStorageKey,
+        JSON.stringify(columnVisibility),
+      );
     }
   }, [columnVisibility]);
 
@@ -672,33 +856,34 @@ export function SequencePerformanceTable({
   }, [mergedRows, searchQuery, sortBy, sortOrder, filters]);
 
   // Group by family with pagination
-  const { familyEntries, activeSequenceCount, uniqueFamilyCount, totalPages } = useMemo(() => {
-    const grouped = processedRows.reduce(
-      (acc, row) => {
-        const family = row.leadMagnet || 'Not Captured Yet';
-        if (!acc[family]) acc[family] = [];
-        acc[family].push(row);
-        return acc;
-      },
-      {} as Record<string, MergedSeqRow[]>,
-    );
+  const { familyEntries, activeSequenceCount, uniqueFamilyCount, totalPages } =
+    useMemo(() => {
+      const grouped = processedRows.reduce(
+        (acc, row) => {
+          const family = row.leadMagnet || 'Not Captured Yet';
+          if (!acc[family]) acc[family] = [];
+          acc[family].push(row);
+          return acc;
+        },
+        {} as Record<string, MergedSeqRow[]>,
+      );
 
-    const allFamilies = Object.entries(grouped);
-    const totalFamilies = allFamilies.length;
-    const totalPages = Math.ceil(totalFamilies / pagination.pageSize);
+      const allFamilies = Object.entries(grouped);
+      const totalFamilies = allFamilies.length;
+      const totalPages = Math.ceil(totalFamilies / pagination.pageSize);
 
-    // Paginate families
-    const startIndex = (pagination.page - 1) * pagination.pageSize;
-    const endIndex = startIndex + pagination.pageSize;
-    const paginatedFamilies = allFamilies.slice(startIndex, endIndex);
+      // Paginate families
+      const startIndex = (pagination.page - 1) * pagination.pageSize;
+      const endIndex = startIndex + pagination.pageSize;
+      const paginatedFamilies = allFamilies.slice(startIndex, endIndex);
 
-    return {
-      familyEntries: paginatedFamilies,
-      activeSequenceCount: processedRows.length,
-      uniqueFamilyCount: totalFamilies,
-      totalPages,
-    };
-  }, [processedRows, pagination]);
+      return {
+        familyEntries: paginatedFamilies,
+        activeSequenceCount: processedRows.length,
+        uniqueFamilyCount: totalFamilies,
+        totalPages,
+      };
+    }, [processedRows, pagination]);
 
   // Reset pagination when filters change
   useEffect(() => {
@@ -726,7 +911,10 @@ export function SequencePerformanceTable({
 
   if (activeSequenceCount === 0) {
     return (
-      <V2Panel title="Sequence Performance" caption={`${modeLabel} · Booked = Slack-verified`}>
+      <V2Panel
+        title="Sequence Performance"
+        caption={`${modeLabel} · Booked = Slack-verified`}
+      >
         <V2State kind="empty">No sequence data for this window.</V2State>
       </V2Panel>
     );
@@ -751,10 +939,19 @@ export function SequencePerformanceTable({
         totalCount={mergedRows.filter((r) => !r.isManual).length}
         filters={filters}
         onFilterChange={setFilters}
-        leadMagnets={Array.from(new Set(mergedRows.map((r) => r.leadMagnet).filter(Boolean)))}
+        leadMagnets={Array.from(
+          new Set(mergedRows.map((r) => r.leadMagnet).filter(Boolean)),
+        )}
       />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem', marginTop: '1.5rem' }}>
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '2rem',
+          marginTop: '1.5rem',
+        }}
+      >
         {familyEntries.map(([family, familyRows]) => (
           <SequenceFamilyGroup
             key={family}

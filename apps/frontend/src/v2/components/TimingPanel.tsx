@@ -27,12 +27,19 @@ interface TimingPanelProps {
 
 export function TimingPanel({ timing }: TimingPanelProps) {
   return (
-    <V2Panel title="Reply Timing" caption="Median time to first reply and reply rate by day of week · weekly window">
+    <V2Panel
+      title="Reply Timing"
+      caption="Median time to first reply and reply rate by day of week · weekly window"
+    >
       <div className="V2SeqTiming">
         {timing.medianTimeToFirstReplyMinutes !== null && (
           <div className="V2SeqTiming__median">
-            <span className="V2SeqTiming__medianLabel">Median Time to First Reply</span>
-            <span className="V2SeqTiming__medianValue">{fmtMins(timing.medianTimeToFirstReplyMinutes)}</span>
+            <span className="V2SeqTiming__medianLabel">
+              Median Time to First Reply
+            </span>
+            <span className="V2SeqTiming__medianValue">
+              {fmtMins(timing.medianTimeToFirstReplyMinutes)}
+            </span>
           </div>
         )}
         {timing.replyRateByDayOfWeek.length > 0 && (
@@ -50,8 +57,12 @@ export function TimingPanel({ timing }: TimingPanelProps) {
                       title={`${fmtPct(day.replyRatePct)} reply rate · ${fmtInt(day.outboundCount)} sent · ${fmtInt(day.replyCount)} replied`}
                     />
                   </div>
-                  <span className="V2SeqTiming__pct">{fmtPct(day.replyRatePct)}</span>
-                  <span className="V2SeqTiming__vol">{fmtInt(day.outboundCount)} sent</span>
+                  <span className="V2SeqTiming__pct">
+                    {fmtPct(day.replyRatePct)}
+                  </span>
+                  <span className="V2SeqTiming__vol">
+                    {fmtInt(day.outboundCount)} sent
+                  </span>
                 </div>
               );
             })}

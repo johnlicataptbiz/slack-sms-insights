@@ -371,7 +371,10 @@ export const modalContentVariants: Variants = {
 };
 
 // ─── Stagger Children Helper ─────────────────────────────────────────────────
-export const staggerContainer = (staggerAmount = 0.08, delayChildren = 0.1): Variants => ({
+export const staggerContainer = (
+  staggerAmount = 0.08,
+  delayChildren = 0.1,
+): Variants => ({
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,

@@ -52,6 +52,8 @@ describe('TimingPanel', () => {
 
     render(<TimingPanel timing={noMedianData} />);
 
-    expect(screen.queryByText('Median Time to First Reply')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Median Time to First Reply'),
+    ).not.toBeInTheDocument();
   });
 });

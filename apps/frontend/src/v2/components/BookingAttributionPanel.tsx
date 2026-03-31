@@ -4,18 +4,27 @@ import { V2Panel } from './V2Primitives';
 
 interface BookingAttributionPanelProps {
   bookedCredit?: BookedCredit | undefined;
-  attribution?: SalesMetricsV2['provenance']['sequenceBookedAttribution'] | undefined;
+  attribution?:
+    | SalesMetricsV2['provenance']['sequenceBookedAttribution']
+    | undefined;
   modeLabel: string;
   mode: string;
 }
 
-export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel }: BookingAttributionPanelProps) {
+export function BookingAttributionPanel({
+  bookedCredit,
+  attribution,
+  modeLabel,
+}: BookingAttributionPanelProps) {
   const navigate = useNavigate();
 
   if (!bookedCredit) return null;
 
   return (
-    <V2Panel title="Booking Attribution" caption={`How ${modeLabel} bookings are being credited and sourced.`}>
+    <V2Panel
+      title="Booking Attribution"
+      caption={`How ${modeLabel} bookings are being credited and sourced.`}
+    >
       <div className="V2SplitStat" style={{ marginBottom: '1.5rem' }}>
         <div>
           <span>Total Slack Bookings</span>
@@ -29,7 +38,14 @@ export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel }
           <span>Manual / Direct</span>
           <strong>{attribution?.manualCalls ?? '—'}</strong>
         </div>
-        <div style={{ color: (attribution?.unattributedCalls ?? 0) > 0 ? 'var(--v2-warning)' : 'inherit' }}>
+        <div
+          style={{
+            color:
+              (attribution?.unattributedCalls ?? 0) > 0
+                ? 'var(--v2-warning)'
+                : 'inherit',
+          }}
+        >
           <span>Unattributed Gaps</span>
           <strong>{attribution?.unattributedCalls ?? 0}</strong>
         </div>
@@ -46,7 +62,14 @@ export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel }
         </button>
       </div>
 
-      <div className="V2Divider" style={{ margin: '1.5rem 0', height: '1px', background: 'var(--v2-border)' }} />
+      <div
+        className="V2Divider"
+        style={{
+          margin: '1.5rem 0',
+          height: '1px',
+          background: 'var(--v2-border)',
+        }}
+      />
 
       <h4
         style={{
@@ -64,7 +87,10 @@ export function BookingAttributionPanel({ bookedCredit, attribution, modeLabel }
           if (rep === 'total') return null;
           return (
             <div key={rep} className="V2RepStat">
-              <span className="V2RepStat__name" style={{ textTransform: 'capitalize' }}>
+              <span
+                className="V2RepStat__name"
+                style={{ textTransform: 'capitalize' }}
+              >
                 {rep}
               </span>
               <span className="V2RepStat__count">{count}</span>

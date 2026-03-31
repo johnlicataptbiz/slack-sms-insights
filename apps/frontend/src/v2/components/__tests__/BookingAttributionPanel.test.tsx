@@ -13,22 +13,27 @@ describe('BookingAttributionPanel', () => {
     selfBooked: 15,
   };
 
-  const mockAttribution: SalesMetricsV2['provenance']['sequenceBookedAttribution'] = {
-    source: 'slack_booked_calls',
-    model: 'strict_sms_first_conversion',
-    totalCalls: 50,
-    matchedCalls: 30,
-    unattributedCalls: 10,
-    manualCalls: 10,
-    strictSmsReplyLinkedCalls: 25,
-    nonSmsOrUnknownCalls: 5,
-    unattributedAuditRows: [],
-  };
+  const mockAttribution: SalesMetricsV2['provenance']['sequenceBookedAttribution'] =
+    {
+      source: 'slack_booked_calls',
+      model: 'strict_sms_first_conversion',
+      totalCalls: 50,
+      matchedCalls: 30,
+      unattributedCalls: 10,
+      manualCalls: 10,
+      strictSmsReplyLinkedCalls: 25,
+      nonSmsOrUnknownCalls: 5,
+      unattributedAuditRows: [],
+    };
 
   it('renders booked credit correctly', () => {
     render(
       <MemoryRouter>
-        <BookingAttributionPanel bookedCredit={mockBookedCredit} modeLabel="Last 7 days" mode="7d" />
+        <BookingAttributionPanel
+          bookedCredit={mockBookedCredit}
+          modeLabel="Last 7 days"
+          mode="7d"
+        />
       </MemoryRouter>,
     );
 

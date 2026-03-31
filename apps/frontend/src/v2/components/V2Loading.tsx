@@ -7,7 +7,12 @@ interface V2LoadingProps {
   className?: string;
 }
 
-export function V2Loading({ size = 'md', message, stage, className = '' }: V2LoadingProps) {
+export function V2Loading({
+  size = 'md',
+  message,
+  stage,
+  className = '',
+}: V2LoadingProps) {
   const sizeMap = {
     sm: { container: 32, ring: 3 },
     md: { container: 48, ring: 4 },
@@ -18,7 +23,10 @@ export function V2Loading({ size = 'md', message, stage, className = '' }: V2Loa
 
   return (
     <div className={`V2Loading ${className}`}>
-      <div className="V2Loading__container" style={{ width: container, height: container }}>
+      <div
+        className="V2Loading__container"
+        style={{ width: container, height: container }}
+      >
         {/* Outer ring - clockwise */}
         <motion.div
           className="V2Loading__ring V2Loading__ring--outer"
@@ -53,7 +61,10 @@ export function V2Loading({ size = 'md', message, stage, className = '' }: V2Loa
 }
 
 // Full-screen loading overlay variant
-export function V2LoadingOverlay({ message, stage }: Omit<V2LoadingProps, 'size' | 'className'>) {
+export function V2LoadingOverlay({
+  message,
+  stage,
+}: Omit<V2LoadingProps, 'size' | 'className'>) {
   return (
     <div className="V2LoadingOverlay">
       <V2Loading

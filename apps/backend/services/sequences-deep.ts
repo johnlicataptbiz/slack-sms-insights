@@ -124,8 +124,9 @@ export const getSequencesDeep = async (
   ] = await Promise.all([
     (async () => {
     (async () => {
+      let bookingRows: any[] = [];
       try {
-        return await prisma.fact_booking_daily.findMany({
+        bookingRows = await prisma.fact_booking_daily.findMany({
           where: {
             day: {
               gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -151,7 +152,9 @@ export const getSequencesDeep = async (
         return [];
       }
     })(),
-    prisma.fact_lead_quality_daily.findMany({
+    let leadRows: any[] = [];
+      try {
+        leadRows = await prisma.fact_lead_quality_daily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),

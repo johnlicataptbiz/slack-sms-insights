@@ -2,7 +2,8 @@
 :root {
   --font-display: "Space Grotesk", "Avenir Next", sans-serif;
   --font-ui: "Manrope", "Inter", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco,
+    monospace;
 
   --surface-base: #edf5fb;
   --surface-raised: #ffffff;
@@ -33,7 +34,11 @@
   --color-bg-secondary: var(--surface-raised);
   --color-sidebar-bg: var(--surface-sidebar);
   --color-sidebar-hover: rgba(255, 255, 255, 0.1);
-  --color-sidebar-active: color-mix(in srgb, var(--accent-primary) 26%, transparent);
+  --color-sidebar-active: color-mix(
+    in srgb,
+    var(--accent-primary) 26%,
+    transparent
+  );
   --shadow-sm: 0 1px 2px 0 rgba(12, 23, 41, 0.08);
   --shadow-md: 0 8px 24px rgba(12, 23, 41, 0.12);
   --shadow-lg: 0 14px 36px rgba(12, 23, 41, 0.18);
@@ -278,9 +283,16 @@ select {
   flex: 1;
   overflow: auto;
   position: relative;
-  background:
-    radial-gradient(1200px 400px at top right, rgba(59, 130, 246, 0.08), transparent 58%),
-    radial-gradient(900px 360px at bottom left, rgba(16, 185, 129, 0.08), transparent 60%), var(--color-bg);
+  background: radial-gradient(
+      1200px 400px at top right,
+      rgba(59, 130, 246, 0.08),
+      transparent 58%
+    ),
+    radial-gradient(
+      900px 360px at bottom left,
+      rgba(16, 185, 129, 0.08),
+      transparent 60%
+    ), var(--color-bg);
   padding: 24px;
 }
 

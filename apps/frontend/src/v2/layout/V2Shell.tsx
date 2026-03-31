@@ -79,7 +79,8 @@ const navItems: NavItem[] = [
 const shellMeta: Record<NavKey, ShellMeta> = {
   insights: {
     eyebrow: 'Revenue command surface',
-    subtitle: 'Track the team pulse, booking velocity, and conversion signals without losing the big picture.',
+    subtitle:
+      'Track the team pulse, booking velocity, and conversion signals without losing the big picture.',
     focusTitle: 'Team pulse + booked-call momentum',
     focusSubtitle: 'Best when you need an executive read in under 30 seconds.',
     topTags: ['Live metrics', 'Team view', 'Exec snapshot'],
@@ -94,36 +95,46 @@ const shellMeta: Record<NavKey, ShellMeta> = {
   },
   runs: {
     eyebrow: 'Automation operations lane',
-    subtitle: 'Inspect cron execution, spot failures early, and keep the daily machine behaving like it had coffee.',
+    subtitle:
+      'Inspect cron execution, spot failures early, and keep the daily machine behaving like it had coffee.',
     focusTitle: 'Run health + daily execution trace',
     focusSubtitle: 'Use this to audit jobs, drift, and operational risk.',
     topTags: ['Ops audit', 'Run history', 'Failure watch'],
   },
   sequences: {
     eyebrow: 'Sequence quality review',
-    subtitle: 'Evaluate sequence pressure, booking contribution, and opt-out risk with a tighter editorial frame.',
+    subtitle:
+      'Evaluate sequence pressure, booking contribution, and opt-out risk with a tighter editorial frame.',
     focusTitle: 'Sequence performance + risk watch',
     focusSubtitle: 'Ideal for campaign tuning and pattern spotting.',
     topTags: ['Campaign QA', 'Conversion lens', 'Opt-out watch'],
   },
 };
 
-const isRouteActive = (pathname: string, to: string) => pathname === to || pathname.startsWith(`${to}/`);
+const isRouteActive = (pathname: string, to: string) =>
+  pathname === to || pathname.startsWith(`${to}/`);
 
 const getStoredTheme = (): 'light' | 'dark' => {
   if (typeof window === 'undefined') return 'light';
   const stored = localStorage.getItem('v2-theme') as 'light' | 'dark' | null;
   if (stored) return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
 };
 
 export default function V2Shell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
-  const activeNavItem = navItems.find((item) => isRouteActive(location.pathname, item.to)) ?? navItems[0];
+  const activeNavItem =
+    navItems.find((item) => isRouteActive(location.pathname, item.to)) ??
+    navItems[0];
 
-  const activeMeta = useMemo(() => shellMeta[activeNavItem.key], [activeNavItem.key]);
+  const activeMeta = useMemo(
+    () => shellMeta[activeNavItem.key],
+    [activeNavItem.key],
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', getStoredTheme());
@@ -157,7 +168,9 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           <button
             type="button"
             className="V2Shell__menuToggle"
-            aria-label={isMobileNavOpen ? 'Close navigation' : 'Open navigation'}
+            aria-label={
+              isMobileNavOpen ? 'Close navigation' : 'Open navigation'
+            }
             aria-expanded={isMobileNavOpen}
             aria-controls="v2-shell-sidebar"
             onClick={() => setIsMobileNavOpen((open) => !open)}
@@ -165,7 +178,10 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             {isMobileNavOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
 
-          <div className="V2Shell__brand" aria-label="PT Biz SMS Command Center">
+          <div
+            className="V2Shell__brand"
+            aria-label="PT Biz SMS Command Center"
+          >
             <span className="V2Shell__brandPulse" aria-hidden="true" />
             <div className="V2Shell__brandCopy">
               <span className="V2Shell__brandEyebrow">PT Biz SMS</span>
@@ -174,7 +190,10 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <div className="V2Shell__quickLinks" aria-label="Current view focus areas">
+        <div
+          className="V2Shell__quickLinks"
+          aria-label="Current view focus areas"
+        >
           {activeMeta.topTags.map((tag) => (
             <span key={tag} className="V2Shell__quickLink">
               {tag}
@@ -195,15 +214,21 @@ export default function V2Shell({ children }: { children: ReactNode }) {
             <div className="V2Shell__sidebarBrand" aria-label="PT Biz SMS">
               <div className="V2Shell__sidebarWordmark">
                 <span className="V2Shell__sidebarWordmarkLine">PT Biz SMS</span>
-                <span className="V2Shell__sidebarWordmarkSubline">Message operations • analytics shell</span>
+                <span className="V2Shell__sidebarWordmarkSubline">
+                  Message operations • analytics shell
+                </span>
               </div>
             </div>
 
             <p className="V2Shell__sidebarHelper">
-              A tighter command surface for the team&apos;s most time-sensitive views.
+              A tighter command surface for the team&apos;s most time-sensitive
+              views.
             </p>
 
-            <div className="V2Shell__sidebarStatusBar" aria-label="Shell status highlights">
+            <div
+              className="V2Shell__sidebarStatusBar"
+              aria-label="Shell status highlights"
+            >
               <span className="V2Shell__sidebarStatusPill">
                 <Radio size={12} />
                 Live sync
@@ -218,7 +243,11 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           <div className="V2Shell__sidebarSectionLabel">Primary surfaces</div>
 
           <nav className="V2Shell__nav" aria-label="V2 primary navigation">
-            <motion.div variants={listContainerVariants} initial="hidden" animate="visible">
+            <motion.div
+              variants={listContainerVariants}
+              initial="hidden"
+              animate="visible"
+            >
               {navItems.map((item, index) => {
                 const isActive = isRouteActive(location.pathname, item.to);
 
@@ -232,7 +261,9 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                   >
                     <NavLink
                       to={item.to}
-                      className={({ isActive: navIsActive }) => `V2Shell__navItem ${navIsActive ? 'is-active' : ''}`}
+                      className={({ isActive: navIsActive }) =>
+                        `V2Shell__navItem ${navIsActive ? 'is-active' : ''}`
+                      }
                     >
                       <span className="V2Shell__navBullet" aria-hidden="true" />
                       <motion.span
@@ -244,11 +275,17 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                       </motion.span>
                       <span className="V2Shell__navLabelWrap">
                         <span className="V2Shell__navLabelRow">
-                          <span className="V2Shell__navLabel">{item.label}</span>
-                          <span className="V2Shell__navSignal">{item.signal}</span>
+                          <span className="V2Shell__navLabel">
+                            {item.label}
+                          </span>
+                          <span className="V2Shell__navSignal">
+                            {item.signal}
+                          </span>
                         </span>
                         <span className="V2Shell__navMeta">{item.detail}</span>
-                        <span className="V2Shell__navLabelShort">{item.shortLabel}</span>
+                        <span className="V2Shell__navLabelShort">
+                          {item.shortLabel}
+                        </span>
                       </span>
                     </NavLink>
                   </motion.div>
@@ -258,28 +295,45 @@ export default function V2Shell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="V2Shell__sidebarFooter">
-            <section className="V2Shell__statusCard" aria-label="Operational signals">
+            <section
+              className="V2Shell__statusCard"
+              aria-label="Operational signals"
+            >
               <span className="V2Shell__statusEyebrow">Ops posture</span>
-              <h2 className="V2Shell__statusTitle">Built for team-wide visibility</h2>
+              <h2 className="V2Shell__statusTitle">
+                Built for team-wide visibility
+              </h2>
               <ul className="V2Shell__statusList">
                 <li className="V2Shell__statusItem">
-                  <span className="V2Shell__statusDot is-live" aria-hidden="true" />
+                  <span
+                    className="V2Shell__statusDot is-live"
+                    aria-hidden="true"
+                  />
                   <span className="V2Shell__statusLabel">Signal lane</span>
                   <span className="V2Shell__statusValue">Live</span>
                 </li>
                 <li className="V2Shell__statusItem">
-                  <span className="V2Shell__statusDot is-accent" aria-hidden="true" />
+                  <span
+                    className="V2Shell__statusDot is-accent"
+                    aria-hidden="true"
+                  />
                   <span className="V2Shell__statusLabel">Focus mode</span>
                   <span className="V2Shell__statusValue">Desktop-first</span>
                 </li>
                 <li className="V2Shell__statusItem">
-                  <span className="V2Shell__statusDot is-muted" aria-hidden="true" />
+                  <span
+                    className="V2Shell__statusDot is-muted"
+                    aria-hidden="true"
+                  />
                   <span className="V2Shell__statusLabel">Shell intent</span>
                   <span className="V2Shell__statusValue">Fast triage</span>
                 </li>
               </ul>
 
-              <div className="V2Shell__sidebarTags" aria-label="Connected system markers">
+              <div
+                className="V2Shell__sidebarTags"
+                aria-label="Connected system markers"
+              >
                 <span className="V2Shell__sidebarTag">Slack</span>
                 <span className="V2Shell__sidebarTag">Monday</span>
                 <span className="V2Shell__sidebarTag">Sequences</span>
@@ -291,10 +345,14 @@ export default function V2Shell({ children }: { children: ReactNode }) {
         <div className="V2Shell__content">
           <header className="V2Shell__contentHeader">
             <div className="V2Shell__brandBlock">
-              <span className="V2Shell__contextEyebrow">{activeMeta.eyebrow}</span>
+              <span className="V2Shell__contextEyebrow">
+                {activeMeta.eyebrow}
+              </span>
               <div className="V2Shell__context">
                 <p className="V2Shell__contextTitle">{activeNavItem.label}</p>
-                <p className="V2Shell__contextSubtitle">{activeMeta.subtitle}</p>
+                <p className="V2Shell__contextSubtitle">
+                  {activeMeta.subtitle}
+                </p>
               </div>
             </div>
 
@@ -305,7 +363,9 @@ export default function V2Shell({ children }: { children: ReactNode }) {
                   Current focus
                 </span>
                 <p className="V2Shell__headerValue">{activeMeta.focusTitle}</p>
-                <p className="V2Shell__headerMeta">{activeMeta.focusSubtitle}</p>
+                <p className="V2Shell__headerMeta">
+                  {activeMeta.focusSubtitle}
+                </p>
               </div>
 
               <div className="V2Shell__topbarPills" aria-label="Quick status">

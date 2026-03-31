@@ -17,7 +17,10 @@ type Run = {
 
 export default function RunList({ runs }: { runs: Run[] }) {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: 'asc' | 'desc';
+  } | null>({
     key: 'timestamp',
     direction: 'desc',
   });
@@ -27,7 +30,12 @@ export default function RunList({ runs }: { runs: Run[] }) {
     const date = new Date(reportDate || isoString);
     if (reportDate) {
       // For historical reports with just a date, show the date in UTC to avoid shifting
-      return date.toLocaleDateString(undefined, { timeZone: 'UTC', month: 'short', day: 'numeric', year: 'numeric' });
+      return date.toLocaleDateString(undefined, {
+        timeZone: 'UTC',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
     }
     // For real-time runs, show the full local timestamp
     return date.toLocaleString();
@@ -47,7 +55,11 @@ export default function RunList({ runs }: { runs: Run[] }) {
 
   const handleSort = (key: string) => {
     let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+    if (
+      sortConfig &&
+      sortConfig.key === key &&
+      sortConfig.direction === 'asc'
+    ) {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
@@ -91,7 +103,9 @@ export default function RunList({ runs }: { runs: Run[] }) {
   }, [runs, sortConfig]);
 
   if (selectedRun) {
-    return <RunDetail run={selectedRun} onBack={() => setSelectedRunId(null)} />;
+    return (
+      <RunDetail run={selectedRun} onBack={() => setSelectedRunId(null)} />
+    );
   }
 
   return (
@@ -100,31 +114,49 @@ export default function RunList({ runs }: { runs: Run[] }) {
         <thead>
           <tr>
             <th className="sortable" onClick={() => handleSort('timestamp')}>
-              Report Date {sortConfig?.key === 'timestamp' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Report Date{' '}
+              {sortConfig?.key === 'timestamp' &&
+                (sortConfig.direction === 'asc' ? '↑' : '↓')}
             </th>
             <th className="sortable" onClick={() => handleSort('channel')}>
-              Channel {sortConfig?.key === 'channel' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Channel{' '}
+              {sortConfig?.key === 'channel' &&
+                (sortConfig.direction === 'asc' ? '↑' : '↓')}
             </th>
             <th className="sortable" onClick={() => handleSort('type')}>
-              Type {sortConfig?.key === 'type' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Type{' '}
+              {sortConfig?.key === 'type' &&
+                (sortConfig.direction === 'asc' ? '↑' : '↓')}
             </th>
             <th className="sortable" onClick={() => handleSort('status')}>
-              Status {sortConfig?.key === 'status' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Status{' '}
+              {sortConfig?.key === 'status' &&
+                (sortConfig.direction === 'asc' ? '↑' : '↓')}
             </th>
             <th className="sortable" onClick={() => handleSort('duration')}>
-              Duration {sortConfig?.key === 'duration' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+              Duration{' '}
+              {sortConfig?.key === 'duration' &&
+                (sortConfig.direction === 'asc' ? '↑' : '↓')}
             </th>
             <th>Summary</th>
           </tr>
         </thead>
         <tbody>
           {sortedRuns.map((run) => (
-            <tr key={run.id} className="runs-table__row-clickable" onClick={() => setSelectedRunId(run.id)}>
-              <td className="timestamp">{formatTime(run.timestamp, run.report_date)}</td>
+            <tr
+              key={run.id}
+              className="runs-table__row-clickable"
+              onClick={() => setSelectedRunId(run.id)}
+            >
+              <td className="timestamp">
+                {formatTime(run.timestamp, run.report_date)}
+              </td>
               <td className="channel">{run.channel_name || run.channel_id}</td>
               <td className="type">{run.report_type}</td>
               <td className="status">{getStatusBadge(run.status)}</td>
-              <td className="duration">{run.duration_ms ? `${run.duration_ms}ms` : '-'}</td>
+              <td className="duration">
+                {run.duration_ms ? `${run.duration_ms}ms` : '-'}
+              </td>
               <td className="summary" title={run.summary_text}>
                 {summarize(run.summary_text)}
               </td>

@@ -1,6 +1,6 @@
 import {
-  autoUpdate,
   FloatingPortal,
+  autoUpdate,
   flip,
   offset,
   shift,
@@ -9,16 +9,36 @@ import {
   useFloating,
   useInteractions,
 } from '@floating-ui/react';
-import { format as formatDateFns, formatISO, isValid, parseISO } from 'date-fns';
+import {
+  format as formatDateFns,
+  formatISO,
+  isValid,
+  parseISO,
+} from 'date-fns';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { RunV2 } from '../../api/v2-types';
-import { useV2Channels, useV2Run, useV2Runs, useV2SalesMetrics } from '../../api/v2Queries';
-import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser';
+import {
+  useV2Channels,
+  useV2Run,
+  useV2Runs,
+  useV2SalesMetrics,
+} from '../../api/v2Queries';
+import {
+  type RepMetrics,
+  type SequenceRow,
+  parseReport,
+} from '../../utils/reportParser';
 import { DEFAULT_BUSINESS_TIME_ZONE as BUSINESS_TZ } from '../../utils/runDay';
 import { SkeletonTable } from '../components/Skeleton';
-import { V2MetricCard, V2PageHeader, V2Panel, V2StatBar, V2State } from '../components/V2Primitives';
+import {
+  V2MetricCard,
+  V2PageHeader,
+  V2Panel,
+  V2StatBar,
+  V2State,
+} from '../components/V2Primitives';
 import { V2Select, type V2SelectOption } from '../components/V2Select';
 import { v2Copy } from '../copy';
 
@@ -26,9 +46,11 @@ const savedViewsStorageKey = 'ptbizsms-v2-runs-saved-views';
 const DAILY_SNAPSHOT_TITLE_PATTERN = /PT BIZ - DAILY SMS SNAPSHOT/i;
 const DAILY_SETTER_SUMMARY_PATTERN = /Daily Setter Snapshot/i;
 const REPORT_DATE_LINE_PATTERN = /^Date:\s*(.+)$/im;
-const SUMMARY_DATE_PATTERN = /^Daily Setter Snapshot\s*\|\s*([^|]+?)(?:\s*\||$)/im;
+const SUMMARY_DATE_PATTERN =
+  /^Daily Setter Snapshot\s*\|\s*([^|]+?)(?:\s*\||$)/im;
 const TIME_RANGE_LINE_PATTERN = /^Time Range:\s*(.+)$/im;
-const OUTBOUND_CONVERSATIONS_PATTERN = /- Outbound Conversations:\s*([0-9,]+)/gi;
+const OUTBOUND_CONVERSATIONS_PATTERN =
+  /- Outbound Conversations:\s*([0-9,]+)/gi;
 const MESSAGES_SENT_PATTERN = /Messages sent:\s*([0-9,]+)/i;
 const REPLIES_RECEIVED_PATTERN = /Replies received:\s*([0-9,]+)/i;
 const REPLY_RATE_PATTERN = /Replies received:\s*[0-9,]+\s*\(([0-9.]+)%\)/i;
@@ -36,7 +58,12 @@ const CALLS_BOOKED_PATTERN = /Calls booked(?:\s*\(Slack\))?:\s*([0-9,]+)/i;
 const BOOKINGS_ALT_PATTERN = /- Book(?:ings?|ed):\s*([0-9,]+)/i;
 const OPT_OUTS_PATTERN = /Opt-outs:\s*([0-9,]+)/i;
 const OUTBOUND_FROM_SUMMARY_PATTERN = /Outbound conversations:\s*([0-9,]+)/i;
-const SUMMARY_NOISE_PATTERNS = [/^PT BIZ - DAILY SMS SNAPSHOT/i, /^Date:/i, /^Time Range:/i, /^Split By Line/i];
+const SUMMARY_NOISE_PATTERNS = [
+  /^PT BIZ - DAILY SMS SNAPSHOT/i,
+  /^Date:/i,
+  /^Time Range:/i,
+  /^Split By Line/i,
+];
 
 const allowedRanges = [1, 7, 30, 90] as const;
 type AllowedRange = (typeof allowedRanges)[number];
@@ -119,7 +146,8 @@ export const resolveSelectedRunViewModel = (
 
 const parseRange = (value: string | null): AllowedRange => {
   const parsed = Number(value);
-  if (allowedRanges.includes(parsed as AllowedRange)) return parsed as AllowedRange;
+  if (allowedRanges.includes(parsed as AllowedRange))
+    return parsed as AllowedRange;
   return 7;
 };
 
@@ -130,7 +158,9 @@ const readSavedViews = (): SavedRunsView[] => {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((view) => typeof view === 'object' && view !== null) as SavedRunsView[];
+    return parsed.filter(
+      (view) => typeof view === 'object' && view !== null,
+    ) as SavedRunsView[];
   } catch {
     return [];
   }
@@ -158,7 +188,9 @@ const matchNumber = (source: string | null, pattern: RegExp): number | null => {
 
 const sumMatches = (source: string | null, pattern: RegExp): number | null => {
   if (!source) return null;
-  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  const flags = pattern.flags.includes('g')
+    ? pattern.flags
+    : `${pattern.flags}g`;
   const globalPattern = new RegExp(pattern.source, flags);
   let found = false;
   let total = 0;
@@ -178,7 +210,9 @@ const formatDateTime = (value: string) => {
 };
 
 const formatReportDay = (value: string): string => {
-  const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00.000Z` : value;
+  const normalizedValue = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? `${value}T12:00:00.000Z`
+    : value;
   const date = parseDateValue(normalizedValue);
   if (!date) return value;
   return formatDateFns(date, 'PP');
@@ -187,10 +221,12 @@ const formatReportDay = (value: string): string => {
 const extractReportDayLabel = (run: RunV2): string | null => {
   if (run.reportDate) return run.reportDate;
 
-  const fromReport = run.fullReport?.match(REPORT_DATE_LINE_PATTERN)?.[1]?.trim() || null;
+  const fromReport =
+    run.fullReport?.match(REPORT_DATE_LINE_PATTERN)?.[1]?.trim() || null;
   if (fromReport) return fromReport;
 
-  const fromSummary = run.summaryText?.match(SUMMARY_DATE_PATTERN)?.[1]?.trim() || null;
+  const fromSummary =
+    run.summaryText?.match(SUMMARY_DATE_PATTERN)?.[1]?.trim() || null;
   if (fromSummary) return fromSummary;
 
   return null;
@@ -230,7 +266,8 @@ const getTodayCT = (): { date: string; hour: number } => {
     hour: '2-digit',
     hour12: false,
   }).formatToParts(now);
-  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  const get = (type: string) =>
+    parts.find((p) => p.type === type)?.value ?? '00';
   const year = get('year');
   const month = get('month');
   const day = get('day');
@@ -296,7 +333,10 @@ const normalizeSummaryLines = (summaryText: string | null): string[] => {
   return summaryText
     .split('\n')
     .map((rawLine) => {
-      const withoutMarkdown = rawLine.trim().replace(/^\*+/, '').replace(/\*+$/, '');
+      const withoutMarkdown = rawLine
+        .trim()
+        .replace(/^\*+/, '')
+        .replace(/\*+$/, '');
       return withoutMarkdown.replace(/^-+\s*/, '').trim();
     })
     .filter((line) => line.length > 0);
@@ -304,7 +344,9 @@ const normalizeSummaryLines = (summaryText: string | null): string[] => {
 
 const toTopSequenceLabel = (rep: RepMetrics): string | null => {
   if (!rep.sequences.length) return null;
-  const sorted = [...rep.sequences].sort((a, b) => b.messagesSent - a.messagesSent);
+  const sorted = [...rep.sequences].sort(
+    (a, b) => b.messagesSent - a.messagesSent,
+  );
   return sorted[0]?.label || null;
 };
 
@@ -315,7 +357,8 @@ const toSequenceInsight = (row: SequenceRow): RunSequenceInsight => ({
   replyRatePct: row.replyRate,
   booked: row.booked,
   optOuts: row.optOuts,
-  optOutRatePct: row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
+  optOutRatePct:
+    row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
 });
 
 const isSummaryNoiseLine = (line: string): boolean => {
@@ -328,10 +371,12 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
   const isDailySnapshot =
     DAILY_SNAPSHOT_TITLE_PATTERN.test(fullReport) ||
     summaryLines.some((line) => DAILY_SETTER_SUMMARY_PATTERN.test(line));
-  const parsed = run.status === 'success' && fullReport ? parseReport(fullReport) : null;
+  const parsed =
+    run.status === 'success' && fullReport ? parseReport(fullReport) : null;
   const hasParsedBreakdown = Boolean(parsed && parsed.reps.length > 0);
 
-  const timeRangeLabel = fullReport.match(TIME_RANGE_LINE_PATTERN)?.[1]?.trim() || null;
+  const timeRangeLabel =
+    fullReport.match(TIME_RANGE_LINE_PATTERN)?.[1]?.trim() || null;
 
   const messagesSent = hasParsedBreakdown
     ? (parsed?.totalMessagesSent ?? null)
@@ -342,11 +387,15 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
   const replyRatePct = hasParsedBreakdown
     ? (parsed?.overallReplyRate ?? null)
     : matchNumber(run.summaryText, REPLY_RATE_PATTERN);
-  const parsedBookedFromSequences = parsed?.allSequences.reduce((sum, row) => sum + row.booked, 0) ?? null;
+  const parsedBookedFromSequences =
+    parsed?.allSequences.reduce((sum, row) => sum + row.booked, 0) ?? null;
   const booked = hasParsedBreakdown
     ? parsedBookedFromSequences
-    : (matchNumber(run.summaryText, CALLS_BOOKED_PATTERN) ?? matchNumber(run.summaryText, BOOKINGS_ALT_PATTERN));
-  const optOuts = hasParsedBreakdown ? (parsed?.totalOptOuts ?? null) : matchNumber(run.summaryText, OPT_OUTS_PATTERN);
+    : (matchNumber(run.summaryText, CALLS_BOOKED_PATTERN) ??
+      matchNumber(run.summaryText, BOOKINGS_ALT_PATTERN));
+  const optOuts = hasParsedBreakdown
+    ? (parsed?.totalOptOuts ?? null)
+    : matchNumber(run.summaryText, OPT_OUTS_PATTERN);
   const outboundConversations =
     sumMatches(fullReport, OUTBOUND_CONVERSATIONS_PATTERN) ??
     matchNumber(run.summaryText, OUTBOUND_FROM_SUMMARY_PATTERN);
@@ -362,22 +411,36 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
   const title = run.status === 'error' ? `${titleBase} (Failed)` : titleBase;
 
   const modeLabel =
-    run.reportType === 'daily' ? '6:00 AM auto-report' : run.reportType === 'manual' ? 'Manual report' : 'Test report';
-  const subtitleParts = [timeRangeLabel, modeLabel].filter((part): part is string => Boolean(part));
+    run.reportType === 'daily'
+      ? '6:00 AM auto-report'
+      : run.reportType === 'manual'
+        ? 'Manual report'
+        : 'Test report';
+  const subtitleParts = [timeRangeLabel, modeLabel].filter(
+    (part): part is string => Boolean(part),
+  );
 
   const metricPreview =
-    messagesSent !== null || repliesReceived !== null || booked !== null || optOuts !== null
+    messagesSent !== null ||
+    repliesReceived !== null ||
+    booked !== null ||
+    optOuts !== null
       ? `Sent ${formatCount(messagesSent)} | Replies ${formatCount(repliesReceived)} | Booked (report) ${formatCount(booked)} | Opt-outs ${formatCount(
           optOuts,
         )}`
       : null;
   const summaryPreview =
     metricPreview ||
-    summaryLines.find((line) => !DAILY_SETTER_SUMMARY_PATTERN.test(line) && !isSummaryNoiseLine(line)) ||
+    summaryLines.find(
+      (line) =>
+        !DAILY_SETTER_SUMMARY_PATTERN.test(line) && !isSummaryNoiseLine(line),
+    ) ||
     summaryLines.find((line) => !isSummaryNoiseLine(line)) ||
     summaryLines[0] ||
     null;
-  const topSequences = hasParsedBreakdown ? (parsed?.allSequences || []).slice(0, 5).map(toSequenceInsight) : [];
+  const topSequences = hasParsedBreakdown
+    ? (parsed?.allSequences || []).slice(0, 5).map(toSequenceInsight)
+    : [];
   const repRows = hasParsedBreakdown
     ? (parsed?.reps || []).map((rep) => ({
         name: rep.name,
@@ -406,7 +469,9 @@ const buildRunViewModel = (run: RunV2): RunViewModel => {
 
 export default function RunsV2() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [savedViews, setSavedViews] = useState<SavedRunsView[]>(() => readSavedViews());
+  const [savedViews, setSavedViews] = useState<SavedRunsView[]>(() =>
+    readSavedViews(),
+  );
   const [newViewName, setNewViewName] = useState('');
   const [copied, setCopied] = useState<'current' | string | null>(null);
   const [showSavedViews, setShowSavedViews] = useState(false);
@@ -433,13 +498,17 @@ export default function RunsV2() {
     ],
   });
   const savedViewsDismiss = useDismiss(savedViewsFloatingContext);
-  const { getReferenceProps: getSavedViewsReferenceProps, getFloatingProps: getSavedViewsFloatingProps } =
-    useInteractions([savedViewsDismiss]);
+  const {
+    getReferenceProps: getSavedViewsReferenceProps,
+    getFloatingProps: getSavedViewsFloatingProps,
+  } = useInteractions([savedViewsDismiss]);
 
   const daysBack = parseRange(searchParams.get('range'));
   const channelId = searchParams.get('channel') || null;
   const selectedId = searchParams.get('run');
-  const [isRunDetailFocused, setIsRunDetailFocused] = useState(() => Boolean(selectedId));
+  const [isRunDetailFocused, setIsRunDetailFocused] = useState(() =>
+    Boolean(selectedId),
+  );
 
   const {
     data: runsData,
@@ -458,7 +527,10 @@ export default function RunsV2() {
 
   const channels = useMemo(() => {
     const rows = channelsData?.data.items || [];
-    const map = new Map<string, { channelId: string; channelName: string | null; runCount: number }>();
+    const map = new Map<
+      string,
+      { channelId: string; channelName: string | null; runCount: number }
+    >();
     for (const row of rows) {
       const existing = map.get(row.channelId);
       if (!existing) {
@@ -493,7 +565,9 @@ export default function RunsV2() {
   }, [selected]);
 
   const selectedBookedMetricsQuery = useV2SalesMetrics(
-    selectedReportDay ? { day: selectedReportDay, tz: BUSINESS_TZ } : { range: 'today', tz: BUSINESS_TZ },
+    selectedReportDay
+      ? { day: selectedReportDay, tz: BUSINESS_TZ }
+      : { range: 'today', tz: BUSINESS_TZ },
     { enabled: Boolean(selectedReportDay) },
   );
 
@@ -524,11 +598,21 @@ export default function RunsV2() {
   const aggregateStats = useMemo(() => {
     const items = runsData?.data.items || [];
     const totalRuns = items.length;
-    const allViews = items.map((r) => viewByRunId.get(r.id) || buildRunViewModel(r));
-    const totalMessagesSent = allViews.reduce((sum, v) => sum + (v.messagesSent ?? 0), 0);
+    const allViews = items.map(
+      (r) => viewByRunId.get(r.id) || buildRunViewModel(r),
+    );
+    const totalMessagesSent = allViews.reduce(
+      (sum, v) => sum + (v.messagesSent ?? 0),
+      0,
+    );
     const totalBooked = allViews.reduce((sum, v) => sum + (v.booked ?? 0), 0);
-    const replyRates = allViews.map((v) => v.replyRatePct).filter((r): r is number => r !== null);
-    const avgReplyRate = replyRates.length > 0 ? replyRates.reduce((a, b) => a + b, 0) / replyRates.length : null;
+    const replyRates = allViews
+      .map((v) => v.replyRatePct)
+      .filter((r): r is number => r !== null);
+    const avgReplyRate =
+      replyRates.length > 0
+        ? replyRates.reduce((a, b) => a + b, 0) / replyRates.length
+        : null;
     return { totalRuns, totalMessagesSent, totalBooked, avgReplyRate };
   }, [runsData?.data.items, viewByRunId]);
 
@@ -548,17 +632,25 @@ export default function RunsV2() {
   }, [runsData?.data.items]);
 
   const selectedView = resolveSelectedRunViewModel(selected, viewByRunId);
-  const selectedSlackBookedTotal = selectedBookedMetricsQuery.data?.data.totals.canonicalBookedCalls ?? null;
-  const selectedSlackBookedJack = selectedBookedMetricsQuery.data?.data.bookedCredit.jack ?? null;
-  const selectedSlackBookedBrandon = selectedBookedMetricsQuery.data?.data.bookedCredit.brandon ?? null;
-  const selectedSlackBookedSelf = selectedBookedMetricsQuery.data?.data.bookedCredit.selfBooked ?? null;
+  const selectedSlackBookedTotal =
+    selectedBookedMetricsQuery.data?.data.totals.canonicalBookedCalls ?? null;
+  const selectedSlackBookedJack =
+    selectedBookedMetricsQuery.data?.data.bookedCredit.jack ?? null;
+  const selectedSlackBookedBrandon =
+    selectedBookedMetricsQuery.data?.data.bookedCredit.brandon ?? null;
+  const selectedSlackBookedSelf =
+    selectedBookedMetricsQuery.data?.data.bookedCredit.selfBooked ?? null;
   const selectedSlackBookedSplit =
-    selectedSlackBookedJack === null || selectedSlackBookedBrandon === null || selectedSlackBookedSelf === null
+    selectedSlackBookedJack === null ||
+    selectedSlackBookedBrandon === null ||
+    selectedSlackBookedSelf === null
       ? '—'
       : `${selectedSlackBookedJack.toLocaleString()} / ${selectedSlackBookedBrandon.toLocaleString()} / ${selectedSlackBookedSelf.toLocaleString()}`;
 
   const channelLabel = (run: RunV2): string => {
-    return run.channelName || channelNameById.get(run.channelId) || run.channelId;
+    return (
+      run.channelName || channelNameById.get(run.channelId) || run.channelId
+    );
   };
 
   useEffect(() => {
@@ -569,7 +661,9 @@ export default function RunsV2() {
   useEffect(() => {
     if (!selectedId) return;
     if (!runsData) return;
-    const stillExists = runsData.data.items.some((item) => item.id === selectedId);
+    const stillExists = runsData.data.items.some(
+      (item) => item.id === selectedId,
+    );
     if (!stillExists) {
       const next = new URLSearchParams(searchParams);
       next.delete('run');
@@ -578,7 +672,11 @@ export default function RunsV2() {
     }
   }, [runsData, searchParams, selectedId, setSearchParams]);
 
-  const setParams = (updates: { range?: AllowedRange; channelId?: string | null; runId?: string | null }) => {
+  const setParams = (updates: {
+    range?: AllowedRange;
+    channelId?: string | null;
+    runId?: string | null;
+  }) => {
     const next = new URLSearchParams(searchParams);
     if (updates.range !== undefined) next.set('range', String(updates.range));
     if (updates.channelId !== undefined) {
@@ -611,7 +709,10 @@ export default function RunsV2() {
     try {
       await navigator.clipboard.writeText(link);
       setCopied(id);
-      window.setTimeout(() => setCopied((value) => (value === id ? null : value)), 1300);
+      window.setTimeout(
+        () => setCopied((value) => (value === id ? null : value)),
+        1300,
+      );
     } catch {
       setCopied(null);
     }
@@ -643,7 +744,9 @@ export default function RunsV2() {
   };
 
   const deleteSavedView = (viewId: string) => {
-    setSavedViews((prev) => prev.filter((view: SavedRunsView) => view.id !== viewId));
+    setSavedViews((prev) =>
+      prev.filter((view: SavedRunsView) => view.id !== viewId),
+    );
   };
 
   const buildSavedViewUrl = (view: SavedRunsView) => {
@@ -675,7 +778,9 @@ export default function RunsV2() {
               <span>Date range (days)</span>
               <V2Select
                 value={String(daysBack)}
-                onValueChange={(value) => setParams({ range: parseRange(value), runId: null })}
+                onValueChange={(value) =>
+                  setParams({ range: parseRange(value), runId: null })
+                }
                 options={RUNS_RANGE_OPTIONS}
                 ariaLabel="Show last days"
               />
@@ -721,7 +826,10 @@ export default function RunsV2() {
           <span className="V2StalenessBanner__icon">⚠️</span>
           <p className="V2StalenessBanner__text">
             No daily run recorded for today yet.{' '}
-            <span>The morning auto-report hasn't run yet. Check back later or trigger a manual report.</span>
+            <span>
+              The morning auto-report hasn't run yet. Check back later or
+              trigger a manual report.
+            </span>
           </p>
           <button
             type="button"
@@ -742,12 +850,20 @@ export default function RunsV2() {
         />
         <V2MetricCard
           label="Messages Sent"
-          value={aggregateStats.totalMessagesSent > 0 ? formatCount(aggregateStats.totalMessagesSent) : '—'}
+          value={
+            aggregateStats.totalMessagesSent > 0
+              ? formatCount(aggregateStats.totalMessagesSent)
+              : '—'
+          }
           meta="across all reports"
         />
         <V2MetricCard
           label="Booked Calls"
-          value={aggregateStats.totalBooked > 0 ? formatCount(aggregateStats.totalBooked) : '—'}
+          value={
+            aggregateStats.totalBooked > 0
+              ? formatCount(aggregateStats.totalBooked)
+              : '—'
+          }
           tone="positive"
           meta="across all reports"
         />
@@ -755,11 +871,18 @@ export default function RunsV2() {
           label="Avg Reply Rate"
           value={formatPct(aggregateStats.avgReplyRate)}
           meta="across runs with data"
-          tone={aggregateStats.avgReplyRate !== null && aggregateStats.avgReplyRate >= 15 ? 'positive' : 'default'}
+          tone={
+            aggregateStats.avgReplyRate !== null &&
+            aggregateStats.avgReplyRate >= 15
+              ? 'positive'
+              : 'default'
+          }
         />
       </section>
 
-      <div className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}>
+      <div
+        className={`V2Grid V2Grid--2-1 V2RunsLayout ${isRunDetailFocused ? 'is-detail-focused' : ''}`}
+      >
         <V2Panel
           title="Report History"
           caption={`Showing ${runsData.data.items.length} reports`}
@@ -778,8 +901,12 @@ export default function RunsV2() {
                   {(() => {
                     const stamp = extractDateStampParts(run);
                     return (
-                      <div className={`V2RunList__dateStamp V2RunList__dateStamp--${run.status}`}>
-                        <span className="V2RunList__dateMonth">{stamp.month}</span>
+                      <div
+                        className={`V2RunList__dateStamp V2RunList__dateStamp--${run.status}`}
+                      >
+                        <span className="V2RunList__dateMonth">
+                          {stamp.month}
+                        </span>
                         <span className="V2RunList__dateDay">{stamp.day}</span>
                       </div>
                     );
@@ -788,25 +915,39 @@ export default function RunsV2() {
                     <div className="V2RunList__head">
                       <span>
                         {runView.title}
-                        {index === 0 && <span className="V2RunList__latestBadge">Latest</span>}
+                        {index === 0 && (
+                          <span className="V2RunList__latestBadge">Latest</span>
+                        )}
                       </span>
                       <div className="V2RunList__badges">
-                        <span className={`V2Tag V2Tag--${statusTone(run.status)}`}>{run.status}</span>
-                        <span className="V2Tag V2Tag--accent">{run.reportType}</span>
+                        <span
+                          className={`V2Tag V2Tag--${statusTone(run.status)}`}
+                        >
+                          {run.status}
+                        </span>
+                        <span className="V2Tag V2Tag--accent">
+                          {run.reportType}
+                        </span>
                       </div>
                     </div>
                     <p className="V2RunList__meta">{channelLabel(run)}</p>
                     <p className="V2RunList__meta">
-                      Generated {runGeneratedLabel(run)} · Covers {runDateLabel(run)}
+                      Generated {runGeneratedLabel(run)} · Covers{' '}
+                      {runDateLabel(run)}
                     </p>
                     <div className="V2RunList__kpis">
                       <span>Sent {formatCount(runView.messagesSent)}</span>
-                      <span>Replies {formatCount(runView.repliesReceived)}</span>
-                      <span>Booked (SMS report) {formatCount(runView.booked)}</span>
+                      <span>
+                        Replies {formatCount(runView.repliesReceived)}
+                      </span>
+                      <span>
+                        Booked (SMS report) {formatCount(runView.booked)}
+                      </span>
                       <span>Opt-outs {formatCount(runView.optOuts)}</span>
                     </div>
                     <p className="V2RunList__summary">
-                      {runView.summaryPreview || 'No summary available for this report.'}
+                      {runView.summaryPreview ||
+                        'No summary available for this report.'}
                     </p>
                   </div>
                 </button>
@@ -815,7 +956,11 @@ export default function RunsV2() {
           </div>
         </V2Panel>
 
-        <V2Panel title="Report Details" caption="Summary and full report text." className="V2RunsLayout__detail">
+        <V2Panel
+          title="Report Details"
+          caption="Summary and full report text."
+          className="V2RunsLayout__detail"
+        >
           {selected && selectedView ? (
             <div className="V2RunDetail">
               {isRunDetailFocused ? (
@@ -833,14 +978,22 @@ export default function RunsV2() {
               <header className="V2RunDetail__hero">
                 <div>
                   <p className="V2RunDetail__eyebrow">
-                    {selected.reportType === 'daily' ? 'Automated Daily Report' : 'Manual Report'}
+                    {selected.reportType === 'daily'
+                      ? 'Automated Daily Report'
+                      : 'Manual Report'}
                   </p>
                   <h3>{selectedView.title}</h3>
                   <p>{selectedView.subtitle}</p>
                 </div>
                 <div className="V2RunDetail__badges">
-                  <span className={`V2Tag V2Tag--${statusTone(selected.status)}`}>{selected.status}</span>
-                  <span className="V2Tag V2Tag--accent">{selected.reportType}</span>
+                  <span
+                    className={`V2Tag V2Tag--${statusTone(selected.status)}`}
+                  >
+                    {selected.status}
+                  </span>
+                  <span className="V2Tag V2Tag--accent">
+                    {selected.reportType}
+                  </span>
                 </div>
               </header>
 
@@ -852,7 +1005,10 @@ export default function RunsV2() {
               ) : null}
 
               <div className="V2MetricsGrid">
-                <V2MetricCard label="Messages Sent" value={formatCount(selectedView.messagesSent)} />
+                <V2MetricCard
+                  label="Messages Sent"
+                  value={formatCount(selectedView.messagesSent)}
+                />
                 <V2MetricCard
                   label="Replies"
                   value={formatCount(selectedView.repliesReceived)}
@@ -868,8 +1024,14 @@ export default function RunsV2() {
                         ? 'Error'
                         : formatCount(selectedSlackBookedTotal)
                   }
-                  meta={selectedReportDay ? `Report date: ${selectedReportDay}` : 'Date not detected'}
-                  tone={(selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'}
+                  meta={
+                    selectedReportDay
+                      ? `Report date: ${selectedReportDay}`
+                      : 'Date not detected'
+                  }
+                  tone={
+                    (selectedSlackBookedTotal ?? 0) > 0 ? 'positive' : 'default'
+                  }
                 />
                 <V2MetricCard
                   label="Booked Calls (SMS report)"
@@ -879,32 +1041,51 @@ export default function RunsV2() {
                 />
                 <V2MetricCard
                   label="Setter Split"
-                  value={selectedBookedMetricsQuery.isLoading ? 'Loading…' : selectedSlackBookedSplit}
+                  value={
+                    selectedBookedMetricsQuery.isLoading
+                      ? 'Loading…'
+                      : selectedSlackBookedSplit
+                  }
                   meta="Jack / Brandon / Self (Slack credit)"
                 />
                 <V2MetricCard
                   label="Opt-Outs"
                   value={formatCount(selectedView.optOuts)}
                   meta={`Outbound conversations ${formatCount(selectedView.outboundConversations)}`}
-                  tone={(selectedView.optOuts ?? 0) > 0 ? 'critical' : 'default'}
+                  tone={
+                    (selectedView.optOuts ?? 0) > 0 ? 'critical' : 'default'
+                  }
                 />
               </div>
 
-              {selectedSlackBookedTotal !== null && selectedSlackBookedTotal > 0 && (
-                <V2Panel
-                  title="Setter Split"
-                  caption="How booked calls are credited across setters and self-bookings for this report day. Bookings are dated by when they were recorded in Slack — if a booking was entered after midnight it will appear in the next day's count, not this one."
-                >
-                  <V2StatBar
-                    segments={[
-                      { label: 'Jack', value: selectedSlackBookedJack ?? 0, color: '#11b8d6' },
-                      { label: 'Brandon', value: selectedSlackBookedBrandon ?? 0, color: '#13b981' },
-                      { label: 'Self', value: selectedSlackBookedSelf ?? 0, color: 'var(--v2-muted)' },
-                    ]}
-                    total={selectedSlackBookedTotal}
-                  />
-                </V2Panel>
-              )}
+              {selectedSlackBookedTotal !== null &&
+                selectedSlackBookedTotal > 0 && (
+                  <V2Panel
+                    title="Setter Split"
+                    caption="How booked calls are credited across setters and self-bookings for this report day. Bookings are dated by when they were recorded in Slack — if a booking was entered after midnight it will appear in the next day's count, not this one."
+                  >
+                    <V2StatBar
+                      segments={[
+                        {
+                          label: 'Jack',
+                          value: selectedSlackBookedJack ?? 0,
+                          color: '#11b8d6',
+                        },
+                        {
+                          label: 'Brandon',
+                          value: selectedSlackBookedBrandon ?? 0,
+                          color: '#13b981',
+                        },
+                        {
+                          label: 'Self',
+                          value: selectedSlackBookedSelf ?? 0,
+                          color: 'var(--v2-muted)',
+                        },
+                      ]}
+                      total={selectedSlackBookedTotal}
+                    />
+                  </V2Panel>
+                )}
 
               <div className="V2Grid V2Grid--2">
                 <section className="V2RunDetail__section">
@@ -916,7 +1097,9 @@ export default function RunsV2() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="V2RunDetail__muted">No summary available for this report.</p>
+                    <p className="V2RunDetail__muted">
+                      No summary available for this report.
+                    </p>
                   )}
                 </section>
 
@@ -956,12 +1139,21 @@ export default function RunsV2() {
                         {selectedView.topSequences.map((row, index) => (
                           <tr key={`${row.label}-${index}`}>
                             <td>{row.label}</td>
-                            <td className="is-right">{row.sent.toLocaleString()}</td>
-                            <td className="is-right">{row.replies.toLocaleString()}</td>
-                            <td className="is-right">{row.replyRatePct.toFixed(1)}%</td>
-                            <td className="is-right">{row.booked.toLocaleString()}</td>
                             <td className="is-right">
-                              {row.optOuts.toLocaleString()} ({row.optOutRatePct.toFixed(1)}%)
+                              {row.sent.toLocaleString()}
+                            </td>
+                            <td className="is-right">
+                              {row.replies.toLocaleString()}
+                            </td>
+                            <td className="is-right">
+                              {row.replyRatePct.toFixed(1)}%
+                            </td>
+                            <td className="is-right">
+                              {row.booked.toLocaleString()}
+                            </td>
+                            <td className="is-right">
+                              {row.optOuts.toLocaleString()} (
+                              {row.optOutRatePct.toFixed(1)}%)
                             </td>
                           </tr>
                         ))}
@@ -969,7 +1161,9 @@ export default function RunsV2() {
                     </table>
                   </div>
                 ) : (
-                  <p className="V2RunDetail__muted">No sequence data found for this report.</p>
+                  <p className="V2RunDetail__muted">
+                    No sequence data found for this report.
+                  </p>
                 )}
               </section>
 
@@ -996,14 +1190,18 @@ export default function RunsV2() {
                         {selectedView.repRows.map((row, index) => (
                           <tr key={`${row.name}-${index}`}>
                             <td>{row.name}</td>
-                            <td className="is-right">{row.outboundConversations.toLocaleString()}</td>
+                            <td className="is-right">
+                              {row.outboundConversations.toLocaleString()}
+                            </td>
                             <td
                               className="is-right"
                               title="Aloware-reported bookings may differ from Slack booked calls above"
                             >
                               {row.booked.toLocaleString()}
                             </td>
-                            <td className="is-right">{row.optOuts.toLocaleString()}</td>
+                            <td className="is-right">
+                              {row.optOuts.toLocaleString()}
+                            </td>
                             <td>{row.topSequenceLabel || '—'}</td>
                           </tr>
                         ))}
@@ -1011,11 +1209,17 @@ export default function RunsV2() {
                     </table>
                   </div>
                 ) : (
-                  <p className="V2RunDetail__muted">No setter data found for this report.</p>
+                  <p className="V2RunDetail__muted">
+                    No setter data found for this report.
+                  </p>
                 )}
-                <p className="V2RunDetail__muted" style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}>
-                  ⓘ <strong>Important:</strong> "Bookings (from report)" come from Aloware SMS report text and may not
-                  match Slack. Use <em>Booked Calls (Slack)</em> as the official number.
+                <p
+                  className="V2RunDetail__muted"
+                  style={{ marginTop: '0.5rem', fontSize: '0.75rem' }}
+                >
+                  ⓘ <strong>Important:</strong> "Bookings (from report)" come
+                  from Aloware SMS report text and may not match Slack. Use{' '}
+                  <em>Booked Calls (Slack)</em> as the official number.
                 </p>
               </section>
 
@@ -1052,7 +1256,10 @@ export default function RunsV2() {
                 exit={{ opacity: 0, y: -8, scale: 0.98 }}
                 transition={{ duration: 0.16 }}
               >
-                <V2Panel title="Saved Views" caption="Save and share specific run views. Up to 12 saved.">
+                <V2Panel
+                  title="Saved Views"
+                  caption="Save and share specific run views. Up to 12 saved."
+                >
                   <div className="V2SavedViews">
                     <div className="V2SavedViews__composer">
                       <input
@@ -1064,8 +1271,15 @@ export default function RunsV2() {
                       <button type="button" onClick={saveCurrentView}>
                         Save current view
                       </button>
-                      <button type="button" onClick={() => void copyShareLink('current', shareableUrl)}>
-                        {copied === 'current' ? 'Copied link' : 'Copy current link'}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void copyShareLink('current', shareableUrl)
+                        }
+                      >
+                        {copied === 'current'
+                          ? 'Copied link'
+                          : 'Copy current link'}
                       </button>
                     </div>
                     {savedViews.length ? (
@@ -1075,21 +1289,33 @@ export default function RunsV2() {
                             <div>
                               <h3>{view.name}</h3>
                               <p>
-                                Last {view.range} days | Channel: {view.channelId || 'All'} | Report:{' '}
+                                Last {view.range} days | Channel:{' '}
+                                {view.channelId || 'All'} | Report:{' '}
                                 {view.runId ? view.runId.slice(0, 8) : 'none'}
                               </p>
                             </div>
                             <div className="V2SavedViews__actions">
-                              <button type="button" onClick={() => applySavedView(view)}>
+                              <button
+                                type="button"
+                                onClick={() => applySavedView(view)}
+                              >
                                 Open
                               </button>
                               <button
                                 type="button"
-                                onClick={() => void copyShareLink(view.id, buildSavedViewUrl(view))}
+                                onClick={() =>
+                                  void copyShareLink(
+                                    view.id,
+                                    buildSavedViewUrl(view),
+                                  )
+                                }
                               >
                                 {copied === view.id ? 'Copied' : 'Copy URL'}
                               </button>
-                              <button type="button" onClick={() => deleteSavedView(view.id)}>
+                              <button
+                                type="button"
+                                onClick={() => deleteSavedView(view.id)}
+                              >
                                 Delete
                               </button>
                             </div>

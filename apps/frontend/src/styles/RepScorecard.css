@@ -9,7 +9,11 @@
   padding: 20px;
   border-radius: 16px;
   border: 1px solid var(--color-border);
-  background: linear-gradient(120deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.88));
+  background: linear-gradient(
+    120deg,
+    rgba(15, 23, 42, 0.9),
+    rgba(30, 41, 59, 0.88)
+  );
   box-shadow: var(--shadow-lg);
   margin-bottom: 20px;
 }
@@ -94,17 +98,29 @@
 
 .RepStatCard--accent {
   border-color: rgba(59, 130, 246, 0.35);
-  background: linear-gradient(180deg, rgba(59, 130, 246, 0.08), var(--color-bg-secondary));
+  background: linear-gradient(
+    180deg,
+    rgba(59, 130, 246, 0.08),
+    var(--color-bg-secondary)
+  );
 }
 
 .RepScorecard--brandon .RepStatCard--accent {
   border-color: rgba(16, 185, 129, 0.35);
-  background: linear-gradient(180deg, rgba(16, 185, 129, 0.08), var(--color-bg-secondary));
+  background: linear-gradient(
+    180deg,
+    rgba(16, 185, 129, 0.08),
+    var(--color-bg-secondary)
+  );
 }
 
 .RepStatCard--danger {
   border-color: rgba(239, 68, 68, 0.35);
-  background: linear-gradient(180deg, rgba(239, 68, 68, 0.07), var(--color-bg-secondary));
+  background: linear-gradient(
+    180deg,
+    rgba(239, 68, 68, 0.07),
+    var(--color-bg-secondary)
+  );
 }
 
 .RepStatCard__label {

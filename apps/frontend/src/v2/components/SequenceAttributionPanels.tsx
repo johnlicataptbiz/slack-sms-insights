@@ -14,7 +14,10 @@ const fmtPct = (value: number) => `${value.toFixed(1)}%`;
 const formatDate = (value: string) => {
   const parsed = new Date(value);
   if (!Number.isFinite(parsed.getTime())) return value;
-  return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return parsed.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
 };
 
 const formatMinutes = (value: number | null | undefined) => {
@@ -31,7 +34,9 @@ const formatDays = (value: number | null | undefined) => {
   return `${value.toFixed(1)}d`;
 };
 
-export function SequenceFunnelPanel({ rows }: { rows: SequenceFunnelDailyRowV2[] }) {
+export function SequenceFunnelPanel({
+  rows,
+}: { rows: SequenceFunnelDailyRowV2[] }) {
   const rowsByDay = useMemo(() => {
     const map = new Map<
       string,
@@ -82,7 +87,10 @@ export function SequenceFunnelPanel({ rows }: { rows: SequenceFunnelDailyRowV2[]
   if (rowsByDay.length === 0) return null;
 
   return (
-    <V2Panel title="Sequence Funnel" caption="Daily contacted-to-booked funnel across the selected range.">
+    <V2Panel
+      title="Sequence Funnel"
+      caption="Daily contacted-to-booked funnel across the selected range."
+    >
       <div className="V2SplitStat" style={{ marginBottom: '1rem' }}>
         <div>
           <span>Contacted</span>
@@ -132,13 +140,18 @@ export function SequenceFunnelPanel({ rows }: { rows: SequenceFunnelDailyRowV2[]
   );
 }
 
-export function AttributionReviewQueuePanel({ rows }: { rows: AttributionReviewQueueRowV2[] }) {
+export function AttributionReviewQueuePanel({
+  rows,
+}: { rows: AttributionReviewQueueRowV2[] }) {
   const visibleRows = rows.slice(0, 6);
 
   if (rows.length === 0) return null;
 
   return (
-    <V2Panel title="Attribution Review Queue" caption="Ambiguous bookings that need a second look.">
+    <V2Panel
+      title="Attribution Review Queue"
+      caption="Ambiguous bookings that need a second look."
+    >
       <div className="V2TableWrap V2TableWrap--sequences">
         <table className="V2Table V2Table--sequences">
           <thead>
@@ -154,26 +167,40 @@ export function AttributionReviewQueuePanel({ rows }: { rows: AttributionReviewQ
             {visibleRows.map((row) => {
               const candidateCount = Array.isArray(row.candidate_sequences)
                 ? row.candidate_sequences.length
-                : row.candidate_sequences && typeof row.candidate_sequences === 'object'
+                : row.candidate_sequences &&
+                    typeof row.candidate_sequences === 'object'
                   ? Object.keys(row.candidate_sequences).length
                   : 0;
 
               return (
                 <tr key={row.id}>
                   <td>
-                    <V2Badge variant={row.priority >= 80 ? 'critical' : row.priority >= 50 ? 'warning' : 'default'}>
+                    <V2Badge
+                      variant={
+                        row.priority >= 80
+                          ? 'critical'
+                          : row.priority >= 50
+                            ? 'warning'
+                            : 'default'
+                      }
+                    >
                       {row.priority}
                     </V2Badge>
                   </td>
                   <td>{row.issue_type || 'unknown'}</td>
                   <td title={row.issue_summary || ''}>
                     {row.issue_summary || 'No summary'}
-                    <div style={{ fontSize: '0.75rem', color: 'var(--v2-muted)' }}>
-                      {candidateCount} candidate{candidateCount === 1 ? '' : 's'}
+                    <div
+                      style={{ fontSize: '0.75rem', color: 'var(--v2-muted)' }}
+                    >
+                      {candidateCount} candidate
+                      {candidateCount === 1 ? '' : 's'}
                     </div>
                   </td>
                   <td>{row.status || 'open'}</td>
-                  <td className="is-right">{row.resolved_at ? formatDate(row.resolved_at) : '—'}</td>
+                  <td className="is-right">
+                    {row.resolved_at ? formatDate(row.resolved_at) : '—'}
+                  </td>
                 </tr>
               );
             })}
@@ -184,13 +211,18 @@ export function AttributionReviewQueuePanel({ rows }: { rows: AttributionReviewQ
   );
 }
 
-export function UnresolvedAttributionPanel({ rows }: { rows: UnresolvedAttributionRowV2[] }) {
+export function UnresolvedAttributionPanel({
+  rows,
+}: { rows: UnresolvedAttributionRowV2[] }) {
   const visibleRows = rows.slice(0, 6);
 
   if (rows.length === 0) return null;
 
   return (
-    <V2Panel title="Unresolved Attributions" caption="Latest bookings that still need a sequence decision.">
+    <V2Panel
+      title="Unresolved Attributions"
+      caption="Latest bookings that still need a sequence decision."
+    >
       <div className="V2TableWrap V2TableWrap--sequences">
         <table className="V2Table V2Table--sequences">
           <thead>
@@ -211,9 +243,15 @@ export function UnresolvedAttributionPanel({ rows }: { rows: UnresolvedAttributi
                     {row.attribution_status || 'unknown'}
                   </V2Badge>
                 </td>
-                <td title={row.review_reason || ''}>{row.review_reason || '—'}</td>
-                <td title={row.resolved_sequence_label || ''}>{row.resolved_sequence_label || '—'}</td>
-                <td className="is-right">{row.created_at ? formatDate(row.created_at) : '—'}</td>
+                <td title={row.review_reason || ''}>
+                  {row.review_reason || '—'}
+                </td>
+                <td title={row.resolved_sequence_label || ''}>
+                  {row.resolved_sequence_label || '—'}
+                </td>
+                <td className="is-right">
+                  {row.created_at ? formatDate(row.created_at) : '—'}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -223,7 +261,9 @@ export function UnresolvedAttributionPanel({ rows }: { rows: UnresolvedAttributi
   );
 }
 
-export function AttributionMethodPanel({ rows }: { rows: AttributionMethodDailyRowV2[] }) {
+export function AttributionMethodPanel({
+  rows,
+}: { rows: AttributionMethodDailyRowV2[] }) {
   const totals = useMemo(() => {
     return rows.reduce(
       (acc, row) => {
@@ -243,22 +283,33 @@ export function AttributionMethodPanel({ rows }: { rows: AttributionMethodDailyR
   if (totalCalls === 0) return null;
 
   return (
-    <V2Panel title="Attribution Methods" caption="How booked calls were matched in the selected range.">
+    <V2Panel
+      title="Attribution Methods"
+      caption="How booked calls were matched in the selected range."
+    >
       <div className="V2SplitStat" style={{ marginBottom: '0.75rem' }}>
         <div>
           <span>Matched</span>
           <strong>{fmtInt(totals.matched)}</strong>
-          <small>{fmtPct(totalCalls > 0 ? (totals.matched / totalCalls) * 100 : 0)}</small>
+          <small>
+            {fmtPct(totalCalls > 0 ? (totals.matched / totalCalls) * 100 : 0)}
+          </small>
         </div>
         <div>
           <span>Manual</span>
           <strong>{fmtInt(totals.manual)}</strong>
-          <small>{fmtPct(totalCalls > 0 ? (totals.manual / totalCalls) * 100 : 0)}</small>
+          <small>
+            {fmtPct(totalCalls > 0 ? (totals.manual / totalCalls) * 100 : 0)}
+          </small>
         </div>
         <div>
           <span>Unattributed</span>
           <strong>{fmtInt(totals.unattributed)}</strong>
-          <small>{fmtPct(totalCalls > 0 ? (totals.unattributed / totalCalls) * 100 : 0)}</small>
+          <small>
+            {fmtPct(
+              totalCalls > 0 ? (totals.unattributed / totalCalls) * 100 : 0,
+            )}
+          </small>
         </div>
       </div>
 
@@ -280,7 +331,9 @@ export function AttributionMethodPanel({ rows }: { rows: AttributionMethodDailyR
               <tr key={row.label}>
                 <td>{row.label}</td>
                 <td className="is-right">{fmtInt(row.value)}</td>
-                <td className="is-right">{fmtPct(totalCalls > 0 ? (row.value / totalCalls) * 100 : 0)}</td>
+                <td className="is-right">
+                  {fmtPct(totalCalls > 0 ? (row.value / totalCalls) * 100 : 0)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -317,21 +370,30 @@ export function RepResponsePanel({ rows }: { rows: RepResponseDailyRowV2[] }) {
       existing.newLeads += row.new_leads_contacted;
       existing.replied += row.leads_replied;
       existing.booked += row.booked_calls;
-      if (row.median_reply_time_minutes !== null) existing.replyMedians.push(row.median_reply_time_minutes);
-      if (row.median_book_time_days !== null) existing.bookMedians.push(row.median_book_time_days);
+      if (row.median_reply_time_minutes !== null)
+        existing.replyMedians.push(row.median_reply_time_minutes);
+      if (row.median_book_time_days !== null)
+        existing.bookMedians.push(row.median_book_time_days);
       map.set(repKey, existing);
     }
 
-    return [...map.values()].sort((a, b) => b.booked - a.booked || b.replied - a.replied);
+    return [...map.values()].sort(
+      (a, b) => b.booked - a.booked || b.replied - a.replied,
+    );
   }, [rows]);
 
   if (byRep.length === 0) return null;
 
   const avg = (values: number[]) =>
-    values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+    values.length > 0
+      ? values.reduce((sum, value) => sum + value, 0) / values.length
+      : null;
 
   return (
-    <V2Panel title="Rep Response" caption="Contacted-to-booked funnel and timing by rep.">
+    <V2Panel
+      title="Rep Response"
+      caption="Contacted-to-booked funnel and timing by rep."
+    >
       <div className="V2TableWrap V2TableWrap--sequences">
         <table className="V2Table V2Table--sequences">
           <thead>
@@ -351,7 +413,9 @@ export function RepResponsePanel({ rows }: { rows: RepResponseDailyRowV2[] }) {
                 <td className="is-right">{fmtInt(row.newLeads)}</td>
                 <td className="is-right">{fmtInt(row.replied)}</td>
                 <td className="is-right">{fmtInt(row.booked)}</td>
-                <td className="is-right">{formatMinutes(avg(row.replyMedians))}</td>
+                <td className="is-right">
+                  {formatMinutes(avg(row.replyMedians))}
+                </td>
                 <td className="is-right">{formatDays(avg(row.bookMedians))}</td>
               </tr>
             ))}

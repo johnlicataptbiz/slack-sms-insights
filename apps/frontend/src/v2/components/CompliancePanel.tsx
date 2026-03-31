@@ -19,11 +19,16 @@ interface CompliancePanelProps {
 
 export function CompliancePanel({ compliance }: CompliancePanelProps) {
   return (
-    <V2Panel title="Opt-Out Health" caption="Opt-out rates and top opt-out sequences · weekly window">
+    <V2Panel
+      title="Opt-Out Health"
+      caption="Opt-out rates and top opt-out sequences · weekly window"
+    >
       <div className="V2SeqCompliance">
         <div className="V2SeqCompliance__rates">
           <div className="V2SeqCompliance__rate">
-            <span className="V2SeqCompliance__rateLabel">Weekly Opt-Out Rate</span>
+            <span className="V2SeqCompliance__rateLabel">
+              Weekly Opt-Out Rate
+            </span>
             <span
               className={`V2SeqCompliance__rateValue${compliance.optOutRateWeeklyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
             >
@@ -31,7 +36,9 @@ export function CompliancePanel({ compliance }: CompliancePanelProps) {
             </span>
           </div>
           <div className="V2SeqCompliance__rate">
-            <span className="V2SeqCompliance__rateLabel">Monthly Opt-Out Rate</span>
+            <span className="V2SeqCompliance__rateLabel">
+              Monthly Opt-Out Rate
+            </span>
             <span
               className={`V2SeqCompliance__rateValue${compliance.optOutRateMonthlyPct >= 3 ? ' V2SeqCompliance__rateValue--warn' : ''}`}
             >
@@ -41,7 +48,9 @@ export function CompliancePanel({ compliance }: CompliancePanelProps) {
         </div>
         {compliance.topOptOutSequences.length > 0 && (
           <div className="V2SeqCompliance__topList">
-            <p className="V2SeqCompliance__topTitle">Highest Opt-Out Sequences</p>
+            <p className="V2SeqCompliance__topTitle">
+              Highest Opt-Out Sequences
+            </p>
             <div className="V2TableWrap">
               <table className="V2Table">
                 <thead>
@@ -56,7 +65,9 @@ export function CompliancePanel({ compliance }: CompliancePanelProps) {
                     <tr key={seq.label}>
                       <td>{seq.label}</td>
                       <td className="is-right">{fmtInt(seq.optOuts)}</td>
-                      <td className={`is-right${seq.optOutRatePct >= 5 ? ' V2Table__cell--warn' : ''}`}>
+                      <td
+                        className={`is-right${seq.optOutRatePct >= 5 ? ' V2Table__cell--warn' : ''}`}
+                      >
                         {fmtPct(seq.optOutRatePct)}
                       </td>
                     </tr>

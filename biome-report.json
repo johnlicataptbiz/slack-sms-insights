@@ -1,0 +1,59 @@
+/Users/jl/Developer/slack-sms-insights/biome.json:6:5 deserialize ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Found an unknown key `includes`.
+  
+    4 │     "enabled": true,
+    5 │     "formatWithErrors": false,
+  > 6 │     "includes": ["**"],
+      │     ^^^^^^^^^^
+    7 │     "attributePosition": "auto",
+    8 │     "indentStyle": "space",
+  
+  i Known keys:
+  
+  - enabled
+  - useEditorconfig
+  - formatWithErrors
+  - indentStyle
+  - indentWidth
+  - lineEnding
+  - lineWidth
+  - attributePosition
+  - bracketSpacing
+  - ignore
+  - include
+  
+
+/Users/jl/Developer/slack-sms-insights/biome.json:39:3 deserialize ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Found an unknown key `assist`.
+  
+    37 │     }
+    38 │   },
+  > 39 │   "assist": {
+       │   ^^^^^^^^
+    40 │     "actions": {
+    41 │       "source": {
+  
+  i Known keys:
+  
+  - $schema
+  - extends
+  - vcs
+  - files
+  - formatter
+  - organizeImports
+  - linter
+  - javascript
+  - json
+  - css
+  - graphql
+  - overrides
+  - assists
+  
+
+configuration ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  × Biome exited because the configuration resulted in errors. Please fix them.
+  
+

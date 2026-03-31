@@ -1,6 +1,6 @@
 import {
-  autoUpdate,
   FloatingPortal,
+  autoUpdate,
   flip,
   offset,
   shift,
@@ -15,7 +15,15 @@ import { useCallback, useMemo, useState } from 'react';
 // Issue #18: Date Range Picker Component
 // ═══════════════════════════════════════════════════════════════════════════════
 
-type PresetRange = 'today' | '7d' | '14d' | '30d' | '90d' | 'mtd' | 'ytd' | 'custom';
+type PresetRange =
+  | 'today'
+  | '7d'
+  | '14d'
+  | '30d'
+  | '90d'
+  | 'mtd'
+  | 'ytd'
+  | 'custom';
 
 interface DateRangePickerProps {
   from: Date;
@@ -63,7 +71,11 @@ export function DateRangePicker({
 
   const detectActivePreset = useMemo((): PresetRange | null => {
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
 
     if (isSameDay(from, startOfToday) && isSameDay(to, now)) return 'today';
     if (isSameDay(from, subDays(now, 7)) && isSameDay(to, now)) return '7d';
@@ -122,7 +134,11 @@ export function DateRangePicker({
     const newFrom = new Date(customFrom);
     const newTo = new Date(customTo);
 
-    if (!isNaN(newFrom.getTime()) && !isNaN(newTo.getTime()) && newFrom <= newTo) {
+    if (
+      !isNaN(newFrom.getTime()) &&
+      !isNaN(newTo.getTime()) &&
+      newFrom <= newTo
+    ) {
       // Ensure we include the full day
       newTo.setHours(23, 59, 59, 999);
       onChange(newFrom, newTo);
@@ -200,7 +216,9 @@ export function DateRangePicker({
                       key={preset}
                       type="button"
                       className={`V2DateRangePicker__preset ${
-                        (activePreset || detectActivePreset) === preset ? 'V2DateRangePicker__preset--active' : ''
+                        (activePreset || detectActivePreset) === preset
+                          ? 'V2DateRangePicker__preset--active'
+                          : ''
                       }`}
                       onClick={() => handlePresetClick(preset)}
                     >
@@ -231,11 +249,19 @@ export function DateRangePicker({
                           value={customTo}
                           onChange={(e) => setCustomTo(e.target.value)}
                           min={customFrom}
-                          max={maxDate ? formatDate(maxDate) : formatDate(new Date())}
+                          max={
+                            maxDate
+                              ? formatDate(maxDate)
+                              : formatDate(new Date())
+                          }
                         />
                       </div>
                     </div>
-                    <button type="button" className="V2DateRangePicker__apply" onClick={handleCustomApply}>
+                    <button
+                      type="button"
+                      className="V2DateRangePicker__apply"
+                      onClick={handleCustomApply}
+                    >
                       Apply
                     </button>
                   </div>
@@ -259,7 +285,11 @@ function formatDisplayDate(date: Date): string {
 }
 
 function isSameDay(d1: Date, d2: Date): boolean {
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
 }
 
 function subDays(date: Date, days: number): Date {

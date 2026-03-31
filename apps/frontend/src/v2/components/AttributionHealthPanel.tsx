@@ -19,7 +19,10 @@ export function AttributionHealthPanel() {
 
   if (isLoading) {
     return (
-      <V2Panel title="Attribution Health" caption="Ensuring Slack bookings stay current.">
+      <V2Panel
+        title="Attribution Health"
+        caption="Ensuring Slack bookings stay current."
+      >
         <V2State kind="loading">Checking attribution freshness…</V2State>
       </V2Panel>
     );
@@ -27,14 +30,23 @@ export function AttributionHealthPanel() {
 
   if (isError || !data) {
     return (
-      <V2Panel title="Attribution Health" caption="Ensuring Slack bookings stay current.">
-        <V2State kind="error">Failed to load attribution health: {(error as any)?.message || 'unknown'}</V2State>
+      <V2Panel
+        title="Attribution Health"
+        caption="Ensuring Slack bookings stay current."
+      >
+        <V2State kind="error">
+          Failed to load attribution health:{' '}
+          {(error as any)?.message || 'unknown'}
+        </V2State>
       </V2Panel>
     );
   }
 
   return (
-    <V2Panel title="Attribution Health" caption="Latest booked call vs. attribution timestamps.">
+    <V2Panel
+      title="Attribution Health"
+      caption="Latest booked call vs. attribution timestamps."
+    >
       <div className="V2SplitStat">
         <div>
           <span>Lag</span>
@@ -59,7 +71,8 @@ export function AttributionHealthPanel() {
       </div>
       {data.isLagging && (
         <div className="V2InlineWarning" style={{ marginTop: '1rem' }}>
-          Attribution lag exceeds 24h — the dashboard may show fallback bookings until the refresh completes.
+          Attribution lag exceeds 24h — the dashboard may show fallback bookings
+          until the refresh completes.
         </div>
       )}
     </V2Panel>

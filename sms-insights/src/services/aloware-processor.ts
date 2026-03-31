@@ -11,7 +11,17 @@ export class AlowareProcessor {
       // Aloware webhooks often use 'from', 'to', 'message' for SMS events
       const direction: NewSmsEvent['direction'] = event.direction || (event.from && event.to ? 'inbound' : 'unknown');
       const contactPhone = event.contact_phone || (direction === 'inbound' ? event.from : event.to);
-      const body = event.body || event.message || '';
+
+      // Handle nested body structure - Aloware sometimes sends body as an object with nested body field
+      let body = '';
+      if (typeof event.body === 'string') {
+        body = event.body;
+      } else if (event.body && typeof event.body === 'object' && 'body' in event.body) {
+        body = String(event.body.body || '');
+      } else {
+        body = event.message || '';
+      }
+
       const eventId = event.id || `webhook-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
       const newEvent: NewSmsEvent = {

@@ -20,14 +20,20 @@ export const prisma =
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 
-// Connection management
-export const connectPrisma = async () => {
-  try {
-    await prisma.$connect();
-    console.log("✅ Database connected successfully");
-  } catch (error) {
-    console.error("❌ Database connection failed:", error);
-    throw error;
+// Connection management with retry logic
+export const connectPrisma = async (retries = 3, delay = 1000) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await prisma.$connect();
+      console.log("✅ Database connected successfully");
+      return;
+    } catch (error) {
+      console.error(`❌ Database connection failed (attempt ${attempt}/${retries}):`, error);
+      if (attempt === retries) {
+        throw new Error(`Database connection failed after ${retries} attempts: ${error}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, delay * attempt));
+    }
   }
 };
 
@@ -41,16 +47,36 @@ export const disconnectPrisma = async () => {
   }
 };
 
-// Health check
+// Health check with detailed diagnostics
 export const healthCheck = async () => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
-    return { status: "healthy", timestamp: new Date().toISOString() };
+    // Test basic connectivity
+    await prisma.$queryRaw`SELECT 1 as health_check`;
+
+    // Test schema access
+    const schemaTest = await prisma.$queryRaw`
+      SELECT COUNT(*) as table_count
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+    `;
+
+    return {
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      details: {
+        tables: schemaTest[0].table_count,
+        connection: "active"
+      }
+    };
   } catch (error) {
     return {
       status: "unhealthy",
       error: error instanceof Error ? error.message : "Unknown error",
       timestamp: new Date().toISOString(),
+      details: {
+        connection: "failed",
+        suggestion: "Check DATABASE_URL and network connectivity"
+      }
     };
   }
 };

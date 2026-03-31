@@ -62,59 +62,69 @@ export const getInsightsSummary = async (
   const toDay = params.to.toISOString().slice(0, 10);
 
   let smsRows: any[] = [];
+  let bookingRows: any[] = [];
+  let mondayRows: any[] = [];
+
   try {
     smsRows = await prisma.fact_sms_daily.findMany({
-    where: {
-      day: {
-        gte: new Date(`${fromDay}T00:00:00.000Z`),
-        lte: new Date(`${toDay}T00:00:00.000Z`),
+      where: {
+        day: {
+          gte: new Date(`${fromDay}T00:00:00.000Z`),
+          lte: new Date(`${toDay}T00:00:00.000Z`),
+        },
+        ...(params.rep ? { rep_id: params.rep } : {}),
       },
-      ...(params.rep ? { rep_id: params.rep } : {}),
-    },
-    select: {
-      rep_id: true,
-      messages_sent: true,
-      unique_contacted: true,
-      replies_received: true,
-      opt_outs: true,
-    },
-  });
+      select: {
+        rep_id: true,
+        messages_sent: true,
+        unique_contacted: true,
+        replies_received: true,
+        opt_outs: true,
+      },
+    });
+  } catch (e) {
+    logger?.warn?.('insights-summary: fact_sms_daily unavailable', e);
+  }
 
-  let bookingRows: any[] = [];
   try {
     bookingRows = await prisma.fact_booking_daily.findMany({
-    where: {
-      day: {
-        gte: new Date(`${fromDay}T00:00:00.000Z`),
-        lte: new Date(`${toDay}T00:00:00.000Z`),
+      where: {
+        day: {
+          gte: new Date(`${fromDay}T00:00:00.000Z`),
+          lte: new Date(`${toDay}T00:00:00.000Z`),
+        },
+        ...(params.rep ? { rep_id: params.rep } : {}),
       },
-      ...(params.rep ? { rep_id: params.rep } : {}),
-    },
-    select: {
-      rep_id: true,
-      booked_total: true,
-    },
-  });
+      select: {
+        rep_id: true,
+        booked_total: true,
+      },
+    });
+  } catch (e) {
+    logger?.warn?.('insights-summary: fact_booking_daily unavailable', e);
+  }
 
-  let mondayRows: any[] = [];
   try {
     mondayRows = await prisma.fact_monday_health_daily.findMany({
-    where: {
-      day: {
-        gte: new Date(`${fromDay}T00:00:00.000Z`),
-        lte: new Date(`${toDay}T00:00:00.000Z`),
+      where: {
+        day: {
+          gte: new Date(`${fromDay}T00:00:00.000Z`),
+          lte: new Date(`${toDay}T00:00:00.000Z`),
+        },
       },
-    },
-    select: {
-      board_id: true,
-      is_stale: true,
-      sync_status: true,
-      source_coverage_pct: true,
-      campaign_coverage_pct: true,
-      set_by_coverage_pct: true,
-      touchpoints_coverage_pct: true,
-    },
-  });
+      select: {
+        board_id: true,
+        is_stale: true,
+        sync_status: true,
+        source_coverage_pct: true,
+        campaign_coverage_pct: true,
+        set_by_coverage_pct: true,
+        touchpoints_coverage_pct: true,
+      },
+    });
+  } catch (e) {
+    logger?.warn?.('insights-summary: fact_monday_health_daily unavailable', e);
+  }
 
   const repTotals = new Map<
     string,
@@ -217,20 +227,11 @@ export const getInsightsSummary = async (
       ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length
       : 0;
 
-  } catch (e1) {
-    logger?.warn?.('insights-summary: fact_sms_daily or fact_booking_daily unavailable', e1);
-  }
-} catch (e2) {
-    logger?.warn?.('insights-summary: fact_monday_health_daily unavailable', e2);
-  }
-
   if (smsRows.length === 0 && bookingRows.length === 0 && mondayRows.length === 0) {
     logger?.warn?.('insights-summary: All fact tables unavailable - serving empty data');
   }
-    logger?.warn?.('insights-summary: no monday health rows in requested window');
-  }
 
-  } finally {
+  return {
     window: { from: params.from.toISOString(), to: params.to.toISOString(), timeZone: params.timeZone },
     kpis: {
       messagesSent: kpis.messagesSent,
@@ -264,3 +265,4 @@ export const getInsightsSummary = async (
     },
   };
 };
+

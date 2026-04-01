@@ -6,17 +6,18 @@
     "apps/backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=ptbizsms-api\" \"npm run dev --workspace=ptbizsms-dashboard\"",
-    "dev:backend": "npm run dev --workspace=ptbizsms-api",
-    "dev:frontend": "npm run dev --workspace=ptbizsms-dashboard",
-    "build": "npm run --workspace=ptbizsms-api build && npm run --workspace=ptbizsms-dashboard build",
-    "build:backend": "npm run --workspace=ptbizsms-api build",
-    "build:frontend": "npm run --workspace=ptbizsms-dashboard build",
-    "lint": "npm run --workspace=ptbizsms-api lint && npm run --workspace=ptbizsms-dashboard lint",
-    "lint:backend": "npm run --workspace=ptbizsms-api lint",
-    "lint:frontend": "npm run --workspace=ptbizsms-dashboard lint",
-    "test": "npm run --workspace=ptbizsms-api test && npm run --workspace=ptbizsms-dashboard test",
-    "typecheck": "npm run --workspace=ptbizsms-dashboard typecheck:v2"
+    "dev": "concurrently \"npm --prefix apps/backend run dev\" \"npm --prefix apps/frontend run dev\"",
+    "dev:backend": "npm --prefix apps/backend run dev",
+    "dev:frontend": "npm --prefix apps/frontend run dev",
+    "build": "npm --prefix apps/backend run build && npm --prefix apps/frontend run build",
+    "build:backend": "npm --prefix apps/backend run build",
+    "build:frontend": "npm --prefix apps/frontend run build",
+    "lint": "npm --prefix apps/backend run lint && npm --prefix apps/frontend run lint",
+    "lint:backend": "npm --prefix apps/backend run lint",
+    "lint:frontend": "npm --prefix apps/frontend run lint",
+    "test": "npm --prefix apps/backend run test && npm --prefix apps/frontend run test",
+    "typecheck": "npm --prefix apps/frontend run typecheck:v2",
+    "typecheck:v2": "npm --prefix apps/frontend run typecheck:v2"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

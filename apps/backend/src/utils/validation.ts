@@ -15,11 +15,11 @@ export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): T {
 
 export function validateParams<T>(schema: z.ZodSchema<T>, params: Record<string, string>): T {
   // Convert string params to appropriate types
-  const convertedParams: Record<string, any> = {};
+  const convertedParams: Record<string, string | number | boolean> = {};
 
   for (const [key, value] of Object.entries(params)) {
     // Try to parse as number
-    if (!isNaN(Number(value)) && value.trim() !== '') {
+    if (!Number.isNaN(Number(value)) && value.trim() !== '') {
       convertedParams[key] = Number(value);
     }
     // Try to parse as boolean

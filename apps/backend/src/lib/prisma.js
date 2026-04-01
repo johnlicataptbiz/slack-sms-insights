@@ -6,4 +6,3 @@ export const connectPrisma = async () => {
   return prismaLocal;
 };
 export const getPrismaClient = () => prismaLocal;
-

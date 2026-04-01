@@ -3,4 +3,3 @@ declare module './prisma-local.js' {
   const prisma: PrismaClient;
   export default prisma;
 }
-

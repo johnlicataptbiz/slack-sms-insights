@@ -80,9 +80,9 @@ MONDAY_OUTBOUND_ENABLED=false
 2. **Test with ONE call manually**
    ```bash
    cd sms-insights
-   railway run node --import tsx monday-sync-manager.mjs sync
+   railway run npm run sync:monday
    ```
-   - This will sync ONE recent call as a test
+   - This will sync recent calls as a test
    - Check Monday board to verify all columns populate correctly
 
 3. **If test successful, re-enable auto-sync:**
@@ -110,10 +110,9 @@ Located in `sms-insights/`:
    - Validates column mapping
    - Usage: `railway run node --import tsx check-status-columns.mjs`
 
-3. **`monday-sync-manager.mjs`**
-   - Complete Monday sync management tool
-   - Commands: `config`, `pending`, `sync`, `activity`, `all`
-   - Usage: `railway run node --import tsx monday-sync-manager.mjs <command>`
+3. **`sync:monday` npm script** (replaces removed `monday-sync-manager.mjs`)
+   - Runs the Monday sync service
+   - Usage: `railway run npm run sync:monday`
 
 ### Monday.com API Behavior
 

@@ -4,17 +4,20 @@ import { describe, it } from 'node:test';
 describe('monday-sms-reports configuration', () => {
   describe('parseBool', () => {
     it('should parse true string to true', () => {
-      const result = (process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED = 'true');
+      process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED = 'true';
+      const result = process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED;
       assert.equal(result, 'true');
     });
 
     it('should parse false string to false', () => {
-      const result = (process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED = 'false');
+      process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED = 'false';
+      const result = process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED;
       assert.equal(result, 'false');
     });
 
     it('should return fallback for empty string', () => {
-      const result = (process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED = '');
+      process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED = '';
+      const result = process.env.MONDAY_SMS_REPORTS_SYNC_ENABLED;
       assert.equal(result, '');
     });
   });

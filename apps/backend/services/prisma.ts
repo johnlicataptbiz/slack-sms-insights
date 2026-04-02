@@ -1,4 +1,3 @@
-import type { Prisma } from '@prisma/client';
 import { PrismaClient } from '@prisma/client';
 import { withAccelerate } from '@prisma/extension-accelerate';
 
@@ -45,16 +44,12 @@ const resolvePrismaConfig = (): {
 
 const createPrismaClient = (config: { url: string; mode: PrismaMode }) => {
   if (config.mode === 'accelerate') {
-    // Prisma 7 client engine expects accelerateUrl rather than the old datasourceUrl option.
-    const clientOptions = { accelerateUrl: config.url } as unknown as Prisma.PrismaClientOptions;
-    return (new PrismaClient(clientOptions) as PrismaClient).$extends(withAccelerate()) as unknown as PrismaClient;
+    return (new PrismaClient({ accelerateUrl: config.url }) as any).$extends(
+      withAccelerate(),
+    ) as unknown as PrismaClient;
   }
 
-  // Direct connection using datasourceUrl (fallback for older Prisma versions)
-return new PrismaClient({ log: ['error', 'warn'] });
-
-
-  // Fallback: try direct connection with minimal config
+  // Direct connection: use plain PrismaClient without Accelerate
   return new PrismaClient({
     log: ['error', 'warn'],
   });

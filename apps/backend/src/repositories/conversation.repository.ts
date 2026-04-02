@@ -1,4 +1,4 @@
-import type { Conversation, ConversationStatus } from '@prisma/client';
+import type { Conversation, ConversationStatus, PrismaClient } from '@prisma/client';
 import { ConversationDetailSelectPattern } from '../schemas/db-results.js';
 import { BaseRepository } from './base.repository.js';
 
@@ -23,6 +23,11 @@ export interface UpdateConversationData {
 }
 
 export class ConversationRepository extends BaseRepository {
+  // biome-ignore lint/complexity/noUselessConstructor: explicit constructor preserves base contract for direct instantiation.
+  constructor(prisma: PrismaClient) {
+    super(prisma);
+  }
+
   async findById(id: string): Promise<Conversation | null> {
     return this.prisma.conversation.findUnique({
       where: { id },

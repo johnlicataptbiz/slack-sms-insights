@@ -3,7 +3,6 @@
  * Consolidates all the refetch-verified mutation operations
  */
 
-import { useMutation } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type { UseInboxStateReturn } from './useInboxState';
 
@@ -30,10 +29,7 @@ export const useInboxMutations = (
         state.updateUIState({ sendStatus: 'sending' });
 
         // Validate stage gating
-        if (
-          messageText.includes('calendly.com') &&
-          state.escalationState.level <= 1
-        ) {
+        if (messageText.includes('calendly.com') && state.escalationState.level <= 1) {
           state.setFlashMessage('Set the escalation stage to L2 or higher...');
           state.updateUIState({ sendStatus: 'idle' });
           return;
@@ -59,9 +55,7 @@ export const useInboxMutations = (
         }
       } catch (error) {
         state.updateUIState({ sendStatus: 'error' });
-        state.setFlashMessage(
-          `Send failed: ${String((error as Error)?.message || error)}`,
-        );
+        state.setFlashMessage(`Send failed: ${String((error as Error)?.message || error)}`);
       }
     },
     [state, detailQuery, mutations],
@@ -85,9 +79,7 @@ export const useInboxMutations = (
       await detailQuery.refetch();
       state.setFlashMessage('Qualification saved and verified.');
     } catch (error) {
-      state.setFlashMessage(
-        `Qualification update failed: ${String((error as Error)?.message || error)}`,
-      );
+      state.setFlashMessage(`Qualification update failed: ${String((error as Error)?.message || error)}`);
     }
   }, [state, detailQuery, mutations]);
 
@@ -107,9 +99,7 @@ export const useInboxMutations = (
       await detailQuery.refetch();
       state.setFlashMessage('Stage saved and verified.');
     } catch (error) {
-      state.setFlashMessage(
-        `Escalation update failed: ${String((error as Error)?.message || error)}`,
-      );
+      state.setFlashMessage(`Escalation update failed: ${String((error as Error)?.message || error)}`);
     }
   }, [state, detailQuery, mutations]);
 
@@ -129,9 +119,7 @@ export const useInboxMutations = (
         await detailQuery.refetch();
         state.setFlashMessage(`Assigned to: ${trimmed || 'Unassigned'}`);
       } catch (error) {
-        state.setFlashMessage(
-          `Assign failed: ${String((error as Error)?.message || error)}`,
-        );
+        state.setFlashMessage(`Assign failed: ${String((error as Error)?.message || error)}`);
       }
     },
     [state, detailQuery, mutations],
@@ -152,9 +140,7 @@ export const useInboxMutations = (
         await detailQuery.refetch();
         state.setFlashMessage(`Status updated to: ${status}`);
       } catch (error) {
-        state.setFlashMessage(
-          `Status update failed: ${String((error as Error)?.message || error)}`,
-        );
+        state.setFlashMessage(`Status update failed: ${String((error as Error)?.message || error)}`);
       }
     },
     [state, detailQuery, mutations],

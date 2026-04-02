@@ -56,8 +56,7 @@ jobs:
     - name: Run frontend tests
       run: npm run --workspace=ptbizsms-dashboard-unified test
 
-    - name: Run type check (non-blocking during inbox refactor)
-      continue-on-error: true
+    - name: Run type check
       run: npm run --workspace=ptbizsms-dashboard-unified typecheck
 
     - name: Build

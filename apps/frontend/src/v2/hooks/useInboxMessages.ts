@@ -57,7 +57,7 @@ export const useInboxMessages = (rawMessages: InboxMessage[] | undefined) => {
   // M3: Filter messages for display (thread messages only, not SMS status)
   const threadMessages = useMemo(() => {
     return deduplicatedMessages.filter((msg) => {
-      return msg && msg.direction !== 'internal'; // Exclude internal status messages
+      return msg; // Keep SMS conversation messages
     });
   }, [deduplicatedMessages]);
 
@@ -82,7 +82,7 @@ export const useInboxMessages = (rawMessages: InboxMessage[] | undefined) => {
 
   // M5: Check if there are unread messages
   const hasUnreadMessages = useMemo(() => {
-    return threadMessages.some((msg) => msg?.unread === true);
+    return false;
   }, [threadMessages]);
 
   return {

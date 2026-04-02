@@ -3,7 +3,6 @@
  * Consolidates all the refetch-verified mutation operations
  */
 
-import { useMutation } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type { UseInboxStateReturn } from './useInboxState';
 

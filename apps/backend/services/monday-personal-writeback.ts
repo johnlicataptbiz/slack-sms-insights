@@ -580,7 +580,7 @@ const pushOne = async (
     boardId: params.boardId,
   };
 
-  await upsertMondayBookedCallPush(
+  const pendingPersisted = await upsertMondayBookedCallPush(
     {
       boardId: params.boardId,
       slackChannelId: source.slackChannelId,
@@ -593,6 +593,14 @@ const pushOne = async (
     },
     logger,
   );
+  if (!pendingPersisted) {
+    logger?.error?.('Skipping Monday writeback because push-tracking persistence failed (fail-closed)', {
+      boardId: params.boardId,
+      slackChannelId: source.slackChannelId,
+      slackMessageTs: source.slackMessageTs,
+    });
+    return 'error';
+  }
 
   try {
     const columnValues = toColumnValues(source, params.mapping, params.columnsById);
@@ -606,7 +614,7 @@ const pushOne = async (
       },
       logger,
     );
-    await upsertMondayBookedCallPush(
+    const syncedPersisted = await upsertMondayBookedCallPush(
       {
         boardId: params.boardId,
         slackChannelId: source.slackChannelId,
@@ -620,9 +628,18 @@ const pushOne = async (
       },
       logger,
     );
+    if (!syncedPersisted) {
+      logger?.error?.('Failed to persist synced push status after Monday writeback', {
+        boardId: params.boardId,
+        mondayItemId: result.itemId,
+        slackChannelId: source.slackChannelId,
+        slackMessageTs: source.slackMessageTs,
+      });
+      return 'error';
+    }
     return 'synced';
   } catch (error) {
-    await upsertMondayBookedCallPush(
+    const erroredPersisted = await upsertMondayBookedCallPush(
       {
         boardId: params.boardId,
         slackChannelId: source.slackChannelId,
@@ -635,6 +652,13 @@ const pushOne = async (
       },
       logger,
     );
+    if (!erroredPersisted) {
+      logger?.error?.('Failed to persist errored push status after Monday writeback failure', {
+        boardId: params.boardId,
+        slackChannelId: source.slackChannelId,
+        slackMessageTs: source.slackMessageTs,
+      });
+    }
     return 'error';
   }
 };

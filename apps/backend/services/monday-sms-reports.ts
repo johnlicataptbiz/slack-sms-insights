@@ -1,5 +1,12 @@
 import type { Logger } from '@slack/bolt';
-import { queryBoardColumns, queryBoardItems, upsertBookedCallItem } from './monday-client.js';
+import { queryBoardColumns, queryBoardItems } from './monday-client.js';
+import {
+  buildSyncDiagnostics,
+  computeDuplicatesDetected,
+  computeLinkCoverage,
+  ensureMondayIntelligentBoardSchema,
+  type MondaySyncDiagnostics,
+} from './monday-sms-intelligence.js';
 import {
   coerceBoardMapping,
   inferBoardMapping,
@@ -12,9 +19,14 @@ import {
   getMondayColumnMapping,
   getMondaySyncState,
   saveMondayColumnMapping,
+  upsertMondayCallColumnValues,
+  upsertMondayCallSnapshot,
+  upsertMondayMetricFacts,
+  upsertNormalizedMondayLeadRecords,
   upsertMondayBoardRegistry,
   upsertMondaySyncState,
 } from './monday-store.js';
+import { findColumnIdByTitle } from './monday-board-schemas.js';
 
 const parseBool = (value: string | undefined, fallback = false): boolean => {
   const normalized = (value || '').trim().toLowerCase();
@@ -49,6 +61,7 @@ export type MondaySmsReportsSyncResult = {
   nextCursor: string | null;
   startedAt: string;
   finishedAt: string;
+  diagnostics: MondaySyncDiagnostics;
   error?: string;
 };
 
@@ -118,6 +131,15 @@ export const syncMondaySmsReportsBoard = async (
       nextCursor: null,
       startedAt,
       finishedAt: new Date().toISOString(),
+      diagnostics: {
+        schemaVersion: 'intelligent-v1',
+        structureValid: false,
+        linkCoverage: 0,
+        kpiParityDelta: null,
+        duplicatesDetected: 0,
+        missingColumns: [],
+        driftedColumns: [],
+      },
       error: 'MONDAY_SMS_REPORTS_SYNC_ENABLED is false',
     };
   }
@@ -135,6 +157,7 @@ export const syncMondaySmsReportsBoard = async (
       queryBoardColumns(boardId, logger),
       getMondayColumnMapping(boardId, logger),
     ]);
+    const schemaResult = await ensureMondayIntelligentBoardSchema('reports', boardId, logger);
     const inferred = inferBoardMapping(columns);
     const persisted = coerceBoardMapping(persistedRaw);
     const envOverride = readBoardMappingFromEnv();
@@ -146,6 +169,8 @@ export const syncMondaySmsReportsBoard = async (
     }
     await saveMondayColumnMapping(boardId, mapping, logger);
     const columnsById = new Map(columns.map((column) => [column.id, column]));
+    const relationColumnId = findColumnIdByTitle(columns, ['Sequence Links']);
+    const joinKeyColumnId = findColumnIdByTitle(columns, ['Report Day Key']);
     let boardProfile = await getMondayBoardRegistry(boardId, logger);
     if (!boardProfile) {
       const fallback = resolveDefaultBoardGovernance(boardId);
@@ -168,7 +193,9 @@ export const syncMondaySmsReportsBoard = async (
 
     let cursor = state?.cursor || null;
     let fetchedItems = 0;
-    const upsertedItems = 0;
+    let upsertedItems = 0;
+    const diagnosticJoinKeys: Array<{ id: string; joinKey: string | null }> = [];
+    const diagnosticLinks: Array<{ linkedIds: string[] }> = [];
     let pageCount = 0;
 
     while (pageCount < mondaySmsReportsConfig.maxPagesPerRun) {
@@ -195,31 +222,103 @@ export const syncMondaySmsReportsBoard = async (
         if (!force && initialSync && normalized.updatedAt < backfillCutoff) continue;
         if (!force && !initialSync && lastSyncAt && normalized.updatedAt <= lastSyncAt) continue;
 
-        await upsertMondaySyncState(
+        const values = item.columnValues.map((column) => ({
+          columnId: column.id,
+          columnTitle: columnsById.get(column.id)?.title || null,
+          columnType: column.type || columnsById.get(column.id)?.type || null,
+          textValue: column.text,
+          valueJson: parseColumnValueJson(column.value),
+        }));
+
+        await upsertMondayCallSnapshot(
           {
             boardId,
-            cursor,
-            lastSyncAt: new Date(),
-            status: 'success',
-            error: null,
+            itemId: normalized.itemId,
+            itemName: normalized.itemName,
+            updatedAt: normalized.updatedAt,
+            callDate: normalized.callDate,
+            setter: normalized.setter,
+            stage: normalized.stage,
+            disposition: normalized.disposition,
+            isBooked: normalized.isBooked,
+            contactKey: normalized.contactKey,
+            raw: normalized.raw,
           },
           logger,
         );
+        await upsertMondayCallColumnValues(
+          {
+            boardId,
+            itemId: normalized.itemId,
+            itemUpdatedAt: normalized.updatedAt,
+            values,
+          },
+          logger,
+        );
+        await upsertNormalizedMondayLeadRecords(
+          {
+            boardId,
+            itemId: normalized.itemId,
+            itemName: normalized.itemName,
+            itemUpdatedAt: normalized.updatedAt,
+            callDate: normalized.callDate,
+            contactKey: normalized.contactKey,
+            setter: normalized.setter,
+            stage: normalized.stage,
+            disposition: normalized.disposition,
+            isBooked: normalized.isBooked,
+            columns: values,
+            raw: normalized.raw,
+          },
+          logger,
+        );
+        await upsertMondayMetricFacts(
+          {
+            boardId,
+            itemId: normalized.itemId,
+            itemUpdatedAt: normalized.updatedAt,
+            callDate: normalized.callDate,
+            setter: normalized.setter,
+            columns: values,
+            raw: normalized.raw,
+          },
+          logger,
+        );
+        upsertedItems += 1;
 
-        return {
-          status: 'success',
-          boardId,
-          fetchedItems,
-          upsertedItems,
-          nextCursor: cursor,
-          startedAt,
-          finishedAt: new Date().toISOString(),
-        };
+        diagnosticJoinKeys.push({
+          id: normalized.itemId,
+          joinKey: item.columnValues.find((value) => value.id === joinKeyColumnId)?.text || null,
+        });
+        const linkedIds = (() => {
+          if (!relationColumnId) return [];
+          const raw = item.columnValues.find((value) => value.id === relationColumnId)?.value || null;
+          if (!raw) return [];
+          try {
+            const parsed = JSON.parse(raw) as { item_ids?: Array<number | string>; linkedPulseIds?: Array<{ linkedPulseId?: number | string }> };
+            if (Array.isArray(parsed.item_ids)) return parsed.item_ids.map((id) => String(id));
+            if (Array.isArray(parsed.linkedPulseIds)) {
+              return parsed.linkedPulseIds
+                .map((entry) => (entry?.linkedPulseId == null ? null : String(entry.linkedPulseId)))
+                .filter((id): id is string => Boolean(id));
+            }
+          } catch {
+            return [];
+          }
+          return [];
+        })();
+        diagnosticLinks.push({ linkedIds });
       }
 
       cursor = page.nextCursor;
       if (!cursor) break;
     }
+
+    const diagnostics = buildSyncDiagnostics(
+      schemaResult.diagnostics,
+      computeLinkCoverage(diagnosticLinks),
+      computeDuplicatesDetected(diagnosticJoinKeys),
+    );
 
     await upsertMondaySyncState(
       {
@@ -240,6 +339,7 @@ export const syncMondaySmsReportsBoard = async (
       nextCursor: cursor,
       startedAt,
       finishedAt: new Date().toISOString(),
+      diagnostics,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -261,6 +361,15 @@ export const syncMondaySmsReportsBoard = async (
       nextCursor: state?.cursor || null,
       startedAt,
       finishedAt: new Date().toISOString(),
+      diagnostics: {
+        schemaVersion: 'intelligent-v1',
+        structureValid: false,
+        linkCoverage: 0,
+        kpiParityDelta: null,
+        duplicatesDetected: 0,
+        missingColumns: [],
+        driftedColumns: [],
+      },
       error: message,
     };
   }

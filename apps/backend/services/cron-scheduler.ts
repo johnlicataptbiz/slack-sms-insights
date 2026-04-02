@@ -1,4 +1,5 @@
 import type { App } from '@slack/bolt';
+import type { Logger } from '@slack/bolt';
 import {
   getConversionTrends,
   getSetterPerformance,
@@ -116,7 +117,13 @@ const resolveNextRunCt = (targetHour: number, targetMinute: number): { date: str
  * this directly generates the report and posts it as a rich Block Kit card
  * with interactive buttons. The full report text is posted in a thread reply.
  */
-export const startDailyReportCron = async (app: App): Promise<void> => {
+type AppLike = {
+  logger: Logger;
+  client: any;
+};
+
+export const startDailyReportCron = async (appRaw: App): Promise<void> => {
+  const app = appRaw as unknown as AppLike;
   app.logger.info(
     `[cron] Daily report cron started — fires at ${REPORT_HOUR_CT}:${String(REPORT_MINUTE_CT).padStart(2, '0')} AM CT`,
   );
@@ -248,7 +255,7 @@ const shouldRunProactiveAlerts = (date: string, hour: number, minute: number): b
   return true;
 };
 
-const checkProactiveAlerts = async (app: App): Promise<void> => {
+const checkProactiveAlerts = async (app: AppLike): Promise<void> => {
   try {
     // Use the intelligent proactive alert system
     const { shouldAlert, alerts } = await quickAlertCheck();
@@ -326,7 +333,7 @@ const loadInboxWatchCounts = async (): Promise<InboxWatchCounts> => {
 };
 
 const postInboxWatchAlert = async (
-  app: App,
+  app: AppLike,
   counts: InboxWatchCounts,
   thresholds: { critical: number; stale: number; unassigned: number },
 ): Promise<void> => {
@@ -386,7 +393,7 @@ const postInboxWatchAlert = async (
 };
 
 const maybeAutoAssignInboxBacklog = async (
-  app: App,
+  app: AppLike,
   counts: InboxWatchCounts,
   thresholds: { critical: number; stale: number; unassigned: number },
 ): Promise<void> => {
@@ -406,7 +413,7 @@ const maybeAutoAssignInboxBacklog = async (
 };
 
 const maybeRefreshBookedCallAttribution = async (
-  app: App,
+  app: AppLike,
   date: string,
   hour: number,
   minute: number,
@@ -428,7 +435,7 @@ const maybeRefreshBookedCallAttribution = async (
   app.logger.info('[cron] booked_call_attribution refresh complete', result);
 };
 
-const maybeAlertAttributionLag = async (app: App, date: string, hour: number, minute: number): Promise<void> => {
+const maybeAlertAttributionLag = async (app: AppLike, date: string, hour: number, minute: number): Promise<void> => {
   if (!shouldRunAttributionHealthCheck(date, hour, minute)) return;
 
   const lagStatus = await getAttributionLagStatus(ATTRIBUTION_LAG_THRESHOLD_HOURS);
@@ -474,7 +481,7 @@ const maybeAlertAttributionLag = async (app: App, date: string, hour: number, mi
   lastAttributionAlertAt = Date.now();
 };
 
-const maybeRefreshKpiFacts = async (app: App, date: string, hour: number, minute: number): Promise<void> => {
+const maybeRefreshKpiFacts = async (app: AppLike, date: string, hour: number, minute: number): Promise<void> => {
   if (hour !== KPI_REFRESH_HOUR_CT || minute !== KPI_REFRESH_MINUTE_CT) return;
   if (lastKpiRefreshDate === date) return;
 
@@ -557,7 +564,8 @@ export const getCronStatusSnapshot = (): {
   };
 };
 
-export const startLrnRefreshCron = (app: App): void => {
+export const startLrnRefreshCron = (appRaw: App): void => {
+  const app = appRaw as unknown as AppLike;
   if (!isLrnRefreshEnabled()) {
     app.logger.info('[cron] LRN refresh cron disabled (ALOWARE_LRN_REFRESH_CRON_ENABLED=false)');
     return;

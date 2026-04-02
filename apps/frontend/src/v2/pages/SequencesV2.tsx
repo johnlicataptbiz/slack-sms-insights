@@ -1,19 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import {
   Calendar,
   ChevronDown,
-  ChevronUp,
   Filter,
   MessageSquare,
   Phone,
   Reply,
   SortAsc,
   SortDesc,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
   Users,
 } from 'lucide-react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
@@ -111,12 +106,12 @@ const normalizeSequenceColumnWidths = (
   return next as SequenceColumnWidths;
 };
 
-const filterVariants = {
+const filterVariants: Variants = {
   hidden: { opacity: 0, y: -20 },
   visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.05 } },
 };
 
-const metricVariants = {
+const metricVariants: Variants = {
   hidden: { opacity: 0, scale: 0.9 },
   visible: {
     opacity: 1,
@@ -126,8 +121,8 @@ const metricVariants = {
 };
 
 export default function SequencesV2() {
-  const [mode, setMode] = useState<Mode>('30d');
-  const [status, setStatus] = useState<'active' | 'inactive' | ''>('active');
+  const [mode] = useState<Mode>('30d');
+  const [status] = useState<'active' | 'inactive' | ''>('active');
   const [minSendsThreshold, setMinSendsThreshold] = useState<number>(15);
   const [sortKey, setSortKey] = useState<SortKey>('messagesSent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -452,7 +447,6 @@ export default function SequencesV2() {
                   </span>
                 }
                 value={fmtInt(totals.messagesSent)}
-                className="V2Metric--neon"
               />
             </motion.div>
             <motion.div variants={metricVariants}>
@@ -484,7 +478,6 @@ export default function SequencesV2() {
                 }
                 value={fmtInt(totals.bookedCalls)}
                 tone="positive"
-                className="V2Metric--success"
               />
             </motion.div>
           </motion.div>
@@ -703,18 +696,35 @@ export default function SequencesV2() {
           </div>
 
           {/* Tabbed Panels */}
-          <Tabs
-            className="V2Tabs"
-            value={activeTab}
-            onChange={(index) => setActiveTab(index)}
-          >
-            <TabList className="V2TabList V2NeonBorder">
-              <Tab className="V2Tab V2NeonText">Overview</Tab>
-              <Tab className="V2Tab V2NeonText">Funnel & Attribution</Tab>
-              <Tab className="V2Tab V2NeonText">Qualification</Tab>
-            </TabList>
-            <TabPanels>
-              <TabPanel>
+          <div className="V2Tabs">
+            <div className="V2TabList V2NeonBorder">
+              <button
+                type="button"
+                className="V2Tab V2NeonText"
+                aria-selected={activeTab === 0}
+                onClick={() => setActiveTab(0)}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                className="V2Tab V2NeonText"
+                aria-selected={activeTab === 1}
+                onClick={() => setActiveTab(1)}
+              >
+                Funnel & Attribution
+              </button>
+              <button
+                type="button"
+                className="V2Tab V2NeonText"
+                aria-selected={activeTab === 2}
+                onClick={() => setActiveTab(2)}
+              >
+                Qualification
+              </button>
+            </div>
+            {activeTab === 0 ? (
+              <div>
                 {/* Qualification Summary */}
                 {!qualificationQuery.isLoading &&
                 !qualificationQuery.isError &&
@@ -768,8 +778,10 @@ export default function SequencesV2() {
                     </motion.article>
                   </motion.div>
                 ) : null}
-              </TabPanel>
-              <TabPanel>
+              </div>
+            ) : null}
+            {activeTab === 1 ? (
+              <div>
                 <div className="V2Grid V2Grid--2">
                   <SequenceFunnelPanel rows={funnelRows} />
                   <AttributionReviewQueuePanel rows={reviewQueueRows} />
@@ -778,15 +790,17 @@ export default function SequencesV2() {
                   <AttributionMethodPanel rows={attributionMethodRows} />
                   <RepResponsePanel rows={repResponseRows} />
                 </div>
-              </TabPanel>
-              <TabPanel>
+              </div>
+            ) : null}
+            {activeTab === 2 ? (
+              <div>
                 <SequenceQualificationBreakdown
                   items={qualificationItems}
                   isLoading={qualificationQuery.isLoading}
                 />
-              </TabPanel>
-            </TabPanels>
-          </Tabs>
+              </div>
+            ) : null}
+          </div>
         </>
       )}
     </div>

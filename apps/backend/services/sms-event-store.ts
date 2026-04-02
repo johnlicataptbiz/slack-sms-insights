@@ -85,42 +85,57 @@ export const insertSmsEvent = async (
       raw: toNullableJson(event.raw),
     };
 
-// Fixed: remove nonexistent fields from upsert
-const result = await prisma.smsEvents.upsert({
-where: {
-        slack_channel_id_slack_message_ts: {
-          slack_channel_id: event.slackChannelId,
-          slack_message_ts: event.slackMessageTs,
-        },
-      },
-      create: {
-        slack_channel_id: data.slack_channel_id,
-        slack_message_ts: data.slack_message_ts,
-        event_ts: data.event_ts,
-        direction: data.direction,
-        contact_phone: data.contact_phone,
-        contact_name: data.contact_name,
-        aloware_user: data.aloware_user,
-        body: data.body,
-        line: data.line,
-        sequence: data.sequence,
-        sequence_id: data.sequence_id,
-        raw: data.raw,
-      },
-      update: {
-        contact_phone: data.contact_phone,
-        contact_name: data.contact_name,
-        aloware_user: data.aloware_user,
-        body: data.body,
-        line: data.line,
-        sequence: data.sequence,
-        sequence_id: data.sequence_id,
-        raw: data.raw,
-      },
-    });
+    const rows = await prisma.$queryRawUnsafe<SmsEventRow[]>(
+      `
+      INSERT INTO sms_events (
+        slack_team_id,
+        slack_channel_id,
+        slack_message_ts,
+        event_ts,
+        direction,
+        contact_id,
+        contact_phone,
+        contact_name,
+        aloware_user,
+        body,
+        line,
+        sequence,
+        sequence_id,
+        raw
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb
+      )
+      ON CONFLICT (slack_channel_id, slack_message_ts)
+      DO UPDATE SET
+        contact_id = EXCLUDED.contact_id,
+        contact_phone = EXCLUDED.contact_phone,
+        contact_name = EXCLUDED.contact_name,
+        aloware_user = EXCLUDED.aloware_user,
+        body = EXCLUDED.body,
+        line = EXCLUDED.line,
+        sequence = EXCLUDED.sequence,
+        sequence_id = EXCLUDED.sequence_id,
+        raw = EXCLUDED.raw
+      RETURNING *
+      `,
+      data.slack_team_id,
+      data.slack_channel_id,
+      data.slack_message_ts,
+      data.event_ts,
+      data.direction,
+      data.contact_id,
+      data.contact_phone,
+      data.contact_name,
+      data.aloware_user,
+      data.body,
+      data.line,
+      data.sequence,
+      data.sequence_id,
+      data.raw ? JSON.stringify(data.raw) : null,
+    );
 
-
-    return result as unknown as SmsEventRow;
+    return rows[0] ?? null;
   } catch (err) {
     logger?.error('insertSmsEvent failed', err);
     throw err;
@@ -146,13 +161,17 @@ export const listWorkItemPreviewEventsByConversation = async (
 
   try {
 // Fixed: schema lacks conversation_id, event_ts, direction - use raw query
-const results = await prisma.$queryRawUnsafe<Array<{ direction: string; body: string | null; event_ts: string }>>(`
-  SELECT direction, body, created_at as event_ts
-  FROM sms_events 
-  WHERE slack_channel_id = ${conversationId} 
-  ORDER BY created_at DESC 
-  LIMIT ${limit}
-`); 
+    const results = await prisma.$queryRawUnsafe<Array<{ direction: string; body: string | null; event_ts: string }>>(
+      `
+      SELECT direction, body, created_at AS event_ts
+      FROM sms_events
+      WHERE slack_channel_id = $1
+      ORDER BY created_at DESC
+      LIMIT $2
+      `,
+      conversationId,
+      limit,
+    );
 
     return results as unknown as Array<Pick<SmsEventRow, 'direction' | 'body' | 'event_ts'>>;
   } catch (err) {
@@ -160,4 +179,3 @@ const results = await prisma.$queryRawUnsafe<Array<{ direction: string; body: st
     return [];
   }
 };
-

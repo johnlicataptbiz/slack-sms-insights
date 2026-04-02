@@ -1,4 +1,3 @@
-import type { Prisma } from '@prisma/client';
 import { getPrismaClient } from './prisma.js';
 
 const getPrisma = () => getPrismaClient();
@@ -69,10 +68,15 @@ export const autoAssignWorkItems = async (): Promise<{
 
     try {
       await prisma.$transaction(async (tx) => {
-        await tx.work_items.update({
-          where: { id: row.id },
-          data: { rep_id: repId },
-        });
+        await tx.$executeRawUnsafe(
+          `
+          UPDATE work_items
+          SET rep_id = $2
+          WHERE id = $1::uuid
+          `,
+          row.id,
+          repId,
+        );
 
         if (!syncedConversationIds.has(row.conversation_id)) {
           // Keep conversation-level assignment in sync so backlog KPIs do not stay "unassigned"
@@ -116,14 +120,20 @@ export const trackDraftRejection = async (
   feedback?: string,
 ): Promise<void> => {
   const prisma = getPrisma();
-  await prisma.draft_suggestions.update({
-    where: { id: draftId },
-    data: {
-      rejection_reason: reason,
-      rejection_feedback: feedback || null,
-      rejected_at: new Date(),
-    },
-  });
+  await prisma.$executeRawUnsafe(
+    `
+    UPDATE draft_suggestions
+    SET
+      rejection_reason = $2,
+      rejection_feedback = $3,
+      rejected_at = $4
+    WHERE id = $1::uuid
+    `,
+    draftId,
+    reason,
+    feedback || null,
+    new Date(),
+  );
 };
 
 export const getDraftRejectionStats = async (): Promise<{
@@ -640,16 +650,24 @@ export const bulkInferQualification = async (limit = 100): Promise<{ processed: 
 
     // Update if we found anything
     if (Object.keys(inferredState).length > 0) {
-      await prisma.conversation_state.update({
-        where: { conversation_id: row.conversation_id },
-        data: {
-          qualification_full_or_part_time: inferredState.employment,
-          qualification_coaching_interest: inferredState.interest,
-          qualification_revenue_mix: inferredState.revenueMix,
-          qualification_delivery_model: inferredState.deliveryModel,
-          updated_at: new Date(),
-        },
-      });
+      await prisma.$executeRawUnsafe(
+        `
+        UPDATE conversation_state
+        SET
+          qualification_full_or_part_time = COALESCE($2, qualification_full_or_part_time),
+          qualification_coaching_interest = COALESCE($3, qualification_coaching_interest),
+          qualification_revenue_mix = COALESCE($4, qualification_revenue_mix),
+          qualification_delivery_model = COALESCE($5, qualification_delivery_model),
+          updated_at = $6
+        WHERE conversation_id = $1::uuid
+        `,
+        row.conversation_id,
+        inferredState.employment ?? null,
+        inferredState.interest ?? null,
+        inferredState.revenueMix ?? null,
+        inferredState.deliveryModel ?? null,
+        new Date(),
+      );
       updated++;
     }
   }
@@ -1181,16 +1199,25 @@ export const logAuditEvent = async (params: {
 }): Promise<void> => {
   const prisma = getPrisma();
 
-  await prisma.audit_logs.create({
-    data: {
-      action: params.action,
-      resource_type: params.resourceType,
-      resource_id: params.resourceId,
-      user_id: params.userId || null,
-      details: toJsonString(params.details),
-      ip_address: params.ipAddress || null,
-    },
-  });
+  await prisma.$executeRawUnsafe(
+    `
+    INSERT INTO audit_logs (
+      action,
+      resource_type,
+      resource_id,
+      user_id,
+      details,
+      ip_address
+    )
+    VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+    `,
+    params.action,
+    params.resourceType,
+    params.resourceId,
+    params.userId || null,
+    toJsonString(params.details),
+    params.ipAddress || null,
+  );
 };
 
 export const getAuditLogs = async (params: {
@@ -1202,24 +1229,46 @@ export const getAuditLogs = async (params: {
   limit?: number;
 }): Promise<AuditLogEntry[]> => {
   const prisma = getPrisma();
-
-  const where: Prisma.audit_logsWhereInput = {};
-  if (params.from || params.to) {
-    where.created_at = {};
-    if (params.from) where.created_at.gte = params.from;
-    if (params.to) where.created_at.lte = params.to;
-  }
-  if (params.action) where.action = params.action;
-  if (params.resourceType) where.resource_type = params.resourceType;
-  if (params.userId) where.user_id = params.userId;
-
   const take = params.limit || 100;
 
-  const rows = await prisma.audit_logs.findMany({
-    where,
-    orderBy: { created_at: 'desc' },
+  const rows = await prisma.$queryRawUnsafe<
+    Array<{
+      id: string;
+      action: string;
+      resource_type: string;
+      resource_id: string;
+      user_id: string | null;
+      details: unknown | null;
+      ip_address: string | null;
+      created_at: Date | null;
+    }>
+  >(
+    `
+    SELECT
+      id,
+      action,
+      resource_type,
+      resource_id,
+      user_id,
+      details,
+      ip_address,
+      created_at
+    FROM audit_logs
+    WHERE ($1::timestamptz IS NULL OR created_at >= $1::timestamptz)
+      AND ($2::timestamptz IS NULL OR created_at <= $2::timestamptz)
+      AND ($3::text IS NULL OR action = $3::text)
+      AND ($4::text IS NULL OR resource_type = $4::text)
+      AND ($5::text IS NULL OR user_id = $5::text)
+    ORDER BY created_at DESC
+    LIMIT $6
+    `,
+    params.from ?? null,
+    params.to ?? null,
+    params.action ?? null,
+    params.resourceType ?? null,
+    params.userId ?? null,
     take,
-  });
+  );
 
   return rows.map((row) => ({
     id: row.id,

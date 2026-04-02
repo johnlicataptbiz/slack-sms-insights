@@ -98,6 +98,8 @@ model MondayColumnMapping {
   board_id     String   @id
   mapping_json Json
   updated_at   DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("monday_column_mappings")
 }
 
 model MondayCallSnapshots {
@@ -115,6 +117,7 @@ model MondayCallSnapshots {
   synced_at   DateTime  @default(now()) @db.Timestamptz(6)
 
   @@id([board_id, item_id])
+  @@map("monday_call_snapshots")
 }
 
 model MondayWeeklyReports {
@@ -123,6 +126,8 @@ model MondayWeeklyReports {
   summary_json    Json
   monday_item_id  String?
   synced_at       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("monday_weekly_reports")
 }
 
 model MondayBookedCallPushes {
@@ -138,6 +143,7 @@ model MondayBookedCallPushes {
   status           String @default("pending")
 
   @@id([board_id, slack_channel_id, slack_message_ts])
+  @@map("monday_booked_call_pushes")
 }
 
 model MondaySyncState {
@@ -147,6 +153,39 @@ model MondaySyncState {
   status       String?
   error        String?
   updated_at   DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("monday_sync_state")
+}
+
+model MondayBoardRegistry {
+  board_id               String    @id
+  board_label            String
+  board_class            String
+  metric_grain           String
+  include_in_funnel      Boolean   @default(false)
+  include_in_exec        Boolean   @default(false)
+  active                 Boolean   @default(true)
+  owner_team             String?
+  notes                  String?
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  last_sync_completed_at DateTime? @db.Timestamptz(6)
+  last_sync_started_at   DateTime? @db.Timestamptz(6)
+  last_sync_error_at     DateTime? @db.Timestamptz(6)
+
+  @@map("monday_board_registry")
+}
+
+model ActorDirectory {
+  canonical_name String   @id
+  role           String
+  aliases        String[] @default([])
+  active         Boolean  @default(true)
+  notes          String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("actor_directory")
 }
 
 model SequenceAliases {

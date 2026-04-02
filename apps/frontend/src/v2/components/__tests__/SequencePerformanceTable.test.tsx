@@ -63,8 +63,8 @@ describe('SequencePerformanceTable', () => {
   it('renders sequence performance data correctly', () => {
     render(<SequencePerformanceTable mergedRows={mockMergedRows} modeLabel="Last 7 days" />);
     
-    // Should show the lead magnet family
-    expect(screen.getAllByText('Test Magnet')[0]).toBeInTheDocument();
+    // Should show the lead magnet family heading
+    expect(screen.getByRole('heading', { name: 'Test Magnet' })).toBeInTheDocument();
     
     // Should show the version
     expect(screen.getByText('v1.0')).toBeInTheDocument();

@@ -12,7 +12,7 @@
 ### 1. Test First
 ```bash
 cd sms-insights
-railway run node --import tsx monday-sync-manager.mjs sync
+railway run npm run sync:monday
 ```
 Check Monday board - verify all columns filled correctly!
 
@@ -39,17 +39,18 @@ railway run node --import tsx inspect-board-items.mjs
 
 ### View Pending Calls
 ```bash
-railway run node --import tsx monday-sync-manager.mjs pending
+railway run npm run sync:monday
 ```
 
 ### Check Recent Sync Activity
 ```bash
-railway run node --import tsx monday-sync-manager.mjs activity
+# Check Railway logs for sync activity
+railway logs --service sms-insights | grep -i monday
 ```
 
 ### Full Overview
 ```bash
-railway run node --import tsx monday-sync-manager.mjs all
+railway run npm run sync:monday
 ```
 
 ---

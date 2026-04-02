@@ -3,6 +3,7 @@ import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ApiError, client, setUnauthorizedHandler } from './api/client';
 import { PasswordGate } from './components/PasswordGate';
+import SeoMetadata from './components/SeoMetadata';
 import { type UiMode, parseUiMode } from './uiMode';
 
 const V2App = lazy(() => import('./v2/V2App'));
@@ -18,6 +19,7 @@ const DefaultRoute = () => {
 
 const AppRoutes = () => (
   <BrowserRouter>
+    <SeoMetadata />
     <Routes>
       <Route path="/legacy" element={<Navigate to="/v2/insights" replace />} />
       <Route

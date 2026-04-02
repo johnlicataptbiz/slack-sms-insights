@@ -41,3 +41,7 @@ jobs:
         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    - name: Verify SEO crawl surface
+      run: node scripts/verify-seo-surface.mjs
+      env:
+        SEO_AUDIT_BASE_URL: https://ptbizsms.com

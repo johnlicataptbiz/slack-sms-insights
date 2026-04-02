@@ -39,6 +39,21 @@ type ResolvedConversationCandidate = {
   confidence: number | null;
 };
 
+type SequenceRegistryLookupRow = {
+  id: string;
+  label: string;
+  normalized_label: string;
+};
+
+type ExistingBookedCallAttributionRow = {
+  booked_call_id: string;
+  conversation_id: string | null;
+  conversation_match_seconds: number | null;
+  first_conversion: string | null;
+  resolved_sequence_id: string | null;
+  resolved_sequence_label: string | null;
+};
+
 const EVIDENCE_PRIORITY: Record<ConversationEvidence, number> = {
   profile_email: 4,
   profile_phone: 3,
@@ -239,27 +254,31 @@ export const refreshBookedCallAttribution = async (
   const [smsReplyLinks, smsSequenceLookup, sequenceRows] = await Promise.all([
     getBookedCallSmsReplyLinks(sources, attributionLogger),
     getBookedCallSequenceFromSmsEvents(sources, attributionLogger),
-    prisma.sequence_registry.findMany({
-      select: { id: true, label: true, normalized_label: true },
-    }),
+    prisma.$queryRawUnsafe<SequenceRegistryLookupRow[]>(
+      `
+      SELECT id, label, normalized_label
+      FROM sequence_registry
+      `,
+    ),
   ]);
   const sequenceIdByLabel = new Map(sequenceRows.map((row) => [row.normalized_label.trim().toLowerCase(), row.id]));
-  const existingRows =
+  const existingRows: ExistingBookedCallAttributionRow[] =
     sources.length === 0
       ? []
-      : await prisma.booked_call_attribution.findMany({
-          where: {
-            booked_call_id: { in: sources.map((source) => source.bookedCallId) },
-          },
-          select: {
-            booked_call_id: true,
-            conversation_id: true,
-            conversation_match_seconds: true,
-            first_conversion: true,
-            resolved_sequence_id: true,
-            resolved_sequence_label: true,
-          },
-        });
+      : await prisma.$queryRawUnsafe<ExistingBookedCallAttributionRow[]>(
+          `
+          SELECT
+            booked_call_id,
+            conversation_id,
+            conversation_match_seconds,
+            first_conversion,
+            resolved_sequence_id,
+            resolved_sequence_label
+          FROM booked_call_attribution
+          WHERE booked_call_id = ANY($1::text[])
+          `,
+          sources.map((source) => source.bookedCallId),
+        );
   const existingByBookedCallId = new Map(existingRows.map((row) => [row.booked_call_id, row]));
 
   const phoneKeys = Array.from(
@@ -463,64 +482,97 @@ export const refreshBookedCallAttribution = async (
       existing?.resolved_sequence_id ||
       null;
 
-    await prisma.booked_call_attribution.upsert({
-      where: { booked_call_id: source.bookedCallId },
-      create: {
-        booked_call_id: source.bookedCallId,
-        booked_event_ts: new Date(source.eventTs),
-        booked_text: source.text || null,
-        canonical_booking: true,
-        mapping_method: mappingMethod,
-        match_confidence: matchConfidence,
-        attribution_status: attributionState.attributionStatus,
-        attribution_confidence_band: attributionState.attributionConfidenceBand,
-        fallback_used: attributionState.fallbackUsed,
-        needs_review: attributionState.needsReview,
-        review_reason: attributionState.reviewReason,
-        conversation_id: resolvedConversationId,
-        conversation_match_seconds: resolvedConversationMatchSeconds,
-        setter_hint: mapSetterHint(source.bucket),
-        setter_final: mapSetterFromBucket(source.bucket),
-        closer_final: null,
-        first_conversion: resolvedFirstConversion,
-        source_bucket: source.bucket === 'selfBooked' ? 'self_booked' : 'setter_attributed',
-        resolved_sequence_id: resolvedSequenceId,
-        resolved_sequence_label: resolvedSequenceLabel,
-        attribution_path: attributionState.attributionPath,
-        matched_via_phone: Boolean(source.contactPhone && smsLookup?.conversationId),
-        matched_via_fuzzy: Boolean(candidateResolution.evidence && !smsLookup?.conversationId),
-        matched_via_reply_link: Boolean(replyLink?.hasPriorReply),
-        hubspot_contact_id: null,
-        lead_score: null,
-        lead_score_source: null,
-        mapper_version: mapperVersion,
-      },
-      update: {
-        booked_event_ts: new Date(source.eventTs),
-        booked_text: source.text || null,
-        canonical_booking: true,
-        mapping_method: mappingMethod,
-        match_confidence: matchConfidence,
-        attribution_status: attributionState.attributionStatus,
-        attribution_confidence_band: attributionState.attributionConfidenceBand,
-        fallback_used: attributionState.fallbackUsed,
-        needs_review: attributionState.needsReview,
-        review_reason: attributionState.reviewReason,
-        conversation_id: resolvedConversationId,
-        conversation_match_seconds: resolvedConversationMatchSeconds,
-        setter_hint: mapSetterHint(source.bucket),
-        setter_final: mapSetterFromBucket(source.bucket),
-        first_conversion: resolvedFirstConversion,
-        source_bucket: source.bucket === 'selfBooked' ? 'self_booked' : 'setter_attributed',
-        resolved_sequence_id: resolvedSequenceId,
-        resolved_sequence_label: resolvedSequenceLabel,
-        attribution_path: attributionState.attributionPath,
-        matched_via_phone: Boolean(source.contactPhone && smsLookup?.conversationId),
-        matched_via_fuzzy: Boolean(candidateResolution.evidence && !smsLookup?.conversationId),
-        matched_via_reply_link: Boolean(replyLink?.hasPriorReply),
-        mapper_version: mapperVersion,
-      },
-    });
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO booked_call_attribution (
+        booked_call_id,
+        booked_event_ts,
+        booked_text,
+        canonical_booking,
+        mapping_method,
+        match_confidence,
+        attribution_status,
+        attribution_confidence_band,
+        fallback_used,
+        needs_review,
+        review_reason,
+        conversation_id,
+        conversation_match_seconds,
+        setter_hint,
+        setter_final,
+        closer_final,
+        first_conversion,
+        source_bucket,
+        resolved_sequence_id,
+        resolved_sequence_label,
+        attribution_path,
+        matched_via_phone,
+        matched_via_fuzzy,
+        matched_via_reply_link,
+        hubspot_contact_id,
+        lead_score,
+        lead_score_source,
+        mapper_version
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
+        $24, $25, $26, $27, $28
+      )
+      ON CONFLICT (booked_call_id)
+      DO UPDATE SET
+        booked_event_ts = EXCLUDED.booked_event_ts,
+        booked_text = EXCLUDED.booked_text,
+        canonical_booking = EXCLUDED.canonical_booking,
+        mapping_method = EXCLUDED.mapping_method,
+        match_confidence = EXCLUDED.match_confidence,
+        attribution_status = EXCLUDED.attribution_status,
+        attribution_confidence_band = EXCLUDED.attribution_confidence_band,
+        fallback_used = EXCLUDED.fallback_used,
+        needs_review = EXCLUDED.needs_review,
+        review_reason = EXCLUDED.review_reason,
+        conversation_id = EXCLUDED.conversation_id,
+        conversation_match_seconds = EXCLUDED.conversation_match_seconds,
+        setter_hint = EXCLUDED.setter_hint,
+        setter_final = EXCLUDED.setter_final,
+        first_conversion = EXCLUDED.first_conversion,
+        source_bucket = EXCLUDED.source_bucket,
+        resolved_sequence_id = EXCLUDED.resolved_sequence_id,
+        resolved_sequence_label = EXCLUDED.resolved_sequence_label,
+        attribution_path = EXCLUDED.attribution_path,
+        matched_via_phone = EXCLUDED.matched_via_phone,
+        matched_via_fuzzy = EXCLUDED.matched_via_fuzzy,
+        matched_via_reply_link = EXCLUDED.matched_via_reply_link,
+        mapper_version = EXCLUDED.mapper_version
+      `,
+      source.bookedCallId,
+      new Date(source.eventTs),
+      source.text || null,
+      true,
+      mappingMethod,
+      matchConfidence,
+      attributionState.attributionStatus,
+      attributionState.attributionConfidenceBand,
+      attributionState.fallbackUsed,
+      attributionState.needsReview,
+      attributionState.reviewReason,
+      resolvedConversationId,
+      resolvedConversationMatchSeconds,
+      mapSetterHint(source.bucket),
+      mapSetterFromBucket(source.bucket),
+      null,
+      resolvedFirstConversion,
+      source.bucket === 'selfBooked' ? 'self_booked' : 'setter_attributed',
+      resolvedSequenceId,
+      resolvedSequenceLabel,
+      attributionState.attributionPath,
+      Boolean(source.contactPhone && smsLookup?.conversationId),
+      Boolean(candidateResolution.evidence && !smsLookup?.conversationId),
+      Boolean(replyLink?.hasPriorReply),
+      null,
+      null,
+      null,
+      mapperVersion,
+    );
 
     if (attributionState.needsReview) {
       await upsertAttributionReviewItem({

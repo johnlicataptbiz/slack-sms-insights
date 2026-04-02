@@ -250,10 +250,16 @@ export const getInboxContactProfileByKey = async (
   }
   const prisma = getPrisma();
   try {
-    const result = await prisma.inbox_contact_profiles.findUnique({
-      where: { contact_key: contactKey },
-    });
-    return result as unknown as InboxContactProfileRow | null;
+    const rows = await prisma.$queryRawUnsafe<InboxContactProfileRow[]>(
+      `
+      SELECT *
+      FROM inbox_contact_profiles
+      WHERE contact_key = $1
+      LIMIT 1
+      `,
+      contactKey,
+    );
+    return rows[0] ?? null;
   } catch (err) {
     logger?.error('getInboxContactProfileByKey failed', err);
     throw err;
@@ -268,12 +274,15 @@ export const listInboxContactProfilesByKeys = async (
 
   const prisma = getPrisma();
   try {
-    const results = await prisma.inbox_contact_profiles.findMany({
-      where: {
-        contact_key: { in: contactKeys },
-      },
-    });
-    return results as unknown as InboxContactProfileRow[];
+    const results = await prisma.$queryRawUnsafe<InboxContactProfileRow[]>(
+      `
+      SELECT *
+      FROM inbox_contact_profiles
+      WHERE contact_key = ANY($1::text[])
+      `,
+      contactKeys,
+    );
+    return results;
   } catch (err) {
     logger?.error('listInboxContactProfilesByKeys failed', err);
     throw err;

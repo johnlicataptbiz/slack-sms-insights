@@ -1,4 +1,14 @@
 import type { App } from '@slack/bolt';
+type AppLike = {
+  logger: {
+    error: (...args: unknown[]) => void;
+  };
+  client: {
+    chat: {
+      postMessage: (args: Record<string, unknown>) => Promise<unknown>;
+    };
+  };
+};
 
 type SlackWebApiPlatformError = {
   code?: string;
@@ -17,9 +27,10 @@ const isSlackWebApiPlatformError = (error: unknown): error is SlackWebApiPlatfor
 };
 
 export async function reportError(app: App, error: unknown, context: string) {
+  const runtime = app as unknown as AppLike;
   const adminChannel = process.env.SYSTEM_ADMIN_CHANNEL_ID || process.env.ALOWARE_WATCHER_CHANNEL_ID;
 
-  app.logger.error(`[${context}] Error:`, error);
+  runtime.logger.error(`[${context}] Error:`, error);
 
   const slackError = isSlackWebApiPlatformError(error) ? error : undefined;
 
@@ -28,7 +39,7 @@ export async function reportError(app: App, error: unknown, context: string) {
     (slackError?.code === 'slack_webapi_platform_error' && slackError?.data?.error === 'invalid_auth')
   ) {
     if (slackError?.data?.error === 'invalid_auth') {
-      app.logger.error(
+      runtime.logger.error(
         `[${context}] Slack reporting skipped due to invalid_auth. Check SLACK_BOT_TOKEN and SLACK_APP_TOKEN.`,
       );
     }
@@ -36,7 +47,7 @@ export async function reportError(app: App, error: unknown, context: string) {
   }
 
   try {
-    await app.client.chat.postMessage({
+    await runtime.client.chat.postMessage({
       channel: adminChannel,
       text: `🚨 System Error in ${context}`,
       blocks: [
@@ -74,6 +85,6 @@ export async function reportError(app: App, error: unknown, context: string) {
       ],
     });
   } catch (logError) {
-    app.logger.error('Failed to send error report to Slack:', logError);
+    runtime.logger.error('Failed to send error report to Slack:', logError);
   }
 }

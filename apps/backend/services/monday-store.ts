@@ -287,10 +287,8 @@ export const getMondayBoardRegistry = async (
 ): Promise<MondayBoardRegistryRow | null> => {
   const prisma = getPrisma();
   try {
-// TODO: mondayBoardRegistry & actorDirectory missing from schema
-const result: MondayBoardRegistryRow | null = null;
-    logger?.warn?.('getMondayBoardRegistry: models missing from schema, stubbed');
-    return result;
+    const result = await prisma.mondayBoardRegistry.findUnique({
+      where: { board_id: boardId },
       select: {
         board_id: true,
         board_label: true,
@@ -328,9 +326,8 @@ export const upsertMondayBoardRegistry = async (
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
-// Stub upsertMondayBoardRegistry since models missing
-logger?.warn?.('upsertMondayBoardRegistry: models missing from schema, stubbed');
-    // where: { board_id: params.boardId },
+    await prisma.mondayBoardRegistry.upsert({
+      where: { board_id: params.boardId },
       update: {
         board_label: params.boardLabel,
         board_class: params.boardClass,
@@ -391,9 +388,8 @@ const result = await prisma.mondayBookedCallPushes.findMany({
 export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Promise<MondayBoardRegistryRow[]> => {
   const prisma = getPrisma();
   try {
-const result = [] as any[];
-logger?.warn?.('listMondayBoardRegistry: models missing from schema, stubbed');
-return result;
+    const result = await prisma.mondayBoardRegistry.findMany({
+      orderBy: [{ board_class: 'asc' }, { board_label: 'asc' }, { board_id: 'asc' }],
       select: {
         board_id: true,
         board_label: true,
@@ -418,9 +414,7 @@ return result;
 export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): Promise<ActorDirectoryRow[]> => {
   const prisma = getPrisma();
   try {
-const result = [] as any[];
-logger?.warn?.('listMondayActorDirectory: models missing from schema, stubbed');
-return result;
+    const result = await prisma.actorDirectory.findMany({
       orderBy: [{ role: 'asc' }, { canonical_name: 'asc' }],
       select: {
         canonical_name: true,
@@ -1247,10 +1241,10 @@ export const upsertMondayBookedCallPush = async (
     pushedAt?: Date | null;
   },
   logger?: Pick<Logger, 'warn'>,
-): Promise<void> => {
+): Promise<boolean> => {
   const prisma = getPrisma();
   try {
-await prisma.mondayBookedCallPushes.upsert({
+    await prisma.mondayBookedCallPushes.upsert({
       where: {
         board_id_slack_channel_id_slack_message_ts: {
           board_id: params.boardId,
@@ -1280,7 +1274,50 @@ await prisma.mondayBookedCallPushes.upsert({
         updated_at: new Date(),
       },
     });
+    return true;
   } catch (error) {
     logger?.warn?.('Failed to upsert monday booked call push', error);
+    try {
+      await prisma.$executeRawUnsafe(
+        `
+        INSERT INTO monday_booked_call_pushes (
+          board_id,
+          slack_channel_id,
+          slack_message_ts,
+          setter_bucket,
+          monday_item_id,
+          status,
+          error,
+          payload_json,
+          pushed_at,
+          updated_at
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (board_id, slack_channel_id, slack_message_ts)
+        DO UPDATE SET
+          setter_bucket = EXCLUDED.setter_bucket,
+          monday_item_id = EXCLUDED.monday_item_id,
+          status = EXCLUDED.status,
+          error = EXCLUDED.error,
+          payload_json = EXCLUDED.payload_json,
+          pushed_at = EXCLUDED.pushed_at,
+          updated_at = CURRENT_TIMESTAMP
+        `,
+        params.boardId,
+        params.slackChannelId,
+        params.slackMessageTs,
+        params.setterBucket,
+        params.mondayItemId ?? null,
+        params.status,
+        params.error ?? null,
+        JSON.stringify(params.payloadJson ?? null),
+        params.pushedAt ?? null,
+      );
+      return true;
+    } catch (fallbackError) {
+      logger?.warn?.('Fallback SQL upsert for monday booked call push failed', fallbackError);
+      return false;
+    }
   }
 };

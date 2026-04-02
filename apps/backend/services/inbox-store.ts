@@ -13,6 +13,14 @@ const toNullableJson = (value: unknown): Prisma.InputJsonValue | typeof Prisma.D
   if (value == null) return Prisma.DbNull;
   return value as Prisma.InputJsonValue;
 };
+const toJsonSql = (value: unknown): string | null => {
+  if (value == null || value === Prisma.DbNull) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+};
 
 export type CadenceStatus = 'idle' | 'podcast_sent' | 'call_offered' | 'nurture_pool';
 
@@ -266,10 +274,16 @@ export const getConversationState = async (
 ): Promise<ConversationStateRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation_state.findUnique({
-      where: { conversation_id: conversationId },
-    });
-    return result as unknown as ConversationStateRow | null;
+    const rows = await prisma.$queryRawUnsafe<ConversationStateRow[]>(
+      `
+      SELECT *
+      FROM conversation_state
+      WHERE conversation_id = $1::uuid
+      LIMIT 1
+      `,
+      conversationId,
+    );
+    return rows[0] ?? null;
   } catch (err) {
     logger?.error('getConversationState failed', err);
     throw err;
@@ -282,12 +296,20 @@ export const ensureConversationState = async (
 ): Promise<ConversationStateRow> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation_state.upsert({
-      where: { conversation_id: conversationId },
-      update: { updated_at: new Date() },
-      create: { conversation_id: conversationId },
-    });
-    return result as unknown as ConversationStateRow;
+    const rows = await prisma.$queryRawUnsafe<ConversationStateRow[]>(
+      `
+      INSERT INTO conversation_state (conversation_id, updated_at)
+      VALUES ($1::uuid, $2)
+      ON CONFLICT (conversation_id)
+      DO UPDATE SET updated_at = EXCLUDED.updated_at
+      RETURNING *;
+      `,
+      conversationId,
+      new Date(),
+    );
+    const row = rows[0];
+    if (!row) throw new Error('Failed to ensure conversation_state row');
+    return row;
   } catch (err) {
     logger?.error('ensureConversationState failed', err);
     throw err;
@@ -318,52 +340,72 @@ export const updateConversationState = async (
   const prisma = getPrisma();
 
   try {
-    type ConversationStateUpdateData = {
-      updated_at: Date;
-      qualification_full_or_part_time?: EmploymentStatus;
-      qualification_niche?: string | null;
-      qualification_revenue_mix?: RevenueMixCategory;
-      qualification_delivery_model?: DeliveryModel;
-      qualification_coaching_interest?: CoachingInterest;
-      qualification_progress_step?: number;
-      objection_tags?: string[];
-      escalation_level?: 1 | 2 | 3 | 4;
-      escalation_reason?: string | null;
-      escalation_overridden?: boolean;
-      last_podcast_sent_at?: Date | null;
-      next_followup_due_at?: Date | null;
-      cadence_status?: CadenceStatus;
-      call_outcome?: string | null;
-    };
-    const updateData: ConversationStateUpdateData = {
-      updated_at: new Date(),
-    };
-    if (input.fullOrPartTime !== undefined) updateData.qualification_full_or_part_time = input.fullOrPartTime;
-    if (input.niche !== undefined) updateData.qualification_niche = input.niche;
-    if (input.revenueMix !== undefined) updateData.qualification_revenue_mix = input.revenueMix;
-    if (input.deliveryModel !== undefined) updateData.qualification_delivery_model = input.deliveryModel;
-    if (input.coachingInterest !== undefined) updateData.qualification_coaching_interest = input.coachingInterest;
-    if (input.progressStep !== undefined) updateData.qualification_progress_step = input.progressStep;
-    if (input.objectionTags !== undefined) updateData.objection_tags = input.objectionTags;
-    if (input.escalationLevel !== undefined) updateData.escalation_level = input.escalationLevel;
-    if (input.escalationReason !== undefined) updateData.escalation_reason = input.escalationReason;
-    if (input.escalationOverridden !== undefined) updateData.escalation_overridden = input.escalationOverridden;
-    if (input.lastPodcastSentAt !== undefined)
-      updateData.last_podcast_sent_at = input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null;
-    if (input.nextFollowupDueAt !== undefined)
-      updateData.next_followup_due_at = input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null;
-    if (input.cadenceStatus !== undefined) updateData.cadence_status = input.cadenceStatus;
+    const now = new Date();
+    await prisma.$executeRawUnsafe(
+      `
+      INSERT INTO conversation_state (conversation_id, updated_at)
+      VALUES ($1::uuid, $2)
+      ON CONFLICT (conversation_id)
+      DO NOTHING
+      `,
+      conversationId,
+      now,
+    );
 
-    const result = await prisma.conversation_state.upsert({
-      where: { conversation_id: conversationId },
-      update: updateData,
-      create: {
-        conversation_id: conversationId,
-        ...updateData,
-      },
-    });
+    const rows = await prisma.$queryRawUnsafe<ConversationStateRow[]>(
+      `
+      UPDATE conversation_state
+      SET
+        updated_at = $2,
+        qualification_full_or_part_time = CASE WHEN $3::boolean THEN $4 ELSE qualification_full_or_part_time END,
+        qualification_niche = CASE WHEN $5::boolean THEN $6 ELSE qualification_niche END,
+        qualification_revenue_mix = CASE WHEN $7::boolean THEN $8 ELSE qualification_revenue_mix END,
+        qualification_delivery_model = CASE WHEN $9::boolean THEN $10 ELSE qualification_delivery_model END,
+        qualification_coaching_interest = CASE WHEN $11::boolean THEN $12 ELSE qualification_coaching_interest END,
+        qualification_progress_step = CASE WHEN $13::boolean THEN $14 ELSE qualification_progress_step END,
+        objection_tags = CASE WHEN $15::boolean THEN $16::text[] ELSE objection_tags END,
+        escalation_level = CASE WHEN $17::boolean THEN $18 ELSE escalation_level END,
+        escalation_reason = CASE WHEN $19::boolean THEN $20 ELSE escalation_reason END,
+        escalation_overridden = CASE WHEN $21::boolean THEN $22 ELSE escalation_overridden END,
+        last_podcast_sent_at = CASE WHEN $23::boolean THEN $24::timestamptz ELSE last_podcast_sent_at END,
+        next_followup_due_at = CASE WHEN $25::boolean THEN $26::timestamptz ELSE next_followup_due_at END,
+        cadence_status = CASE WHEN $27::boolean THEN $28 ELSE cadence_status END
+      WHERE conversation_id = $1::uuid
+      RETURNING *;
+      `,
+      conversationId,
+      now,
+      input.fullOrPartTime !== undefined,
+      input.fullOrPartTime ?? null,
+      input.niche !== undefined,
+      input.niche ?? null,
+      input.revenueMix !== undefined,
+      input.revenueMix ?? null,
+      input.deliveryModel !== undefined,
+      input.deliveryModel ?? null,
+      input.coachingInterest !== undefined,
+      input.coachingInterest ?? null,
+      input.progressStep !== undefined,
+      input.progressStep ?? null,
+      input.objectionTags !== undefined,
+      input.objectionTags ?? [],
+      input.escalationLevel !== undefined,
+      input.escalationLevel ?? null,
+      input.escalationReason !== undefined,
+      input.escalationReason ?? null,
+      input.escalationOverridden !== undefined,
+      input.escalationOverridden ?? null,
+      input.lastPodcastSentAt !== undefined,
+      input.lastPodcastSentAt ? new Date(input.lastPodcastSentAt) : null,
+      input.nextFollowupDueAt !== undefined,
+      input.nextFollowupDueAt ? new Date(input.nextFollowupDueAt) : null,
+      input.cadenceStatus !== undefined,
+      input.cadenceStatus ?? null,
+    );
 
-    return result as unknown as ConversationStateRow;
+    const row = rows[0];
+    if (!row) throw new Error('Failed to update conversation_state');
+    return row;
   } catch (err) {
     logger?.error('updateConversationState failed', err);
     throw err;
@@ -772,22 +814,6 @@ export const insertSendAttempt = async (
 ): Promise<SendAttemptRow> => {
   const prisma = getPrisma();
   try {
-    const data = {
-      conversation_id: input.conversationId,
-      message_body: input.messageBody,
-      sender_identity: input.senderIdentity ?? null,
-      line_id: input.lineId ?? null,
-      from_number: input.fromNumber ?? null,
-      allowlist_decision: input.allowlistDecision,
-      dnc_decision: input.dncDecision,
-      idempotency_key: input.idempotencyKey ?? null,
-      status: input.status,
-      retry_count: input.retryCount ?? 0,
-      request_payload: toNullableJson(input.requestPayload),
-      response_payload: toNullableJson(input.responsePayload),
-      error_message: input.errorMessage ?? null,
-    };
-
     if (input.idempotencyKey) {
       // Use raw SQL for upsert to handle the composite unique key and GREATEST logic
       const upsertSql = `
@@ -824,10 +850,43 @@ export const insertSendAttempt = async (
       );
       return rows[0];
     }
-    const result = await prisma.send_attempts.create({
-      data,
-    });
-    return result as unknown as SendAttemptRow;
+    const rows = await prisma.$queryRawUnsafe<SendAttemptRow[]>(
+      `
+      INSERT INTO send_attempts (
+        conversation_id,
+        message_body,
+        sender_identity,
+        line_id,
+        from_number,
+        allowlist_decision,
+        dnc_decision,
+        idempotency_key,
+        status,
+        retry_count,
+        request_payload,
+        response_payload,
+        error_message
+      )
+      VALUES ($1::uuid,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13)
+      RETURNING *;
+      `,
+      input.conversationId,
+      input.messageBody,
+      input.senderIdentity ?? null,
+      input.lineId ?? null,
+      input.fromNumber ?? null,
+      input.allowlistDecision,
+      input.dncDecision,
+      input.idempotencyKey ?? null,
+      input.status,
+      input.retryCount ?? 0,
+      toJsonSql(input.requestPayload),
+      toJsonSql(input.responsePayload),
+      input.errorMessage ?? null,
+    );
+    const row = rows[0];
+    if (!row) throw new Error('Failed to insert send_attempt');
+    return row;
   } catch (err) {
     logger?.error('insertSendAttempt failed', err);
     throw err;
@@ -962,20 +1021,33 @@ export const insertDraftSuggestion = async (
 ): Promise<DraftSuggestionRow> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.draft_suggestions.create({
-      data: {
-        conversation_id: input.conversationId,
-        prompt_snapshot_hash: input.promptSnapshotHash,
-        retrieved_exemplar_ids: toNullableJson(input.retrievedExemplarIds),
-        generated_text: input.generatedText,
-        lint_score: input.lintScore,
-        structural_score: input.structuralScore,
-        lint_issues: toNullableJson(input.lintIssues),
-        raw: toNullableJson(input.raw),
-      },
-    });
-
-    return result as unknown as DraftSuggestionRow;
+    const rows = await prisma.$queryRawUnsafe<DraftSuggestionRow[]>(
+      `
+      INSERT INTO draft_suggestions (
+        conversation_id,
+        prompt_snapshot_hash,
+        retrieved_exemplar_ids,
+        generated_text,
+        lint_score,
+        structural_score,
+        lint_issues,
+        raw
+      )
+      VALUES ($1::uuid,$2,$3::jsonb,$4,$5,$6,$7::jsonb,$8::jsonb)
+      RETURNING *;
+      `,
+      input.conversationId,
+      input.promptSnapshotHash,
+      toJsonSql(input.retrievedExemplarIds),
+      input.generatedText,
+      input.lintScore,
+      input.structuralScore,
+      toJsonSql(input.lintIssues),
+      toJsonSql(input.raw),
+    );
+    const row = rows[0];
+    if (!row) throw new Error('Failed to insert draft_suggestion');
+    return row;
   } catch (err) {
     logger?.error('insertDraftSuggestion failed', err);
     throw err;
@@ -989,12 +1061,17 @@ export const listDraftSuggestionsForConversation = async (
 ): Promise<DraftSuggestionRow[]> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.draft_suggestions.findMany({
-      where: { conversation_id: conversationId },
-      orderBy: { created_at: 'desc' },
-      take: Math.max(1, Math.min(limit, 50)),
-    });
-    return result as unknown as DraftSuggestionRow[];
+    return await prisma.$queryRawUnsafe<DraftSuggestionRow[]>(
+      `
+      SELECT *
+      FROM draft_suggestions
+      WHERE conversation_id = $1::uuid
+      ORDER BY created_at DESC
+      LIMIT $2
+      `,
+      conversationId,
+      Math.max(1, Math.min(limit, 50)),
+    );
   } catch (err) {
     logger?.error('listDraftSuggestionsForConversation failed', err);
     throw err;
@@ -1007,10 +1084,16 @@ export const getDraftSuggestionById = async (
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.draftSuggestions.findUnique({
-      where: { id: draftId },
-    });
-    return result as unknown as DraftSuggestionRow | null;
+    const rows = await prisma.$queryRawUnsafe<DraftSuggestionRow[]>(
+      `
+      SELECT *
+      FROM draft_suggestions
+      WHERE id = $1::uuid
+      LIMIT 1
+      `,
+      draftId,
+    );
+    return rows[0] ?? null;
   } catch (err) {
     logger?.error('getDraftSuggestionById failed', err);
     throw err;
@@ -1028,24 +1111,28 @@ export const updateDraftSuggestionFeedback = async (
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
-    const updateData: {
-      updated_at: Date;
-      accepted?: boolean;
-      edited?: boolean;
-      send_linked_event_id?: string | null;
-    } = {
-      updated_at: new Date(),
-    };
-    if (typeof params.accepted === 'boolean') updateData.accepted = params.accepted;
-    if (typeof params.edited === 'boolean') updateData.edited = params.edited;
-    if (params.sendLinkedEventId !== undefined) updateData.send_linked_event_id = params.sendLinkedEventId;
+    const rows = await prisma.$queryRawUnsafe<DraftSuggestionRow[]>(
+      `
+      UPDATE draft_suggestions
+      SET
+        updated_at = $2,
+        accepted = CASE WHEN $3::boolean THEN $4 ELSE accepted END,
+        edited = CASE WHEN $5::boolean THEN $6 ELSE edited END,
+        send_linked_event_id = CASE WHEN $7::boolean THEN $8 ELSE send_linked_event_id END
+      WHERE id = $1::uuid
+      RETURNING *;
+      `,
+      draftId,
+      new Date(),
+      typeof params.accepted === 'boolean',
+      params.accepted ?? null,
+      typeof params.edited === 'boolean',
+      params.edited ?? null,
+      params.sendLinkedEventId !== undefined,
+      params.sendLinkedEventId ?? null,
+    );
 
-    const result = await prisma.draftSuggestions.update({
-      where: { id: draftId },
-      data: updateData,
-    });
-
-    return result as unknown as DraftSuggestionRow | null;
+    return rows[0] ?? null;
   } catch (err) {
     logger?.error('updateDraftSuggestionFeedback failed', err);
     throw err;
@@ -1058,30 +1145,45 @@ export const upsertConversionExample = async (
 ): Promise<ConversionExampleRow> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversionExamples.upsert({
-      where: { source_outbound_event_id: input.sourceOutboundEventId },
-      update: {
-        booked_call_label: input.bookedCallLabel ?? undefined,
-        closed_won_label: input.closedWonLabel ?? undefined,
-        escalation_level: input.escalationLevel,
-        structure_signature: input.structureSignature ?? undefined,
-        ...(input.qualifierSnapshot !== undefined && {
-          qualifier_snapshot: toNullableJson(input.qualifierSnapshot),
-        }),
-        channel_marker: input.channelMarker ?? undefined,
-      },
-      create: {
-        source_outbound_event_id: input.sourceOutboundEventId,
-        booked_call_label: input.bookedCallLabel ?? null,
-        closed_won_label: input.closedWonLabel ?? null,
-        escalation_level: input.escalationLevel,
-        structure_signature: input.structureSignature ?? null,
-        qualifier_snapshot: toNullableJson(input.qualifierSnapshot),
-        channel_marker: input.channelMarker || 'sms',
-      },
-    });
+    const rows = await prisma.$queryRawUnsafe<ConversionExampleRow[]>(
+      `
+      INSERT INTO conversion_examples (
+        source_outbound_event_id,
+        booked_call_label,
+        closed_won_label,
+        escalation_level,
+        structure_signature,
+        qualifier_snapshot,
+        channel_marker
+      )
+      VALUES ($1::uuid,$2,$3,$4,$5,$6::jsonb,COALESCE($7, 'sms'))
+      ON CONFLICT (source_outbound_event_id)
+      DO UPDATE SET
+        booked_call_label = CASE WHEN $8::boolean THEN EXCLUDED.booked_call_label ELSE conversion_examples.booked_call_label END,
+        closed_won_label = CASE WHEN $9::boolean THEN EXCLUDED.closed_won_label ELSE conversion_examples.closed_won_label END,
+        escalation_level = EXCLUDED.escalation_level,
+        structure_signature = CASE WHEN $10::boolean THEN EXCLUDED.structure_signature ELSE conversion_examples.structure_signature END,
+        qualifier_snapshot = CASE WHEN $11::boolean THEN EXCLUDED.qualifier_snapshot ELSE conversion_examples.qualifier_snapshot END,
+        channel_marker = CASE WHEN $12::boolean THEN EXCLUDED.channel_marker ELSE conversion_examples.channel_marker END
+      RETURNING *;
+      `,
+      input.sourceOutboundEventId,
+      input.bookedCallLabel ?? null,
+      input.closedWonLabel ?? null,
+      input.escalationLevel,
+      input.structureSignature ?? null,
+      toJsonSql(input.qualifierSnapshot),
+      input.channelMarker ?? null,
+      input.bookedCallLabel !== undefined,
+      input.closedWonLabel !== undefined,
+      input.structureSignature !== undefined,
+      input.qualifierSnapshot !== undefined,
+      input.channelMarker !== undefined,
+    );
 
-    return result as unknown as ConversionExampleRow;
+    const row = rows[0];
+    if (!row) throw new Error('Failed to upsert conversion_example');
+    return row;
   } catch (err) {
     logger?.error('upsertConversionExample failed', err);
     throw err;
@@ -1095,18 +1197,18 @@ export const updateConversationStatus = async (
 ): Promise<{ id: string; status: 'open' | 'closed' | 'dnc' } | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation.update({
-      where: { id: conversationId },
-      data: {
-        status: { set: status },
-        updatedAt: new Date(),
-      },
-      select: {
-        id: true,
-        status: true,
-      },
-    });
-    return result as { id: string; status: 'open' | 'closed' | 'dnc' };
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: string; status: 'open' | 'closed' | 'dnc' }>>(
+      `
+      UPDATE conversations
+      SET status = $2, updated_at = $3
+      WHERE id = $1::uuid
+      RETURNING id, status;
+      `,
+      conversationId,
+      status,
+      new Date(),
+    );
+    return rows[0] ?? null;
   } catch (err) {
     logger?.error('updateConversationStatus failed', err);
     throw err;
@@ -1216,12 +1318,8 @@ export const listMessageTemplates = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<MessageTemplateRow[]> => {
   // TODO: message_templates table missing from schema
-  logger?.warn?.('listMessageTemplates: table missing, stubbed'); 
+  logger?.warn?.('listMessageTemplates: table missing, stubbed');
   return [];
-};
-    logger?.error('listMessageTemplates failed', err);
-    throw err;
-  }
 };
 
 export const insertMessageTemplate = async (
@@ -1232,11 +1330,14 @@ export const insertMessageTemplate = async (
 ): Promise<MessageTemplateRow> => {
   // TODO: message_templates table missing from schema
   logger?.warn?.('insertMessageTemplate: table missing, stubbed');
-  return { id: '', name, body, created_by: createdBy, created_at: new Date(), updated_at: new Date() } as MessageTemplateRow;
-};
-    logger?.error('insertMessageTemplate failed', err);
-    throw err;
-  }
+  return {
+    id: '',
+    name,
+    body,
+    created_by: createdBy,
+    created_at: new Date(),
+    updated_at: new Date(),
+  } as MessageTemplateRow;
 };
 
 export const deleteMessageTemplate = async (
@@ -1246,10 +1347,6 @@ export const deleteMessageTemplate = async (
   // TODO: message_templates table missing from schema
   logger?.warn?.('deleteMessageTemplate: table missing, stubbed');
   return true;
-};
-    logger?.error('deleteMessageTemplate failed', err);
-    throw err;
-  }
 };
 
 // ─── Phase 3: Objection Tags ──────────────────────────────────────────────────
@@ -1298,22 +1395,22 @@ export const updateCallOutcome = async (
 ): Promise<{ conversation_id: string; call_outcome: string | null }> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation_state.upsert({
-      where: { conversation_id: conversationId },
-      update: {
-        call_outcome: outcome,
-        updated_at: new Date(),
-      },
-      create: {
-        conversation_id: conversationId,
-        call_outcome: outcome,
-      },
-      select: {
-        conversation_id: true,
-        call_outcome: true,
-      },
-    });
-    return result;
+    const rows = await prisma.$queryRawUnsafe<Array<{ conversation_id: string; call_outcome: string | null }>>(
+      `
+      INSERT INTO conversation_state (conversation_id, call_outcome, updated_at)
+      VALUES ($1::uuid, $2, NOW())
+      ON CONFLICT (conversation_id)
+      DO UPDATE SET
+        call_outcome = EXCLUDED.call_outcome,
+        updated_at = NOW()
+      RETURNING conversation_id, call_outcome;
+      `,
+      conversationId,
+      outcome,
+    );
+    const row = rows[0];
+    if (!row) throw new Error('Failed to update call outcome');
+    return row;
   } catch (err) {
     logger?.error('updateCallOutcome failed', err);
     throw err;

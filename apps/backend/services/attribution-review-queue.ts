@@ -62,28 +62,11 @@ export type RepResponseDailyRow = {
 
 export const listOpenAttributionReviewItems = async (take = 50): Promise<AttributionReviewQueueItem[]> => {
   const prisma = getPrisma();
-  const rows = (await prisma.$queryRawUnsafe(
-    `
-      SELECT
-        id,
-        booked_call_id,
-        priority,
-        issue_type,
-        issue_summary,
-        candidate_sequences,
-        status,
-        resolved_by,
-        resolved_at,
-        created_at,
-        updated_at
-      FROM attribution_review_queue
-      WHERE status IN ('open','pending','needs_review')
-      ORDER BY priority DESC, created_at DESC
-      LIMIT $1
-    `,
+  return prisma.attribution_review_queue.findMany({
+    where: { status: { in: ['open', 'pending', 'needs_review'] } },
+    orderBy: [{ priority: 'desc' }, { created_at: 'desc' }],
     take,
-  )) as AttributionReviewQueueItem[];
-  return rows;
+  });
 };
 
 export const upsertAttributionReviewItem = async (input: {
@@ -97,52 +80,28 @@ export const upsertAttributionReviewItem = async (input: {
   resolved_at?: Date | null;
 }): Promise<AttributionReviewQueueItem> => {
   const prisma = getPrisma();
-  const rows = (await prisma.$queryRawUnsafe(
-    `
-      INSERT INTO attribution_review_queue (
-        booked_call_id,
-        priority,
-        issue_type,
-        issue_summary,
-        candidate_sequences,
-        status,
-        resolved_by,
-        resolved_at
-      ) VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8)
-      ON CONFLICT (booked_call_id)
-      DO UPDATE SET
-        priority = EXCLUDED.priority,
-        issue_type = EXCLUDED.issue_type,
-        issue_summary = EXCLUDED.issue_summary,
-        candidate_sequences = EXCLUDED.candidate_sequences,
-        status = EXCLUDED.status,
-        resolved_by = EXCLUDED.resolved_by,
-        resolved_at = EXCLUDED.resolved_at,
-        updated_at = NOW()
-      RETURNING
-        id,
-        booked_call_id,
-        priority,
-        issue_type,
-        issue_summary,
-        candidate_sequences,
-        status,
-        resolved_by,
-        resolved_at,
-        created_at,
-        updated_at
-    `,
-    input.booked_call_id,
-    input.priority,
-    input.issue_type,
-    input.issue_summary,
-    JSON.stringify(input.candidate_sequences ?? null),
-    input.status || 'open',
-    input.resolved_by ?? null,
-    input.resolved_at ?? null,
-  )) as AttributionReviewQueueItem[];
-  if (!rows[0]) throw new Error('Failed to upsert attribution review item');
-  return rows[0];
+  return prisma.attribution_review_queue.upsert({
+    where: { booked_call_id: input.booked_call_id },
+    create: {
+      booked_call_id: input.booked_call_id,
+      priority: input.priority,
+      issue_type: input.issue_type,
+      issue_summary: input.issue_summary,
+      candidate_sequences: input.candidate_sequences as never,
+      status: input.status || 'open',
+      resolved_by: input.resolved_by ?? null,
+      resolved_at: input.resolved_at ?? null,
+    },
+    update: {
+      priority: input.priority,
+      issue_type: input.issue_type,
+      issue_summary: input.issue_summary,
+      candidate_sequences: input.candidate_sequences as never,
+      status: input.status || 'open',
+      resolved_by: input.resolved_by ?? null,
+      resolved_at: input.resolved_at ?? null,
+    },
+  });
 };
 
 export const listUnresolvedAttributions = async (take = 100): Promise<UnresolvedAttributionRow[]> => {
@@ -173,27 +132,13 @@ export const listSequenceFunnelDaily = async (params: {
   sequenceId?: string | null;
 }): Promise<SequenceFunnelRow[]> => {
   const prisma = getPrisma();
-  const rows = (await prisma.$queryRawUnsafe(
-    `
-      SELECT
-        day,
-        sequence_id,
-        rep_id,
-        new_leads_contacted,
-        leads_replied,
-        qualified_leads,
-        booked_calls,
-        opt_outs
-      FROM fact_sequence_funnel_daily
-      WHERE day >= $1 AND day <= $2
-        AND ($3::text IS NULL OR sequence_id = $3)
-      ORDER BY day ASC, sequence_id ASC, rep_id ASC
-    `,
-    params.from,
-    params.to,
-    params.sequenceId ?? null,
-  )) as SequenceFunnelRow[];
-  return rows;
+  return prisma.fact_sequence_funnel_daily.findMany({
+    where: {
+      day: { gte: params.from, lte: params.to },
+      ...(params.sequenceId ? { sequence_id: params.sequenceId } : {}),
+    },
+    orderBy: [{ day: 'asc' }, { sequence_id: 'asc' }, { rep_id: 'asc' }],
+  });
 };
 
 export const listAttributionMethodDaily = async (params: {
@@ -201,57 +146,21 @@ export const listAttributionMethodDaily = async (params: {
   to: Date;
 }): Promise<AttributionMethodDailyRow[]> => {
   const prisma = getPrisma();
-  const rows = (await prisma.$queryRawUnsafe(
-    `
-      SELECT
-        day,
-        matched_calls,
-        manual_direct_calls,
-        unattributed_calls,
-        sms_phone_match_calls,
-        fuzzy_match_calls,
-        reply_linked_calls
-      FROM fact_attribution_method_daily
-      WHERE day >= $1 AND day <= $2
-      ORDER BY day ASC
-    `,
-    params.from,
-    params.to,
-  )) as AttributionMethodDailyRow[];
-  return rows;
+  return prisma.fact_attribution_method_daily.findMany({
+    where: { day: { gte: params.from, lte: params.to } },
+    orderBy: { day: 'asc' },
+  });
 };
 
 export const listRepResponseDaily = async (params: { from: Date; to: Date }): Promise<RepResponseDailyRow[]> => {
   const prisma = getPrisma();
-  const rows = (await prisma.$queryRawUnsafe(
-    `
-      SELECT
-        day,
-        rep_id,
-        new_leads_contacted,
-        leads_replied,
-        booked_calls,
-        median_reply_time_minutes,
-        median_book_time_days
-      FROM fact_rep_response_daily
-      WHERE day >= $1 AND day <= $2
-      ORDER BY day ASC, rep_id ASC
-    `,
-    params.from,
-    params.to,
-  )) as Array<
-    Omit<RepResponseDailyRow, 'median_reply_time_minutes' | 'median_book_time_days'> & {
-      median_reply_time_minutes: { toNumber?: () => number } | number | null;
-      median_book_time_days: { toNumber?: () => number } | number | null;
-    }
-  >;
+  const rows = await prisma.fact_rep_response_daily.findMany({
+    where: { day: { gte: params.from, lte: params.to } },
+    orderBy: [{ day: 'asc' }, { rep_id: 'asc' }],
+  });
   return rows.map((row) => ({
     ...row,
-    median_reply_time_minutes:
-      typeof row.median_reply_time_minutes === 'number'
-        ? row.median_reply_time_minutes
-        : row.median_reply_time_minutes?.toNumber?.() ?? null,
-    median_book_time_days:
-      typeof row.median_book_time_days === 'number' ? row.median_book_time_days : row.median_book_time_days?.toNumber?.() ?? null,
+    median_reply_time_minutes: row.median_reply_time_minutes?.toNumber?.() ?? null,
+    median_book_time_days: row.median_book_time_days?.toNumber?.() ?? null,
   }));
 };

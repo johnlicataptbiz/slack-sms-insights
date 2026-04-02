@@ -200,39 +200,18 @@ export const getSalesMetricsSummary = async (
   // - optOuts: unique contacts with >=1 opt-out inbound in range (max 1 per contact)
   //
   // NOTE: This uses sms_events (not daily_runs text) so it can enforce unique-per-contact and 14-day attribution.
-  const rows = await prisma.$queryRawUnsafe<
-    Array<{
-      event_ts: Date;
-      direction: 'inbound' | 'outbound' | 'unknown';
-      contact_id: string | null;
-      contact_phone: string | null;
-      contact_name: string | null;
-      aloware_user: string | null;
-      body: string | null;
-      line: string | null;
-      sequence: string | null;
-    }>
-  >(
-    `
-    SELECT
-      event_ts,
-      direction,
-      contact_id,
-      contact_phone,
-      contact_name,
-      aloware_user,
-      body,
-      line,
-      sequence
-    FROM sms_events
-    WHERE event_ts >= $1
-      AND event_ts <= $2
-      AND direction IN ('inbound', 'outbound')
-    ORDER BY event_ts ASC
-    `,
-    fromIso,
-    toIso,
-  );
+  const rows = await prisma.sms_events.findMany({
+    where: {
+      event_ts: {
+        gte: fromIso,
+        lte: toIso,
+      },
+      direction: {
+        in: ['inbound', 'outbound'],
+      },
+    },
+    orderBy: { event_ts: 'asc' },
+  });
 
   const normalizeDigits = (value: string): string => value.replace(/\D/g, '');
   const contactKeyFor = (row: { contact_id: string | null; contact_phone: string | null }): string | null => {

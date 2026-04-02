@@ -114,7 +114,8 @@ export class App {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const port = Number.parseInt(process.env.PORT || '8080', 10);
+  const port = Number.parseInt(process.env.PORT || '3001', 10);
   const app = new App(port);
   app.start().catch(console.error);
 }
+

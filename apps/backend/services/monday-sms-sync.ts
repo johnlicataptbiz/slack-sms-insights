@@ -1,13 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import { queryBoardColumns, queryBoardItems } from './monday-client.js';
-import {
-  buildSyncDiagnostics,
-  computeDuplicatesDetected,
-  computeLinkCoverage,
-  ensureMondayIntelligentBoardSchema,
-  runMondaySmsIntelligentGraphReconciliation,
-  type MondaySyncDiagnostics,
-} from './monday-sms-intelligence.js';
+import { queryBoardColumns, queryBoardItems, upsertBookedCallItem } from './monday-client.js';
 import {
   coerceBoardMapping,
   inferBoardMapping,
@@ -20,14 +12,9 @@ import {
   getMondayColumnMapping,
   getMondaySyncState,
   saveMondayColumnMapping,
-  upsertMondayCallColumnValues,
-  upsertMondayCallSnapshot,
-  upsertMondayMetricFacts,
-  upsertNormalizedMondayLeadRecords,
   upsertMondayBoardRegistry,
   upsertMondaySyncState,
 } from './monday-store.js';
-import { findColumnIdByTitle } from './monday-board-schemas.js';
 
 const parseBool = (value: string | undefined, fallback = false): boolean => {
   const normalized = (value || '').trim().toLowerCase();
@@ -54,10 +41,6 @@ export const mondaySmsConfig = {
   backfillDays: Number.parseInt(process.env.MONDAY_SMS_SYNC_BACKFILL_DAYS || '90', 10),
   maxPagesPerRun: Number.parseInt(process.env.MONDAY_SMS_SYNC_MAX_PAGES || '20', 10),
   pollIntervalMs: Number.parseInt(process.env.MONDAY_SMS_SYNC_INTERVAL_MS || `${15 * 60 * 1000}`, 10),
-  weeklyMaintenanceMs: Number.parseInt(
-    process.env.MONDAY_SMS_WEEKLY_MAINTENANCE_INTERVAL_MS || `${7 * 24 * 60 * 60 * 1000}`,
-    10,
-  ),
 };
 
 export type MondaySmsSyncResult = {
@@ -68,7 +51,6 @@ export type MondaySmsSyncResult = {
   nextCursor: string | null;
   startedAt: string;
   finishedAt: string;
-  diagnostics: MondaySyncDiagnostics;
   error?: string;
 };
 
@@ -85,12 +67,6 @@ const parseColumnValueJson = (value: string | null): unknown | null => {
   } catch {
     return value;
   }
-};
-
-const resolveBoardKey = (boardId: string): 'events' | 'sequences' | 'reports' => {
-  if (boardId === mondaySmsConfig.smsSequencesBoardId) return 'sequences';
-  if (boardId === mondaySmsConfig.smsReportsBoardId) return 'reports';
-  return 'events';
 };
 
 const resolveSyncBoardIds = (): string[] => {
@@ -166,15 +142,6 @@ export const syncMondaySmsBoard = async (
       nextCursor: null,
       startedAt,
       finishedAt: new Date().toISOString(),
-      diagnostics: {
-        schemaVersion: 'intelligent-v1',
-        structureValid: false,
-        linkCoverage: 0,
-        kpiParityDelta: null,
-        duplicatesDetected: 0,
-        missingColumns: [],
-        driftedColumns: [],
-      },
       error: 'MONDAY_SMS_SYNC_ENABLED is false',
     };
   }
@@ -192,8 +159,6 @@ export const syncMondaySmsBoard = async (
       queryBoardColumns(boardId, logger),
       getMondayColumnMapping(boardId, logger),
     ]);
-    const boardKey = resolveBoardKey(boardId);
-    const schemaResult = await ensureMondayIntelligentBoardSchema(boardKey, boardId, logger);
     const inferred = inferBoardMapping(columns);
     const persisted = coerceBoardMapping(persistedRaw);
     const envOverride = readBoardMappingFromEnv();
@@ -203,18 +168,6 @@ export const syncMondaySmsBoard = async (
     }
     await saveMondayColumnMapping(boardId, mapping, logger);
     const columnsById = new Map(columns.map((column) => [column.id, column]));
-    const relationColumnId =
-      boardKey === 'sequences'
-        ? findColumnIdByTitle(columns, ['Events Links'])
-        : boardKey === 'reports'
-          ? findColumnIdByTitle(columns, ['Sequence Links'])
-          : null;
-    const joinKeyColumnId =
-      boardKey === 'sequences'
-        ? findColumnIdByTitle(columns, ['Sequence Run Key'])
-        : boardKey === 'reports'
-          ? findColumnIdByTitle(columns, ['Report Day Key'])
-          : findColumnIdByTitle(columns, ['External Event ID', 'Conversation ID']);
     let boardProfile = await getMondayBoardRegistry(boardId, logger);
     if (!boardProfile) {
       const fallback = resolveDefaultBoardGovernance(boardId);
@@ -237,9 +190,7 @@ export const syncMondaySmsBoard = async (
 
     let cursor = state?.cursor || null;
     let fetchedItems = 0;
-    let upsertedItems = 0;
-    const diagnosticJoinKeys: Array<{ id: string; joinKey: string | null }> = [];
-    const diagnosticLinks: Array<{ linkedIds: string[] }> = [];
+    const upsertedItems = 0;
     let pageCount = 0;
 
     while (pageCount < mondaySmsConfig.maxPagesPerRun) {
@@ -266,103 +217,31 @@ export const syncMondaySmsBoard = async (
         if (!force && initialSync && normalized.updatedAt < backfillCutoff) continue;
         if (!force && !initialSync && lastSyncAt && normalized.updatedAt <= lastSyncAt) continue;
 
-        const values = item.columnValues.map((column) => ({
-          columnId: column.id,
-          columnTitle: columnsById.get(column.id)?.title || null,
-          columnType: column.type || columnsById.get(column.id)?.type || null,
-          textValue: column.text,
-          valueJson: parseColumnValueJson(column.value),
-        }));
+        await upsertMondaySyncState(
+          {
+            boardId,
+            cursor,
+            lastSyncAt: new Date(),
+            status: 'success',
+            error: null,
+          },
+          logger,
+        );
 
-        await upsertMondayCallSnapshot(
-          {
-            boardId,
-            itemId: normalized.itemId,
-            itemName: normalized.itemName,
-            updatedAt: normalized.updatedAt,
-            callDate: normalized.callDate,
-            setter: normalized.setter,
-            stage: normalized.stage,
-            disposition: normalized.disposition,
-            isBooked: normalized.isBooked,
-            contactKey: normalized.contactKey,
-            raw: normalized.raw,
-          },
-          logger,
-        );
-        await upsertMondayCallColumnValues(
-          {
-            boardId,
-            itemId: normalized.itemId,
-            itemUpdatedAt: normalized.updatedAt,
-            values,
-          },
-          logger,
-        );
-        await upsertNormalizedMondayLeadRecords(
-          {
-            boardId,
-            itemId: normalized.itemId,
-            itemName: normalized.itemName,
-            itemUpdatedAt: normalized.updatedAt,
-            callDate: normalized.callDate,
-            contactKey: normalized.contactKey,
-            setter: normalized.setter,
-            stage: normalized.stage,
-            disposition: normalized.disposition,
-            isBooked: normalized.isBooked,
-            columns: values,
-            raw: normalized.raw,
-          },
-          logger,
-        );
-        await upsertMondayMetricFacts(
-          {
-            boardId,
-            itemId: normalized.itemId,
-            itemUpdatedAt: normalized.updatedAt,
-            callDate: normalized.callDate,
-            setter: normalized.setter,
-            columns: values,
-            raw: normalized.raw,
-          },
-          logger,
-        );
-        upsertedItems += 1;
-
-        diagnosticJoinKeys.push({
-          id: normalized.itemId,
-          joinKey: item.columnValues.find((value) => value.id === joinKeyColumnId)?.text || null,
-        });
-        const linkedIds = (() => {
-          if (!relationColumnId) return [];
-          const raw = item.columnValues.find((value) => value.id === relationColumnId)?.value || null;
-          if (!raw) return [];
-          try {
-            const parsed = JSON.parse(raw) as { item_ids?: Array<number | string>; linkedPulseIds?: Array<{ linkedPulseId?: number | string }> };
-            if (Array.isArray(parsed.item_ids)) return parsed.item_ids.map((id) => String(id));
-            if (Array.isArray(parsed.linkedPulseIds)) {
-              return parsed.linkedPulseIds
-                .map((entry) => (entry?.linkedPulseId == null ? null : String(entry.linkedPulseId)))
-                .filter((id): id is string => Boolean(id));
-            }
-          } catch {
-            return [];
-          }
-          return [];
-        })();
-        diagnosticLinks.push({ linkedIds });
+        return {
+          status: 'success',
+          boardId,
+          fetchedItems,
+          upsertedItems,
+          nextCursor: cursor,
+          startedAt,
+          finishedAt: new Date().toISOString(),
+        };
       }
 
       cursor = page.nextCursor;
       if (!cursor) break;
     }
-
-    const diagnostics = buildSyncDiagnostics(
-      schemaResult.diagnostics,
-      computeLinkCoverage(diagnosticLinks),
-      computeDuplicatesDetected(diagnosticJoinKeys),
-    );
 
     await upsertMondaySyncState(
       {
@@ -383,7 +262,6 @@ export const syncMondaySmsBoard = async (
       nextCursor: cursor,
       startedAt,
       finishedAt: new Date().toISOString(),
-      diagnostics,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -405,15 +283,6 @@ export const syncMondaySmsBoard = async (
       nextCursor: state?.cursor || null,
       startedAt,
       finishedAt: new Date().toISOString(),
-      diagnostics: {
-        schemaVersion: 'intelligent-v1',
-        structureValid: false,
-        linkCoverage: 0,
-        kpiParityDelta: null,
-        duplicatesDetected: 0,
-        missingColumns: [],
-        driftedColumns: [],
-      },
       error: message,
     };
   }
@@ -441,14 +310,9 @@ export const startMondaySmsSyncJobs = (logger?: Pick<Logger, 'info' | 'debug' | 
     void runMondaySmsMaintenanceCycle(logger);
   }, mondaySmsConfig.pollIntervalMs);
 
-  const weeklyMaintenance = setInterval(() => {
-    void runMondaySmsIntelligenceMaintenance(logger);
-  }, mondaySmsConfig.weeklyMaintenanceMs);
-
   return () => {
     clearTimeout(initialTimer);
     clearInterval(interval);
-    clearInterval(weeklyMaintenance);
   };
 };
 
@@ -460,21 +324,5 @@ const runMondaySmsMaintenanceCycle = async (
     if (syncResult.status === 'error') {
       logger?.warn?.('Monday SMS sync cycle failed', { boardId, error: syncResult.error });
     }
-  }
-};
-
-const runMondaySmsIntelligenceMaintenance = async (
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
-): Promise<void> => {
-  const stats = await runMondaySmsIntelligentGraphReconciliation(
-    {
-      eventsBoardId: mondaySmsConfig.smsEventsBoardId,
-      sequencesBoardId: mondaySmsConfig.smsSequencesBoardId,
-      reportsBoardId: mondaySmsConfig.smsReportsBoardId,
-    },
-    logger,
-  );
-  if (stats.length > 0) {
-    logger?.info?.('Monday SMS weekly intelligent maintenance complete', { stats });
   }
 };

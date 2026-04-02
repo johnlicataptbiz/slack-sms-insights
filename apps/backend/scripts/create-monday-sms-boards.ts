@@ -102,16 +102,14 @@ async function createColumn(
   title: string,
   columnType: string,
   defaults?: Record<string, unknown>,
-  formula?: string,
 ): Promise<string> {
   const query = `
-    mutation ($boardId: ID!, $title: String!, $columnType: ColumnType!, $defaults: JSON, $description: String) {
+    mutation ($boardId: ID!, $title: String!, $columnType: ColumnType!, $defaults: JSON) {
       create_column (
         board_id: $boardId,
         title: $title,
         column_type: $columnType,
-        defaults: $defaults,
-        description: $description
+        defaults: $defaults
       ) {
         id
         title
@@ -124,7 +122,6 @@ async function createColumn(
     title,
     columnType,
     defaults: defaults ? JSON.stringify(defaults) : undefined,
-    description: columnType === 'formula' ? formula : undefined,
   });
 
   if (result.errors) {
@@ -138,7 +135,7 @@ async function createColumn(
 async function setupSmsEventsBoard(boardId: string): Promise<void> {
   console.log('  📋 Setting up columns for SMS Events board...');
   for (const col of mondaySmsBoardSchemas.events.columns) {
-    await createColumn(boardId, col.title, col.type, col.defaults, col.formula);
+    await createColumn(boardId, col.title, col.type, col.defaults);
     console.log(`    ✓ Created: ${col.title}`);
   }
 }
@@ -146,7 +143,7 @@ async function setupSmsEventsBoard(boardId: string): Promise<void> {
 async function setupSmsSequencesBoard(boardId: string): Promise<void> {
   console.log('  📋 Setting up columns for SMS Sequences board...');
   for (const col of mondaySmsBoardSchemas.sequences.columns) {
-    await createColumn(boardId, col.title, col.type, col.defaults, col.formula);
+    await createColumn(boardId, col.title, col.type, col.defaults);
     console.log(`    ✓ Created: ${col.title}`);
   }
 }
@@ -154,7 +151,7 @@ async function setupSmsSequencesBoard(boardId: string): Promise<void> {
 async function setupSmsReportsBoard(boardId: string): Promise<void> {
   console.log('  📋 Setting up columns for SMS Reports board...');
   for (const col of mondaySmsBoardSchemas.reports.columns) {
-    await createColumn(boardId, col.title, col.type, col.defaults, col.formula);
+    await createColumn(boardId, col.title, col.type, col.defaults);
     console.log(`    ✓ Created: ${col.title}`);
   }
 }

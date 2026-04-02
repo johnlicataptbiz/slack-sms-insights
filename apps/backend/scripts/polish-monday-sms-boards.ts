@@ -62,16 +62,14 @@ async function createColumn(
   title: string,
   columnType: string,
   defaults?: Record<string, unknown>,
-  formula?: string,
 ): Promise<boolean> {
   const query = `
-    mutation ($boardId: ID!, $title: String!, $columnType: ColumnType!, $defaults: JSON, $description: String) {
+    mutation ($boardId: ID!, $title: String!, $columnType: ColumnType!, $defaults: JSON) {
       create_column (
         board_id: $boardId,
         title: $title,
         column_type: $columnType,
-        defaults: $defaults,
-        description: $description
+        defaults: $defaults
       ) {
         id
       }
@@ -83,7 +81,6 @@ async function createColumn(
     title,
     columnType,
     defaults: defaults ? JSON.stringify(defaults) : undefined,
-    description: columnType === 'formula' ? formula : undefined,
   });
 
   if (result.errors) {
@@ -110,7 +107,7 @@ async function repairBoard(
   console.log(`   Missing columns: ${missingColumns.map((col) => col.title).join(', ')}`);
 
   for (const column of missingColumns) {
-    const created = await createColumn(boardId, column.title, column.type, column.defaults, column.formula);
+    const created = await createColumn(boardId, column.title, column.type, column.defaults);
     results.push({ title: column.title, created, reason: created ? 'created' : 'could not create' });
     console.log(created ? `   ✓ Created ${column.title}` : `   ⚠️  Could not create ${column.title}`);
   }

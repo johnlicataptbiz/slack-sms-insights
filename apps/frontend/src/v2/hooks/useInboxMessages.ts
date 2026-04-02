@@ -18,7 +18,6 @@ export interface Message {
 export interface InboxMessage extends Message {
   intent?: 'objection' | 'coaching_interest' | 'deal_update' | null;
   tags?: string[];
-  unread?: boolean;
 }
 
 export const useInboxMessages = (rawMessages: InboxMessage[] | undefined) => {
@@ -58,7 +57,7 @@ export const useInboxMessages = (rawMessages: InboxMessage[] | undefined) => {
   // M3: Filter messages for display (thread messages only, not SMS status)
   const threadMessages = useMemo(() => {
     return deduplicatedMessages.filter((msg) => {
-      return msg && (msg.direction === 'inbound' || msg.direction === 'outbound');
+      return msg && msg.direction !== 'internal'; // Exclude internal status messages
     });
   }, [deduplicatedMessages]);
 

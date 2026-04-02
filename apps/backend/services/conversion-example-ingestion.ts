@@ -105,42 +105,25 @@ export const maybeRecordConversionExample = async (
     // ── Find the most recent qualifying outbound message ──────────────────
     const fortyEightHoursAgo = new Date(inboundEvent.event_ts.getTime() - 48 * 60 * 60 * 1000);
 
-    const outboundRows = await prisma.$queryRawUnsafe<
-      Array<{
-        id: string;
-        body: string | null;
-        sequence: string | null;
-      }>
-    >(
-      `
-      SELECT id, body, sequence
-      FROM sms_events
-      WHERE conversation_id = $1
-        AND direction = 'outbound'
-        AND event_ts < $2
-        AND event_ts > $3
-      ORDER BY event_ts DESC
-      LIMIT 1
-      `,
-      conversationId,
-      inboundEvent.event_ts,
-      fortyEightHoursAgo,
-    );
-    const outbound = outboundRows[0];
+    const outbound = await prisma.sms_events.findFirst({
+      where: {
+        conversation_id: conversationId,
+        direction: 'outbound',
+        event_ts: {
+          lt: inboundEvent.event_ts,
+          gt: fortyEightHoursAgo,
+        },
+      },
+      orderBy: { event_ts: 'desc' },
+    });
 
     if (!outbound || !outbound.body || outbound.body.length < 30) return;
 
     // ── Get escalation level from conversation state (default 1) ─────────
-    const stateRows = await prisma.$queryRawUnsafe<Array<{ escalation_level: number | null }>>(
-      `
-      SELECT escalation_level
-      FROM conversation_state
-      WHERE conversation_id = $1
-      LIMIT 1
-      `,
-      conversationId,
-    );
-    const state = stateRows[0];
+    const state = await prisma.conversation_state.findUnique({
+      where: { conversation_id: conversationId },
+      select: { escalation_level: true },
+    });
     const escalationLevel = Math.max(1, Math.min(4, state?.escalation_level ?? 1)) as 1 | 2 | 3 | 4;
 
     // ── Classify message structure ────────────────────────────────────────

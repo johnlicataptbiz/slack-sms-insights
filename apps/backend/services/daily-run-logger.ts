@@ -37,35 +37,23 @@ export const logDailyRun = async (
   const prisma = getPrisma();
 
   try {
-    const rows = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-      `
-        INSERT INTO daily_runs (
-          channel_id,
-          channel_name,
-          report_date,
-          report_type,
-          status,
-          error_message,
-          summary_text,
-          full_report,
-          duration_ms,
-          is_legacy
-        ) VALUES ($1,$2,$3::date,$4,$5,$6,$7,$8,$9,$10)
-        RETURNING id
-      `,
-      input.channelId,
-      input.channelName || null,
-      input.reportDate || null,
-      input.reportType,
-      input.status,
-      input.errorMessage || null,
-      input.summaryText || null,
-      input.fullReport || null,
-      input.durationMs || null,
-      input.isLegacy === true,
-    );
+    const run = await prisma.daily_runs.create({
+      data: {
+        channel_id: input.channelId,
+        channel_name: input.channelName || null,
+        report_date: input.reportDate ? new Date(input.reportDate) : null,
+        report_type: input.reportType,
+        status: input.status,
+        error_message: input.errorMessage || null,
+        summary_text: input.summaryText || null,
+        full_report: input.fullReport || null,
+        duration_ms: input.durationMs || null,
+        is_legacy: input.isLegacy === true,
+      },
+      select: { id: true },
+    });
 
-    const runId = rows[0]?.id || null;
+    const runId = run.id;
     logger?.debug(`Logged daily run: ${runId}`);
 
     if (runId) {
@@ -217,31 +205,28 @@ export const getDailyRuns = async (
 
   try {
     if (options.raw) {
-      const rawParams: Array<string | number> = [];
-      let rawWhere = 'WHERE 1=1';
-      if (options.channelId) {
-        rawParams.push(options.channelId);
-        rawWhere += ` AND channel_id = $${rawParams.length}`;
-      }
+      const where: {
+        channel_id?: string;
+        timestamp?: { gt: Date };
+        is_legacy?: boolean;
+      } = {};
+      if (options.channelId) where.channel_id = options.channelId;
       if (options.daysBack) {
-        const safeDaysBack = Math.max(1, Math.floor(Number(options.daysBack)));
-        rawParams.push(safeDaysBack);
-        rawWhere += ` AND timestamp > NOW() - INTERVAL '1 day' * $${rawParams.length}`;
+        where.timestamp = {
+          gt: new Date(Date.now() - options.daysBack * 24 * 60 * 60 * 1000),
+        };
       }
       const legacyMode = options.legacyMode || 'exclude';
-      if (legacyMode === 'exclude') rawWhere += ' AND COALESCE(is_legacy, FALSE) = FALSE';
-      else if (legacyMode === 'only') rawWhere += ' AND COALESCE(is_legacy, FALSE) = TRUE';
+      if (legacyMode === 'exclude') where.is_legacy = false;
+      else if (legacyMode === 'only') where.is_legacy = true;
 
-      const query = [
-        `SELECT id, timestamp, channel_id, channel_name, report_date, report_type, status, error_message, summary_text, full_report, duration_ms, is_legacy, created_at FROM daily_runs`,
-        rawWhere,
-        'ORDER BY timestamp DESC',
-        options.limit ? `LIMIT ${options.limit}` : '',
-        options.offset ? `OFFSET ${options.offset}` : '',
-      ]
-        .filter(Boolean)
-        .join(' ');
-      return await prisma.$queryRawUnsafe<DailyRunRow[]>(query, ...rawParams);
+      const results = await prisma.daily_runs.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        take: options.limit,
+        skip: options.offset,
+      });
+      return results as unknown as DailyRunRow[];
     }
 
     // Use $queryRaw for complex window function
@@ -333,18 +318,10 @@ export const getDailyRunById = async (id: string, logger?: Pick<Logger, 'warn'>)
   const prisma = getPrisma();
 
   try {
-    const rows = await prisma.$queryRawUnsafe<DailyRunRow[]>(
-      `
-        SELECT
-          id, timestamp, channel_id, channel_name, report_date, report_type, status,
-          error_message, summary_text, full_report, duration_ms, is_legacy, created_at
-        FROM daily_runs
-        WHERE id = $1
-        LIMIT 1
-      `,
-      id,
-    );
-    return rows[0] || null;
+    const result = await prisma.daily_runs.findUnique({
+      where: { id },
+    });
+    return result as unknown as DailyRunRow | null;
   } catch (error) {
     logger?.warn('Failed to fetch daily run by ID:', error);
     return null;
@@ -355,18 +332,26 @@ export const getChannelsWithRuns = async (logger?: Pick<Logger, 'warn'>): Promis
   const prisma = getPrisma();
 
   try {
-    return await prisma.$queryRawUnsafe<ChannelWithRunsRow[]>(
-      `
-        SELECT
-          channel_id,
-          channel_name,
-          COUNT(*)::text AS run_count
-        FROM daily_runs
-        WHERE COALESCE(is_legacy, FALSE) = FALSE
-        GROUP BY channel_id, channel_name
-        ORDER BY COUNT(*) DESC
-      `,
-    );
+    const result = await prisma.daily_runs.groupBy({
+      by: ['channel_id', 'channel_name'],
+      where: {
+        is_legacy: false,
+      },
+      _count: {
+        _all: true,
+      },
+      orderBy: {
+        _count: {
+          channel_id: 'desc',
+        },
+      },
+    });
+
+    return result.map((r) => ({
+      channel_id: r.channel_id,
+      channel_name: r.channel_name,
+      run_count: String(r._count._all),
+    }));
   } catch (error) {
     logger?.warn('Failed to fetch channels with runs:', error);
     return [];

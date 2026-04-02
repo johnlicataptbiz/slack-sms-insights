@@ -11,24 +11,8 @@
     "moduleResolution": "bundler",
     "outDir": "./dist",
     "strict": true,
-    "composite": false
+    "composite": true
   },
-  "include": [
-    "app.ts",
-    "api/**/*.ts",
-    "services/db.ts",
-    "services/error-reporter.ts",
-    "services/logger.ts",
-    "services/monday-*.ts",
-    "services/prisma.ts",
-    "services/runtime-status.ts",
-    "services/stream-token.ts",
-    "scripts/create-monday-sms-boards.ts",
-    "scripts/dedupe-monday-board-registry.ts",
-    "scripts/dedupe-monday-items.ts",
-    "scripts/polish-monday-sms-boards.ts",
-    "scripts/run-monday-intelligence-maintenance.ts",
-    "tests/services/monday-*.test.ts"
-  ],
+  "include": ["**/*.ts"],
   "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*"]
 }

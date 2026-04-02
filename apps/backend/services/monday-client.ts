@@ -1,5 +1,4 @@
 import type { Logger } from '@slack/bolt';
-import type { MondayColumnDefinition } from './monday-board-schemas.js';
 
 const MONDAY_API_URL = 'https://api.monday.com/v2';
 const DEFAULT_TIMEOUT_MS = Number.parseInt(process.env.MONDAY_API_TIMEOUT_MS || '12000', 10);
@@ -70,36 +69,6 @@ const requestGraphQl = async <T>(
       clearTimeout(timeout);
     }
   }
-};
-
-export const createBoardColumn = async (
-  boardId: string,
-  column: MondayColumnDefinition,
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
-): Promise<string> => {
-  const mutation = `
-    mutation CreateBoardColumn($boardId: ID!, $title: String!, $columnType: ColumnType!, $defaults: JSON, $description: String) {
-      create_column(board_id: $boardId, title: $title, column_type: $columnType, defaults: $defaults, description: $description) {
-        id
-      }
-    }
-  `;
-  const defaults = column.defaults ? JSON.stringify(column.defaults) : null;
-  const description = column.type === 'formula' ? column.formula || null : null;
-  const data = await requestGraphQl<{ create_column?: { id?: string } }>(
-    mutation,
-    {
-      boardId,
-      title: column.title,
-      columnType: column.type,
-      defaults,
-      description,
-    },
-    logger,
-  );
-  const id = data.create_column?.id || '';
-  if (!id) throw new Error(`Failed to create monday column ${column.title}`);
-  return id;
 };
 
 export type MondayBoardColumn = {
@@ -430,36 +399,4 @@ export const upsertBookedCallItem = async (
   await requestGraphQl(updateMutation, { itemId, body: updateBodyPrefix }, logger);
 
   return { itemId, action };
-};
-
-export const setBoardRelationLinks = async (
-  boardId: string,
-  itemId: string,
-  relationColumnId: string,
-  linkedItemIds: string[],
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
-): Promise<void> => {
-  const uniqueIds = [...new Set(linkedItemIds.map((id) => id.trim()).filter((id) => id.length > 0))];
-  const payloadIds = uniqueIds.map((id) => {
-    const numeric = Number.parseInt(id, 10);
-    return Number.isFinite(numeric) ? numeric : id;
-  });
-  const mutation = `
-    mutation SetBoardRelationLinks($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
-      change_column_value(board_id: $boardId, item_id: $itemId, column_id: $columnId, value: $value) {
-        id
-      }
-    }
-  `;
-  const value = JSON.stringify({ item_ids: payloadIds });
-  await requestGraphQl(
-    mutation,
-    {
-      boardId,
-      itemId,
-      columnId: relationColumnId,
-      value,
-    },
-    logger,
-  );
 };

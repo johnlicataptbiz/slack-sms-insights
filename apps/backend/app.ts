@@ -17,6 +17,7 @@ import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
 import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
+import { HealthController } from './src/controllers/health.controller.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
@@ -150,27 +151,21 @@ app.error(async (error) => {
     const compressionMiddleware = compression();
     const server = createServer((req, res) => {
       // Apply compression
-      compressionMiddleware(req as never, res as never, () => {
+      compressionMiddleware(req, res, () => {
         // Continue with request handling
         void (async () => {
           const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
 
           // Handle health check
           if (pathname === '/health') {
-            res.writeHead(200, { ...responseSecurityHeaders, 'Content-Type': 'application/json' });
-            res.end(
-              JSON.stringify({
-                status: 'healthy',
-                ts: new Date().toISOString(),
-                service: 'sms-insights',
-              }),
-            );
+            const controller = new HealthController();
+            await controller.execute({ req, res } as unknown as Parameters<typeof controller.execute>[0]);
             return;
           }
 
           // Handle API routes
           if (pathname.startsWith('/api/')) {
-            const handled = await handleApiRoute(req, res, pathname, logger.app);
+            const handled = await handleApiRoute(req, res, pathname, app.logger);
             if (handled) {
               return;
             }
@@ -227,7 +222,7 @@ app.error(async (error) => {
 
     // Initialize the pg pool after the HTTP server starts listening so Railway
     // health checks are not blocked by cold database connection latency.
-    void initDatabase(logger.app);
+    void initDatabase(app.logger);
 
     // Start Bolt App
     let slackStarted = false;
@@ -277,12 +272,12 @@ app.error(async (error) => {
     }
 
     // monday read-sync/writeback maintenance jobs (feature-flag gated).
-    startMondaySyncJobs(logger.app);
+    startMondaySyncJobs(app.logger);
 
     // Monday SMS sync jobs (feature-flag gated)
-    startMondaySmsSyncJobs(logger.app);
-    startMondaySmsSequencesSyncJobs(logger.app);
-    startMondaySmsReportsSyncJobs(logger.app);
+    startMondaySmsSyncJobs(app.logger);
+    startMondaySmsSequencesSyncJobs(app.logger);
+    startMondaySmsReportsSyncJobs(app.logger);
   } catch (error) {
     logger.app.error(`[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`);
     await reportError(app, error, 'Startup Failure');

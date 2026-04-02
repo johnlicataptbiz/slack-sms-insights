@@ -11,14 +11,17 @@ export interface AuthResponse {
 
 export const authApi = {
   async verify(): Promise<AuthResponse> {
-    return client.get<AuthResponse>('/api/auth/verify');
+    const response = await client.get('/api/auth/verify');
+    return response.data;
   },
 
   async login(data: LoginRequest): Promise<AuthResponse> {
-    return client.post<AuthResponse>('/api/auth/login', data);
+    const response = await client.post('/api/auth/login', data);
+    return response.data;
   },
 
   async logout(): Promise<AuthResponse> {
-    return client.post<AuthResponse>('/api/auth/logout', {});
+    const response = await client.post('/api/auth/logout');
+    return response.data;
   },
 };

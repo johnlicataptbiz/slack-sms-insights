@@ -26,7 +26,7 @@ export type NewSmsEvent = {
   line?: string | null;
   sequence?: string | null;
   conversationId?: string | null;
-  raw?: string | null;
+  raw?: unknown | null;
 };
 
 export type SmsEventRow = {
@@ -45,7 +45,7 @@ export type SmsEventRow = {
   sequence: string | null;
   sequence_id?: string | null;
   conversation_id: string | null;
-  raw: string | null;
+  raw: unknown | null;
   created_at: Date;
 };
 

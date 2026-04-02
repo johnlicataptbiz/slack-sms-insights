@@ -1676,11 +1676,14 @@ const isRecoverableAnalyticsSchemaError = (error: unknown): boolean => {
   return (
     normalized.includes("does not exist in the current database") ||
     normalized.includes("does not exist in the current") ||
-    normalized.includes("the table") && normalized.includes("does not exist") ||
-    normalized.includes("the column") && normalized.includes("does not exist") ||
+    (normalized.includes("the table") &&
+      normalized.includes("does not exist")) ||
+    (normalized.includes("the column") &&
+      normalized.includes("does not exist")) ||
     normalized.includes("does not exist in the current") ||
-    normalized.includes("relation") && normalized.includes("does not exist") ||
-    normalized.includes("column") && normalized.includes("does not exist")
+    (normalized.includes("relation") &&
+      normalized.includes("does not exist")) ||
+    (normalized.includes("column") && normalized.includes("does not exist"))
   );
 };
 
@@ -1718,7 +1721,8 @@ const buildInsightsSummaryFallback = (params: {
     {
       key: "analytics-schema",
       severity: "warning",
-      message: "Insights data is temporarily unavailable while analytics schema catches up.",
+      message:
+        "Insights data is temporarily unavailable while analytics schema catches up.",
     },
   ],
   mondayHealth: {
@@ -2607,6 +2611,51 @@ const buildSalesMetricsPayload = async (params: {
   };
 };
 
+const buildSalesMetricsFallback = (params: {
+  from: Date;
+  to: Date;
+}) => ({
+  timeRange: { from: params.from.toISOString(), to: params.to.toISOString() },
+  totals: {
+    messagesSent: 0,
+    manualMessagesSent: 0,
+    sequenceMessagesSent: 0,
+    peopleContacted: 0,
+    manualPeopleContacted: 0,
+    sequencePeopleContacted: 0,
+    repliesReceived: 0,
+    replyRatePct: 0,
+    manualRepliesReceived: 0,
+    manualReplyRatePct: 0,
+    sequenceRepliesReceived: 0,
+    sequenceReplyRatePct: 0,
+    booked: 0,
+    optOuts: 0,
+  },
+  trendByDay: [],
+  topSequences: [],
+  repLeaderboard: [],
+  bookedCalls: {
+    booked: 0,
+    jack: 0,
+    brandon: 0,
+    selfBooked: 0,
+  },
+  meta: {
+    sequenceBookedAttribution: {
+      source: "slack_booked_calls" as const,
+      model: "degraded-schema-fallback",
+      totalCalls: 0,
+      matchedCalls: 0,
+      unattributedCalls: 0,
+      manualCalls: 0,
+      strictSmsReplyLinkedCalls: 0,
+      nonSmsOrUnknownCalls: 0,
+      unattributedAuditRows: [],
+    },
+  },
+});
+
 const handleGetSalesMetrics: RequestHandler = async (
   req,
   res,
@@ -2659,6 +2708,17 @@ const handleGetSalesMetrics: RequestHandler = async (
     });
     sendJson(res, 200, payload, origin);
   } catch (err) {
+    if (isRecoverableAnalyticsSchemaError(err)) {
+      logger?.warn?.(
+        `Sales metrics degraded fallback: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      const fallback = buildSalesMetricsFallback({
+        from: resolved.from,
+        to: resolved.to,
+      });
+      sendJson(res, 200, fallback, origin);
+      return;
+    }
     logger?.error("Failed to fetch sales metrics:", err);
     sendJson(
       res,
@@ -2718,6 +2778,26 @@ const handleGetSalesMetricsV2: RequestHandler = async (
       origin,
     );
   } catch (err) {
+    if (isRecoverableAnalyticsSchemaError(err)) {
+      logger?.warn?.(
+        `V2 sales metrics degraded fallback: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      const fallback = buildSalesMetricsFallback({
+        from: resolved.from,
+        to: resolved.to,
+      });
+      sendJson(
+        res,
+        200,
+        toEnvelope({
+          data: toSalesMetricsV2(fallback),
+          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+          requestedMode: resolved.mode,
+        }),
+        origin,
+      );
+      return;
+    }
     logger?.error("Failed to fetch v2 sales metrics:", err);
     sendJson(
       res,
@@ -5118,12 +5198,15 @@ const handleGetContactActivitiesV2: RequestHandler = async (
   if (!contactKey) {
     return sendJson(res, 400, { error: "contactKey is required" }, origin);
   }
-  const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "50", 10), 100);
+  const limit = Math.min(
+    parseInt(url.searchParams.get("limit") ?? "50", 10),
+    100,
+  );
   const offset = parseInt(url.searchParams.get("offset") ?? "0", 10);
-  
+
   const activities = await listContactActivities(contactKey, limit, offset);
   const stats = await getContactActivityStats(contactKey);
-  
+
   sendJson(
     res,
     200,
@@ -5163,9 +5246,9 @@ const handleGetContactActivityStatsV2: RequestHandler = async (
   if (!contactKey) {
     return sendJson(res, 400, { error: "contactKey is required" }, origin);
   }
-  
+
   const stats = await getContactActivityStats(contactKey);
-  
+
   sendJson(
     res,
     200,
@@ -6588,7 +6671,12 @@ const handleAlertWebhook: RequestHandler = async (req, res, logger, origin) => {
 
 const alowareProcessor = new AlowareProcessor();
 
-const handleAlowareWebhook: RequestHandler = async (req, res, logger, origin) => {
+const handleAlowareWebhook: RequestHandler = async (
+  req,
+  res,
+  logger,
+  origin,
+) => {
   try {
     const body = (await parseJsonBody(req)) as SMSMessage;
     logger?.info("Aloware webhook received:", { id: body.id });

@@ -1,5 +1,4 @@
 import type { Conversation, ConversationStatus, PrismaClient } from '@prisma/client';
-import { ConversationDetailSelectPattern } from '../schemas/db-results.js';
 import { BaseRepository } from './base.repository.js';
 
 export interface CreateConversationData {
@@ -30,21 +29,18 @@ export class ConversationRepository extends BaseRepository {
   async findById(id: string): Promise<Conversation | null> {
     return this.prisma.conversation.findUnique({
       where: { id },
-      select: ConversationDetailSelectPattern,
     });
   }
 
   async findByContactKey(contactKey: string): Promise<Conversation | null> {
     return this.prisma.conversation.findUnique({
       where: { contactKey },
-      select: ConversationDetailSelectPattern,
     });
   }
 
   async create(data: CreateConversationData): Promise<Conversation> {
     return this.prisma.conversation.create({
       data,
-      select: ConversationDetailSelectPattern,
     });
   }
 
@@ -53,7 +49,6 @@ export class ConversationRepository extends BaseRepository {
       return await this.prisma.conversation.update({
         where: { id },
         data,
-        select: ConversationDetailSelectPattern,
       });
     } catch (error) {
       // Handle not found case
@@ -95,11 +90,6 @@ export class ConversationRepository extends BaseRepository {
         ...(status && { status }),
         ...(current_rep_id && { current_rep_id }),
       },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
-      },
       orderBy: {
         [orderBy]: orderDirection,
       },
@@ -128,10 +118,6 @@ export class ConversationRepository extends BaseRepository {
           lte: now,
         },
         status: 'open',
-      },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
       },
       orderBy: {
         nextFollowupAt: 'asc',

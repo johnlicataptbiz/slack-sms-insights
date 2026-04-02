@@ -1,12 +1,23 @@
-// Fixed import issue - removed prisma-local.d.ts references
-// import prismaLocal from './prisma-local.js';
-// export * from './prisma-local.js';
+import { PrismaClient } from '@prisma/client';
 
-
-export const getPrismaClient = () => prismaLocal;
-export const connectPrisma = async () => {
-  await prismaLocal.$connect();
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient;
 };
 
-export default prismaLocal;
+const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+  });
 
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
+
+export const getPrismaClient = () => prisma;
+
+export const connectPrisma = async () => {
+  await prisma.$connect();
+};
+
+export default prisma;

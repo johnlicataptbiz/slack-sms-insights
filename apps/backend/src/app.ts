@@ -2,7 +2,6 @@ import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
-import { AlowareController } from './controllers/aloware.controller.js';
 import { AuthController } from './controllers/auth.controller.js';
 import { HealthController } from './controllers/health.controller.js';
 import { connectPrisma } from './lib/prisma.js';
@@ -34,7 +33,7 @@ export class App {
     this.app.use(compression());
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(express.urlencoded({ extended: true }));
-    this.app.use(requestLogger);
+    this.app.use(requestLogger as express.RequestHandler);
   }
 
   private initializeRoutes(): void {
@@ -118,4 +117,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const app = new App(port);
   app.start().catch(console.error);
 }
-

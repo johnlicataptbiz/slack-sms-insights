@@ -75,6 +75,7 @@ export default function App() {
             !cancelled &&
             error instanceof ApiError &&
             (error.status === 404 ||
+              error.status === 500 ||
               error.status === 502 ||
               error.status === 503)
           ) {

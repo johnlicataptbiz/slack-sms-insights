@@ -65,11 +65,17 @@ export default function RunList({ runs }: { runs: Run[] }) {
     setSortConfig({ key, direction });
   };
 
+  const getSortIndicator = (key: string) => {
+    if (sortConfig?.key !== key) return null;
+    return sortConfig.direction === 'asc' ? '↑' : '↓';
+  };
+
   const sortedRuns = useMemo(() => {
     if (!sortConfig) return runs;
 
     return [...runs].sort((a, b) => {
-      let aValue: number | string, bValue: number | string;
+      let aValue: number | string;
+      let bValue: number | string;
 
       switch (sortConfig.key) {
         case 'timestamp':
@@ -113,41 +119,37 @@ export default function RunList({ runs }: { runs: Run[] }) {
       <table className="runs-table">
         <thead>
           <tr>
-            <th className="sortable" onClick={() => handleSort('timestamp')}>
-              Report Date{' '}
-              {sortConfig?.key === 'timestamp' &&
-                (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            <th>
+              <button className="sortable" onClick={() => handleSort('timestamp')} type="button">
+                Report Date {getSortIndicator('timestamp')}
+              </button>
             </th>
-            <th className="sortable" onClick={() => handleSort('channel')}>
-              Channel{' '}
-              {sortConfig?.key === 'channel' &&
-                (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            <th>
+              <button className="sortable" onClick={() => handleSort('channel')} type="button">
+                Channel {getSortIndicator('channel')}
+              </button>
             </th>
-            <th className="sortable" onClick={() => handleSort('type')}>
-              Type{' '}
-              {sortConfig?.key === 'type' &&
-                (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            <th>
+              <button className="sortable" onClick={() => handleSort('type')} type="button">
+                Type {getSortIndicator('type')}
+              </button>
             </th>
-            <th className="sortable" onClick={() => handleSort('status')}>
-              Status{' '}
-              {sortConfig?.key === 'status' &&
-                (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            <th>
+              <button className="sortable" onClick={() => handleSort('status')} type="button">
+                Status {getSortIndicator('status')}
+              </button>
             </th>
-            <th className="sortable" onClick={() => handleSort('duration')}>
-              Duration{' '}
-              {sortConfig?.key === 'duration' &&
-                (sortConfig.direction === 'asc' ? '↑' : '↓')}
+            <th>
+              <button className="sortable" onClick={() => handleSort('duration')} type="button">
+                Duration {getSortIndicator('duration')}
+              </button>
             </th>
             <th>Summary</th>
           </tr>
         </thead>
         <tbody>
           {sortedRuns.map((run) => (
-            <tr
-              key={run.id}
-              className="runs-table__row-clickable"
-              onClick={() => setSelectedRunId(run.id)}
-            >
+            <tr key={run.id} className="runs-table__row-clickable">
               <td className="timestamp">
                 {formatTime(run.timestamp, run.report_date)}
               </td>
@@ -158,7 +160,13 @@ export default function RunList({ runs }: { runs: Run[] }) {
                 {run.duration_ms ? `${run.duration_ms}ms` : '-'}
               </td>
               <td className="summary" title={run.summary_text}>
-                {summarize(run.summary_text)}
+                <button
+                  className="runs-table__summary-button"
+                  onClick={() => setSelectedRunId(run.id)}
+                  type="button"
+                >
+                  {summarize(run.summary_text)}
+                </button>
               </td>
             </tr>
           ))}

@@ -14,27 +14,7 @@ export function validateData<T>(schema: z.ZodSchema<T>, data: unknown): T {
 }
 
 export function validateParams<T>(schema: z.ZodSchema<T>, params: Record<string, string>): T {
-  // Convert string params to appropriate types
-  const convertedParams: Record<string, any> = {};
-
-  for (const [key, value] of Object.entries(params)) {
-    // Try to parse as number
-    if (!isNaN(Number(value)) && value.trim() !== '') {
-      convertedParams[key] = Number(value);
-    }
-    // Try to parse as boolean
-    else if (value.toLowerCase() === 'true') {
-      convertedParams[key] = true;
-    } else if (value.toLowerCase() === 'false') {
-      convertedParams[key] = false;
-    }
-    // Keep as string
-    else {
-      convertedParams[key] = value;
-    }
-  }
-
-  return validateData(schema, convertedParams);
+  return validateData(schema, params);
 }
 
 // Common validation schemas

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -13,7 +13,7 @@ export interface RequestContext {
   logger: Console;
   params: Record<string, string>;
   query: Record<string, string>;
-  body?: any;
+  body?: unknown;
 }
 
 export abstract class BaseController {
@@ -28,7 +28,7 @@ export abstract class BaseController {
     res: ServerResponse,
     params: Record<string, string>,
     query: Record<string, string>,
-    body?: any,
+    body?: unknown,
   ): Promise<void> {
     const context: RequestContext = {
       req,

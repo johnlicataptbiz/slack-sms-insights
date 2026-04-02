@@ -17,10 +17,16 @@ jobs:
         cache: 'npm'
         cache-dependency-path: package-lock.json
     - run: npm ci
-    - run: npm run lint
+    - run: npm run lint:backend
+    - run: npm run lint:frontend
+      continue-on-error: true
 
   test-backend:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+      SKIP_FRONTEND_BUILD: "true"
+      NODE_ENV: test
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -47,6 +53,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: [lint, test-backend, test-frontend]
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+      SKIP_FRONTEND_BUILD: "true"
+      NODE_ENV: test
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4

@@ -15,7 +15,7 @@ export abstract class BaseRepository {
   }
 
   protected async executeWithRetry<T>(operation: () => Promise<T>, maxRetries = 3, delay = 1000): Promise<T> {
-    let lastError: Error;
+    let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -33,6 +33,10 @@ export abstract class BaseRepository {
       }
     }
 
-    throw lastError!;
+    if (lastError) {
+      throw lastError;
+    }
+
+    throw new Error('Operation failed without an error');
   }
 }

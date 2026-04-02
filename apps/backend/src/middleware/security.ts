@@ -1,6 +1,6 @@
+import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 
 export const securityMiddleware = [
@@ -12,18 +12,26 @@ export const securityMiddleware = [
 ];
 
 type ZodSchema = z.ZodSchema;
+
 export const validateRequest = (schema: ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    const result = schema.safeParse(req.body);
+    const result = schema.safeParse({
+      body: req.body,
+      query: req.query,
+      params: req.params,
+    });
+
     if (!result.success) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         error: 'Invalid request payload',
         details: result.error.flatten(),
       });
-      return;
     }
-    req.body = result.data;
+
+    req.body = result.data.body;
+    req.query = result.data.query as Request['query'];
+    req.params = result.data.params as Request['params'];
     next();
   };
 };

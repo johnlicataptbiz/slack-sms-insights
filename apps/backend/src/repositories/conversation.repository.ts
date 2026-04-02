@@ -22,6 +22,7 @@ export interface UpdateConversationData {
 }
 
 export class ConversationRepository extends BaseRepository {
+  // biome-ignore lint/complexity/noUselessConstructor: explicit constructor preserves base contract for direct instantiation.
   constructor(prisma: PrismaClient) {
     super(prisma);
   }

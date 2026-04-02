@@ -3,10 +3,6 @@ import type { RequestContext } from './base.controller.js';
 import { BaseController } from './base.controller.js';
 
 export class HealthController extends BaseController {
-  constructor(logger: Console) {
-    super(logger);
-  }
-
   async execute(context: RequestContext): Promise<void> {
     const { res } = context;
 
@@ -33,4 +29,3 @@ export class HealthController extends BaseController {
     this.sendSuccessResponse(res, healthData);
   }
 }
-

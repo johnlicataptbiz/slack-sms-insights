@@ -3,15 +3,18 @@
    * Visit https://aka.ms/tsconfig to read more about this file.
    */
   "$schema": "https://www.schemastore.org/tsconfig.json",
-  "extends": "../../tsconfig.json",
   "compilerOptions": {
     "target": "esnext",
     "esModuleInterop": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
     "outDir": "./dist",
     "strict": true,
-    "composite": true
+    "composite": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts", "types/**/*.ts"],
   "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*", "scripts/**/*", "services/**/*", "api/**/*"]

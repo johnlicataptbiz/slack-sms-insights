@@ -23,11 +23,15 @@ export const validateRequest = (schema: ZodSchema) => {
 
     if (!result.success) {
       return res.status(400).json({
-        message: 'Invalid request',
-        errors: result.error.flatten(),
+        success: false,
+        error: 'Invalid request payload',
+        details: result.error.flatten(),
       });
     }
 
+    req.body = result.data.body;
+    req.query = result.data.query as Request['query'];
+    req.params = result.data.params as Request['params'];
     next();
   };
 };

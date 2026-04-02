@@ -1219,10 +1219,6 @@ export const listMessageTemplates = async (
   logger?.warn?.('listMessageTemplates: table missing, stubbed'); 
   return [];
 };
-    logger?.error('listMessageTemplates failed', err);
-    throw err;
-  }
-};
 
 export const insertMessageTemplate = async (
   name: string,
@@ -1234,10 +1230,6 @@ export const insertMessageTemplate = async (
   logger?.warn?.('insertMessageTemplate: table missing, stubbed');
   return { id: '', name, body, created_by: createdBy, created_at: new Date(), updated_at: new Date() } as MessageTemplateRow;
 };
-    logger?.error('insertMessageTemplate failed', err);
-    throw err;
-  }
-};
 
 export const deleteMessageTemplate = async (
   id: string,
@@ -1246,10 +1238,6 @@ export const deleteMessageTemplate = async (
   // TODO: message_templates table missing from schema
   logger?.warn?.('deleteMessageTemplate: table missing, stubbed');
   return true;
-};
-    logger?.error('deleteMessageTemplate failed', err);
-    throw err;
-  }
 };
 
 // ─── Phase 3: Objection Tags ──────────────────────────────────────────────────

@@ -3,6 +3,7 @@
   "formatter": {
     "enabled": true,
     "formatWithErrors": false,
+    "include": ["**"],
     "indentStyle": "space",
     "indentWidth": 2,
     "lineWidth": 120,
@@ -28,6 +29,7 @@
         "useSelfClosingElements": "error",
         "useSingleVarDeclarator": "error",
         "noUnusedTemplateLiteral": "error",
+        "useNumericLiterals": "error",
         "noInferrableTypes": "error",
         "noUselessElse": "error"
       }

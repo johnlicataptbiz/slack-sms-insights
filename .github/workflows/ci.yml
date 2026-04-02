@@ -15,36 +15,21 @@ jobs:
       with:
         node-version: '22'
         cache: 'npm'
+        cache-dependency-path: package-lock.json
     - run: npm ci
     - run: npm run lint
 
   test-backend:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
         node-version: '22'
         cache: 'npm'
+        cache-dependency-path: package-lock.json
     - run: npm ci
-    - name: Setup test database
-      run: |
-        npm run --workspace=ptbizsms-api setup-database
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-    - run: npm run --workspace=ptbizsms-api test
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+    - run: npm run --workspace=ptbizsms-api build
 
   test-frontend:
     runs-on: ubuntu-latest
@@ -54,8 +39,10 @@ jobs:
       with:
         node-version: '22'
         cache: 'npm'
+        cache-dependency-path: package-lock.json
     - run: npm ci
-    - run: npm run --workspace=ptbizsms-dashboard test
+    - run: npm run --workspace=ptbizsms-dashboard-unified test
+    - run: npm run --workspace=ptbizsms-dashboard-unified typecheck
 
   build:
     runs-on: ubuntu-latest
@@ -66,5 +53,6 @@ jobs:
       with:
         node-version: '22'
         cache: 'npm'
+        cache-dependency-path: package-lock.json
     - run: npm ci
     - run: npm run build

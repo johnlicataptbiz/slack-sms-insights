@@ -10,7 +10,11 @@
     "src/vite-env.d.ts",
     "src/v2/**/*.ts",
     "src/v2/**/*.tsx",
-    "src/api/client.ts",
-    "src/api/v2*.ts"
+    "src/api/**/*.ts",
+    "src/components/**/*.ts",
+    "src/components/**/*.tsx",
+    "src/lib/**/*.ts",
+    "src/styles/**/*.ts",
+    "src/utils/**/*.ts"
   ]
 }

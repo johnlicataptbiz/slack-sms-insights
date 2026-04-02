@@ -13,6 +13,6 @@
     "strict": true,
     "composite": true
   },
-  "include": ["**/*.ts"],
-  "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*"]
+  "include": ["src/**/*.ts", "types/**/*.ts"],
+  "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*", "scripts/**/*", "services/**/*", "api/**/*"]
 }

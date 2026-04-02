@@ -10,9 +10,6 @@ jobs:
   test-backend:
     name: Test Backend (sms-insights)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./sms-insights
 
     steps:
     - uses: actions/checkout@v4
@@ -22,7 +19,7 @@ jobs:
       with:
         node-version: "22"
         cache: "npm"
-        cache-dependency-path: ./sms-insights/package-lock.json
+        cache-dependency-path: ./package-lock.json
 
     - name: Install dependencies
       run: npm ci
@@ -31,7 +28,7 @@ jobs:
       run: npm run lint || true
 
     - name: Run backend tests
-      run: npm run build && npm run test:vitest && npm run test:node
+      run: npm run --workspace=ptbizsms-api build
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
         SKIP_FRONTEND_BUILD: "true"
@@ -40,9 +37,6 @@ jobs:
   test-frontend:
     name: Test Frontend
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
 
     steps:
     - uses: actions/checkout@v4
@@ -54,19 +48,19 @@ jobs:
       with:
         node-version: "22"
         cache: "npm"
-        cache-dependency-path: ./frontend/package-lock.json
+        cache-dependency-path: ./package-lock.json
 
     - name: Install dependencies
-      run: npm ci --legacy-peer-deps
+      run: npm ci
 
     - name: Run frontend tests
-      run: npm run test:run
+      run: npm run --workspace=ptbizsms-dashboard-unified test
 
     - name: Run type check
-      run: npm run typecheck:v2
+      run: npm run --workspace=ptbizsms-dashboard-unified typecheck
 
     - name: Build
-      run: npm run build
+      run: npm run --workspace=ptbizsms-dashboard-unified build
 
   deploy-backend:
     name: Deploy Backend to Railway
@@ -99,7 +93,7 @@ jobs:
 
     - name: Deploy to Vercel
       run: vercel --prod --yes
-      working-directory: ./frontend
+      working-directory: ./apps/frontend
       env:
         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}

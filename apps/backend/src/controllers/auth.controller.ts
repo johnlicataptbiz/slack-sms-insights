@@ -9,6 +9,10 @@ const LoginRequestSchema = z.object({
 export class AuthController extends BaseController {
   private readonly correctPassword = process.env.DASHBOARD_PASSWORD || 'default';
 
+  protected async execute(context: RequestContext): Promise<void> {
+    await this.verify(context);
+  }
+
   async verify(context: RequestContext): Promise<void> {
     // For now, just return success - session management would be added later
     this.sendSuccessResponse(context.res, {

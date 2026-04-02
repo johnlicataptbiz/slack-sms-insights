@@ -1658,6 +1658,119 @@ const shouldRefreshFactsOnRead = (): boolean => {
   return raw !== "false" && raw !== "0" && raw !== "off";
 };
 
+const isRecoverableAnalyticsSchemaError = (error: unknown): boolean => {
+  const prismaCode =
+    typeof error === "object" &&
+    error &&
+    "code" in error &&
+    typeof (error as { code?: unknown }).code === "string"
+      ? (error as { code: string }).code
+      : null;
+
+  if (prismaCode === "P2021" || prismaCode === "P2022") {
+    return true;
+  }
+
+  const message = error instanceof Error ? error.message : String(error || "");
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("does not exist in the current database") ||
+    normalized.includes("does not exist in the current") ||
+    normalized.includes("the table") && normalized.includes("does not exist") ||
+    normalized.includes("the column") && normalized.includes("does not exist") ||
+    normalized.includes("does not exist in the current") ||
+    normalized.includes("relation") && normalized.includes("does not exist") ||
+    normalized.includes("column") && normalized.includes("does not exist")
+  );
+};
+
+const buildInsightsSummaryFallback = (params: {
+  from: Date;
+  to: Date;
+  timeZone: string;
+  warning: string;
+}) => ({
+  window: {
+    from: params.from.toISOString(),
+    to: params.to.toISOString(),
+    timeZone: params.timeZone,
+  },
+  warnings: [params.warning],
+  kpis: {
+    messagesSent: 0,
+    uniqueContacted: 0,
+    repliesReceived: 0,
+    replyRatePct: 0,
+    bookedCalls: 0,
+    bookingRatePct: 0,
+    optOuts: 0,
+    optOutRatePct: 0,
+  },
+  reps: [],
+  funnel: {
+    contacted: 0,
+    replied: 0,
+    booked: 0,
+    replyDropoffPct: 0,
+    bookingDropoffPct: 0,
+  },
+  risks: [
+    {
+      key: "analytics-schema",
+      severity: "warning",
+      message: "Insights data is temporarily unavailable while analytics schema catches up.",
+    },
+  ],
+  mondayHealth: {
+    boards: 0,
+    staleBoards: 0,
+    erroredBoards: 0,
+    avgSourceCoveragePct: 0,
+    avgCampaignCoveragePct: 0,
+    avgSetByCoveragePct: 0,
+    avgTouchpointsCoveragePct: 0,
+  },
+});
+
+const buildSequencesDeepFallback = (params: {
+  from: Date;
+  to: Date;
+  timeZone: string;
+  warning: string;
+}) => ({
+  window: {
+    from: params.from.toISOString(),
+    to: params.to.toISOString(),
+    timeZone: params.timeZone,
+  },
+  warnings: [params.warning],
+  sequences: [],
+  monday: {
+    boards: 0,
+    staleBoards: 0,
+    erroredBoards: 0,
+    avgSourceCoveragePct: 0,
+    avgCampaignCoveragePct: 0,
+    avgSetByCoveragePct: 0,
+    avgTouchpointsCoveragePct: 0,
+  },
+  verification: {
+    slackBookedTotal: 0,
+    mondayBookedTotal: 0,
+    deltaBookedVsMonday: 0,
+    matchedCalls: 0,
+    unattributedCalls: 0,
+    manualCalls: 0,
+    strictSmsReplyLinkedCalls: 0,
+    smsPhoneMatchedCalls: 0,
+    fuzzyTextMatchedCalls: 0,
+    manualDirectBooked: 0,
+    manualDirectSharePct: 0,
+    attributionConversationMapped: 0,
+    attributionConversationMappedPct: 0,
+  },
+});
+
 const handleGetInsightsSummaryV2: RequestHandler = async (
   req,
   res,
@@ -1725,6 +1838,29 @@ const handleGetInsightsSummaryV2: RequestHandler = async (
       origin,
     );
   } catch (error) {
+    if (isRecoverableAnalyticsSchemaError(error)) {
+      const warning =
+        "Insights summary is running in degraded mode because analytics tables are not fully available yet.";
+      logger?.warn?.(
+        `Insights summary degraded fallback: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      sendJson(
+        res,
+        200,
+        toEnvelope({
+          data: buildInsightsSummaryFallback({
+            from: resolved.from,
+            to: resolved.to,
+            timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+            warning,
+          }),
+          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+          requestedMode: resolved.mode,
+        }),
+        origin,
+      );
+      return;
+    }
     logger?.error("Failed to fetch insights summary:", error);
     sendJson(
       res,
@@ -1971,6 +2107,29 @@ const handleGetSequencesDeepV2: RequestHandler = async (
       origin,
     );
   } catch (error) {
+    if (isRecoverableAnalyticsSchemaError(error)) {
+      const warning =
+        "Sequence deep analytics is running in degraded mode because analytics schema is not fully available yet.";
+      logger?.warn?.(
+        `Sequences deep degraded fallback: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      sendJson(
+        res,
+        200,
+        toEnvelope({
+          data: buildSequencesDeepFallback({
+            from: resolved.from,
+            to: resolved.to,
+            timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+            warning,
+          }),
+          timeZone: resolved.timeZone || DEFAULT_BUSINESS_TIMEZONE,
+          requestedMode: resolved.mode,
+        }),
+        origin,
+      );
+      return;
+    }
     logger?.error("Failed to fetch sequences deep analytics:", error);
     sendJson(
       res,

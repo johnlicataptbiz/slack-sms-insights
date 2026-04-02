@@ -26,7 +26,10 @@ server.tool("getCiStatus", {
   const res = await fetch(
     `${GITHUB_API}/repos/${owner}/${repo}/pulls/${pull_number}`,
     {
-      headers: {
+        headers: {
+        Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+        "User-Agent": "ci-enforcer-mcp/1.0.0"
+      }
         Authorization: `Bearer ${process.env.GITHUB_TOKEN}`
       }
     }

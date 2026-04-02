@@ -1,55 +1,67 @@
-import { PrismaClient } from "@prisma/client";
+import type { Prisma } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
-// Prisma client configuration with optimizations
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
-    // Prisma 7: Must specify accelerateUrl for client engine or use adapter
-    ...(process.env.DATABASE_ACCELERATE_URL && {
-      accelerateUrl: process.env.DATABASE_ACCELERATE_URL,
-    }),
-  });
+const buildPrismaClient = (): PrismaClient => {
+  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || '').trim();
+  const databaseUrl = (process.env.DATABASE_URL || '').trim();
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+  const log =
+    process.env.NODE_ENV === 'development'
+      ? (['query', 'error', 'warn'] as const)
+      : (['error'] as const);
 
-// Connection management
-export const connectPrisma = async () => {
-  try {
-    await prisma.$connect();
-    console.log("✅ Database connected successfully");
-  } catch (error) {
-    console.error("❌ Database connection failed:", error);
-    throw error;
+  if (accelerateUrl.startsWith('prisma+postgres://')) {
+    return new PrismaClient({
+      log,
+      accelerateUrl,
+    } as Prisma.PrismaClientOptions);
   }
+
+  if (databaseUrl.startsWith('prisma+postgres://')) {
+    return new PrismaClient({
+      log,
+      accelerateUrl: databaseUrl,
+    } as Prisma.PrismaClientOptions);
+  }
+
+  if (databaseUrl) {
+    const adapter = new PrismaPg({ connectionString: databaseUrl });
+    return new PrismaClient({
+      log,
+      adapter,
+    } as Prisma.PrismaClientOptions);
+  }
+
+  throw new Error('Missing DATABASE_URL or PRISMA_ACCELERATE_URL');
+};
+
+export const prisma = globalForPrisma.prisma ?? buildPrismaClient();
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}
+
+export const connectPrisma = async () => {
+  await prisma.$connect();
 };
 
 export const disconnectPrisma = async () => {
-  try {
-    await prisma.$disconnect();
-    console.log("✅ Database disconnected successfully");
-  } catch (error) {
-    console.error("❌ Database disconnection failed:", error);
-    throw error;
-  }
+  await prisma.$disconnect();
 };
 
-// Health check
 export const healthCheck = async () => {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return { status: "healthy", timestamp: new Date().toISOString() };
+    return { status: 'healthy', timestamp: new Date().toISOString() };
   } catch (error) {
     return {
-      status: "unhealthy",
-      error: error instanceof Error ? error.message : "Unknown error",
+      status: 'unhealthy',
+      error: error instanceof Error ? error.message : 'Unknown error',
       timestamp: new Date().toISOString(),
     };
   }

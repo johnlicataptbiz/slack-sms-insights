@@ -1129,19 +1129,49 @@ export const insertConversationNote = async (
   text: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationNoteRow> => {
-  // TODO: conversation_notes table missing from schema
-  // Raw SQL or logger.warn('conversation_notes not implemented');
-  logger?.warn?.('insertConversationNote: table missing, stubbed');
-  return { id: '', conversation_id: conversationId, author, text, created_at: new Date() } as ConversationNoteRow;
+  const prisma = getPrisma();
+  try {
+    const result = await prisma.conversation_notes.create({
+      data: {
+        conversation_id: conversationId,
+        author,
+        text,
+      },
+    });
+    return {
+      id: result.id,
+      conversation_id: result.conversation_id,
+      author: result.author,
+      text: result.text,
+      created_at: result.created_at,
+    };
+  } catch (err) {
+    logger?.error('insertConversationNote failed', err);
+    throw err;
+  }
 };
 
 export const listConversationNotes = async (
   conversationId: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<ConversationNoteRow[]> => {
-  // TODO: conversation_notes table missing from schema  
-  logger?.warn?.('listConversationNotes: table missing, stubbed');
-  return [];
+  const prisma = getPrisma();
+  try {
+    const result = await prisma.conversation_notes.findMany({
+      where: { conversation_id: conversationId },
+      orderBy: { created_at: 'asc' },
+    });
+    return result.map((row) => ({
+      id: row.id,
+      conversation_id: row.conversation_id,
+      author: row.author,
+      text: row.text,
+      created_at: row.created_at,
+    }));
+  } catch (err) {
+    logger?.error('listConversationNotes failed', err);
+    throw err;
+  }
 };
 
 // ─── Snooze (reuses existing next_followup_due_at on conversations) ───────────
@@ -1215,9 +1245,23 @@ export type MessageTemplateRow = {
 export const listMessageTemplates = async (
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<MessageTemplateRow[]> => {
-  // TODO: message_templates table missing from schema
-  logger?.warn?.('listMessageTemplates: table missing, stubbed'); 
-  return [];
+  const prisma = getPrisma();
+  try {
+    const result = await prisma.message_templates.findMany({
+      orderBy: { created_at: 'asc' },
+    });
+    return result.map((row) => ({
+      id: row.id,
+      name: row.name,
+      body: row.body,
+      created_by: row.created_by,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }));
+  } catch (err) {
+    logger?.error('listMessageTemplates failed', err);
+    throw err;
+  }
 };
 
 export const insertMessageTemplate = async (
@@ -1226,18 +1270,43 @@ export const insertMessageTemplate = async (
   createdBy: string | null,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<MessageTemplateRow> => {
-  // TODO: message_templates table missing from schema
-  logger?.warn?.('insertMessageTemplate: table missing, stubbed');
-  return { id: '', name, body, created_by: createdBy, created_at: new Date(), updated_at: new Date() } as MessageTemplateRow;
+  const prisma = getPrisma();
+  try {
+    const result = await prisma.message_templates.create({
+      data: {
+        name,
+        body,
+        created_by: createdBy,
+      },
+    });
+    return {
+      id: result.id,
+      name: result.name,
+      body: result.body,
+      created_by: result.created_by,
+      created_at: result.created_at,
+      updated_at: result.updated_at,
+    };
+  } catch (err) {
+    logger?.error('insertMessageTemplate failed', err);
+    throw err;
+  }
 };
 
 export const deleteMessageTemplate = async (
   id: string,
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<boolean> => {
-  // TODO: message_templates table missing from schema
-  logger?.warn?.('deleteMessageTemplate: table missing, stubbed');
-  return true;
+  const prisma = getPrisma();
+  try {
+    await prisma.message_templates.delete({
+      where: { id },
+    });
+    return true;
+  } catch (err) {
+    logger?.error('deleteMessageTemplate failed', err);
+    throw err;
+  }
 };
 
 // ─── Phase 3: Objection Tags ──────────────────────────────────────────────────

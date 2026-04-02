@@ -13,9 +13,21 @@ export const securityMiddleware = [
 
 type ZodSchema = z.ZodSchema;
 
-export const validateRequest = (_schema: ZodSchema) => {
-  return (_req: Request, _res: Response, next: NextFunction) => {
-    // Zod validation implementation
+export const validateRequest = (schema: ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse({
+      body: req.body,
+      query: req.query,
+      params: req.params,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: 'Invalid request',
+        errors: result.error.flatten(),
+      });
+    }
+
     next();
   };
 };

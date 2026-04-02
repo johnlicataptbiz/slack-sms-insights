@@ -29,9 +29,10 @@ export const validateRequest = (schema: ZodSchema) => {
       });
     }
 
-    req.body = result.data.body;
-    req.query = result.data.query as Request['query'];
-    req.params = result.data.params as Request['params'];
+    const data = result.data as { body: unknown; query: unknown; params: unknown };
+    req.body = data.body;
+    req.query = data.query as Request['query'];
+    req.params = data.params as Request['params'];
     next();
   };
 };

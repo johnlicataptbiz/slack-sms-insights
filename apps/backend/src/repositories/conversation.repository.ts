@@ -1,4 +1,4 @@
-import type { Conversation, ConversationStatus, PrismaClient } from '@prisma/client';
+import type { ConversationStatus, PrismaClient } from '@prisma/client';
 import { BaseRepository } from './base.repository.js';
 
 export interface CreateConversationData {
@@ -27,27 +27,27 @@ export class ConversationRepository extends BaseRepository {
     super(prisma);
   }
 
-  async findById(id: string): Promise<Conversation | null> {
-    return this.prisma.conversation.findUnique({
+  async findById(id: string): Promise<unknown | null> {
+    return this.prisma.conversations.findUnique({
       where: { id },
     });
   }
 
-  async findByContactKey(contactKey: string): Promise<Conversation | null> {
-    return this.prisma.conversation.findUnique({
+  async findByContactKey(contactKey: string): Promise<unknown | null> {
+    return this.prisma.conversations.findUnique({
       where: { contactKey },
     });
   }
 
-  async create(data: CreateConversationData): Promise<Conversation> {
-    return this.prisma.conversation.create({
+  async create(data: CreateConversationData): Promise<unknown> {
+    return this.prisma.conversations.create({
       data,
     });
   }
 
-  async update(id: string, data: UpdateConversationData): Promise<Conversation | null> {
+  async update(id: string, data: UpdateConversationData): Promise<unknown | null> {
     try {
-      return await this.prisma.conversation.update({
+      return await this.prisma.conversations.update({
         where: { id },
         data,
       });
@@ -62,7 +62,7 @@ export class ConversationRepository extends BaseRepository {
 
   async delete(id: string): Promise<boolean> {
     try {
-      await this.prisma.conversation.delete({
+      await this.prisma.conversations.delete({
         where: { id },
       });
       return true;
@@ -83,10 +83,10 @@ export class ConversationRepository extends BaseRepository {
       orderBy?: 'createdAt' | 'updatedAt' | 'last_touch_at';
       orderDirection?: 'asc' | 'desc';
     } = {},
-  ): Promise<Conversation[]> {
+  ): Promise<unknown[]> {
     const { status, current_rep_id, limit = 50, offset = 0, orderBy = 'updatedAt', orderDirection = 'desc' } = options;
 
-    return this.prisma.conversation.findMany({
+    return this.prisma.conversations.findMany({
       where: {
         ...(status && { status }),
         ...(current_rep_id && { current_rep_id }),
@@ -102,7 +102,7 @@ export class ConversationRepository extends BaseRepository {
   async count(options: { status?: ConversationStatus; current_rep_id?: string } = {}): Promise<number> {
     const { status, current_rep_id } = options;
 
-    return this.prisma.conversation.count({
+    return this.prisma.conversations.count({
       where: {
         ...(status && { status }),
         ...(current_rep_id && { current_rep_id }),
@@ -110,10 +110,10 @@ export class ConversationRepository extends BaseRepository {
     });
   }
 
-  async findDueForFollowup(): Promise<Conversation[]> {
+  async findDueForFollowup(): Promise<unknown[]> {
     const now = new Date();
 
-    return this.prisma.conversation.findMany({
+    return this.prisma.conversations.findMany({
       where: {
         nextFollowupAt: {
           lte: now,

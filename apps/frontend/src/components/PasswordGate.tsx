@@ -63,7 +63,6 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
               }}
               placeholder="Password"
               autoComplete="current-password"
-              autoFocus
               disabled={isSubmitting || success}
               className={error ? 'is-error' : ''}
             />

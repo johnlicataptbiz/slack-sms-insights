@@ -1,7 +1,6 @@
 # Exclude large directories from Railway deployment
 node_modules/
 frontend/
-sms-insights/
 archive/
 ptbiz_sms_asset_kit/
 .git/

@@ -120,8 +120,9 @@ const getStoredTheme = (): 'light' | 'dark' => {
 export default function V2Shell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const fallbackNavItem = navItems[0]!;
 
-  const activeNavItem = navItems.find((item) => isRouteActive(location.pathname, item.to)) ?? navItems[0];
+  const activeNavItem = navItems.find((item) => isRouteActive(location.pathname, item.to)) ?? fallbackNavItem;
 
   const activeMeta = useMemo(() => shellMeta[activeNavItem.key], [activeNavItem.key]);
 

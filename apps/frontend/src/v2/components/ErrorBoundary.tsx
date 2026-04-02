@@ -57,7 +57,14 @@ export class ErrorBoundary extends Component<Props, State> {
           aria-live="assertive"
         >
           <div className="V2ErrorBoundary__icon" aria-hidden="true">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -66,7 +73,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
           <h2 className="V2ErrorBoundary__title">Something went wrong</h2>
 
-          <p className="V2ErrorBoundary__message">{this.state.error?.message || 'An unexpected error occurred'}</p>
+          <p className="V2ErrorBoundary__message">
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </p>
 
           {import.meta.env.DEV && this.state.errorInfo && (
             <details className="V2ErrorBoundary__details">

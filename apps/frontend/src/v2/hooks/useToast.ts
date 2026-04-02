@@ -20,7 +20,9 @@ export function useToast() {
     toast.success(message, {
       description: options?.description,
       duration: options?.duration ?? 4000,
-      action: options?.action ? { label: options.action.label, onClick: options.action.onClick } : undefined,
+      action: options?.action
+        ? { label: options.action.label, onClick: options.action.onClick }
+        : undefined,
     });
   };
 
@@ -28,7 +30,9 @@ export function useToast() {
     toast.error(message, {
       description: options?.description,
       duration: options?.duration ?? 6000,
-      action: options?.action ? { label: options.action.label, onClick: options.action.onClick } : undefined,
+      action: options?.action
+        ? { label: options.action.label, onClick: options.action.onClick }
+        : undefined,
     });
   };
 
@@ -36,7 +40,9 @@ export function useToast() {
     toast.warning(message, {
       description: options?.description,
       duration: options?.duration ?? 5000,
-      action: options?.action ? { label: options.action.label, onClick: options.action.onClick } : undefined,
+      action: options?.action
+        ? { label: options.action.label, onClick: options.action.onClick }
+        : undefined,
     });
   };
 
@@ -44,7 +50,9 @@ export function useToast() {
     toast.info(message, {
       description: options?.description,
       duration: options?.duration ?? 4000,
-      action: options?.action ? { label: options.action.label, onClick: options.action.onClick } : undefined,
+      action: options?.action
+        ? { label: options.action.label, onClick: options.action.onClick }
+        : undefined,
     });
   };
 
@@ -54,7 +62,11 @@ export function useToast() {
    */
   const promise = <T>(
     promiseFn: Promise<T>,
-    messages: { loading: string; success: string | ((data: T) => string); error: string | ((err: unknown) => string) },
+    messages: {
+      loading: string;
+      success: string | ((data: T) => string);
+      error: string | ((err: unknown) => string);
+    },
     options?: Pick<ToastOptions, 'duration'>,
   ) => {
     return toast.promise(promiseFn, {

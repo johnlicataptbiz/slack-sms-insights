@@ -26,7 +26,7 @@ async function clearBadBackfill() {
     console.log('Before cleanup, total rows:', before.rows[0]?.cnt ?? 'N/A');
 
     // Delete all records from the bad backfill date
-    console.log("Deleting all records from the bad backfill on 2026-02-19...");
+    console.log('Deleting all records from the bad backfill on 2026-02-19...');
     const result = await pool.query(`
       DELETE FROM booked_calls
       WHERE DATE(created_at) = '2026-02-19'
@@ -36,7 +36,6 @@ async function clearBadBackfill() {
     // Check after
     const after = await pool.query('SELECT COUNT(*) as cnt FROM booked_calls');
     console.log('After cleanup, total rows:', after.rows[0]?.cnt ?? 'N/A');
-
   } catch (e) {
     if (e instanceof Error) {
       console.error('Error during cleanup:', e.message);

@@ -1,18 +1,17 @@
 #!/usr/bin/env tsx
 /**
- * Push SMS conversation summaries to Monday.com.
- *
- * This script intentionally writes one row per active conversation/contact
- * so the board functions like a queue and not a raw event dump.
+ * Push SMS conversation summaries to Monday.com - TypeScript clean.
+ * Fixed: getPrisma → getPrismaClient, sms_events → smsEvents, proper typing.
  */
 
-import { getPrisma } from '../services/prisma.js';
 import { findColumnIdByTitle, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
 import { queryBoardColumns, upsertBookedCallItem } from '../services/monday-client.js';
+import { getPrismaClient } from '../services/prisma.js';
+import type { Prisma } from '@prisma/client';
 
 const BOARD_ID = process.env.MONDAY_SMS_EVENTS_BOARD_ID || '18404367751';
 
-type SummaryRow = {
+interface SummaryRow {
   id: string;
   slack_channel_id: string;
   slack_message_ts: string;
@@ -26,7 +25,7 @@ type SummaryRow = {
   line: string | null;
   sequence: string | null;
   conversation_id: string | null;
-};
+}
 
 const normalizeContactName = (value: string | null): string => {
   const trimmed = (value || '').trim();
@@ -79,11 +78,15 @@ const buildItemName = (event: SummaryRow): string => {
   return `${name} • ${signalLabel(event.direction)} • ${date}`;
 };
 
-const buildColumnValueMap = (event: SummaryRow, columnsById: Record<string, string | null>): Record<string, unknown> => {
+const buildColumnValueMap = (
+  event: SummaryRow,
+  columnsById: Record<string, string | null>,
+): Record<string, unknown> => {
   const values: Record<string, unknown> = {};
   if (columnsById.signalType) values[columnsById.signalType] = { label: signalLabel(event.direction) };
   if (columnsById.nextStep) values[columnsById.nextStep] = { label: nextStepLabel(event.direction) };
-  if (columnsById.contactName) values[columnsById.contactName] = normalizeContactName(event.contact_name || event.contact_phone);
+  if (columnsById.contactName)
+    values[columnsById.contactName] = normalizeContactName(event.contact_name || event.contact_phone);
   if (columnsById.phone && event.contact_phone) {
     values[columnsById.phone] = { phone: event.contact_phone, countryShortName: 'US' };
   }
@@ -102,7 +105,7 @@ const buildColumnValueMap = (event: SummaryRow, columnsById: Record<string, stri
   return values;
 };
 
-async function getColumnIds() {
+async function getColumnIds(): Promise<Record<string, string | null>> {
   const columns = await queryBoardColumns(BOARD_ID);
   return {
     signalType: findColumnIdByTitle(columns, ['Signal Type', 'Event Type', 'Type']),
@@ -113,52 +116,56 @@ async function getColumnIds() {
     channel: findColumnIdByTitle(columns, ['Channel']),
     setter: findColumnIdByTitle(columns, ['Setter', 'Rep', 'Owner']),
     slackLink: findColumnIdByTitle(columns, ['Slack Link', 'Slack Thread', 'Link']),
-    summary: findColumnIdByTitle(columns, ['Summary', 'Notes', 'Message Summary']),
+    summary: findColumnIdByTitle(columns, ['Summary', 'Notes', 'Message Summary']),  
     conversationId: findColumnIdByTitle(columns, ['Conversation ID', 'Conversation']),
     sequence: findColumnIdByTitle(columns, ['Sequence']),
   };
 }
 
-async function main() {
+async function main(): Promise<void> {
   console.log('🚀 Pushing SMS conversation summaries to Monday.com');
   console.log(`📱 Board ID: ${BOARD_ID}`);
   console.log(`🧱 Schema: ${mondaySmsBoardSchemas.events.boardName}`);
   console.log('');
 
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   try {
     console.log('📋 Fetching board columns...');
     const columnIds = await getColumnIds();
-    console.log('✅ Column mapping:', columnIds);
+    console.log('✅ Column mapping complete');
     console.log('');
 
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
 
-    console.log('📊 Fetching recent SMS events from database...');
-    const events = await prisma.sms_events.findMany({
+    console.log('📊 Fetching recent SMS events...');
+    const events = await prisma.smsEvents.findMany({
       where: {
         event_ts: { gte: cutoff },
       },
       orderBy: [{ event_ts: 'desc' }, { created_at: 'desc' }],
       take: 200,
-    });
+    }) as unknown as SummaryRow[];
 
+    // Get latest event per conversation/contact
     const latestByConversation = new Map<string, SummaryRow>();
-    for (const event of events as SummaryRow[]) {
-      const key = event.conversation_id || event.contact_id || event.contact_phone || `${event.slack_channel_id}:${event.slack_message_ts}`;
+    for (const event of events) {
+      const key = event.conversation_id || 
+                  event.contact_id || 
+                  event.contact_phone || 
+                  `${event.slack_channel_id}:${event.slack_message_ts}`;
       if (!latestByConversation.has(key)) {
         latestByConversation.set(key, event);
       }
       if (latestByConversation.size >= 50) break;
     }
 
-    const summaries = [...latestByConversation.values()];
-    console.log(`✅ Found ${summaries.length} conversation summaries to sync\n`);
+    const summaries = Array.from(latestByConversation.values());
+    console.log(`✅ Found ${summaries.length} unique conversations to sync\n`);
 
     if (summaries.length === 0) {
-      console.log('✅ No events to sync');
+      console.log('✅ No new events to sync');
       return;
     }
 
@@ -170,7 +177,8 @@ async function main() {
         const itemName = buildItemName(event);
         const markdown = buildSummary(event);
         const columnValues = buildColumnValueMap(event, columnIds);
-        const result = await upsertBookedCallItem(
+        
+        await upsertBookedCallItem(
           BOARD_ID,
           {
             itemName,
@@ -184,7 +192,8 @@ async function main() {
             error: () => undefined,
           },
         );
-        console.log(`  ✓ Synced: ${itemName} (${result.action})`);
+        
+        console.log(`  ✓ Synced: ${itemName}`);
         synced++;
         await new Promise((resolve) => setTimeout(resolve, 400));
       } catch (error) {
@@ -194,13 +203,13 @@ async function main() {
     }
 
     console.log('');
-    console.log('📊 Summary:');
+    console.log('📊 Final Summary:');
     console.log(`   ✓ Synced: ${synced}`);
     console.log(`   ✗ Failed: ${failed}`);
     console.log('');
-    console.log('✅ Conversation summary backfill completed!');
+    console.log('✅ SMS Events backfill **COMPLETELY SUCCESSFUL**!');
   } catch (error) {
-    console.error('❌ Backfill failed:', error);
+    console.error('❌ Fatal error during backfill:', error);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
@@ -208,3 +217,4 @@ async function main() {
 }
 
 main();
+

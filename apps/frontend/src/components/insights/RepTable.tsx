@@ -22,12 +22,26 @@ export function RepTable({ reps }: Props) {
           <tr key={rep.repId}>
             <td>{rep.repName}</td>
             <td>{rep.conversationsHandled}</td>
-            <td>{rep.avgFirstResponseMinutes != null ? `${Math.round(rep.avgFirstResponseMinutes)}m` : '-'}</td>
-            <td>{rep.p90FirstResponseMinutes != null ? `${Math.round(rep.p90FirstResponseMinutes)}m` : '-'}</td>
-            <td>{rep.followupLagMinutesAvg != null ? `${Math.round(rep.followupLagMinutesAvg)}m` : '-'}</td>
+            <td>
+              {rep.avgFirstResponseMinutes != null
+                ? `${Math.round(rep.avgFirstResponseMinutes)}m`
+                : '-'}
+            </td>
+            <td>
+              {rep.p90FirstResponseMinutes != null
+                ? `${Math.round(rep.p90FirstResponseMinutes)}m`
+                : '-'}
+            </td>
+            <td>
+              {rep.followupLagMinutesAvg != null
+                ? `${Math.round(rep.followupLagMinutesAvg)}m`
+                : '-'}
+            </td>
             <td>
               {rep.overdueWorkItems > 0 ? (
-                <span className="badge badge--high">{rep.overdueWorkItems}</span>
+                <span className="badge badge--high">
+                  {rep.overdueWorkItems}
+                </span>
               ) : (
                 <span style={{ color: '#9ca3af' }}>0</span>
               )}

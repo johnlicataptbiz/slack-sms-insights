@@ -1,1 +1,5 @@
-const e={actions:{argTypesRegex:"^on[A-Z].*"},controls:{expanded:!0}};export{e as parameters};
+const e = {
+  actions: { argTypesRegex: '^on[A-Z].*' },
+  controls: { expanded: !0 },
+};
+export { e as parameters };

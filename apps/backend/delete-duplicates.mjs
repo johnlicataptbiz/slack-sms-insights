@@ -18,7 +18,7 @@ async function deleteMondayItem(itemId) {
   if (!apiToken) {
     throw new Error('MONDAY_API_TOKEN not set');
   }
-  
+
   const query = `
     mutation {
       delete_item (item_id: ${itemId}) {
@@ -26,22 +26,22 @@ async function deleteMondayItem(itemId) {
       }
     }
   `;
-  
+
   const response = await fetch('https://api.monday.com/v2', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': apiToken,
+      Authorization: apiToken,
     },
-    body: JSON.stringify({ query })
+    body: JSON.stringify({ query }),
   });
-  
+
   const result = await response.json();
-  
+
   if (result.errors) {
     throw new Error(result.errors[0].message);
   }
-  
+
   return result.data.delete_item;
 }
 
@@ -57,38 +57,40 @@ const duplicatesToDelete = [
 ];
 
 async function deleteDuplicates() {
-  console.log(`\n${colors.bright}${colors.yellow}⚠️  WARNING: ABOUT TO DELETE ${duplicatesToDelete.length} MONDAY ITEMS${colors.reset}\n`);
-  
+  console.log(
+    `\n${colors.bright}${colors.yellow}⚠️  WARNING: ABOUT TO DELETE ${duplicatesToDelete.length} MONDAY ITEMS${colors.reset}\n`,
+  );
+
   console.log('Items to be deleted:');
   duplicatesToDelete.forEach((item, idx) => {
     console.log(`  ${idx + 1}. ${item.name} (ID: ${item.id})`);
   });
-  
+
   console.log(`\n${colors.yellow}This action cannot be undone!${colors.reset}`);
-  console.log(`\nPress Ctrl+C within 5 seconds to cancel...\n`);
-  
+  console.log('\nPress Ctrl+C within 5 seconds to cancel...\n');
+
   // Wait 5 seconds
-  await new Promise(resolve => setTimeout(resolve, 5000));
-  
+  await new Promise((resolve) => setTimeout(resolve, 5000));
+
   console.log(`${colors.green}Starting deletion...${colors.reset}\n`);
-  
+
   let successCount = 0;
   let errorCount = 0;
-  
+
   for (const item of duplicatesToDelete) {
     try {
       await deleteMondayItem(item.id);
       log.success(`Deleted: ${item.name} (ID: ${item.id})`);
       successCount++;
-      
+
       // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     } catch (error) {
       log.error(`Failed to delete ${item.name}: ${error.message}`);
       errorCount++;
     }
   }
-  
+
   console.log(`\n${colors.bright}DELETION COMPLETE${colors.reset}`);
   console.log(`  ${colors.green}Deleted: ${successCount}${colors.reset}`);
   if (errorCount > 0) {

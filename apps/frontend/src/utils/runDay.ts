@@ -21,7 +21,10 @@ const clampHour = (value: number): number => {
   return Math.min(23, Math.max(0, Math.trunc(value)));
 };
 
-const getTimeZoneParts = (input: Date | string, timeZone: string): TimeZoneParts | null => {
+const getTimeZoneParts = (
+  input: Date | string,
+  timeZone: string,
+): TimeZoneParts | null => {
   const instant = input instanceof Date ? input : new Date(input);
   if (!Number.isFinite(instant.getTime())) return null;
 
@@ -45,11 +48,17 @@ const getTimeZoneParts = (input: Date | string, timeZone: string): TimeZoneParts
 };
 
 export const shiftIsoDay = (day: string, deltaDays: number): string => {
-  const [year, month, date] = day.split('-').map((value) => Number.parseInt(value, 10));
-  const safeYear = typeof year === 'number' && Number.isFinite(year) ? year : 1970;
-  const safeMonth = typeof month === 'number' && Number.isFinite(month) ? month : 1;
+  const [year, month, date] = day
+    .split('-')
+    .map((value) => Number.parseInt(value, 10));
+  const safeYear =
+    typeof year === 'number' && Number.isFinite(year) ? year : 1970;
+  const safeMonth =
+    typeof month === 'number' && Number.isFinite(month) ? month : 1;
   const safeDate = typeof date === 'number' && Number.isFinite(date) ? date : 1;
-  const shifted = new Date(Date.UTC(safeYear, safeMonth - 1, safeDate + deltaDays, 0, 0, 0, 0));
+  const shifted = new Date(
+    Date.UTC(safeYear, safeMonth - 1, safeDate + deltaDays, 0, 0, 0, 0),
+  );
   const yyyy = shifted.getUTCFullYear();
   const mm = String(shifted.getUTCMonth() + 1).padStart(2, '0');
   const dd = String(shifted.getUTCDate()).padStart(2, '0');
@@ -63,7 +72,10 @@ export type BusinessDayContext = {
   timeZone: string;
 };
 
-export const dayKeyInTimeZone = (input: Date | string, timeZone: string): string | null => {
+export const dayKeyInTimeZone = (
+  input: Date | string,
+  timeZone: string,
+): string | null => {
   const parts = getTimeZoneParts(input, timeZone);
   if (!parts) return null;
   return `${parts.year}-${parts.month}-${parts.day}`;
@@ -78,7 +90,9 @@ export const resolveCurrentBusinessDay = (params?: {
   if (!Number.isFinite(now.getTime())) return null;
 
   const timeZone = params?.timeZone || DEFAULT_BUSINESS_TIME_ZONE;
-  const startHour = clampHour(params?.startHour ?? DEFAULT_BUSINESS_DAY_START_HOUR);
+  const startHour = clampHour(
+    params?.startHour ?? DEFAULT_BUSINESS_DAY_START_HOUR,
+  );
   const parts = getTimeZoneParts(now, timeZone);
   if (!parts) return null;
 
@@ -89,7 +103,10 @@ export const resolveCurrentBusinessDay = (params?: {
   return { day, isCarryOver, startHour, timeZone };
 };
 
-export const resolveRunBusinessDay = (run: RunDayInput, timeZone = DEFAULT_BUSINESS_TIME_ZONE): string | null => {
+export const resolveRunBusinessDay = (
+  run: RunDayInput,
+  timeZone = DEFAULT_BUSINESS_TIME_ZONE,
+): string | null => {
   const reportDay = (run.report_date || '').trim();
   if (ISO_DAY_PATTERN.test(reportDay)) return reportDay;
   if (ISO_DAY_PREFIX_PATTERN.test(reportDay)) return reportDay.slice(0, 10);

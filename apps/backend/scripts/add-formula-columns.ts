@@ -1,9 +1,9 @@
 #!/usr/bin/env tsx
 /**
  * Add Formula Columns to Redesigned Monday Boards
- * 
+ *
  * Formula columns calculate metrics automatically in Monday.
- * 
+ *
  * Usage: npx tsx scripts/add-formula-columns.ts
  */
 
@@ -40,7 +40,7 @@ async function callMondayApi(query: string, variables?: Record<string, unknown>)
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: MONDAY_API_TOKEN!,
+      Authorization: MONDAY_API_TOKEN as string,
     },
     body: JSON.stringify({ query, variables }),
   });
@@ -88,11 +88,7 @@ async function getBoardColumns(boardId: string): Promise<Column[]> {
   return result.data?.boards?.[0]?.columns || [];
 }
 
-async function createFormulaColumn(
-  boardId: string,
-  title: string,
-  formula: string
-): Promise<string | null> {
+async function createFormulaColumn(boardId: string, title: string, formula: string): Promise<string | null> {
   const query = `
     mutation ($boardId: ID!, $title: String!, $formula: String!) {
       create_column(
@@ -124,21 +120,21 @@ async function setupReportsFormulas(boardId: string): Promise<void> {
   console.log('  📊 Adding formulas to SMS Reports board...');
 
   const columns = await getBoardColumns(boardId);
-  
+
   // Find existing columns
-  const hasJack = columns.some(c => c.title === 'Jack');
-  const hasBrandon = columns.some(c => c.title === 'Brandon');
-  const hasSelfBooked = columns.some(c => c.title === 'Self Booked');
-  const hasReplyRate = columns.some(c => c.title === 'Reply Rate %');
-  const hasBookedTarget = columns.some(c => c.title === 'Booked Target');
-  const hasReplyTarget = columns.some(c => c.title === 'Reply Target');
+  const _hasJack = columns.some((c) => c.title === 'Jack');
+  const _hasBrandon = columns.some((c) => c.title === 'Brandon');
+  const _hasSelfBooked = columns.some((c) => c.title === 'Self Booked');
+  const _hasReplyRate = columns.some((c) => c.title === 'Reply Rate %');
+  const hasBookedTarget = columns.some((c) => c.title === 'Booked Target');
+  const hasReplyTarget = columns.some((c) => c.title === 'Reply Target');
 
   // Create target columns if missing
   if (!hasBookedTarget) {
     await createColumn(boardId, 'Booked Target', 'numbers', '10');
     console.log('    ✓ Created: Booked Target');
   }
-  
+
   if (!hasReplyTarget) {
     await createColumn(boardId, 'Reply Target', 'numbers', '15');
     console.log('    ✓ Created: Reply Target');
@@ -148,32 +144,33 @@ async function setupReportsFormulas(boardId: string): Promise<void> {
   const formulas = [
     {
       title: 'Total Booked Formula',
-      formula: `{Jack}+{Brandon}+{Self Booked}`,
+      formula: '{Jack}+{Brandon}+{Self Booked}',
     },
     {
       title: 'Booked vs Target %',
-      formula: `IF({Total Booked}>0, ({Total Booked}/{Booked Target})*100, 0)`,
+      formula: 'IF({Total Booked}>0, ({Total Booked}/{Booked Target})*100, 0)',
     },
     {
       title: 'Reply Score',
-      formula: `MIN({Reply Rate %}/{Reply Target}, 1)*50`,
+      formula: 'MIN({Reply Rate %}/{Reply Target}, 1)*50',
     },
     {
       title: 'Booked Score',
-      formula: `MIN({Total Booked}/{Booked Target}, 1)*50`,
+      formula: 'MIN({Total Booked}/{Booked Target}, 1)*50',
     },
     {
       title: 'Health Score Formula',
-      formula: `{Booked Score}+{Reply Score}`,
+      formula: '{Booked Score}+{Reply Score}',
     },
     {
       title: 'vs Last Week Formula',
-      formula: `IF({Total Booked Previous Week}>0, (({Total Booked}-{Total Booked Previous Week})/{Total Booked Previous Week})*100, 0)`,
+      formula:
+        'IF({Total Booked Previous Week}>0, (({Total Booked}-{Total Booked Previous Week})/{Total Booked Previous Week})*100, 0)',
     },
   ];
 
   for (const f of formulas) {
-    const existing = columns.some(c => c.title === f.title);
+    const existing = columns.some((c) => c.title === f.title);
     if (!existing) {
       await createFormulaColumn(boardId, f.title, f.formula);
       console.log(`    ✓ Created: ${f.title}`);
@@ -192,11 +189,11 @@ async function setupSequencesFormulas(boardId: string): Promise<void> {
   const formulas = [
     {
       title: 'Conversion Rate %',
-      formula: `IF({Messages Sent}>0, ({Booked Calls}/{Messages Sent})*100, 0)`,
+      formula: 'IF({Messages Sent}>0, ({Booked Calls}/{Messages Sent})*100, 0)',
     },
     {
       title: 'Engagement Score',
-      formula: `{Reply Rate %}*0.6+{Booking Rate %}*0.4`,
+      formula: '{Reply Rate %}*0.6+{Booking Rate %}*0.4',
     },
     {
       title: 'Performance Tier',
@@ -205,7 +202,7 @@ async function setupSequencesFormulas(boardId: string): Promise<void> {
   ];
 
   for (const f of formulas) {
-    const existing = columns.some(c => c.title === f.title);
+    const existing = columns.some((c) => c.title === f.title);
     if (!existing) {
       await createFormulaColumn(boardId, f.title, f.formula);
       console.log(`    ✓ Created: ${f.title}`);
@@ -237,7 +234,7 @@ async function setupPersonalFormulas(boardId: string): Promise<void> {
   ];
 
   for (const f of formulas) {
-    const existing = columns.some(c => c.title === f.title);
+    const existing = columns.some((c) => c.title === f.title);
     if (!existing) {
       await createFormulaColumn(boardId, f.title, f.formula);
       console.log(`    ✓ Created: ${f.title}`);
@@ -252,7 +249,7 @@ async function createColumn(
   boardId: string,
   title: string,
   columnType: string,
-  defaults?: string
+  defaults?: string,
 ): Promise<string | null> {
   const query = `
     mutation ($boardId: ID!, $title: String!, $columnType: ColumnType!, $defaults: JSON) {

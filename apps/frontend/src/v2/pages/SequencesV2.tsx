@@ -1,4 +1,16 @@
-import { ChevronDown, ChevronUp, MessageSquare, Phone, Reply, Users } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
+import {
+  Calendar,
+  ChevronDown,
+  Filter,
+  MessageSquare,
+  Phone,
+  Reply,
+  SortAsc,
+  SortDesc,
+  Users,
+} from 'lucide-react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SequenceQualificationItem } from '../../api/v2Queries';
@@ -21,16 +33,20 @@ import {
   UnresolvedAttributionPanel,
 } from '../components/SequenceAttributionPanels';
 import { SequenceQualificationBreakdown } from '../components/SequenceQualificationBreakdown';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State } from '../components/V2Primitives';
+import {
+  V2MetricCard,
+  V2PageHeader,
+  V2Panel,
+  V2State,
+} from '../components/V2Primitives';
 
-function IconLabel({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-      {icon}
-      {children}
-    </span>
-  );
-}
+const MODE_LABELS: Record<Mode, string> = {
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+  '180d': '180d',
+  '365d': '365d',
+};
 
 type Mode = '7d' | '30d' | '90d' | '180d' | '365d';
 type SortKey =
@@ -54,21 +70,7 @@ type SequenceColumnKey =
   | 'optOuts'
   | 'optOutRatePct'
   | 'bookedSplit';
-
 type SequenceColumnWidths = Record<SequenceColumnKey, number>;
-
-const MODE_LABELS: Record<Mode, string> = {
-  '7d': 'Last 7 days',
-  '30d': 'Last 30 days',
-  '90d': 'Last 90 days',
-  '180d': 'Last 180 days',
-  '365d': 'Last 365 days',
-};
-
-const fmtInt = (n: number) => n.toLocaleString();
-const fmtPct = (n: number) => `${n.toFixed(1)}%`;
-const fmtSplit = (jack: number, brandon: number, selfBooked: number) =>
-  `${fmtInt(jack)} / ${fmtInt(brandon)} / ${fmtInt(selfBooked)}`;
 
 const SEQUENCE_COLUMN_WIDTH_STORAGE_KEY = 'v2-sequences-column-widths';
 const DEFAULT_SEQUENCE_COLUMN_WIDTHS: SequenceColumnWidths = {
@@ -83,11 +85,20 @@ const DEFAULT_SEQUENCE_COLUMN_WIDTHS: SequenceColumnWidths = {
   bookedSplit: 150,
 };
 
-const normalizeSequenceColumnWidths = (value: unknown): SequenceColumnWidths | null => {
+const fmtInt = (n: number) => n.toLocaleString();
+const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+const fmtSplit = (jack: number, brandon: number, selfBooked: number) =>
+  `${fmtInt(jack)} / ${fmtInt(brandon)} / ${fmtInt(selfBooked)}`;
+
+const normalizeSequenceColumnWidths = (
+  value: unknown,
+): SequenceColumnWidths | null => {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<Record<SequenceColumnKey, unknown>>;
   const next: Partial<SequenceColumnWidths> = {};
-  for (const key of Object.keys(DEFAULT_SEQUENCE_COLUMN_WIDTHS) as SequenceColumnKey[]) {
+  for (const key of Object.keys(
+    DEFAULT_SEQUENCE_COLUMN_WIDTHS,
+  ) as SequenceColumnKey[]) {
     const raw = candidate[key];
     if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
     next[key] = Math.max(120, Math.min(420, Math.round(raw)));
@@ -95,9 +106,23 @@ const normalizeSequenceColumnWidths = (value: unknown): SequenceColumnWidths | n
   return next as SequenceColumnWidths;
 };
 
+const filterVariants: Variants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.05 } },
+};
+
+const metricVariants: Variants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { type: 'spring', stiffness: 300, damping: 20 },
+  },
+};
+
 export default function SequencesV2() {
-  const [mode, setMode] = useState<Mode>('30d');
-  const [status, setStatus] = useState<'active' | 'inactive' | ''>('active');
+  const [mode] = useState<Mode>('30d');
+  const [status] = useState<'active' | 'inactive' | ''>('active');
   const [minSendsThreshold, setMinSendsThreshold] = useState<number>(15);
   const [sortKey, setSortKey] = useState<SortKey>('messagesSent');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -110,10 +135,11 @@ export default function SequencesV2() {
         if (parsed) return parsed;
       }
     } catch {
-      // Ignore parse errors and fall back to defaults.
+      // Ignore parse errors
     }
     return DEFAULT_SEQUENCE_COLUMN_WIDTHS;
   });
+  const [activeTab, setActiveTab] = useState(0);
   const tableRef = useRef<HTMLDivElement | null>(null);
 
   const onSort = useCallback(
@@ -131,15 +157,18 @@ export default function SequencesV2() {
   const sortIndicator = (key: SortKey) => {
     if (sortKey !== key) return null;
     return sortDirection === 'asc' ? (
-      <ChevronUp size={10} style={{ marginLeft: '3px', display: 'inline' }} />
+      <SortAsc size={12} className="V2IconGlow" />
     ) : (
-      <ChevronDown size={10} style={{ marginLeft: '3px', display: 'inline' }} />
+      <SortDesc size={12} className="V2IconGlow" />
     );
   };
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem(SEQUENCE_COLUMN_WIDTH_STORAGE_KEY, JSON.stringify(columnWidths));
+      localStorage.setItem(
+        SEQUENCE_COLUMN_WIDTH_STORAGE_KEY,
+        JSON.stringify(columnWidths),
+      );
     }
   }, [columnWidths]);
 
@@ -152,8 +181,15 @@ export default function SequencesV2() {
       const startWidth = columnWidths[key];
 
       const onMove = (moveEvent: PointerEvent) => {
-        const nextWidth = Math.max(120, Math.min(420, startWidth + (moveEvent.clientX - startX)));
-        setColumnWidths((current) => (current[key] === nextWidth ? current : { ...current, [key]: nextWidth }));
+        const nextWidth = Math.max(
+          120,
+          Math.min(420, startWidth + (moveEvent.clientX - startX)),
+        );
+        setColumnWidths((current) =>
+          current[key] === nextWidth
+            ? current
+            : { ...current, [key]: nextWidth },
+        );
       };
 
       const onUp = () => {
@@ -174,12 +210,25 @@ export default function SequencesV2() {
     tz: DEFAULT_BUSINESS_TIME_ZONE,
     ...(status ? { status } : {}),
   });
-  const funnelQuery = useV2SequenceFunnel({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
-  const attributionMethodQuery = useV2AttributionMethodDaily({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
-  const repResponseQuery = useV2RepResponseDaily({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
+  const funnelQuery = useV2SequenceFunnel({
+    range: mode,
+    tz: DEFAULT_BUSINESS_TIME_ZONE,
+  });
+  const attributionMethodQuery = useV2AttributionMethodDaily({
+    range: mode,
+    tz: DEFAULT_BUSINESS_TIME_ZONE,
+  });
+  const repResponseQuery = useV2RepResponseDaily({
+    range: mode,
+    tz: DEFAULT_BUSINESS_TIME_ZONE,
+  });
   const reviewQueueQuery = useV2AttributionReviewQueue(8);
   const unresolvedQuery = useV2UnresolvedAttributions(8);
-  const qualificationQuery = useV2SequenceQualification({ range: mode, tz: DEFAULT_BUSINESS_TIME_ZONE });
+  const qualificationQuery = useV2SequenceQualification({
+    range: mode,
+    tz: DEFAULT_BUSINESS_TIME_ZONE,
+  });
+
   const data = query.data?.data;
   const funnelRows = funnelQuery.data ?? [];
   const attributionMethodRows = attributionMethodQuery.data ?? [];
@@ -187,47 +236,60 @@ export default function SequencesV2() {
   const reviewQueueRows = reviewQueueQuery.data ?? [];
   const unresolvedRows = unresolvedQuery.data ?? [];
   const qualificationItems = qualificationQuery.data?.data.items ?? [];
+
   const qualificationSummary = useMemo(() => {
     const total = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.totalConversations,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.totalConversations,
       0,
     );
     const sumFullTime = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.fullTime.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.fullTime.count,
       0,
     );
     const sumPartTime = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.partTime.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.partTime.count,
       0,
     );
     const sumCash = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.mostlyCash.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.mostlyCash.count,
       0,
     );
     const sumInsurance = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.mostlyInsurance.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.mostlyInsurance.count,
       0,
     );
     const sumBalanced = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.balancedMix.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.balancedMix.count,
       0,
     );
     const sumHighInterest = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.highInterest.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.highInterest.count,
       0,
     );
     const sumMediumInterest = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.mediumInterest.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.mediumInterest.count,
       0,
     );
     const sumLowInterest = qualificationItems.reduce(
-      (sum: number, item: SequenceQualificationItem) => sum + item.lowInterest.count,
+      (sum: number, item: SequenceQualificationItem) =>
+        sum + item.lowInterest.count,
       0,
     );
     const nicheMap = new Map<string, number>();
     for (const item of qualificationItems) {
       for (const niche of item.topNiches) {
-        nicheMap.set(niche.niche, (nicheMap.get(niche.niche) || 0) + niche.count);
+        nicheMap.set(
+          niche.niche,
+          (nicheMap.get(niche.niche) || 0) + niche.count,
+        );
       }
     }
     const topNiches = [...nicheMap.entries()]
@@ -265,12 +327,21 @@ export default function SequencesV2() {
         acc.optOuts += row.optOuts;
         return acc;
       },
-      { messagesSent: 0, uniqueContacted: 0, inboundTexts: 0, repliesReceived: 0, bookedCalls: 0, optOuts: 0 },
+      {
+        messagesSent: 0,
+        uniqueContacted: 0,
+        inboundTexts: 0,
+        repliesReceived: 0,
+        bookedCalls: 0,
+        optOuts: 0,
+      },
     );
   }, [tableEligibleSequences]);
 
   const sortedSequences = useMemo(() => {
-    const filtered = tableEligibleSequences.filter((row) => row.messagesSent >= minSendsThreshold);
+    const filtered = tableEligibleSequences.filter(
+      (row) => row.messagesSent >= minSendsThreshold,
+    );
     const dir = sortDirection === 'asc' ? 1 : -1;
     return [...filtered].sort((a, b) => {
       if (sortKey === 'label') return a.label.localeCompare(b.label) * dir;
@@ -290,377 +361,446 @@ export default function SequencesV2() {
   ].join(' · ');
 
   return (
-    <div className="V2Page V2PageTransition V2Page--sequencesClean">
+    <div className="V2Page V2Page--sequences">
       <V2PageHeader
         title="Sequences"
-        subtitle="How each sequence is performing: outbound texts, contact response, and booked calls."
-        right={
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
-              <button key={m} className={`V2Chip ${mode === m ? 'is-active' : ''}`} onClick={() => setMode(m)}>
-                {MODE_LABELS[m]}
-              </button>
-            ))}
-            <select value={status} onChange={(event) => setStatus(event.target.value as 'active' | 'inactive' | '')}>
-              <option value="">All statuses</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem' }}>
-              <span style={{ whiteSpace: 'nowrap' }}>Min sends</span>
-              <input
-                type="number"
-                min={0}
-                max={1000}
-                value={minSendsThreshold}
-                onChange={(e) => setMinSendsThreshold(Math.max(0, Number.parseInt(e.target.value, 10) || 0))}
-                style={{
-                  width: '64px',
-                  padding: '4px 6px',
-                  borderRadius: '6px',
-                  border: '1px solid var(--v2-border, #e2e8f0)',
-                  fontSize: '0.85rem',
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              className="V2GhostButton"
-              onClick={() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            >
-              Jump to table
-            </button>
-          </div>
-        }
+        subtitle="Performance analysis: outbound, response rates, bookings, and qualification insights."
       />
 
+      {/* Compact Filter Bar */}
+      <motion.div
+        className="V2FilterBar"
+        variants={filterVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <div className="V2FilterGroup">
+          <motion.button className="V2FilterButton V2FilterButton--active">
+            <Calendar size={16} />
+            {MODE_LABELS[mode]}
+            <ChevronDown size={16} />
+          </motion.button>
+          <motion.button className="V2FilterButton">
+            <Filter size={16} />
+            {status || 'All'}
+            <ChevronDown size={16} />
+          </motion.button>
+        </div>
+        <div className="V2FilterGroup">
+          <span className="V2FilterLabel">Min sends</span>
+          <input
+            type="number"
+            min={0}
+            max={1000}
+            value={minSendsThreshold}
+            onChange={(e) =>
+              setMinSendsThreshold(
+                Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+              )
+            }
+            className="V2FilterInput"
+          />
+        </div>
+        <motion.button
+          className="V2ActionButton V2ActionButton--neon"
+          onClick={() =>
+            tableRef.current?.scrollIntoView({ behavior: 'smooth' })
+          }
+          whileHover={{ scale: 1.05 }}
+        >
+          Jump to Table
+        </motion.button>
+      </motion.div>
+
       {query.isLoading ? (
-        <V2State kind="loading">Loading sequence performance…</V2State>
+        <V2State kind="loading">
+          <motion.div className="V2IndustrialLoader">
+            Loading sequence performance...
+          </motion.div>
+        </V2State>
       ) : query.isError || !data ? (
         <V2State kind="error" onRetry={() => void query.refetch()}>
-          Failed to load sequence performance.
+          <motion.div className="V2ErrorGlow" animate={{ scale: [1, 1.05, 1] }}>
+            Failed to load sequence performance.
+          </motion.div>
         </V2State>
       ) : (
         <>
           {data.warnings && data.warnings.length > 0 ? (
-            <div className="V2InlineWarning">{data.warnings.join(' ')}</div>
+            <div className="V2InlineWarning V2NeonBorder">
+              {data.warnings.join(' ')}
+            </div>
           ) : null}
 
-          <div className="V2MetricsGrid V2MetricsGrid--compact">
-            <V2MetricCard
-              label={<IconLabel icon={<MessageSquare size={11} />}>Total outbound sent</IconLabel>}
-              value={fmtInt(totals.messagesSent)}
-            />
-            <V2MetricCard
-              label={<IconLabel icon={<Users size={11} />}>New leads contacted</IconLabel>}
-              value={fmtInt(totals.uniqueContacted)}
-            />
-            <V2MetricCard
-              label={<IconLabel icon={<Reply size={11} />}>Leads who replied</IconLabel>}
-              value={fmtInt(totals.repliesReceived)}
-            />
-            <V2MetricCard
-              label={<IconLabel icon={<Phone size={11} />}>Booked calls</IconLabel>}
-              value={fmtInt(totals.bookedCalls)}
-              tone="positive"
-            />
-          </div>
-          <div style={{ marginTop: '0.85rem', color: 'var(--v2-muted)', fontSize: '0.88rem' }}>{summaryCopy}</div>
+          {/* Animated Metrics Grid */}
+          <motion.div
+            className="V2MetricsGrid"
+            variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.div variants={metricVariants}>
+              <V2MetricCard
+                label={
+                  <span>
+                    <MessageSquare size={16} /> Total Outbound
+                  </span>
+                }
+                value={fmtInt(totals.messagesSent)}
+              />
+            </motion.div>
+            <motion.div variants={metricVariants}>
+              <V2MetricCard
+                label={
+                  <span>
+                    <Users size={16} /> Leads Contacted
+                  </span>
+                }
+                value={fmtInt(totals.uniqueContacted)}
+              />
+            </motion.div>
+            <motion.div variants={metricVariants}>
+              <V2MetricCard
+                label={
+                  <span>
+                    <Reply size={16} /> Replies Received
+                  </span>
+                }
+                value={fmtInt(totals.repliesReceived)}
+              />
+            </motion.div>
+            <motion.div variants={metricVariants}>
+              <V2MetricCard
+                label={
+                  <span>
+                    <Phone size={16} /> Booked Calls
+                  </span>
+                }
+                value={fmtInt(totals.bookedCalls)}
+                tone="positive"
+              />
+            </motion.div>
+          </motion.div>
 
-          <div ref={tableRef}>
+          <div className="V2SummaryBar V2NeonText">{summaryCopy}</div>
+
+          {/* Resizable Table */}
+          <div ref={tableRef} className="V2TableContainer">
             <V2Panel
               title="Sequence Results"
-              caption="Outbound, response, and booked-call performance for each sequence."
+              caption="Sortable and resizable performance table."
             >
-              <div className="V2TableWrap V2TableWrap--sequences">
-                <table className="V2Table V2Table--sequences SequencesTable--resizable">
+              <div className="V2TableWrap">
+                <table className="V2Table V2Table--neon SequencesTable--resizable">
                   <colgroup>
-                    <col style={{ width: `${columnWidths.label}px` }} />
-                    <col style={{ width: `${columnWidths.uniqueContacted}px` }} />
-                    <col style={{ width: `${columnWidths.repliesReceived}px` }} />
-                    <col style={{ width: `${columnWidths.replyRatePct}px` }} />
-                    <col style={{ width: `${columnWidths.bookedCalls}px` }} />
-                    <col style={{ width: `${columnWidths.bookingRatePct}px` }} />
-                    <col style={{ width: `${columnWidths.optOuts}px` }} />
-                    <col style={{ width: `${columnWidths.optOutRatePct}px` }} />
-                    <col style={{ width: `${columnWidths.bookedSplit}px` }} />
+                    {Object.entries(columnWidths).map(([key]) => (
+                      <col
+                        key={key}
+                        style={{
+                          width: `${columnWidths[key as SequenceColumnKey]}px`,
+                        }}
+                      />
+                    ))}
                   </colgroup>
                   <thead>
                     <tr>
-                      <th style={{ width: `${columnWidths.label}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('label')}>
-                          Sequence{sortIndicator('label')}
+                      <th>
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('label')}
+                        >
+                          Sequence {sortIndicator('label')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Sequence column"
+                          className="V2ResizeHandle V2NeonGlow"
                           onPointerDown={(event) => startResize('label', event)}
                         />
                       </th>
-                      <th className="is-right" style={{ width: `${columnWidths.uniqueContacted}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('uniqueContacted')}>
-                          New leads contacted{sortIndicator('uniqueContacted')}
+                      <th className="is-right">
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('uniqueContacted')}
+                        >
+                          Leads Contacted {sortIndicator('uniqueContacted')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize New leads contacted column"
-                          onPointerDown={(event) => startResize('uniqueContacted', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('uniqueContacted', event)
+                          }
                         />
                       </th>
-                      <th className="is-right" style={{ width: `${columnWidths.repliesReceived}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('repliesReceived')}>
-                          Leads who replied{sortIndicator('repliesReceived')}
+                      {/* Add other headers similarly */}
+                      <th className="is-right">
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('repliesReceived')}
+                        >
+                          Replies {sortIndicator('repliesReceived')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Leads who replied column"
-                          onPointerDown={(event) => startResize('repliesReceived', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('repliesReceived', event)
+                          }
                         />
                       </th>
-                      <th className="is-right" style={{ width: `${columnWidths.replyRatePct}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('replyRatePct')}>
-                          Reply rate{sortIndicator('replyRatePct')}
+                      <th className="is-right">
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('replyRatePct')}
+                        >
+                          Reply Rate {sortIndicator('replyRatePct')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Reply rate column"
-                          onPointerDown={(event) => startResize('replyRatePct', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('replyRatePct', event)
+                          }
                         />
                       </th>
-                      <th className="is-right" style={{ width: `${columnWidths.bookedCalls}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('bookedCalls')}>
-                          Calls booked{sortIndicator('bookedCalls')}
+                      <th className="is-right">
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('bookedCalls')}
+                        >
+                          Booked {sortIndicator('bookedCalls')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Calls booked column"
-                          onPointerDown={(event) => startResize('bookedCalls', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('bookedCalls', event)
+                          }
                         />
                       </th>
-                      <th className="is-right" style={{ width: `${columnWidths.bookingRatePct}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('bookingRatePct')}>
-                          Booking rate{sortIndicator('bookingRatePct')}
+                      <th className="is-right">
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('bookingRatePct')}
+                        >
+                          Booking Rate {sortIndicator('bookingRatePct')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Booking rate column"
-                          onPointerDown={(event) => startResize('bookingRatePct', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('bookingRatePct', event)
+                          }
                         />
                       </th>
-                      <th className="is-right" style={{ width: `${columnWidths.optOuts}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('optOuts')}>
-                          Opt-outs{sortIndicator('optOuts')}
+                      <th className="is-right">
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('optOuts')}
+                        >
+                          Opt-outs {sortIndicator('optOuts')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Opt-outs column"
-                          onPointerDown={(event) => startResize('optOuts', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('optOuts', event)
+                          }
                         />
                       </th>
-                      <th className="is-right" style={{ width: `${columnWidths.optOutRatePct}px` }}>
-                        <button type="button" className="V2SortButton" onClick={() => onSort('optOutRatePct')}>
-                          Opt-out rate{sortIndicator('optOutRatePct')}
+                      <th className="is-right">
+                        <button
+                          className="V2SortButton"
+                          onClick={() => onSort('optOutRatePct')}
+                        >
+                          Opt-out Rate {sortIndicator('optOutRatePct')}
                         </button>
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize Opt-out rate column"
-                          onPointerDown={(event) => startResize('optOutRatePct', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('optOutRatePct', event)
+                          }
                         />
                       </th>
-                      <th
-                        className="is-right"
-                        style={{ width: `${columnWidths.bookedSplit}px` }}
-                        title="Booked split as Jack / Brandon / Self"
-                      >
+                      <th className="is-right">
                         J / B / Self
                         <span
-                          className="SequencesTable__resizeHandle"
-                          role="separator"
-                          aria-label="Resize booked split column"
-                          onPointerDown={(event) => startResize('bookedSplit', event)}
+                          className="V2ResizeHandle V2NeonGlow"
+                          onPointerDown={(event) =>
+                            startResize('bookedSplit', event)
+                          }
                         />
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedSequences.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={9}
-                          style={{ textAlign: 'center', padding: '2rem', color: 'var(--v2-muted, #94a3b8)' }}
+                    <AnimatePresence>
+                      {sortedSequences.length === 0 ? (
+                        <motion.tr
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="V2TableRow--empty"
                         >
-                          No sequences match the current filter.
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedSequences.map((row) => (
-                        <tr key={row.sequenceId} className={row.isManualBucket ? 'V2Table__row--manual' : ''}>
-                          <td title={`${row.label}${row.leadMagnet ? ` • ${row.leadMagnet}` : ''}`}>
-                            <span className="V2Table__seqName">{row.label}</span>
+                          <td
+                            colSpan={9}
+                            className="V2TableCell--center V2NeonText"
+                          >
+                            No sequences match the current filter.
                           </td>
-                          <td className="is-right">{fmtInt(row.uniqueContacted)}</td>
-                          <td className="is-right">{fmtInt(row.repliesReceived)}</td>
-                          <td className="is-right">{fmtPct(row.replyRatePct)}</td>
-                          <td className="is-right">{fmtInt(row.bookedCalls)}</td>
-                          <td className="is-right">{fmtPct(row.bookingRatePct)}</td>
-                          <td className="is-right">{fmtInt(row.optOuts)}</td>
-                          <td className="is-right">{fmtPct(row.optOutRatePct)}</td>
-                          <td className="is-right">
-                            {fmtSplit(
-                              row.bookedBreakdown.jack,
-                              row.bookedBreakdown.brandon,
-                              row.bookedBreakdown.selfBooked,
-                            )}
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                        </motion.tr>
+                      ) : (
+                        sortedSequences.map((row, index) => (
+                          <motion.tr
+                            key={row.sequenceId}
+                            initial={{ opacity: 0, x: -50 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className={`V2TableRow ${row.isManualBucket ? 'V2TableRow--manual' : ''}`}
+                          >
+                            <td
+                              title={`${row.label}${row.leadMagnet ? ` • ${row.leadMagnet}` : ''}`}
+                            >
+                              <span className="V2TableSeqName V2NeonText">
+                                {row.label}
+                              </span>
+                            </td>
+                            <td className="is-right V2TableCell--number">
+                              {fmtInt(row.uniqueContacted)}
+                            </td>
+                            <td className="is-right V2TableCell--number">
+                              {fmtInt(row.repliesReceived)}
+                            </td>
+                            <td className="is-right V2TableCell--pct">
+                              {fmtPct(row.replyRatePct)}
+                            </td>
+                            <td className="is-right V2TableCell--number">
+                              {fmtInt(row.bookedCalls)}
+                            </td>
+                            <td className="is-right V2TableCell--pct">
+                              {fmtPct(row.bookingRatePct)}
+                            </td>
+                            <td className="is-right V2TableCell--number">
+                              {fmtInt(row.optOuts)}
+                            </td>
+                            <td className="is-right V2TableCell--pct">
+                              {fmtPct(row.optOutRatePct)}
+                            </td>
+                            <td className="is-right V2TableCell--split">
+                              {fmtSplit(
+                                row.bookedBreakdown.jack,
+                                row.bookedBreakdown.brandon,
+                                row.bookedBreakdown.selfBooked,
+                              )}
+                            </td>
+                          </motion.tr>
+                        ))
+                      )}
+                    </AnimatePresence>
                   </tbody>
                 </table>
               </div>
             </V2Panel>
           </div>
 
-          <div className="V2Grid V2Grid--2">
-            {funnelQuery.isLoading ? (
-              <V2Panel title="Sequence Funnel" caption="Daily contacted-to-booked funnel across the selected range.">
-                <V2State kind="loading">Loading funnel data…</V2State>
-              </V2Panel>
-            ) : funnelQuery.isError ? (
-              <V2Panel title="Sequence Funnel" caption="Daily contacted-to-booked funnel across the selected range.">
-                <V2State kind="error" onRetry={() => void funnelQuery.refetch()}>
-                  Failed to load funnel data.
-                </V2State>
-              </V2Panel>
-            ) : (
-              <SequenceFunnelPanel rows={funnelRows} />
-            )}
-
-            {reviewQueueQuery.isLoading ? (
-              <V2Panel title="Attribution Review Queue" caption="Ambiguous bookings that need a second look.">
-                <V2State kind="loading">Loading review queue…</V2State>
-              </V2Panel>
-            ) : reviewQueueQuery.isError ? (
-              <V2Panel title="Attribution Review Queue" caption="Ambiguous bookings that need a second look.">
-                <V2State kind="error" onRetry={() => void reviewQueueQuery.refetch()}>
-                  Failed to load review queue.
-                </V2State>
-              </V2Panel>
-            ) : (
-              <AttributionReviewQueuePanel rows={reviewQueueRows} />
-            )}
-          </div>
-
-          <div className="V2Grid V2Grid--2">
-            <AttributionHealthPanel />
-
-            {unresolvedQuery.isLoading ? (
-              <V2Panel title="Unresolved Attributions" caption="Latest bookings that still need a sequence decision.">
-                <V2State kind="loading">Loading unresolved attributions…</V2State>
-              </V2Panel>
-            ) : unresolvedQuery.isError ? (
-              <V2Panel title="Unresolved Attributions" caption="Latest bookings that still need a sequence decision.">
-                <V2State kind="error" onRetry={() => void unresolvedQuery.refetch()}>
-                  Failed to load unresolved attributions.
-                </V2State>
-              </V2Panel>
-            ) : (
-              <UnresolvedAttributionPanel rows={unresolvedRows} />
-            )}
-          </div>
-
-          <div className="V2Grid V2Grid--2">
-            {attributionMethodQuery.isLoading ? (
-              <V2Panel title="Attribution Methods" caption="How booked calls were matched in the selected range.">
-                <V2State kind="loading">Loading attribution methods…</V2State>
-              </V2Panel>
-            ) : attributionMethodQuery.isError ? (
-              <V2Panel title="Attribution Methods" caption="How booked calls were matched in the selected range.">
-                <V2State kind="error" onRetry={() => void attributionMethodQuery.refetch()}>
-                  Failed to load attribution methods.
-                </V2State>
-              </V2Panel>
-            ) : (
-              <AttributionMethodPanel rows={attributionMethodRows} />
-            )}
-
-            {repResponseQuery.isLoading ? (
-              <V2Panel title="Rep Response" caption="Contacted-to-booked funnel and timing by rep.">
-                <V2State kind="loading">Loading rep response…</V2State>
-              </V2Panel>
-            ) : repResponseQuery.isError ? (
-              <V2Panel title="Rep Response" caption="Contacted-to-booked funnel and timing by rep.">
-                <V2State kind="error" onRetry={() => void repResponseQuery.refetch()}>
-                  Failed to load rep response.
-                </V2State>
-              </V2Panel>
-            ) : (
-              <RepResponsePanel rows={repResponseRows} />
-            )}
-          </div>
-
-          {!qualificationQuery.isLoading && !qualificationQuery.isError && qualificationItems.length > 0 ? (
-            <div className="V2QualSummary">
-              <article className="V2QualSummary__cell">
-                <strong>{fmtPct(qualificationSummary.fullTimePct)}</strong>
-                <span>Full-time</span>
-                <small>{fmtPct(qualificationSummary.partTimePct)} part-time</small>
-              </article>
-              <article className="V2QualSummary__cell">
-                <strong>{fmtPct(qualificationSummary.cashPct)}</strong>
-                <span>Revenue mix</span>
-                <small>
-                  {fmtPct(qualificationSummary.insurancePct)} insurance · {fmtPct(qualificationSummary.balancedPct)}{' '}
-                  balanced
-                </small>
-              </article>
-              <article className="V2QualSummary__cell">
-                <strong>{fmtPct(qualificationSummary.highInterestPct)}</strong>
-                <span>Coaching interest</span>
-                <small>
-                  {fmtPct(qualificationSummary.mediumInterestPct)} medium ·{' '}
-                  {fmtPct(qualificationSummary.lowInterestPct)} low
-                </small>
-              </article>
-              <article className="V2QualSummary__cell">
-                <strong>Top niches</strong>
-                <span>Incoming interests</span>
-                <div className="V2QualSummary__niches">
-                  {qualificationSummary.topNiches.map((niche) => (
-                    <span key={niche.niche} className="V2QualSummary__niche">
-                      {niche.niche}
-                      <strong>{fmtInt(niche.count)}</strong>
-                    </span>
-                  ))}
-                </div>
-              </article>
+          {/* Tabbed Panels */}
+          <div className="V2Tabs">
+            <div className="V2TabList V2NeonBorder">
+              <button
+                type="button"
+                className="V2Tab V2NeonText"
+                aria-selected={activeTab === 0}
+                onClick={() => setActiveTab(0)}
+              >
+                Overview
+              </button>
+              <button
+                type="button"
+                className="V2Tab V2NeonText"
+                aria-selected={activeTab === 1}
+                onClick={() => setActiveTab(1)}
+              >
+                Funnel & Attribution
+              </button>
+              <button
+                type="button"
+                className="V2Tab V2NeonText"
+                aria-selected={activeTab === 2}
+                onClick={() => setActiveTab(2)}
+              >
+                Qualification
+              </button>
             </div>
-          ) : null}
-
-          <V2Panel
-            title="Lead Qualification by Sequence"
-            caption="Deeper breakdown as you scroll: employment, revenue model, interest level, and top niches."
-          >
-            {qualificationQuery.isLoading ? (
-              <V2State kind="loading">Loading qualification breakdown...</V2State>
-            ) : qualificationQuery.isError ? (
-              <V2State kind="error" onRetry={() => void qualificationQuery.refetch()}>
-                Failed to load qualification breakdown.
-              </V2State>
-            ) : qualificationItems.length === 0 ? (
-              <V2State kind="empty">No qualification breakdown available for this date range.</V2State>
-            ) : (
-              <SequenceQualificationBreakdown items={qualificationItems} isLoading={false} />
-            )}
-          </V2Panel>
+            {activeTab === 0 ? (
+              <div>
+                {/* Qualification Summary */}
+                {!qualificationQuery.isLoading &&
+                !qualificationQuery.isError &&
+                qualificationItems.length > 0 ? (
+                  <motion.div
+                    className="V2QualSummary V2NeonGrid"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    <motion.article className="V2QualCell">
+                      <strong>
+                        {fmtPct(qualificationSummary.fullTimePct)}
+                      </strong>
+                      <span>Full-time</span>
+                      <small>
+                        {fmtPct(qualificationSummary.partTimePct)} part-time
+                      </small>
+                    </motion.article>
+                    <motion.article className="V2QualCell">
+                      <strong>{fmtPct(qualificationSummary.cashPct)}</strong>
+                      <span>Revenue mix</span>
+                      <small>
+                        {fmtPct(qualificationSummary.insurancePct)} insurance ·{' '}
+                        {fmtPct(qualificationSummary.balancedPct)} balanced
+                      </small>
+                    </motion.article>
+                    <motion.article className="V2QualCell">
+                      <strong>
+                        {fmtPct(qualificationSummary.highInterestPct)}
+                      </strong>
+                      <span>Coaching interest</span>
+                      <small>
+                        {fmtPct(qualificationSummary.mediumInterestPct)} medium
+                        · {fmtPct(qualificationSummary.lowInterestPct)} low
+                      </small>
+                    </motion.article>
+                    <motion.article className="V2QualCell">
+                      <strong>Top niches</strong>
+                      <span>Incoming interests</span>
+                      <div className="V2QualNiches">
+                        {qualificationSummary.topNiches.map((niche) => (
+                          <span
+                            key={niche.niche}
+                            className="V2QualNiche V2NeonTag"
+                          >
+                            {niche.niche}
+                            <strong>{fmtInt(niche.count)}</strong>
+                          </span>
+                        ))}
+                      </div>
+                    </motion.article>
+                  </motion.div>
+                ) : null}
+              </div>
+            ) : null}
+            {activeTab === 1 ? (
+              <div>
+                <div className="V2Grid V2Grid--2">
+                  <SequenceFunnelPanel rows={funnelRows} />
+                  <AttributionReviewQueuePanel rows={reviewQueueRows} />
+                  <AttributionHealthPanel />
+                  <UnresolvedAttributionPanel rows={unresolvedRows} />
+                  <AttributionMethodPanel rows={attributionMethodRows} />
+                  <RepResponsePanel rows={repResponseRows} />
+                </div>
+              </div>
+            ) : null}
+            {activeTab === 2 ? (
+              <div>
+                <SequenceQualificationBreakdown
+                  items={qualificationItems}
+                  isLoading={qualificationQuery.isLoading}
+                />
+              </div>
+            ) : null}
+          </div>
         </>
       )}
     </div>

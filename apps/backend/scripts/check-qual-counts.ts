@@ -33,11 +33,10 @@ async function main() {
     FROM conversation_state 
     GROUP BY qualification_delivery_model;
   `);
-  console.table((result as any[]).map(r => ({ ...r, count: Number(r.count) })));
+  console.table((result as any[]).map((r) => ({ ...r, count: Number(r.count) })));
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

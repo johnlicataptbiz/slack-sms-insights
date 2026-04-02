@@ -263,7 +263,7 @@ export const getMondaySyncState = async (
 ): Promise<MondaySyncStateRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_sync_state.findUnique({
+const result = await prisma.mondaySyncState.findUnique({
       where: { board_id: boardId },
       select: {
         board_id: true,
@@ -287,7 +287,7 @@ export const getMondayBoardRegistry = async (
 ): Promise<MondayBoardRegistryRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_board_registry.findUnique({
+    const result = await prisma.mondayBoardRegistry.findUnique({
       where: { board_id: boardId },
       select: {
         board_id: true,
@@ -326,7 +326,7 @@ export const upsertMondayBoardRegistry = async (
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
-    await prisma.monday_board_registry.upsert({
+    await prisma.mondayBoardRegistry.upsert({
       where: { board_id: params.boardId },
       update: {
         board_label: params.boardLabel,
@@ -362,7 +362,7 @@ export const listPendingMondayBookedCallPushes = async (
 ): Promise<MondayBookedCallPushRow[]> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_booked_call_pushes.findMany({
+const result = await prisma.mondayBookedCallPushes.findMany({
       where: { status: 'pending' },
       orderBy: { updated_at: 'asc' },
       select: {
@@ -388,8 +388,8 @@ export const listPendingMondayBookedCallPushes = async (
 export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Promise<MondayBoardRegistryRow[]> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_board_registry.findMany({
-      orderBy: [{ board_label: 'asc' }, { board_id: 'asc' }],
+    const result = await prisma.mondayBoardRegistry.findMany({
+      orderBy: [{ board_class: 'asc' }, { board_label: 'asc' }, { board_id: 'asc' }],
       select: {
         board_id: true,
         board_label: true,
@@ -414,8 +414,7 @@ export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Pr
 export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): Promise<ActorDirectoryRow[]> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.actor_directory.findMany({
-      where: { active: true },
+    const result = await prisma.actorDirectory.findMany({
       orderBy: [{ role: 'asc' }, { canonical_name: 'asc' }],
       select: {
         canonical_name: true,
@@ -446,7 +445,7 @@ export const upsertMondaySyncState = async (
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
-    await prisma.monday_sync_state.upsert({
+    await prisma.mondaySyncState.upsert({
       where: { board_id: params.boardId },
       update: {
         cursor: params.cursor ?? null,
@@ -476,7 +475,7 @@ export const saveMondayColumnMapping = async (
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
-    await prisma.monday_column_mappings.upsert({
+await prisma.mondayColumnMapping.upsert({
       where: { board_id: boardId },
       update: {
         mapping_json: toJsonValue(mapping),
@@ -499,7 +498,7 @@ export const getMondayColumnMapping = async (
 ): Promise<unknown | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_column_mappings.findUnique({
+const result = await prisma.mondayColumnMapping.findUnique({
       where: { board_id: boardId },
       select: { mapping_json: true },
     });
@@ -518,11 +517,11 @@ export const deleteMondayCallSnapshots = async (
   const prisma = getPrisma();
   if (!itemIds.length) return;
   try {
-    await prisma.monday_call_snapshots.deleteMany({
+await prisma.mondayCallSnapshots.deleteMany({
       where: {
         board_id: boardId,
         item_id: { in: itemIds },
-      } satisfies Prisma.monday_call_snapshotsWhereInput,
+      },
     });
   } catch (error) {
     logger?.warn?.('Failed to delete monday call snapshots', error);
@@ -535,7 +534,7 @@ export const upsertMondayCallSnapshot = async (
   const prisma = getPrisma();
   const callDate = toPrismaDate(input.callDate);
   try {
-    await prisma.monday_call_snapshots.upsert({
+await prisma.mondayCallSnapshots.upsert({
       where: {
         board_id_item_id: {
           board_id: input.boardId,
@@ -1096,7 +1095,7 @@ export const listMondayCallSnapshotsInRange = async (
 ): Promise<MondayCallSnapshotRow[]> => {
   const prisma = getPrisma();
   try {
-    const where: Prisma.monday_call_snapshotsWhereInput = {
+  const where: Prisma.MondayCallSnapshotsWhereInput = {
       updated_at: {
         gte: params.from,
         lte: params.to,
@@ -1104,7 +1103,7 @@ export const listMondayCallSnapshotsInRange = async (
     };
     if (params.boardId) where.board_id = params.boardId;
 
-    const result = await prisma.monday_call_snapshots.findMany({
+    const result = await prisma.mondayCallSnapshots.findMany({
       where,
       orderBy: { updated_at: 'desc' },
       select: {
@@ -1133,7 +1132,7 @@ export const getLatestMondaySyncStatus = async (
 ): Promise<MondaySyncStateRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_sync_state.findMany({
+const result = await prisma.mondaySyncState.findMany({
       where: boardId ? { board_id: boardId } : {},
       orderBy: { updated_at: 'desc' },
       take: 1,
@@ -1165,7 +1164,7 @@ export const upsertMondayWeeklyReport = async (
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
-    await prisma.monday_weekly_reports.upsert({
+await prisma.mondayWeeklyReports.upsert({
       where: { week_start: new Date(params.weekStart) },
       update: {
         source_board_id: params.sourceBoardId ?? null,
@@ -1192,7 +1191,7 @@ export const getMondayWeeklyReport = async (
 ): Promise<MondayWeeklyReportRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_weekly_reports.findUnique({
+const result = await prisma.mondayWeeklyReports.findUnique({
       where: { week_start: new Date(weekStart) },
       select: {
         week_start: true,
@@ -1216,7 +1215,7 @@ export const getMondayBookedCallPush = async (
 ): Promise<MondayBookedCallPushRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.monday_booked_call_pushes.findFirst({
+const result = await prisma.mondayBookedCallPushes.findFirst({
       where: {
         slack_channel_id: slackChannelId,
         slack_message_ts: slackMessageTs,
@@ -1242,10 +1241,10 @@ export const upsertMondayBookedCallPush = async (
     pushedAt?: Date | null;
   },
   logger?: Pick<Logger, 'warn'>,
-): Promise<void> => {
+): Promise<boolean> => {
   const prisma = getPrisma();
   try {
-    await prisma.monday_booked_call_pushes.upsert({
+    await prisma.mondayBookedCallPushes.upsert({
       where: {
         board_id_slack_channel_id_slack_message_ts: {
           board_id: params.boardId,
@@ -1275,7 +1274,50 @@ export const upsertMondayBookedCallPush = async (
         updated_at: new Date(),
       },
     });
+    return true;
   } catch (error) {
     logger?.warn?.('Failed to upsert monday booked call push', error);
+    try {
+      await prisma.$executeRawUnsafe(
+        `
+        INSERT INTO monday_booked_call_pushes (
+          board_id,
+          slack_channel_id,
+          slack_message_ts,
+          setter_bucket,
+          monday_item_id,
+          status,
+          error,
+          payload_json,
+          pushed_at,
+          updated_at
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,CURRENT_TIMESTAMP
+        )
+        ON CONFLICT (board_id, slack_channel_id, slack_message_ts)
+        DO UPDATE SET
+          setter_bucket = EXCLUDED.setter_bucket,
+          monday_item_id = EXCLUDED.monday_item_id,
+          status = EXCLUDED.status,
+          error = EXCLUDED.error,
+          payload_json = EXCLUDED.payload_json,
+          pushed_at = EXCLUDED.pushed_at,
+          updated_at = CURRENT_TIMESTAMP
+        `,
+        params.boardId,
+        params.slackChannelId,
+        params.slackMessageTs,
+        params.setterBucket,
+        params.mondayItemId ?? null,
+        params.status,
+        params.error ?? null,
+        JSON.stringify(params.payloadJson ?? null),
+        params.pushedAt ?? null,
+      );
+      return true;
+    } catch (fallbackError) {
+      logger?.warn?.('Fallback SQL upsert for monday booked call push failed', fallbackError);
+      return false;
+    }
   }
 };

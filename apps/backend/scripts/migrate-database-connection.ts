@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
  * Database Connection Migration Script
- * 
+ *
  * This script updates the database connection to the new ptbizsms DB
  * and validates the connection works correctly.
- * 
+ *
  * Usage:
  *   # Bash/zsh inline env form
  *   NEW_DATABASE_URL=postgresql://<db-user>:<db-password>@<db-host>:5432/postgres?sslmode=require npx tsx scripts/migrate-database-connection.ts
@@ -16,7 +16,7 @@
  */
 
 import { execSync } from 'child_process';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { resolve } from 'path';
 
 // Target database connection string (new ptbizsms DB)
@@ -97,7 +97,7 @@ function getCurrentDatabaseUrl(): string | null {
 function updateEnvFile(newUrl: string): boolean {
   try {
     let envContent = '';
-    
+
     if (existsSync(ENV_FILE)) {
       envContent = readFileSync(ENV_FILE, 'utf8');
     }
@@ -105,10 +105,7 @@ function updateEnvFile(newUrl: string): boolean {
     // Check if DATABASE_URL already exists
     if (envContent.includes('DATABASE_URL=')) {
       // Replace existing DATABASE_URL
-      envContent = envContent.replace(
-        /^DATABASE_URL=.*$/m,
-        `DATABASE_URL=${newUrl}`
-      );
+      envContent = envContent.replace(/^DATABASE_URL=.*$/m, `DATABASE_URL=${newUrl}`);
     } else {
       // Add DATABASE_URL to end of file
       envContent += `\nDATABASE_URL=${newUrl}\n`;
@@ -117,7 +114,7 @@ function updateEnvFile(newUrl: string): boolean {
     if (!DRY_RUN) {
       writeFileSync(ENV_FILE, envContent);
     }
-    
+
     console.log(`${DRY_RUN ? '[DRY RUN] ' : ''}✅ DATABASE_URL updated in .env file`);
     return true;
   } catch (error) {
@@ -131,7 +128,7 @@ function updateEnvFile(newUrl: string): boolean {
  */
 async function testConnection(url: string): Promise<{ success: boolean; tablesAccessible: string[]; error?: string }> {
   const { PrismaClient } = await import('@prisma/client');
-  
+
   const prisma = new PrismaClient({
     datasources: {
       db: {
@@ -146,19 +143,14 @@ async function testConnection(url: string): Promise<{ success: boolean; tablesAc
     console.log('✅ Database connection successful');
 
     // Test table access
-    const tables = [
-      'conversations',
-      'conversation_state',
-      'sms_events',
-      'booked_calls',
-    ];
+    const tables = ['conversations', 'conversation_state', 'sms_events', 'booked_calls'];
 
     const accessibleTables: string[] = [];
 
     for (const table of tables) {
       try {
         const result = await prisma.$queryRawUnsafe<{ count: number }[]>(
-          `SELECT COUNT(*) as count FROM "${table}" LIMIT 1`
+          `SELECT COUNT(*) as count FROM "${table}" LIMIT 1`,
         );
         accessibleTables.push(table);
         console.log(`  ✅ Table "${table}" accessible (${result[0]?.count || 0} rows)`);
@@ -190,7 +182,7 @@ async function testConnection(url: string): Promise<{ success: boolean; tablesAc
 function runMigrations(): boolean {
   try {
     console.log('Running Prisma migrations...');
-    
+
     if (DRY_RUN) {
       console.log('[DRY RUN] Would execute: npx prisma migrate deploy');
       return true;
@@ -260,14 +252,14 @@ async function runMigration(): Promise<MigrationResult> {
   // Step 1: Get current connection
   const currentUrl = getCurrentDatabaseUrl();
   result.oldConnection = currentUrl?.replace(/\/\/.*@/, '//***@') || 'not found';
-  
+
   console.log(`Current connection: ${result.oldConnection}`);
   console.log(`New connection:     ${result.newConnection}\n`);
 
   // Step 2: Create backup
   console.log('Step 1: Creating backup...');
   result.steps.backupCreated = createBackup();
-  
+
   if (!result.steps.backupCreated && existsSync(ENV_FILE)) {
     result.errors.push('Failed to create backup');
     console.log('⚠️  Continuing without backup...\n');
@@ -278,7 +270,7 @@ async function runMigration(): Promise<MigrationResult> {
   // Step 3: Update .env file
   console.log('Step 2: Updating .env file...');
   result.steps.envUpdated = updateEnvFile(NEW_DB_URL);
-  
+
   if (!result.steps.envUpdated) {
     result.errors.push('Failed to update .env file');
   }
@@ -288,7 +280,7 @@ async function runMigration(): Promise<MigrationResult> {
   console.log('Step 3: Testing new database connection...');
   const connectionTest = await testConnection(NEW_DB_URL);
   result.steps.connectionTested = connectionTest.success;
-  
+
   if (!connectionTest.success) {
     result.errors.push(`Connection test failed: ${connectionTest.error}`);
   }
@@ -298,7 +290,7 @@ async function runMigration(): Promise<MigrationResult> {
   if (connectionTest.success) {
     console.log('Step 4: Running Prisma migrations...');
     result.steps.migrationsRun = runMigrations();
-    
+
     if (!result.steps.migrationsRun) {
       result.errors.push('Migrations failed');
     }
@@ -321,7 +313,7 @@ async function runMigration(): Promise<MigrationResult> {
   if (result.errors.length === 0) {
     result.success = true;
     console.log('✅ Migration completed successfully!\n');
-    
+
     console.log('Next steps:');
     console.log('1. Update Railway environment variables:');
     console.log(generateRailwayCommand());
@@ -330,7 +322,7 @@ async function runMigration(): Promise<MigrationResult> {
     console.log('4. Run the verification script to confirm data integrity');
   } else {
     console.log('❌ Migration completed with errors:\n');
-    result.errors.forEach(error => console.log(`   - ${error}`));
+    result.errors.forEach((error) => console.log(`   - ${error}`));
     console.log('\nPlease resolve these issues before proceeding.');
   }
 
@@ -344,10 +336,10 @@ async function runMigration(): Promise<MigrationResult> {
 
 // Run the migration
 runMigration()
-  .then(result => {
+  .then((result) => {
     process.exit(result.success ? 0 : 1);
   })
-  .catch(error => {
+  .catch((error) => {
     console.error('Migration failed:', error);
     process.exit(1);
   });

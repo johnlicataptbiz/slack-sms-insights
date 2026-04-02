@@ -18,7 +18,8 @@ export function useEventStream() {
     const scheduleReconnect = (baseDelayMs: number) => {
       const cappedFailures = Math.min(failureCount, 6);
       const jitter = Math.floor(Math.random() * 500);
-      const backoffMs = Math.min(baseDelayMs * 2 ** cappedFailures, 60_000) + jitter;
+      const backoffMs =
+        Math.min(baseDelayMs * 2 ** cappedFailures, 60_000) + jitter;
       retryTimer = setTimeout(() => {
         if (mounted) connect();
       }, backoffMs);
@@ -47,7 +48,9 @@ export function useEventStream() {
         // Close existing if any (shouldn't happen due to cleanup, but safe)
         es?.close();
 
-        es = new EventSource(`/api/stream?token=${token}`, { withCredentials: true });
+        es = new EventSource(`/api/stream?token=${token}`, {
+          withCredentials: true,
+        });
 
         es.addEventListener('open', () => {
           // console.debug('EventSource connected');
@@ -79,21 +82,33 @@ export function useEventStream() {
 
         es.onerror = (err) => {
           failureCount += 1;
-          console.warn('EventSource failed, reconnecting with backoff...', { failureCount, err });
+          console.warn('EventSource failed, reconnecting with backoff...', {
+            failureCount,
+            err,
+          });
           es?.close();
           es = null;
           if (failureCount >= 8) {
             disabledUntil = Date.now() + 60_000;
-            console.warn('Realtime temporarily paused after repeated failures', { disabledUntil });
+            console.warn(
+              'Realtime temporarily paused after repeated failures',
+              { disabledUntil },
+            );
           }
           scheduleReconnect(3_000);
         };
       } catch (err) {
         failureCount += 1;
-        console.warn('Realtime setup failed, retrying with backoff...', { failureCount, err });
+        console.warn('Realtime setup failed, retrying with backoff...', {
+          failureCount,
+          err,
+        });
         if (failureCount >= 8) {
           disabledUntil = Date.now() + 60_000;
-          console.warn('Realtime temporarily paused after repeated token failures', { disabledUntil });
+          console.warn(
+            'Realtime temporarily paused after repeated token failures',
+            { disabledUntil },
+          );
         }
         scheduleReconnect(10_000);
       }

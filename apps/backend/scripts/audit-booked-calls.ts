@@ -13,7 +13,8 @@ async function main() {
   console.log(`\n=== BOOKED CALLS AUDIT FOR ${targetDate} ===\n`);
 
   // 1. Raw booked_calls rows for the target date (UTC)
-  const raw = await pool.query(`
+  const raw = await pool.query(
+    `
     SELECT
       bc.id,
       bc.event_ts,
@@ -33,7 +34,9 @@ async function main() {
       AND bc.event_ts < ($1::date + INTERVAL '1 day')::timestamptz
     GROUP BY bc.id, bc.event_ts, bc.text, bc.slack_message_ts, bc.slack_channel_id
     ORDER BY bc.event_ts ASC
-  `, [targetDate]);
+  `,
+    [targetDate],
+  );
 
   console.log(`Total booked_calls rows for ${targetDate} UTC: ${raw.rowCount}`);
   for (const r of raw.rows) {
@@ -48,7 +51,8 @@ async function main() {
   const chicagoFrom = `${targetDate}T06:00:00Z`; // midnight Chicago = 06:00 UTC
   const chicagoTo = new Date(new Date(chicagoFrom).getTime() + 24 * 60 * 60 * 1000).toISOString();
 
-  const tzCheck = await pool.query(`
+  const tzCheck = await pool.query(
+    `
     SELECT
       bc.id,
       bc.event_ts,
@@ -67,7 +71,9 @@ async function main() {
       AND bc.event_ts < $2::timestamptz
     GROUP BY bc.id, bc.event_ts, bc.text, bc.slack_message_ts, bc.slack_channel_id
     ORDER BY bc.event_ts ASC
-  `, [chicagoFrom, chicagoTo]);
+  `,
+    [chicagoFrom, chicagoTo],
+  );
 
   console.log(`\n=== BOOKED CALLS FOR ${targetDate} IN CHICAGO TIME (UTC-6) ===`);
   console.log('Count:', tzCheck.rowCount);
@@ -106,7 +112,9 @@ async function main() {
     ORDER BY day_chicago DESC
   `);
   for (const r of summary.rows) {
-    console.log(`  ${r.day_chicago}: total=${r.total} jack_reactions=${r.jack_reactions} brandon_reactions=${r.brandon_reactions} no_reactions=${r.no_reactions}`);
+    console.log(
+      `  ${r.day_chicago}: total=${r.total} jack_reactions=${r.jack_reactions} brandon_reactions=${r.brandon_reactions} no_reactions=${r.no_reactions}`,
+    );
   }
 
   // 5. Check for any booked_calls with no reactions at all (potential self-bookings)

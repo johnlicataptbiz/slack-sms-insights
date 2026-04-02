@@ -1,4 +1,9 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 
 import { client } from './client';
 import type {
@@ -22,8 +27,8 @@ import type {
   ObjectionFrequencyRowV2,
   QualificationStateV2,
   RepResponseDailyRowV2,
-  RunsListV2,
   RunV2,
+  RunsListV2,
   SalesMetricsBatchV2,
   SalesMetricsV2,
   ScoreboardV2,
@@ -54,8 +59,8 @@ import {
   assertMondayLeadInsightsV2Envelope,
   assertMondayScorecardsV2Envelope,
   assertRepResponseV2Envelope,
-  assertRunsListV2Envelope,
   assertRunV2Envelope,
+  assertRunsListV2Envelope,
   assertSalesMetricsBatchV2Envelope,
   assertSalesMetricsV2Envelope,
   assertScoreboardV2Envelope,
@@ -73,7 +78,9 @@ export type SalesMetricsQueryParams =
   | { day: string; tz?: string }
   | { range: 'today' | '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string };
 
-const buildSalesMetricsSearchParams = (params: SalesMetricsQueryParams): URLSearchParams => {
+const buildSalesMetricsSearchParams = (
+  params: SalesMetricsQueryParams,
+): URLSearchParams => {
   const searchParams = new URLSearchParams();
   if ('from' in params && 'to' in params) {
     searchParams.set('from', params.from);
@@ -137,7 +144,9 @@ const toRunsSearchParams = (params: {
 
 export const fetchV2SalesMetrics = async (params: SalesMetricsQueryParams) => {
   const searchParams = buildSalesMetricsSearchParams(params);
-  const response = await client.get<unknown>(`/api/v2/sales-metrics?${searchParams.toString()}`);
+  const response = await client.get<unknown>(
+    `/api/v2/sales-metrics?${searchParams.toString()}`,
+  );
   assertSalesMetricsV2Envelope(response);
   return response as ApiEnvelope<SalesMetricsV2>;
 };
@@ -149,55 +158,83 @@ const fetchV2AttributionHealth = async () => {
 };
 
 const fetchV2AttributionReviewQueue = async (take: number) => {
-  const response = await client.get<unknown>(`/api/v2/attribution/review-queue?take=${take}`);
+  const response = await client.get<unknown>(
+    `/api/v2/attribution/review-queue?take=${take}`,
+  );
   assertAttributionReviewQueueV2Envelope(response);
   return response as ApiEnvelope<AttributionReviewQueueRowV2[]>;
 };
 
-const fetchV2SequenceFunnel = async (params: { range: string; tz?: string; sequenceId?: string | null }) => {
+const fetchV2SequenceFunnel = async (params: {
+  range: string;
+  tz?: string;
+  sequenceId?: string | null;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
   if (params.sequenceId) searchParams.set('sequenceId', params.sequenceId);
-  const response = await client.get<unknown>(`/api/v2/sequences/funnel?${searchParams.toString()}`);
+  const response = await client.get<unknown>(
+    `/api/v2/sequences/funnel?${searchParams.toString()}`,
+  );
   assertSequenceFunnelV2Envelope(response);
   return response as ApiEnvelope<SequenceFunnelDailyRowV2[]>;
 };
 
-const fetchV2AttributionMethodDaily = async (params: { range: string; tz?: string }) => {
+const fetchV2AttributionMethodDaily = async (params: {
+  range: string;
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
-  const response = await client.get<unknown>(`/api/v2/attribution/methods?${searchParams.toString()}`);
+  const response = await client.get<unknown>(
+    `/api/v2/attribution/methods?${searchParams.toString()}`,
+  );
   assertAttributionMethodV2Envelope(response);
   return response as ApiEnvelope<AttributionMethodDailyRowV2[]>;
 };
 
-const fetchV2RepResponseDaily = async (params: { range: string; tz?: string }) => {
+const fetchV2RepResponseDaily = async (params: {
+  range: string;
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
-  const response = await client.get<unknown>(`/api/v2/reps/response?${searchParams.toString()}`);
+  const response = await client.get<unknown>(
+    `/api/v2/reps/response?${searchParams.toString()}`,
+  );
   assertRepResponseV2Envelope(response);
   return response as ApiEnvelope<RepResponseDailyRowV2[]>;
 };
 
 const fetchV2UnresolvedAttributions = async (take: number) => {
-  const response = await client.get<unknown>(`/api/v2/attribution/unresolved?take=${take}`);
+  const response = await client.get<unknown>(
+    `/api/v2/attribution/unresolved?take=${take}`,
+  );
   assertUnresolvedAttributionV2Envelope(response);
   return response as ApiEnvelope<UnresolvedAttributionRowV2[]>;
 };
 
-const fetchV2SalesMetricsBatch = async (params: { days: string[]; tz?: string }) => {
+const fetchV2SalesMetricsBatch = async (params: {
+  days: string[];
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('days', params.days.join(','));
   if (params.tz) searchParams.set('tz', params.tz);
-  const response = await client.get<unknown>(`/api/v2/sales-metrics/batch?${searchParams.toString()}`);
+  const response = await client.get<unknown>(
+    `/api/v2/sales-metrics/batch?${searchParams.toString()}`,
+  );
   assertSalesMetricsBatchV2Envelope(response);
   return response as ApiEnvelope<SalesMetricsBatchV2>;
 };
 
-export const useV2SalesMetrics = (params: SalesMetricsQueryParams, options?: { enabled?: boolean }) => {
+export const useV2SalesMetrics = (
+  params: SalesMetricsQueryParams,
+  options?: { enabled?: boolean },
+) => {
   return useQuery({
     queryKey: ['v2', 'salesMetrics', params],
     enabled: options?.enabled ?? true,
@@ -238,7 +275,11 @@ export const useV2AttributionReviewQueue = (take = 50) => {
   });
 };
 
-export const useV2SequenceFunnel = (params: { range: string; tz?: string; sequenceId?: string | null }) => {
+export const useV2SequenceFunnel = (params: {
+  range: string;
+  tz?: string;
+  sequenceId?: string | null;
+}) => {
   return useQuery({
     queryKey: ['v2', 'sequences', 'funnel', params],
     queryFn: async () => {
@@ -252,7 +293,10 @@ export const useV2SequenceFunnel = (params: { range: string; tz?: string; sequen
   });
 };
 
-export const useV2AttributionMethodDaily = (params: { range: string; tz?: string }) => {
+export const useV2AttributionMethodDaily = (params: {
+  range: string;
+  tz?: string;
+}) => {
   return useQuery({
     queryKey: ['v2', 'attribution', 'methods', params],
     queryFn: async () => {
@@ -266,7 +310,10 @@ export const useV2AttributionMethodDaily = (params: { range: string; tz?: string
   });
 };
 
-export const useV2RepResponseDaily = (params: { range: string; tz?: string }) => {
+export const useV2RepResponseDaily = (params: {
+  range: string;
+  tz?: string;
+}) => {
   return useQuery({
     queryKey: ['v2', 'reps', 'response', params],
     queryFn: async () => {
@@ -300,7 +347,10 @@ export const useV2SetterTrend = (days: string[], tz: string) => {
     enabled: days.length > 0,
     queryFn: async () => {
       const uniqueDays = [...new Set(days)].sort((a, b) => a.localeCompare(b));
-      const batchEnvelope = await fetchV2SalesMetricsBatch({ days: uniqueDays, tz });
+      const batchEnvelope = await fetchV2SalesMetricsBatch({
+        days: uniqueDays,
+        tz,
+      });
 
       return batchEnvelope.data.items.map<SetterTrendPoint>((item, index) => {
         const metrics = item.metrics;
@@ -308,7 +358,8 @@ export const useV2SetterTrend = (days: string[], tz: string) => {
         const brandon = findRepRow(metrics.reps, 'brandon');
 
         return {
-          day: item.day || metrics.trendByDay[0]?.day || uniqueDays[index] || '',
+          day:
+            item.day || metrics.trendByDay[0]?.day || uniqueDays[index] || '',
           team: {
             messagesSent: metrics.totals.messagesSent,
             replyRatePct: metrics.totals.replyRatePct,
@@ -353,7 +404,9 @@ export const useV2Runs = (params: {
   return useQuery({
     queryKey: ['v2', 'runs', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/runs?${searchParams.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/runs?${searchParams.toString()}`,
+      );
       assertRunsListV2Envelope(response);
       return response as ApiEnvelope<RunsListV2>;
     },
@@ -398,12 +451,18 @@ export const useV2Channels = () => {
   });
 };
 
-export const useV2SequenceVersionHistory = (params?: { lookbackDays?: number }) => {
-  const lookbackDays = Number.isFinite(params?.lookbackDays) ? Math.trunc(params?.lookbackDays ?? 365) : 365;
+export const useV2SequenceVersionHistory = (params?: {
+  lookbackDays?: number;
+}) => {
+  const lookbackDays = Number.isFinite(params?.lookbackDays)
+    ? Math.trunc(params?.lookbackDays ?? 365)
+    : 365;
   return useQuery({
     queryKey: ['v2', 'sequences', 'version-history', lookbackDays],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/sequences/version-history?lookbackDays=${lookbackDays}`);
+      const response = await client.get<unknown>(
+        `/api/v2/sequences/version-history?lookbackDays=${lookbackDays}`,
+      );
       assertSequenceVersionHistoryV2Envelope(response);
       return response as ApiEnvelope<SequenceVersionHistoryV2>;
     },
@@ -423,33 +482,52 @@ export const useV2UpdateSequenceVersionDecision = () => {
       status: 'active' | 'testing' | 'rewrite' | 'archived';
       updatedBy?: string;
     }) => {
-      return client.post<ApiEnvelope<{ label: string; status: string; updatedBy: string | null; updatedAt: string }>>(
-        '/api/v2/sequences/version-decisions',
-        params,
-      );
+      return client.post<
+        ApiEnvelope<{
+          label: string;
+          status: string;
+          updatedBy: string | null;
+          updatedAt: string;
+        }>
+      >('/api/v2/sequences/version-decisions', params);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'sequences', 'version-history'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'sequences', 'version-history'],
+      });
     },
   });
 };
 
-const toWeeklySummarySearchParams = (params: { weekStart?: string; tz?: string }): URLSearchParams => {
+const toWeeklySummarySearchParams = (params: {
+  weekStart?: string;
+  tz?: string;
+}): URLSearchParams => {
   const searchParams = new URLSearchParams();
   if (params.weekStart) searchParams.set('weekStart', params.weekStart);
   if (params.tz) searchParams.set('tz', params.tz);
   return searchParams;
 };
 
-export const useV2WeeklySummary = (params: { weekStart?: string; tz?: string }) => {
+export const useV2WeeklySummary = (params: {
+  weekStart?: string;
+  tz?: string;
+}) => {
   const searchParams = toWeeklySummarySearchParams(params);
   const queryString = searchParams.toString();
   const suffix = queryString ? `?${queryString}` : '';
 
   return useQuery({
-    queryKey: ['v2', 'weeklySummary', params.weekStart || null, params.tz || null],
+    queryKey: [
+      'v2',
+      'weeklySummary',
+      params.weekStart || null,
+      params.tz || null,
+    ],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/weekly-summary${suffix}`);
+      const response = await client.get<unknown>(
+        `/api/v2/weekly-summary${suffix}`,
+      );
       assertWeeklySummaryV2Envelope(response);
       return response as ApiEnvelope<WeeklyManagerSummaryV2>;
     },
@@ -468,9 +546,12 @@ type InsightsSummaryQueryParams = {
   range?: 'today' | '7d' | '30d' | '90d' | '180d' | '365d';
   tz?: string;
   rep?: 'jack' | 'brandon' | null;
+  realtime?: boolean;
 };
 
-const toInsightsSummarySearchParams = (params: InsightsSummaryQueryParams): URLSearchParams => {
+const toInsightsSummarySearchParams = (
+  params: InsightsSummaryQueryParams,
+): URLSearchParams => {
   const searchParams = new URLSearchParams();
   if (params.from && params.to) {
     searchParams.set('from', params.from);
@@ -491,14 +572,18 @@ export const useV2InsightsSummary = (params: InsightsSummaryQueryParams) => {
   return useQuery({
     queryKey: ['v2', 'insights', 'summary', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/insights/summary?${searchParams.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/insights/summary?${searchParams.toString()}`,
+      );
       assertInsightsSummaryV2Envelope(response);
       return response as ApiEnvelope<InsightsSummaryV2>;
     },
-    staleTime: 30 * 1000,
+    staleTime: params.realtime ? 10 * 1000 : 30 * 1000, // 10s for realtime, 30s otherwise
     gcTime: 5 * 60 * 1000,
     retry: 2,
     refetchOnWindowFocus: false,
+    refetchInterval: params.realtime ? 30 * 1000 : false, // Poll every 30s for realtime
+    refetchIntervalInBackground: false,
   });
 };
 
@@ -511,7 +596,9 @@ type SequencesDeepQueryParams = {
   status?: 'active' | 'inactive';
 };
 
-const toSequencesDeepSearchParams = (params: SequencesDeepQueryParams): URLSearchParams => {
+const toSequencesDeepSearchParams = (
+  params: SequencesDeepQueryParams,
+): URLSearchParams => {
   const searchParams = new URLSearchParams();
   if (params.from && params.to) {
     searchParams.set('from', params.from);
@@ -532,7 +619,9 @@ export const useV2SequencesDeep = (params: SequencesDeepQueryParams) => {
   return useQuery({
     queryKey: ['v2', 'sequences', 'deep', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/sequences/deep?${searchParams.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/sequences/deep?${searchParams.toString()}`,
+      );
       assertSequenceDeepV2Envelope(response);
       return response as ApiEnvelope<SequenceDeepV2>;
     },
@@ -555,7 +644,9 @@ type MondayLeadInsightsQueryParams = {
   setterLimit?: number;
 };
 
-const toMondayLeadInsightsSearchParams = (params: MondayLeadInsightsQueryParams): URLSearchParams => {
+const toMondayLeadInsightsSearchParams = (
+  params: MondayLeadInsightsQueryParams,
+): URLSearchParams => {
   const search = new URLSearchParams();
   if (params.day) {
     search.set('day', params.day);
@@ -567,18 +658,25 @@ const toMondayLeadInsightsSearchParams = (params: MondayLeadInsightsQueryParams)
   }
   if (params.tz) search.set('tz', params.tz);
   if (params.scope) search.set('scope', params.scope);
-  if (params.boardIds?.length) search.set('boardIds', params.boardIds.join(','));
-  if (Number.isFinite(params.sourceLimit)) search.set('sourceLimit', String(params.sourceLimit));
-  if (Number.isFinite(params.setterLimit)) search.set('setterLimit', String(params.setterLimit));
+  if (params.boardIds?.length)
+    search.set('boardIds', params.boardIds.join(','));
+  if (Number.isFinite(params.sourceLimit))
+    search.set('sourceLimit', String(params.sourceLimit));
+  if (Number.isFinite(params.setterLimit))
+    search.set('setterLimit', String(params.setterLimit));
   return search;
 };
 
-export const useV2MondayLeadInsights = (params: MondayLeadInsightsQueryParams) => {
+export const useV2MondayLeadInsights = (
+  params: MondayLeadInsightsQueryParams,
+) => {
   const search = toMondayLeadInsightsSearchParams(params);
   return useQuery({
     queryKey: ['v2', 'admin', 'monday', 'lead-insights', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/admin/monday/lead-insights?${search.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/admin/monday/lead-insights?${search.toString()}`,
+      );
       assertMondayLeadInsightsV2Envelope(response);
       return response as ApiEnvelope<MondayLeadInsightsV2>;
     },
@@ -594,7 +692,9 @@ type MondayBoardCatalogQueryParams = {
   staleThresholdHours?: number;
 };
 
-const toMondayBoardCatalogSearchParams = (params: MondayBoardCatalogQueryParams): URLSearchParams => {
+const toMondayBoardCatalogSearchParams = (
+  params: MondayBoardCatalogQueryParams,
+): URLSearchParams => {
   const search = new URLSearchParams();
   if (Number.isFinite(params.staleThresholdHours)) {
     search.set('staleThresholdHours', String(params.staleThresholdHours));
@@ -602,12 +702,16 @@ const toMondayBoardCatalogSearchParams = (params: MondayBoardCatalogQueryParams)
   return search;
 };
 
-export const useV2MondayBoardCatalog = (params: MondayBoardCatalogQueryParams = {}) => {
+export const useV2MondayBoardCatalog = (
+  params: MondayBoardCatalogQueryParams = {},
+) => {
   const search = toMondayBoardCatalogSearchParams(params);
   return useQuery({
     queryKey: ['v2', 'admin', 'monday', 'board-catalog', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/admin/monday/board-catalog?${search.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/admin/monday/board-catalog?${search.toString()}`,
+      );
       assertMondayBoardCatalogV2Envelope(response);
       return response as ApiEnvelope<BoardCatalogV2>;
     },
@@ -630,7 +734,9 @@ type MondayScorecardsQueryParams = {
   metricName?: string;
 };
 
-const toMondayScorecardsSearchParams = (params: MondayScorecardsQueryParams): URLSearchParams => {
+const toMondayScorecardsSearchParams = (
+  params: MondayScorecardsQueryParams,
+): URLSearchParams => {
   const search = new URLSearchParams();
   if (params.day) {
     search.set('day', params.day);
@@ -652,7 +758,9 @@ export const useV2MondayScorecards = (params: MondayScorecardsQueryParams) => {
   return useQuery({
     queryKey: ['v2', 'admin', 'monday', 'scorecards', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/admin/monday/scorecards?${search.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/admin/monday/scorecards?${search.toString()}`,
+      );
       assertMondayScorecardsV2Envelope(response);
       return response as ApiEnvelope<MondayScorecardsV2>;
     },
@@ -680,7 +788,8 @@ const toInboxListSearchParams = (params: InboxListParams): URLSearchParams => {
   if (params.status) search.set('status', params.status);
   if (params.repId) search.set('repId', params.repId);
   if (params.needsReplyOnly) search.set('needsReplyOnly', 'true');
-  if (params.search && params.search.trim().length > 0) search.set('search', params.search.trim());
+  if (params.search && params.search.trim().length > 0)
+    search.set('search', params.search.trim());
   return search;
 };
 
@@ -689,7 +798,9 @@ export const useV2InboxConversations = (params: InboxListParams) => {
   return useQuery({
     queryKey: ['v2', 'inbox', 'conversations', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/inbox/conversations?${search.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/inbox/conversations?${search.toString()}`,
+      );
       assertInboxConversationListEnvelope(response);
       return response as ApiEnvelope<InboxConversationListV2>;
     },
@@ -705,7 +816,9 @@ type InboxInfiniteListParams = Omit<InboxListParams, 'limit' | 'offset'> & {
   pageSize?: number;
 };
 
-export const useV2InboxConversationsInfinite = (params: InboxInfiniteListParams) => {
+export const useV2InboxConversationsInfinite = (
+  params: InboxInfiniteListParams,
+) => {
   const pageSize = Math.max(1, Math.min(params.pageSize ?? 75, 200));
   return useInfiniteQuery({
     queryKey: ['v2', 'inbox', 'conversations', 'infinite', params],
@@ -717,7 +830,9 @@ export const useV2InboxConversationsInfinite = (params: InboxInfiniteListParams)
         limit: pageSize,
         offset: Number.isFinite(offset) ? offset : 0,
       });
-      const response = await client.get<unknown>(`/api/v2/inbox/conversations?${search.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/inbox/conversations?${search.toString()}`,
+      );
       assertInboxConversationListEnvelope(response);
       return response as ApiEnvelope<InboxConversationListV2>;
     },
@@ -745,7 +860,9 @@ export const useV2InboxConversationDetail = (
     enabled: Boolean(conversationId),
     queryFn: async () => {
       const query = forceSync ? '?sync=1' : '';
-      const response = await client.get<unknown>(`/api/v2/inbox/conversations/${conversationId}${query}`);
+      const response = await client.get<unknown>(
+        `/api/v2/inbox/conversations/${conversationId}${query}`,
+      );
       assertInboxConversationDetailEnvelope(response);
       return response as ApiEnvelope<InboxConversationDetailV2>;
     },
@@ -762,17 +879,29 @@ export const useV2InboxConversationDetail = (
 export const useV2GenerateDraft = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { conversationId: string; bookedCallLabel?: string }) => {
-      const response = await client.post<unknown>(`/api/v2/inbox/conversations/${params.conversationId}/draft`, {
-        bookedCallLabel: params.bookedCallLabel,
-      });
+    mutationFn: async (params: {
+      conversationId: string;
+      bookedCallLabel?: string;
+    }) => {
+      const response = await client.post<unknown>(
+        `/api/v2/inbox/conversations/${params.conversationId}/draft`,
+        {
+          bookedCallLabel: params.bookedCallLabel,
+        },
+      );
       assertDraftSuggestionEnvelope(response);
       return response as ApiEnvelope<DraftSuggestionV2>;
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'analytics', 'setter-assist-performance'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'analytics', 'setter-assist-performance'],
+      });
     },
   });
 };
@@ -780,7 +909,10 @@ export const useV2GenerateDraft = () => {
 export const useV2GenerateCrmNotes = () => {
   return useMutation({
     mutationFn: async (params: { conversationId: string }) => {
-      const response = await client.post<unknown>(`/api/v2/inbox/conversations/${params.conversationId}/crm-notes`, {});
+      const response = await client.post<unknown>(
+        `/api/v2/inbox/conversations/${params.conversationId}/crm-notes`,
+        {},
+      );
       assertCrmNotesSuggestionEnvelope(response);
       return response as ApiEnvelope<CrmNotesSuggestionV2>;
     },
@@ -803,21 +935,28 @@ export const useV2SendInboxMessage = () => {
         intent: string;
       };
     }) => {
-      const response = await client.post<unknown>(`/api/v2/inbox/conversations/${params.conversationId}/send`, {
-        body: params.body,
-        idempotencyKey: params.idempotencyKey,
-        lineId: params.lineId,
-        fromNumber: params.fromNumber,
-        senderIdentity: params.senderIdentity,
-        draftId: params.draftId,
-        setterAssist: params.setterAssist,
-      });
+      const response = await client.post<unknown>(
+        `/api/v2/inbox/conversations/${params.conversationId}/send`,
+        {
+          body: params.body,
+          idempotencyKey: params.idempotencyKey,
+          lineId: params.lineId,
+          fromNumber: params.fromNumber,
+          senderIdentity: params.senderIdentity,
+          draftId: params.draftId,
+          setterAssist: params.setterAssist,
+        },
+      );
       assertSendMessageResultEnvelope(response);
       return response as ApiEnvelope<SendMessageResultV2>;
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -845,8 +984,12 @@ export const useV2UpdateQualification = () => {
       );
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -874,8 +1017,12 @@ export const useV2OverrideEscalation = () => {
       );
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -896,21 +1043,28 @@ export const useV2DraftFeedback = () => {
       structureSignature?: string;
       qualifierSnapshot?: unknown;
     }) => {
-      return client.post<ApiEnvelope<{ success: boolean }>>(`/api/v2/inbox/drafts/${params.draftId}/feedback`, {
-        accepted: params.accepted,
-        edited: params.edited,
-        sendLinkedEventId: params.sendLinkedEventId,
-        sourceOutboundEventId: params.sourceOutboundEventId,
-        bookedCallLabel: params.bookedCallLabel,
-        closedWonLabel: params.closedWonLabel,
-        escalationLevel: params.escalationLevel,
-        structureSignature: params.structureSignature,
-        qualifierSnapshot: params.qualifierSnapshot,
-      });
+      return client.post<ApiEnvelope<{ success: boolean }>>(
+        `/api/v2/inbox/drafts/${params.draftId}/feedback`,
+        {
+          accepted: params.accepted,
+          edited: params.edited,
+          sendLinkedEventId: params.sendLinkedEventId,
+          sourceOutboundEventId: params.sourceOutboundEventId,
+          bookedCallLabel: params.bookedCallLabel,
+          closedWonLabel: params.closedWonLabel,
+          escalationLevel: params.escalationLevel,
+          structureSignature: params.structureSignature,
+          qualifierSnapshot: params.qualifierSnapshot,
+        },
+      );
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -934,18 +1088,27 @@ export const useV2InboxSendConfig = () => {
 export const useV2UpdateConversationStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { conversationId: string; status: 'open' | 'closed' | 'dnc' }) => {
+    mutationFn: async (params: {
+      conversationId: string;
+      status: 'open' | 'closed' | 'dnc';
+    }) => {
       return client.post<
         ApiEnvelope<{
           id: string;
           status: 'open' | 'closed' | 'dnc';
           alowareSequenceSync: AlowareSequenceSyncV2 | null;
         }>
-      >(`/api/v2/inbox/conversations/${params.conversationId}/status`, { status: params.status });
+      >(`/api/v2/inbox/conversations/${params.conversationId}/status`, {
+        status: params.status,
+      });
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -953,21 +1116,32 @@ export const useV2UpdateConversationStatus = () => {
 export const useV2EnrollConversationToSequence = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { conversationId: string; sequenceId: string | number; forceEnroll?: boolean }) => {
+    mutationFn: async (params: {
+      conversationId: string;
+      sequenceId: string | number;
+      forceEnroll?: boolean;
+    }) => {
       return client.post<
         ApiEnvelope<{
           conversationId: string;
           sequenceId: string | number;
           alowareSequenceSync: AlowareSequenceSyncV2 | null;
         }>
-      >(`/api/v2/inbox/conversations/${params.conversationId}/sequence-enroll`, {
-        sequenceId: params.sequenceId,
-        forceEnroll: params.forceEnroll,
-      });
+      >(
+        `/api/v2/inbox/conversations/${params.conversationId}/sequence-enroll`,
+        {
+          sequenceId: params.sequenceId,
+          forceEnroll: params.forceEnroll,
+        },
+      );
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -981,11 +1155,18 @@ export const useV2DisenrollConversationFromSequence = () => {
           conversationId: string;
           alowareSequenceSync: AlowareSequenceSyncV2 | null;
         }>
-      >(`/api/v2/inbox/conversations/${params.conversationId}/sequence-disenroll`, {});
+      >(
+        `/api/v2/inbox/conversations/${params.conversationId}/sequence-disenroll`,
+        {},
+      );
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -993,32 +1174,46 @@ export const useV2DisenrollConversationFromSequence = () => {
 export const useV2SetDefaultSendLine = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { lineId?: number | null; fromNumber?: string | null; clear?: boolean }) => {
-      return client.post<ApiEnvelope<{ success: boolean; defaultSelection: InboxSendConfigV2['defaultSelection'] }>>(
-        '/api/v2/inbox/send-config/default',
-        {
-          lineId: params.lineId,
-          fromNumber: params.fromNumber,
-          clear: params.clear,
-        },
-      );
+    mutationFn: async (params: {
+      lineId?: number | null;
+      fromNumber?: string | null;
+      clear?: boolean;
+    }) => {
+      return client.post<
+        ApiEnvelope<{
+          success: boolean;
+          defaultSelection: InboxSendConfigV2['defaultSelection'];
+        }>
+      >('/api/v2/inbox/send-config/default', {
+        lineId: params.lineId,
+        fromNumber: params.fromNumber,
+        clear: params.clear,
+      });
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'send-config'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'send-config'],
+      });
     },
   });
 };
 
 // ─── Scoreboard V2 Hook ───────────────────────────────────────────────────────────
 
-const toScoreboardSearchParams = (params: { weekStart?: string; tz?: string }): URLSearchParams => {
+const toScoreboardSearchParams = (params: {
+  weekStart?: string;
+  tz?: string;
+}): URLSearchParams => {
   const searchParams = new URLSearchParams();
   if (params.weekStart) searchParams.set('weekStart', params.weekStart);
   if (params.tz) searchParams.set('tz', params.tz);
   return searchParams;
 };
 
-export const useV2Scoreboard = (params: { weekStart?: string; tz?: string }) => {
+export const useV2Scoreboard = (params: {
+  weekStart?: string;
+  tz?: string;
+}) => {
   const searchParams = toScoreboardSearchParams(params);
   const queryString = searchParams.toString();
   const suffix = queryString ? `?${queryString}` : '';
@@ -1065,14 +1260,23 @@ export const useV2ConversationNotes = (conversationId: string | null) => {
 export const useV2AddConversationNote = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { conversationId: string; author: string; text: string }) => {
-      return client.post<ApiEnvelope<ConversationNote>>(`/api/v2/inbox/conversations/${params.conversationId}/notes`, {
-        author: params.author,
-        text: params.text,
-      });
+    mutationFn: async (params: {
+      conversationId: string;
+      author: string;
+      text: string;
+    }) => {
+      return client.post<ApiEnvelope<ConversationNote>>(
+        `/api/v2/inbox/conversations/${params.conversationId}/notes`,
+        {
+          author: params.author,
+          text: params.text,
+        },
+      );
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'notes', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'notes', variables.conversationId],
+      });
     },
   });
 };
@@ -1082,15 +1286,23 @@ export const useV2AddConversationNote = () => {
 export const useV2SnoozeConversation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { conversationId: string; snoozedUntil: string | null }) => {
-      return client.post<ApiEnvelope<{ id: string; nextFollowupDueAt: string | null }>>(
-        `/api/v2/inbox/conversations/${params.conversationId}/snooze`,
-        { snoozedUntil: params.snoozedUntil },
-      );
+    mutationFn: async (params: {
+      conversationId: string;
+      snoozedUntil: string | null;
+    }) => {
+      return client.post<
+        ApiEnvelope<{ id: string; nextFollowupDueAt: string | null }>
+      >(`/api/v2/inbox/conversations/${params.conversationId}/snooze`, {
+        snoozedUntil: params.snoozedUntil,
+      });
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -1100,15 +1312,23 @@ export const useV2SnoozeConversation = () => {
 export const useV2AssignConversation = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { conversationId: string; ownerLabel: string | null }) => {
-      return client.post<ApiEnvelope<{ id: string; ownerLabel: string | null }>>(
-        `/api/v2/inbox/conversations/${params.conversationId}/assign`,
-        { ownerLabel: params.ownerLabel },
-      );
+    mutationFn: async (params: {
+      conversationId: string;
+      ownerLabel: string | null;
+    }) => {
+      return client.post<
+        ApiEnvelope<{ id: string; ownerLabel: string | null }>
+      >(`/api/v2/inbox/conversations/${params.conversationId}/assign`, {
+        ownerLabel: params.ownerLabel,
+      });
     },
     onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversation', variables.conversationId] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversation', variables.conversationId],
+      });
     },
   });
 };
@@ -1128,8 +1348,11 @@ export const useV2InboxTemplates = () => {
   return useQuery({
     queryKey: ['v2', 'inbox', 'templates'],
     queryFn: async () => {
-      const res = await client.get<ApiEnvelope<{ templates: MessageTemplate[] }>>('/api/v2/inbox/templates');
-      return (res as ApiEnvelope<{ templates: MessageTemplate[] }>).data.templates;
+      const res = await client.get<
+        ApiEnvelope<{ templates: MessageTemplate[] }>
+      >('/api/v2/inbox/templates');
+      return (res as ApiEnvelope<{ templates: MessageTemplate[] }>).data
+        .templates;
     },
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
@@ -1139,15 +1362,24 @@ export const useV2InboxTemplates = () => {
 export const useV2CreateTemplate = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { name: string; body: string; createdBy?: string }) => {
-      return client.post<ApiEnvelope<MessageTemplate>>('/api/v2/inbox/templates', {
-        name: params.name,
-        body: params.body,
-        createdBy: params.createdBy,
-      });
+    mutationFn: async (params: {
+      name: string;
+      body: string;
+      createdBy?: string;
+    }) => {
+      return client.post<ApiEnvelope<MessageTemplate>>(
+        '/api/v2/inbox/templates',
+        {
+          name: params.name,
+          body: params.body,
+          createdBy: params.createdBy,
+        },
+      );
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'templates'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'templates'],
+      });
     },
   });
 };
@@ -1156,10 +1388,14 @@ export const useV2DeleteTemplate = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (templateId: string) => {
-      return client.delete<ApiEnvelope<{ id: string; deleted: boolean }>>(`/api/v2/inbox/templates/${templateId}`);
+      return client.delete<ApiEnvelope<{ id: string; deleted: boolean }>>(
+        `/api/v2/inbox/templates/${templateId}`,
+      );
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'templates'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'templates'],
+      });
     },
   });
 };
@@ -1198,9 +1434,9 @@ export const useV2SetterAssistPerformance = () =>
   useQuery({
     queryKey: ['v2', 'inbox', 'analytics', 'setter-assist-performance'],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<SetterAssistPerformanceRowV2[]>>(
-        '/api/v2/inbox/analytics/setter-assist-performance',
-      );
+      const response = await client.get<
+        ApiEnvelope<SetterAssistPerformanceRowV2[]>
+      >('/api/v2/inbox/analytics/setter-assist-performance');
       return (response as ApiEnvelope<SetterAssistPerformanceRowV2[]>).data;
     },
     staleTime: 2 * 60 * 1000,
@@ -1214,10 +1450,11 @@ export const useV2UpdateObjectionTags = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (params: { conversationId: string; tags: string[] }) => {
-      return client.post<ApiEnvelope<{ conversationId: string; objectionTags: string[] }>>(
-        `/api/v2/inbox/conversations/${params.conversationId}/objection-tags`,
-        { tags: params.tags },
-      );
+      return client.post<
+        ApiEnvelope<{ conversationId: string; objectionTags: string[] }>
+      >(`/api/v2/inbox/conversations/${params.conversationId}/objection-tags`, {
+        tags: params.tags,
+      });
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
@@ -1233,11 +1470,15 @@ export const useV2UpdateObjectionTags = () => {
 export const useV2UpdateCallOutcome = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { conversationId: string; outcome: CallOutcomeV2 | null }) => {
-      return client.post<ApiEnvelope<{ conversationId: string; callOutcome: string | null }>>(
-        `/api/v2/inbox/conversations/${params.conversationId}/call-outcome`,
-        { outcome: params.outcome },
-      );
+    mutationFn: async (params: {
+      conversationId: string;
+      outcome: CallOutcomeV2 | null;
+    }) => {
+      return client.post<
+        ApiEnvelope<{ conversationId: string; callOutcome: string | null }>
+      >(`/api/v2/inbox/conversations/${params.conversationId}/call-outcome`, {
+        outcome: params.outcome,
+      });
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
@@ -1254,10 +1495,9 @@ export const useV2IncrementGuardrailOverride = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (conversationId: string) => {
-      return client.post<ApiEnvelope<{ conversationId: string; guardrailOverrideCount: number }>>(
-        `/api/v2/inbox/conversations/${conversationId}/guardrail-override`,
-        {},
-      );
+      return client.post<
+        ApiEnvelope<{ conversationId: string; guardrailOverrideCount: number }>
+      >(`/api/v2/inbox/conversations/${conversationId}/guardrail-override`, {});
     },
     onSuccess: (_data, conversationId) => {
       void queryClient.invalidateQueries({
@@ -1292,7 +1532,10 @@ export type LinePerformanceAnalytics = {
   };
 };
 
-export const useV2LinePerformance = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+export const useV2LinePerformance = (params: {
+  range: 'today' | '7d' | '30d';
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
@@ -1308,7 +1551,8 @@ export const useV2LinePerformance = (params: { range: 'today' | '7d' | '30d'; tz
     staleTime: 5 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     retry: 2,
-    retryDelay: (attemptIndex: number) => Math.min(1000 * 2 ** attemptIndex, 15000),
+    retryDelay: (attemptIndex: number) =>
+      Math.min(1000 * 2 ** attemptIndex, 15000),
     refetchOnWindowFocus: false,
   });
 };
@@ -1318,11 +1562,31 @@ export type QualificationFunnelAnalytics = {
   qualifiedConversations: number;
   funnel: {
     employmentStatus: { fullTime: number; partTime: number; unknown: number };
-    revenueMix: { mostlyCash: number; mostlyInsurance: number; balanced: number; unknown: number };
-    coachingInterest: { high: number; medium: number; low: number; unknown: number };
+    revenueMix: {
+      mostlyCash: number;
+      mostlyInsurance: number;
+      balanced: number;
+      unknown: number;
+    };
+    coachingInterest: {
+      high: number;
+      medium: number;
+      low: number;
+      unknown: number;
+    };
   };
-  escalationDistribution: { level1: number; level2: number; level3: number; level4: number };
-  cadenceDistribution: { idle: number; podcastSent: number; callOffered: number; nurturePool: number };
+  escalationDistribution: {
+    level1: number;
+    level2: number;
+    level3: number;
+    level4: number;
+  };
+  cadenceDistribution: {
+    idle: number;
+    podcastSent: number;
+    callOffered: number;
+    nurturePool: number;
+  };
   conversionByQualification: {
     highInterestConversionRate: number;
     mediumInterestConversionRate: number;
@@ -1334,9 +1598,9 @@ export const useV2QualificationFunnel = () => {
   return useQuery({
     queryKey: ['v2', 'analytics', 'qualification-funnel'],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<QualificationFunnelAnalytics>>(
-        '/api/v2/analytics/qualification-funnel',
-      );
+      const response = await client.get<
+        ApiEnvelope<QualificationFunnelAnalytics>
+      >('/api/v2/analytics/qualification-funnel');
       return response as ApiEnvelope<QualificationFunnelAnalytics>;
     },
     staleTime: 5 * 60 * 1000,
@@ -1373,7 +1637,10 @@ export type DraftAIPerformanceAnalytics = {
   }>;
 };
 
-export const useV2DraftAIPerformance = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+export const useV2DraftAIPerformance = (params: {
+  range: 'today' | '7d' | '30d';
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
@@ -1381,9 +1648,9 @@ export const useV2DraftAIPerformance = (params: { range: 'today' | '7d' | '30d';
   return useQuery({
     queryKey: ['v2', 'analytics', 'draft-ai-performance', params],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<DraftAIPerformanceAnalytics>>(
-        `/api/v2/analytics/draft-ai-performance?${searchParams.toString()}`,
-      );
+      const response = await client.get<
+        ApiEnvelope<DraftAIPerformanceAnalytics>
+      >(`/api/v2/analytics/draft-ai-performance?${searchParams.toString()}`);
       return response as ApiEnvelope<DraftAIPerformanceAnalytics>;
     },
     staleTime: 5 * 60 * 1000,
@@ -1416,7 +1683,10 @@ export type FollowUpSLAAnalytics = {
   }>;
 };
 
-export const useV2FollowUpSLA = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+export const useV2FollowUpSLA = (params: {
+  range: 'today' | '7d' | '30d';
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
@@ -1451,7 +1721,9 @@ export const useV2Goals = () => {
   return useQuery({
     queryKey: ['v2', 'analytics', 'goals'],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<Goal[]>>('/api/v2/analytics/goals');
+      const response = await client.get<ApiEnvelope<Goal[]>>(
+        '/api/v2/analytics/goals',
+      );
       return response as ApiEnvelope<Goal[]>;
     },
     staleTime: 60 * 1000,
@@ -1475,7 +1747,9 @@ export const useV2TrendAlerts = () => {
   return useQuery({
     queryKey: ['v2', 'analytics', 'trend-alerts'],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<TrendAlert[]>>('/api/v2/analytics/trend-alerts');
+      const response = await client.get<ApiEnvelope<TrendAlert[]>>(
+        '/api/v2/analytics/trend-alerts',
+      );
       return response as ApiEnvelope<TrendAlert[]>;
     },
     staleTime: 30 * 1000,
@@ -1502,7 +1776,9 @@ export const useV2TimeToBooking = () => {
   return useQuery({
     queryKey: ['v2', 'analytics', 'time-to-booking'],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<TimeToBookingStats>>('/api/v2/analytics/time-to-booking');
+      const response = await client.get<ApiEnvelope<TimeToBookingStats>>(
+        '/api/v2/analytics/time-to-booking',
+      );
       return response as ApiEnvelope<TimeToBookingStats>;
     },
     staleTime: 5 * 60 * 1000,
@@ -1527,7 +1803,10 @@ export type ResponseTimeStats = {
   }>;
 };
 
-export const useV2ResponseTime = (params: { range: 'today' | '7d' | '30d'; tz?: string }) => {
+export const useV2ResponseTime = (params: {
+  range: 'today' | '7d' | '30d';
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
@@ -1561,7 +1840,9 @@ export const useV2LineBalance = () => {
   return useQuery({
     queryKey: ['v2', 'analytics', 'line-balance'],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<LineActivityBalance>>('/api/v2/analytics/line-balance');
+      const response = await client.get<ApiEnvelope<LineActivityBalance>>(
+        '/api/v2/analytics/line-balance',
+      );
       return response as ApiEnvelope<LineActivityBalance>;
     },
     staleTime: 5 * 60 * 1000,
@@ -1580,7 +1861,9 @@ export const useV2AutoAssign = () => {
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['v2', 'analytics', 'followup-sla'] });
+      queryClient.invalidateQueries({
+        queryKey: ['v2', 'analytics', 'followup-sla'],
+      });
     },
   });
 };
@@ -1590,11 +1873,16 @@ export const useV2BulkInferQualification = () => {
 
   return useMutation<unknown, Error, number>({
     mutationFn: async (limit = 100) => {
-      const response = await client.post(`/api/v2/admin/bulk-infer-qualification?limit=${limit}`, {});
+      const response = await client.post(
+        `/api/v2/admin/bulk-infer-qualification?limit=${limit}`,
+        {},
+      );
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['v2', 'analytics', 'qualification-funnel'] });
+      queryClient.invalidateQueries({
+        queryKey: ['v2', 'analytics', 'qualification-funnel'],
+      });
     },
   });
 };
@@ -1608,7 +1896,9 @@ export const useV2DeduplicateLines = () => {
       return response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['v2', 'analytics', 'line-performance'] });
+      queryClient.invalidateQueries({
+        queryKey: ['v2', 'analytics', 'line-performance'],
+      });
     },
   });
 };
@@ -1676,7 +1966,9 @@ export const useV2Changelog = (params: { days?: number } = {}) => {
   return useQuery({
     queryKey: ['v2', 'changelog', days],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/changelog?days=${days}`);
+      const response = await client.get<unknown>(
+        `/api/v2/changelog?days=${days}`,
+      );
       assertChangelogEnvelope(response);
       return response as ApiEnvelope<ChangelogTimeline>;
     },
@@ -1686,7 +1978,10 @@ export const useV2Changelog = (params: { days?: number } = {}) => {
   });
 };
 
-export const useV2SequenceQualification = (params: { range: '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string }) => {
+export const useV2SequenceQualification = (params: {
+  range: '7d' | '30d' | '90d' | '180d' | '365d';
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
@@ -1694,9 +1989,9 @@ export const useV2SequenceQualification = (params: { range: '7d' | '30d' | '90d'
   return useQuery({
     queryKey: ['v2', 'sequences', 'qualification', params],
     queryFn: async () => {
-      const response = await client.get<ApiEnvelope<SequenceQualificationBreakdown>>(
-        `/api/v2/sequences/qualification?${searchParams.toString()}`,
-      );
+      const response = await client.get<
+        ApiEnvelope<SequenceQualificationBreakdown>
+      >(`/api/v2/sequences/qualification?${searchParams.toString()}`);
       return response as ApiEnvelope<SequenceQualificationBreakdown>;
     },
     staleTime: 5 * 60 * 1000,
@@ -1715,7 +2010,10 @@ type ManualMondayPayload = {
 };
 
 const createManualMondayBookedCall = async (payload: ManualMondayPayload) => {
-  const response = await client.post<unknown>('/api/v2/monday/manual-booked-call', payload);
+  const response = await client.post<unknown>(
+    '/api/v2/monday/manual-booked-call',
+    payload,
+  );
   assertManualMondayEnvelope(response);
   return response as ApiEnvelope<{ status: 'synced'; itemId: string }>;
 };
@@ -1725,12 +2023,17 @@ export const useManualMondayBookedCall = () => {
   return useMutation({
     mutationFn: createManualMondayBookedCall,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+      queryClient.invalidateQueries({
+        queryKey: ['v2', 'inbox', 'conversations'],
+      });
     },
   });
 };
 
-export const useV2SequenceKpis = (params: { range: '7d' | '30d' | '90d' | '180d' | '365d'; tz?: string }) => {
+export const useV2SequenceKpis = (params: {
+  range: '7d' | '30d' | '90d' | '180d' | '365d';
+  tz?: string;
+}) => {
   const searchParams = new URLSearchParams();
   searchParams.set('range', params.range);
   if (params.tz) searchParams.set('tz', params.tz);
@@ -1738,7 +2041,9 @@ export const useV2SequenceKpis = (params: { range: '7d' | '30d' | '90d' | '180d'
   return useQuery({
     queryKey: ['v2', 'sequences', 'kpis', params],
     queryFn: async () => {
-      const response = await client.get<unknown>(`/api/v2/sequences/kpis?${searchParams.toString()}`);
+      const response = await client.get<unknown>(
+        `/api/v2/sequences/kpis?${searchParams.toString()}`,
+      );
       assertSequenceKpisV2Envelope(response);
       return response as ApiEnvelope<SequenceKpisV2>;
     },
@@ -1773,7 +2078,10 @@ export type ContactActivityStats = {
   last_activity_at: string | null;
 };
 
-export const useV2ContactActivities = (contactKey: string | null, options?: { limit?: number; offset?: number }) => {
+export const useV2ContactActivities = (
+  contactKey: string | null,
+  options?: { limit?: number; offset?: number },
+) => {
   const params = new URLSearchParams({ contactKey: contactKey ?? '' });
   if (options?.limit) params.set('limit', String(options.limit));
   if (options?.offset) params.set('offset', String(options.offset));
@@ -1783,7 +2091,9 @@ export const useV2ContactActivities = (contactKey: string | null, options?: { li
     queryFn: async () => {
       const res = await fetch(`/api/v2/contact-activities?${params}`);
       if (!res.ok) throw new Error('Failed to fetch contact activities');
-      return res.json() as Promise<{ data: { activities: ContactActivity[]; stats: ContactActivityStats } }>;
+      return res.json() as Promise<{
+        data: { activities: ContactActivity[]; stats: ContactActivityStats };
+      }>;
     },
     enabled: !!contactKey,
     staleTime: 30 * 1000,

@@ -18,7 +18,11 @@ type Props = {
   onOpenChange?: (open: boolean) => void;
 };
 
-export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }: Props) {
+export function CommandPalette({
+  onSignOut,
+  open: controlledOpen,
+  onOpenChange,
+}: Props) {
   const [internalOpen, setInternalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const navigate = useNavigate();
@@ -141,7 +145,12 @@ export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }
 
   const dialogVariants = {
     hidden: { opacity: 0, scale: 0.96, y: -8 },
-    visible: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring' as const, stiffness: 400, damping: 30 } },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: { type: 'spring' as const, stiffness: 400, damping: 30 },
+    },
     exit: { opacity: 0, scale: 0.96, y: -8, transition: { duration: 0.15 } },
   };
 
@@ -183,7 +192,8 @@ export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }
               background: 'var(--v2-surface, #0d1829)',
               border: '1px solid rgba(17, 184, 214, 0.18)',
               borderRadius: '12px',
-              boxShadow: '0 24px 64px rgba(4, 10, 22, 0.6), 0 0 0 1px rgba(17, 184, 214, 0.08)',
+              boxShadow:
+                '0 24px 64px rgba(4, 10, 22, 0.6), 0 0 0 1px rgba(17, 184, 214, 0.08)',
               overflow: 'hidden',
             }}
           >
@@ -191,7 +201,11 @@ export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }
               className="CmdPalette"
               label="Command palette"
               shouldFilter={true}
-              style={{ display: 'flex', flexDirection: 'column', maxHeight: '60vh' }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                maxHeight: '60vh',
+              }}
             >
               {/* Search input */}
               <div
@@ -203,7 +217,14 @@ export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }
                   borderBottom: '1px solid rgba(17, 184, 214, 0.1)',
                 }}
               >
-                <span style={{ color: 'var(--v2-muted, #56607a)', fontSize: '0.9rem' }}>⌘</span>
+                <span
+                  style={{
+                    color: 'var(--v2-muted, #56607a)',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  ⌘
+                </span>
                 <Command.Input
                   value={search}
                   onValueChange={setSearch}
@@ -330,15 +351,39 @@ export function CommandPalette({ onSignOut, open: controlledOpen, onOpenChange }
                 }}
               >
                 <span>
-                  <kbd style={{ background: 'rgba(17,184,214,0.08)', borderRadius: '3px', padding: '1px 4px' }}>↑↓</kbd>{' '}
+                  <kbd
+                    style={{
+                      background: 'rgba(17,184,214,0.08)',
+                      borderRadius: '3px',
+                      padding: '1px 4px',
+                    }}
+                  >
+                    ↑↓
+                  </kbd>{' '}
                   navigate
                 </span>
                 <span>
-                  <kbd style={{ background: 'rgba(17,184,214,0.08)', borderRadius: '3px', padding: '1px 4px' }}>↵</kbd>{' '}
+                  <kbd
+                    style={{
+                      background: 'rgba(17,184,214,0.08)',
+                      borderRadius: '3px',
+                      padding: '1px 4px',
+                    }}
+                  >
+                    ↵
+                  </kbd>{' '}
                   select
                 </span>
                 <span>
-                  <kbd style={{ background: 'rgba(17,184,214,0.08)', borderRadius: '3px', padding: '1px 4px' }}>⌘K</kbd>{' '}
+                  <kbd
+                    style={{
+                      background: 'rgba(17,184,214,0.08)',
+                      borderRadius: '3px',
+                      padding: '1px 4px',
+                    }}
+                  >
+                    ⌘K
+                  </kbd>{' '}
                   toggle
                 </span>
               </div>

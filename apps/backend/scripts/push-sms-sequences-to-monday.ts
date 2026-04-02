@@ -1,17 +1,17 @@
 #!/usr/bin/env tsx
 /**
- * Push SMS sequence performance to Monday.com.
- *
- * The goal is to keep the board as a KPI dashboard, not a registry export.
+ * Push SMS sequence performance to Monday.com board.
+ * Fixed: getPrisma() → getPrismaClient(), sequenceRegistry camelCase, proper typing.
  */
 
-import { getPrisma } from '../services/prisma.js';
 import { findColumnIdByTitle, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
 import { queryBoardColumns, upsertBookedCallItem } from '../services/monday-client.js';
+import { getPrismaClient } from '../services/prisma.js';
+import type { Prisma } from '@prisma/client';
 
 const BOARD_ID = process.env.MONDAY_SMS_SEQUENCES_BOARD_ID || '18404367764';
 
-type SequenceMetrics = {
+interface SequenceMetrics {
   sequence_id: string;
   label: string;
   normalized_label: string;
@@ -26,12 +26,11 @@ type SequenceMetrics = {
   booking_rate_pct: number;
   reply_rate_pct: number;
   trend: 'Up' | 'Flat' | 'Down';
-};
+}
 
 const formatOwner = (value: string | null): string => {
   const trimmed = (value || '').trim();
-  if (!trimmed) return 'Unassigned';
-  return trimmed;
+  return trimmed || 'Unassigned';
 };
 
 const trendLabel = (replyRatePct: number, bookingRatePct: number): 'Up' | 'Flat' | 'Down' => {
@@ -46,11 +45,12 @@ const buildNotes = (sequence: SequenceMetrics): string => {
     sequence.lead_magnet ? `Lead magnet: ${sequence.lead_magnet}` : null,
     sequence.version_tag ? `Version: ${sequence.version_tag}` : null,
     `Last updated: ${sequence.updated_at.toISOString().slice(0, 10)}`,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
   return notes.join('\n');
 };
 
-const buildItemName = (sequence: SequenceMetrics): string => sequence.label || sequence.normalized_label || `Sequence ${sequence.sequence_id}`;
+const buildItemName = (sequence: SequenceMetrics): string =>
+  sequence.label || sequence.normalized_label || `Sequence ${sequence.sequence_id}`;
 
 const buildColumnValues = (
   sequence: SequenceMetrics,
@@ -67,12 +67,13 @@ const buildColumnValues = (
   if (columnsById.bookedCalls) values[columnsById.bookedCalls] = sequence.booked_calls;
   if (columnsById.bookingRate) values[columnsById.bookingRate] = Number(sequence.booking_rate_pct.toFixed(2));
   if (columnsById.trend) values[columnsById.trend] = { label: sequence.trend };
-  if (columnsById.lastUpdated) values[columnsById.lastUpdated] = { date: sequence.updated_at.toISOString().slice(0, 10) };
+  if (columnsById.lastUpdated)
+    values[columnsById.lastUpdated] = { date: sequence.updated_at.toISOString().slice(0, 10) };
   if (columnsById.notes) values[columnsById.notes] = buildNotes(sequence);
   return values;
 };
 
-async function getColumnIds() {
+async function getColumnIds(prisma: PrismaClient): Promise<Record<string, string | null>> {
   const columns = await queryBoardColumns(BOARD_ID);
   return {
     sequenceName: findColumnIdByTitle(columns, ['Sequence Name', 'Name']),
@@ -90,17 +91,17 @@ async function getColumnIds() {
   };
 }
 
-async function main() {
+async function main(): Promise<void> {
   console.log('🚀 Pushing SMS sequence performance to Monday.com');
   console.log(`📱 Board ID: ${BOARD_ID}`);
   console.log(`🧱 Schema: ${mondaySmsBoardSchemas.sequences.boardName}`);
   console.log('');
 
-  const prisma = getPrisma();
+  const prisma = getPrismaClient();
 
   try {
     console.log('📋 Fetching board columns...');
-    const columnIds = await getColumnIds();
+    const columnIds = await getColumnIds(prisma);
     console.log('✅ Column mapping:', columnIds);
     console.log('');
 
@@ -109,31 +110,59 @@ async function main() {
 
     console.log('📊 Aggregating sequence performance from fact tables...');
     const [sequences, smsFacts, bookingFacts] = await Promise.all([
-      prisma.sequence_registry.findMany({ orderBy: { updated_at: 'desc' }, take: 50 }),
-      prisma.fact_sms_daily.findMany({ where: { day: { gte: cutoff } } }),
-      prisma.fact_booking_daily.findMany({ where: { day: { gte: cutoff } } }),
+      prisma.sequenceRegistry.findMany({ 
+        orderBy: { updated_at: 'desc' }, 
+        take: 50 
+      }),
+      prisma.factSmsDaily.findMany({ 
+        where: { day: { gte: cutoff } } 
+      }),
+      prisma.factBookingDaily.findMany({ 
+        where: { day: { gte: cutoff } } 
+      }),
     ]);
 
-    const smsBySequence = new Map<string, { messagesSent: number; repliesReceived: number; updatedAt: Date }>();
+    const smsBySequence = new Map<string, {
+      messagesSent: number;
+      repliesReceived: number;
+      updatedAt: Date;
+    }>();
     for (const row of smsFacts) {
-      const current = smsBySequence.get(row.sequence_id) || { messagesSent: 0, repliesReceived: 0, updatedAt: row.updated_at };
+      const current = smsBySequence.get(row.sequence_id) || {
+        messagesSent: 0,
+        repliesReceived: 0,
+        updatedAt: row.updated_at,
+      };
       current.messagesSent += row.messages_sent;
       current.repliesReceived += row.replies_received;
       if (row.updated_at > current.updatedAt) current.updatedAt = row.updated_at;
       smsBySequence.set(row.sequence_id, current);
     }
 
-    const bookingsBySequence = new Map<string, { bookedCalls: number; updatedAt: Date }>();
+    const bookingsBySequence = new Map<string, {
+      bookedCalls: number;
+      updatedAt: Date;
+    }>();
     for (const row of bookingFacts) {
-      const current = bookingsBySequence.get(row.sequence_id) || { bookedCalls: 0, updatedAt: row.updated_at };
+      const current = bookingsBySequence.get(row.sequence_id) || { 
+        bookedCalls: 0, 
+        updatedAt: row.updated_at 
+      };
       current.bookedCalls += row.booked_total;
       if (row.updated_at > current.updatedAt) current.updatedAt = row.updated_at;
       bookingsBySequence.set(row.sequence_id, current);
     }
 
     const summaries: SequenceMetrics[] = sequences.map((sequence) => {
-      const sms = smsBySequence.get(sequence.id) || { messagesSent: 0, repliesReceived: 0, updatedAt: sequence.updated_at };
-      const bookings = bookingsBySequence.get(sequence.id) || { bookedCalls: 0, updatedAt: sequence.updated_at };
+      const sms = smsBySequence.get(sequence.id) || {
+        messagesSent: 0,
+        repliesReceived: 0,
+        updatedAt: sequence.updated_at,
+      };
+      const bookings = bookingsBySequence.get(sequence.id) || { 
+        bookedCalls: 0, 
+        updatedAt: sequence.updated_at 
+      };
       const messagesSent = sms.messagesSent;
       const repliesReceived = sms.repliesReceived;
       const bookedCalls = bookings.bookedCalls;
@@ -144,10 +173,10 @@ async function main() {
         sequence_id: sequence.id,
         label: sequence.label,
         normalized_label: sequence.normalized_label,
-        status: sequence.status,
+        status: sequence.status as 'active' | 'inactive',
         owner_rep: sequence.owner_rep,
-        lead_magnet: sequence.lead_magnet,
-        version_tag: sequence.version_tag,
+        lead_magnet: sequence.lead_magnet || null,
+        version_tag: sequence.version_tag || null,
         updated_at: sms.updatedAt > bookings.updatedAt ? sms.updatedAt : bookings.updatedAt,
         messages_sent: messagesSent,
         replies_received: repliesReceived,
@@ -206,3 +235,4 @@ async function main() {
 }
 
 main();
+

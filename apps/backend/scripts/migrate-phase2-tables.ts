@@ -1,4 +1,4 @@
-import { initDatabase, getPool } from '../services/db.js';
+import { getPool, initDatabase } from '../services/db.js';
 
 async function migrate() {
   await initDatabase();

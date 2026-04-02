@@ -3,9 +3,9 @@
  * Shows SMS, calls, emails, and other touchpoints in chronological order
  */
 
+import { cn } from '@/lib/utils';
 import type React from 'react';
 import { useMemo } from 'react';
-import { cn } from '@/lib/utils';
 
 export type ActivityType =
   | 'sms_inbound'
@@ -42,20 +42,75 @@ interface ContactActivityTimelineProps {
   onActivityClick?: (activity: ContactActivity) => void;
 }
 
-const activityConfig: Record<ActivityType, { icon: string; label: string; color: string }> = {
-  sms_inbound: { icon: '💬', label: 'SMS Received', color: 'bg-blue-100 text-blue-800' },
-  sms_outbound: { icon: '📤', label: 'SMS Sent', color: 'bg-blue-200 text-blue-900' },
-  call_inbound: { icon: '📞', label: 'Call Received', color: 'bg-green-100 text-green-800' },
-  call_outbound: { icon: '📲', label: 'Call Made', color: 'bg-green-200 text-green-900' },
-  call_missed: { icon: '❌', label: 'Missed Call', color: 'bg-yellow-100 text-yellow-800' },
-  voicemail: { icon: '📧', label: 'Voicemail', color: 'bg-orange-100 text-orange-800' },
-  email_inbound: { icon: '📬', label: 'Email Received', color: 'bg-purple-100 text-purple-800' },
-  email_outbound: { icon: '📮', label: 'Email Sent', color: 'bg-purple-200 text-purple-900' },
-  note_added: { icon: '📝', label: 'Note Added', color: 'bg-gray-100 text-gray-800' },
-  status_change: { icon: '🔄', label: 'Status Changed', color: 'bg-indigo-100 text-indigo-800' },
-  assignment_change: { icon: '👤', label: 'Assignment Changed', color: 'bg-pink-100 text-pink-800' },
-  qualification_change: { icon: '✅', label: 'Qualification Updated', color: 'bg-teal-100 text-teal-800' },
-  escalation: { icon: '⚠️', label: 'Escalated', color: 'bg-red-100 text-red-800' },
+const activityConfig: Record<
+  ActivityType,
+  { icon: string; label: string; color: string }
+> = {
+  sms_inbound: {
+    icon: '💬',
+    label: 'SMS Received',
+    color: 'bg-blue-100 text-blue-800',
+  },
+  sms_outbound: {
+    icon: '📤',
+    label: 'SMS Sent',
+    color: 'bg-blue-200 text-blue-900',
+  },
+  call_inbound: {
+    icon: '📞',
+    label: 'Call Received',
+    color: 'bg-green-100 text-green-800',
+  },
+  call_outbound: {
+    icon: '📲',
+    label: 'Call Made',
+    color: 'bg-green-200 text-green-900',
+  },
+  call_missed: {
+    icon: '❌',
+    label: 'Missed Call',
+    color: 'bg-yellow-100 text-yellow-800',
+  },
+  voicemail: {
+    icon: '📧',
+    label: 'Voicemail',
+    color: 'bg-orange-100 text-orange-800',
+  },
+  email_inbound: {
+    icon: '📬',
+    label: 'Email Received',
+    color: 'bg-purple-100 text-purple-800',
+  },
+  email_outbound: {
+    icon: '📮',
+    label: 'Email Sent',
+    color: 'bg-purple-200 text-purple-900',
+  },
+  note_added: {
+    icon: '📝',
+    label: 'Note Added',
+    color: 'bg-gray-100 text-gray-800',
+  },
+  status_change: {
+    icon: '🔄',
+    label: 'Status Changed',
+    color: 'bg-indigo-100 text-indigo-800',
+  },
+  assignment_change: {
+    icon: '👤',
+    label: 'Assignment Changed',
+    color: 'bg-pink-100 text-pink-800',
+  },
+  qualification_change: {
+    icon: '✅',
+    label: 'Qualification Updated',
+    color: 'bg-teal-100 text-teal-800',
+  },
+  escalation: {
+    icon: '⚠️',
+    label: 'Escalated',
+    color: 'bg-red-100 text-red-800',
+  },
 };
 
 const formatTimeAgo = (date: Date): string => {
@@ -79,14 +134,13 @@ const formatDuration = (seconds?: number): string => {
   return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 };
 
-export const ContactActivityTimeline: React.FC<ContactActivityTimelineProps> = ({
-  activities,
-  maxItems = 50,
-  showRep = true,
-  onActivityClick,
-}) => {
+export const ContactActivityTimeline: React.FC<
+  ContactActivityTimelineProps
+> = ({ activities, maxItems = 50, showRep = true, onActivityClick }) => {
   const sortedActivities = useMemo(() => {
-    return [...activities].sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime()).slice(0, maxItems);
+    return [...activities]
+      .sort((a, b) => b.occurredAt.getTime() - a.occurredAt.getTime())
+      .slice(0, maxItems);
   }, [activities, maxItems]);
 
   if (activities.length === 0) {
@@ -104,7 +158,12 @@ export const ContactActivityTimeline: React.FC<ContactActivityTimelineProps> = (
         const isCall = activity.activityType.startsWith('call_');
         const isSms = activity.activityType.startsWith('sms_');
         const metadata = activity.metadata as
-          | { duration?: number; disposition?: string; newValue?: string; oldValue?: string }
+          | {
+              duration?: number;
+              disposition?: string;
+              newValue?: string;
+              oldValue?: string;
+            }
           | undefined;
 
         return (
@@ -120,10 +179,17 @@ export const ContactActivityTimeline: React.FC<ContactActivityTimelineProps> = (
           >
             {/* Timeline connector */}
             <div className="flex flex-col items-center">
-              <div className={cn('flex h-8 w-8 items-center justify-center rounded-full text-sm', config.color)}>
+              <div
+                className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-full text-sm',
+                  config.color,
+                )}
+              >
                 <span className="text-base">{config.icon}</span>
               </div>
-              {index < sortedActivities.length - 1 && <div className="h-4 w-0.5 bg-border" />}
+              {index < sortedActivities.length - 1 && (
+                <div className="h-4 w-0.5 bg-border" />
+              )}
             </div>
 
             {/* Activity content */}
@@ -139,21 +205,29 @@ export const ContactActivityTimeline: React.FC<ContactActivityTimelineProps> = (
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 {/* Duration for calls */}
                 {isCall && metadata?.duration && (
-                  <span className="rounded bg-muted px-1.5 py-0.5">📞 {formatDuration(metadata.duration)}</span>
+                  <span className="rounded bg-muted px-1.5 py-0.5">
+                    📞 {formatDuration(metadata.duration)}
+                  </span>
                 )}
 
                 {/* Call disposition */}
                 {isCall && metadata?.disposition && (
-                  <span className="rounded bg-muted px-1.5 py-0.5">{metadata.disposition}</span>
+                  <span className="rounded bg-muted px-1.5 py-0.5">
+                    {metadata.disposition}
+                  </span>
                 )}
 
                 {/* SMS preview or summary */}
-                {(isSms || activity.referenceType === 'sms') && activity.summary && (
-                  <p className="truncate text-muted-foreground max-w-[200px]">{activity.summary}</p>
-                )}
+                {(isSms || activity.referenceType === 'sms') &&
+                  activity.summary && (
+                    <p className="truncate text-muted-foreground max-w-[200px]">
+                      {activity.summary}
+                    </p>
+                  )}
 
                 {/* Status/Qualification change values */}
-                {(activity.activityType === 'status_change' || activity.activityType === 'qualification_change') &&
+                {(activity.activityType === 'status_change' ||
+                  activity.activityType === 'qualification_change') &&
                   metadata?.oldValue &&
                   metadata?.newValue && (
                     <span className="rounded bg-muted px-1.5 py-0.5">
@@ -163,7 +237,9 @@ export const ContactActivityTimeline: React.FC<ContactActivityTimelineProps> = (
 
                 {/* Note preview */}
                 {activity.activityType === 'note_added' && activity.summary && (
-                  <p className="truncate italic max-w-[200px]">"{activity.summary}"</p>
+                  <p className="truncate italic max-w-[200px]">
+                    "{activity.summary}"
+                  </p>
                 )}
               </div>
 
@@ -189,7 +265,9 @@ interface ActivitySummaryProps {
   activities: ContactActivity[];
 }
 
-export const ActivitySummary: React.FC<ActivitySummaryProps> = ({ activities }) => {
+export const ActivitySummary: React.FC<ActivitySummaryProps> = ({
+  activities,
+}) => {
   const stats = useMemo(() => {
     const counts = {
       sms: { inbound: 0, outbound: 0 },
@@ -225,7 +303,9 @@ export const ActivitySummary: React.FC<ActivitySummaryProps> = ({ activities }) 
         <span>📞</span>
         <span>{stats.calls.inbound} in</span>
         <span>{stats.calls.outbound} out</span>
-        {(stats.calls.missed > 0 || stats.calls.voicemail > 0) && <span>·</span>}
+        {(stats.calls.missed > 0 || stats.calls.voicemail > 0) && (
+          <span>·</span>
+        )}
         {stats.calls.missed > 0 && <span>{stats.calls.missed} missed</span>}
         {stats.calls.voicemail > 0 && <span>{stats.calls.voicemail} VM</span>}
       </div>

@@ -1,9 +1,19 @@
 import { useMemo } from 'react';
 
 import { useV2SalesMetrics } from '../../api/v2Queries';
-import { DEFAULT_BUSINESS_TIME_ZONE, resolveCurrentBusinessDay, shiftIsoDay } from '../../utils/runDay';
+import {
+  DEFAULT_BUSINESS_TIME_ZONE,
+  resolveCurrentBusinessDay,
+  shiftIsoDay,
+} from '../../utils/runDay';
 import { SkeletonDashboard } from '../components/Skeleton';
-import { V2MetricCard, V2PageHeader, V2Panel, V2State, V2Term } from '../components/V2Primitives';
+import {
+  V2MetricCard,
+  V2PageHeader,
+  V2Panel,
+  V2State,
+  V2Term,
+} from '../components/V2Primitives';
 
 type RepKey = 'jack' | 'brandon';
 
@@ -14,7 +24,11 @@ const fmtDeltaPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}pp`;
 
 export default function RepV2({ rep }: { rep: RepKey }) {
   const currentBusinessDay = useMemo(
-    () => resolveCurrentBusinessDay({ timeZone: DEFAULT_BUSINESS_TIME_ZONE, startHour: 4 }),
+    () =>
+      resolveCurrentBusinessDay({
+        timeZone: DEFAULT_BUSINESS_TIME_ZONE,
+        startHour: 4,
+      }),
     [],
   );
   const day = useMemo(
@@ -24,10 +38,14 @@ export default function RepV2({ rep }: { rep: RepKey }) {
   const prevDay = useMemo(() => (day ? shiftIsoDay(day, -1) : null), [day]);
 
   const { data, isLoading, isError, refetch } = useV2SalesMetrics(
-    day ? { day, tz: DEFAULT_BUSINESS_TIME_ZONE } : { range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE },
+    day
+      ? { day, tz: DEFAULT_BUSINESS_TIME_ZONE }
+      : { range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE },
   );
   const { data: prevData } = useV2SalesMetrics(
-    prevDay ? { day: prevDay, tz: DEFAULT_BUSINESS_TIME_ZONE } : { range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE },
+    prevDay
+      ? { day: prevDay, tz: DEFAULT_BUSINESS_TIME_ZONE }
+      : { range: 'today', tz: DEFAULT_BUSINESS_TIME_ZONE },
   );
 
   const payload = data?.data;
@@ -45,8 +63,11 @@ export default function RepV2({ rep }: { rep: RepKey }) {
       };
     }
 
-    const repRow = payload.reps.find((row) => row.repName.toLowerCase().includes(rep)) || null;
-    const booked = rep === 'jack' ? payload.bookedCredit.jack : payload.bookedCredit.brandon;
+    const repRow =
+      payload.reps.find((row) => row.repName.toLowerCase().includes(rep)) ||
+      null;
+    const booked =
+      rep === 'jack' ? payload.bookedCredit.jack : payload.bookedCredit.brandon;
     const replyRate = repRow?.replyRatePct ?? 0;
     const outbound = repRow?.outboundConversations ?? 0;
     const optOuts = repRow?.optOuts ?? 0;
@@ -63,8 +84,13 @@ export default function RepV2({ rep }: { rep: RepKey }) {
   const prevMetrics = useMemo(() => {
     if (!prevPayload) return null;
 
-    const repRow = prevPayload.reps.find((row) => row.repName.toLowerCase().includes(rep)) || null;
-    const booked = rep === 'jack' ? prevPayload.bookedCredit.jack : prevPayload.bookedCredit.brandon;
+    const repRow =
+      prevPayload.reps.find((row) => row.repName.toLowerCase().includes(rep)) ||
+      null;
+    const booked =
+      rep === 'jack'
+        ? prevPayload.bookedCredit.jack
+        : prevPayload.bookedCredit.brandon;
     const replyRate = repRow?.replyRatePct ?? 0;
     const outbound = repRow?.outboundConversations ?? 0;
     const optOuts = repRow?.optOuts ?? 0;
@@ -90,7 +116,11 @@ export default function RepV2({ rep }: { rep: RepKey }) {
   }, [metrics, prevMetrics]);
 
   const riskFlags = useMemo(() => {
-    const flags: Array<{ level: 'critical' | 'warning' | 'info'; title: string; detail: string }> = [];
+    const flags: Array<{
+      level: 'critical' | 'warning' | 'info';
+      title: string;
+      detail: string;
+    }> = [];
 
     if (metrics.optOutRate >= 3) {
       flags.push({
@@ -106,7 +136,11 @@ export default function RepV2({ rep }: { rep: RepKey }) {
         detail: `${fmtInt(metrics.outbound)} outbound conversations with no booked calls credited yet.`,
       });
     }
-    if (metrics.replyRate > 0 && metrics.replyRate < 5 && metrics.outbound >= 20) {
+    if (
+      metrics.replyRate > 0 &&
+      metrics.replyRate < 5 &&
+      metrics.outbound >= 20
+    ) {
       flags.push({
         level: 'warning',
         title: 'Low reply rate on high volume',
@@ -122,7 +156,14 @@ export default function RepV2({ rep }: { rep: RepKey }) {
     }
 
     return flags;
-  }, [deltas, metrics.booked, metrics.optOutRate, metrics.outbound, metrics.replyRate, prevDay]);
+  }, [
+    deltas,
+    metrics.booked,
+    metrics.optOutRate,
+    metrics.outbound,
+    metrics.replyRate,
+    prevDay,
+  ]);
 
   if (isLoading) return <SkeletonDashboard />;
   if (isError || !payload)
@@ -143,42 +184,74 @@ export default function RepV2({ rep }: { rep: RepKey }) {
         <V2MetricCard
           label={<V2Term term="callsBookedCreditSlack" />}
           value={fmtInt(metrics.booked)}
-          meta={deltas ? `${fmtDeltaInt(deltas.booked)} vs prior day` : 'No prior-day data yet'}
+          meta={
+            deltas
+              ? `${fmtDeltaInt(deltas.booked)} vs prior day`
+              : 'No prior-day data yet'
+          }
           tone="positive"
         />
         <V2MetricCard
           label={<V2Term term="outboundConversations" />}
           value={fmtInt(metrics.outbound)}
-          meta={deltas ? `${fmtDeltaInt(deltas.outbound)} vs prior day` : 'No prior-day data yet'}
+          meta={
+            deltas
+              ? `${fmtDeltaInt(deltas.outbound)} vs prior day`
+              : 'No prior-day data yet'
+          }
         />
         <V2MetricCard
           label={<V2Term term="replyRatePeople" />}
           value={fmtPct(metrics.replyRate)}
-          meta={deltas ? `${fmtDeltaPct(deltas.replyRate)} vs prior day` : 'No prior-day data yet'}
+          meta={
+            deltas
+              ? `${fmtDeltaPct(deltas.replyRate)} vs prior day`
+              : 'No prior-day data yet'
+          }
           tone="accent"
         />
         <V2MetricCard
           label={<V2Term term="optOuts" />}
           value={fmtInt(metrics.optOuts)}
-          meta={deltas ? `${fmtDeltaInt(deltas.optOuts)} vs prior day` : 'No prior-day data yet'}
+          meta={
+            deltas
+              ? `${fmtDeltaInt(deltas.optOuts)} vs prior day`
+              : 'No prior-day data yet'
+          }
           tone={metrics.optOuts > 0 ? 'critical' : 'default'}
         />
         <V2MetricCard
           label={<V2Term term="optOutRate" />}
           value={fmtPct(metrics.optOutRate)}
-          meta={deltas ? `${fmtDeltaPct(deltas.optOutRate)} vs prior day` : 'No prior-day data yet'}
+          meta={
+            deltas
+              ? `${fmtDeltaPct(deltas.optOutRate)} vs prior day`
+              : 'No prior-day data yet'
+          }
           tone={metrics.optOutRate >= 3 ? 'critical' : 'default'}
         />
         <V2MetricCard
           label="Booking Rate"
-          value={metrics.outbound > 0 ? `${((metrics.booked / metrics.outbound) * 100).toFixed(1)}%` : 'n/a'}
+          value={
+            metrics.outbound > 0
+              ? `${((metrics.booked / metrics.outbound) * 100).toFixed(1)}%`
+              : 'n/a'
+          }
           meta={`${fmtInt(metrics.booked)} booked / ${fmtInt(metrics.outbound)} outbound`}
-          tone={metrics.outbound > 0 && (metrics.booked / metrics.outbound) * 100 >= 5 ? 'positive' : 'default'}
+          tone={
+            metrics.outbound > 0 &&
+            (metrics.booked / metrics.outbound) * 100 >= 5
+              ? 'positive'
+              : 'default'
+          }
         />
       </section>
 
       <div className="V2Grid V2Grid--2">
-        <V2Panel title="Day-over-Day" caption="How today compares with yesterday.">
+        <V2Panel
+          title="Day-over-Day"
+          caption="How today compares with yesterday."
+        >
           {deltas ? (
             <div className="V2DeltaList">
               <div>
@@ -203,11 +276,17 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           )}
         </V2Panel>
 
-        <V2Panel title="Watch List" caption="Items that may need coaching or follow-up.">
+        <V2Panel
+          title="Watch List"
+          caption="Items that may need coaching or follow-up."
+        >
           {riskFlags.length ? (
             <div className="V2RiskFlags">
               {riskFlags.map((flag) => (
-                <article className={`V2RiskFlag V2RiskFlag--${flag.level}`} key={`${flag.level}-${flag.title}`}>
+                <article
+                  className={`V2RiskFlag V2RiskFlag--${flag.level}`}
+                  key={`${flag.level}-${flag.title}`}
+                >
                   <h3>{flag.title}</h3>
                   <p>{flag.detail}</p>
                 </article>
@@ -237,10 +316,15 @@ export default function RepV2({ rep }: { rep: RepKey }) {
           </div>
         </V2Panel>
 
-        <V2Panel title="How to Read This Page" caption="This is a coaching snapshot, not a leaderboard.">
+        <V2Panel
+          title="How to Read This Page"
+          caption="This is a coaching snapshot, not a leaderboard."
+        >
           <ul className="V2BulletList">
             <li>Booked Calls come from Slack booking records and reactions.</li>
-            <li>Use Sequences and Performance pages to find root causes quickly.</li>
+            <li>
+              Use Sequences and Performance pages to find root causes quickly.
+            </li>
           </ul>
         </V2Panel>
       </div>

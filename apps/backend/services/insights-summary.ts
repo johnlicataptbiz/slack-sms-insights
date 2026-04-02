@@ -61,54 +61,31 @@ export const getInsightsSummary = async (
   const fromDay = params.from.toISOString().slice(0, 10);
   const toDay = params.to.toISOString().slice(0, 10);
 
-  const smsRows = await prisma.fact_sms_daily.findMany({
-    where: {
-      day: {
-        gte: new Date(`${fromDay}T00:00:00.000Z`),
-        lte: new Date(`${toDay}T00:00:00.000Z`),
-      },
-      ...(params.rep ? { rep_id: params.rep } : {}),
-    },
-    select: {
-      rep_id: true,
-      messages_sent: true,
-      unique_contacted: true,
-      replies_received: true,
-      opt_outs: true,
-    },
-  });
+  let smsRows: any[] = [];
+  let bookingRows: any[] = [];
+  let mondayRows: any[] = [];
+  const warnings: string[] = [];
 
-  const bookingRows = await prisma.fact_booking_daily.findMany({
-    where: {
-      day: {
-        gte: new Date(`${fromDay}T00:00:00.000Z`),
-        lte: new Date(`${toDay}T00:00:00.000Z`),
-      },
-      ...(params.rep ? { rep_id: params.rep } : {}),
-    },
-    select: {
-      rep_id: true,
-      booked_total: true,
-    },
-  });
+  try {
+    smsRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_sms_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`, fromDay, toDay, ...(params.rep ? [params.rep] : []));
+  } catch (e) {
+    warnings.push('fact_sms_daily unavailable');
+    logger?.warn?.('insights-summary: fact_sms_daily unavailable', e);
+  }
 
-  const mondayRows = await prisma.fact_monday_health_daily.findMany({
-    where: {
-      day: {
-        gte: new Date(`${fromDay}T00:00:00.000Z`),
-        lte: new Date(`${toDay}T00:00:00.000Z`),
-      },
-    },
-    select: {
-      board_id: true,
-      is_stale: true,
-      sync_status: true,
-      source_coverage_pct: true,
-      campaign_coverage_pct: true,
-      set_by_coverage_pct: true,
-      touchpoints_coverage_pct: true,
-    },
-  });
+  try {
+bookingRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_booking_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`, fromDay, toDay, ...(params.rep ? [params.rep] : []));
+  } catch (e) {
+    warnings.push('fact_booking_daily unavailable');
+    logger?.warn?.('insights-summary: fact_booking_daily unavailable', e);
+  }
+
+  try {
+    mondayRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_monday_health_daily WHERE day >= $${1}::date AND day <= $${2}::date`, fromDay, toDay);
+  } catch (e) {
+    warnings.push('fact_monday_health_daily unavailable');
+    logger?.warn?.('insights-summary: fact_monday_health_daily unavailable', e);
+  }
 
   const repTotals = new Map<
     string,
@@ -211,12 +188,14 @@ export const getInsightsSummary = async (
       ? mondayRows.reduce((sum, row) => sum + row.touchpoints_coverage_pct, 0) / mondayRows.length
       : 0;
 
-  if (mondayRows.length === 0) {
-    logger?.warn?.('insights-summary: no monday health rows in requested window');
+  if (smsRows.length === 0 && bookingRows.length === 0 && mondayRows.length === 0) {
+    warnings.push('All fact tables unavailable - serving empty data');
+    logger?.warn?.('insights-summary: All fact tables unavailable - serving empty data');
   }
 
   return {
     window: { from: params.from.toISOString(), to: params.to.toISOString(), timeZone: params.timeZone },
+    ...(warnings.length > 0 && { warnings }),
     kpis: {
       messagesSent: kpis.messagesSent,
       uniqueContacted: kpis.uniqueContacted,
@@ -249,3 +228,4 @@ export const getInsightsSummary = async (
     },
   };
 };
+

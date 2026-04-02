@@ -75,7 +75,7 @@ alertRouter.post('/webhook', async (req: Request, res: Response): Promise<void> 
  * GET /api/alerts/status
  * Get current alert status snapshot for Command Center dashboard
  */
-alertRouter.get('/status', async (req: Request, res: Response): Promise<void> => {
+alertRouter.get('/status', async (_req: Request, res: Response): Promise<void> => {
   try {
     const status = {
       timestamp: new Date().toISOString(),

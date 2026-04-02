@@ -1,5 +1,5 @@
 import express from 'express';
-import { AlowareProcessor } from '../services/aloware-processor';
+import { AlowareProcessor } from '../services/aloware-processor.js';
 
 const router = express.Router();
 const processor = new AlowareProcessor();

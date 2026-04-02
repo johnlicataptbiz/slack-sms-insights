@@ -2,11 +2,11 @@ import type { Request, Response } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Test utilities for common patterns
-export class TestUtils {
+export const TestUtils = {
   /**
    * Create a mock Express request object
    */
-  static createMockRequest(overrides: Partial<Request> = {}): Request {
+createMockRequest(overrides: Partial<Request> = {}): Request {
     return {
       body: {},
       params: {},
@@ -21,7 +21,7 @@ export class TestUtils {
   /**
    * Create a mock Express response object
    */
-  static createMockResponse(overrides: Partial<Response> = {}): Response {
+createMockResponse(overrides: Partial<Response> = {}): Response {
     const res = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
@@ -34,7 +34,7 @@ export class TestUtils {
   /**
    * Create a mock database transaction
    */
-  static createMockTransaction() {
+createMockTransaction() {
     return {
       commit: vi.fn(),
       rollback: vi.fn(),
@@ -44,14 +44,14 @@ export class TestUtils {
   /**
    * Wait for a specified amount of time
    */
-  static async wait(ms: number): Promise<void> {
+async wait(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
    * Create a test database connection string
    */
-  static getTestDatabaseUrl(): string {
+getTestDatabaseUrl(): string {
     return process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db';
   }
 }
@@ -61,7 +61,7 @@ export const testPatterns = {
   /**
    * Test that a function throws an error with specific message
    */
-  async expectThrowsAsync(fn: () => Promise<any>, expectedMessage: string) {
+async expectThrowsAsync<T>(fn: () => Promise<T>, expectedMessage: string) {
     try {
       await fn();
       expect.fail('Expected function to throw');
@@ -73,7 +73,7 @@ export const testPatterns = {
   /**
    * Test that an async operation completes within timeout
    */
-  async expectCompletesWithin(fn: () => Promise<any>, timeoutMs: number) {
+async expectCompletesWithin<T>(fn: () => Promise<T>, timeoutMs: number) {
     const start = Date.now();
     await fn();
     const duration = Date.now() - start;
@@ -82,11 +82,11 @@ export const testPatterns = {
 };
 
 // Database test helpers
-export class DatabaseTestHelper {
+export const DatabaseTestHelper = {
   /**
    * Clean up database tables between tests
    */
-  static async cleanupTables(prisma: any, tables: string[]) {
+async cleanupTables(prisma: PrismaClient, tables: string[]) {
     for (const table of tables) {
       await prisma.$executeRawUnsafe(`TRUNCATE TABLE "${table}" CASCADE`);
     }
@@ -95,7 +95,7 @@ export class DatabaseTestHelper {
   /**
    * Seed database with test data
    */
-  static async seedData(prisma: any, data: Record<string, any[]>) {
+async seedData(prisma: PrismaClient, data: Record<string, any[]>) {
     for (const [table, records] of Object.entries(data)) {
       for (const record of records) {
         await prisma[table].create({ data: record });

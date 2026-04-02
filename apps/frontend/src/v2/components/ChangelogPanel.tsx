@@ -43,7 +43,9 @@ export function ChangelogPanel() {
   const formatRelativeDate = (dateStr: string) => {
     const date = new Date(dateStr);
     const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     if (diffDays === 0) return 'Today';
     if (diffDays === 1) return 'Yesterday';
@@ -73,7 +75,10 @@ export function ChangelogPanel() {
   }, [timeline?.entries]);
 
   const sortedDates = useMemo<string[]>(
-    () => Object.keys(groupedEntries).sort((a, b) => new Date(b).getTime() - new Date(a).getTime()),
+    () =>
+      Object.keys(groupedEntries).sort(
+        (a, b) => new Date(b).getTime() - new Date(a).getTime(),
+      ),
     [groupedEntries],
   );
 
@@ -87,21 +92,40 @@ export function ChangelogPanel() {
         title="View changelog"
         aria-label="Open changelog"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
           <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <span className="ChangelogButton__label">Updates</span>
-        {timeline && timeline.totalCount > 0 && <span className="ChangelogButton__badge">{timeline.totalCount}</span>}
+        {timeline && timeline.totalCount > 0 && (
+          <span className="ChangelogButton__badge">{timeline.totalCount}</span>
+        )}
       </button>
 
       {/* Modal Overlay */}
       {isOpen && (
-        <div className="ChangelogModal__overlay" onClick={() => setIsOpen(false)}>
+        <div
+          className="ChangelogModal__overlay"
+          onClick={() => setIsOpen(false)}
+        >
           <div className="ChangelogModal" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
             <div className="ChangelogModal__header">
               <h2 className="ChangelogModal__title">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 Changelog
@@ -139,30 +163,52 @@ export function ChangelogPanel() {
                 <div className="ChangelogModal__stats">
                   <div
                     className="ChangelogModal__stat"
-                    style={{ '--stat-color': TYPE_COLORS.feature } as React.CSSProperties}
+                    style={
+                      {
+                        '--stat-color': TYPE_COLORS.feature,
+                      } as React.CSSProperties
+                    }
                   >
-                    <span className="ChangelogModal__statValue">{timeline.stats.features}</span>
+                    <span className="ChangelogModal__statValue">
+                      {timeline.stats.features}
+                    </span>
                     <span className="ChangelogModal__statLabel">Features</span>
                   </div>
                   <div
                     className="ChangelogModal__stat"
-                    style={{ '--stat-color': TYPE_COLORS.fix } as React.CSSProperties}
+                    style={
+                      { '--stat-color': TYPE_COLORS.fix } as React.CSSProperties
+                    }
                   >
-                    <span className="ChangelogModal__statValue">{timeline.stats.fixes}</span>
+                    <span className="ChangelogModal__statValue">
+                      {timeline.stats.fixes}
+                    </span>
                     <span className="ChangelogModal__statLabel">Fixes</span>
                   </div>
                   <div
                     className="ChangelogModal__stat"
-                    style={{ '--stat-color': TYPE_COLORS.refactor } as React.CSSProperties}
+                    style={
+                      {
+                        '--stat-color': TYPE_COLORS.refactor,
+                      } as React.CSSProperties
+                    }
                   >
-                    <span className="ChangelogModal__statValue">{timeline.stats.refactors}</span>
+                    <span className="ChangelogModal__statValue">
+                      {timeline.stats.refactors}
+                    </span>
                     <span className="ChangelogModal__statLabel">Refactors</span>
                   </div>
                   <div
                     className="ChangelogModal__stat"
-                    style={{ '--stat-color': TYPE_COLORS.docs } as React.CSSProperties}
+                    style={
+                      {
+                        '--stat-color': TYPE_COLORS.docs,
+                      } as React.CSSProperties
+                    }
                   >
-                    <span className="ChangelogModal__statValue">{timeline.stats.docs}</span>
+                    <span className="ChangelogModal__statValue">
+                      {timeline.stats.docs}
+                    </span>
                     <span className="ChangelogModal__statLabel">Docs</span>
                   </div>
                 </div>
@@ -179,7 +225,11 @@ export function ChangelogPanel() {
               ) : error ? (
                 <div className="ChangelogModal__error">
                   <p>Failed to load changelog</p>
-                  <button type="button" onClick={() => window.location.reload()} className="ChangelogModal__retry">
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="ChangelogModal__retry"
+                  >
                     Retry
                   </button>
                 </div>
@@ -192,36 +242,58 @@ export function ChangelogPanel() {
                   {sortedDates.map((date: string) => (
                     <div key={date} className="ChangelogModal__dateGroup">
                       <div className="ChangelogModal__dateHeader">
-                        <span className="ChangelogModal__date">{formatRelativeDate(date)}</span>
-                        <span className="ChangelogModal__dateCount">{groupedEntries[date]?.length ?? 0} changes</span>
+                        <span className="ChangelogModal__date">
+                          {formatRelativeDate(date)}
+                        </span>
+                        <span className="ChangelogModal__dateCount">
+                          {groupedEntries[date]?.length ?? 0} changes
+                        </span>
                       </div>
 
                       <div className="ChangelogModal__entries">
-                        {(groupedEntries[date] ?? []).map((entry: ChangelogEntry, index: number) => (
-                          <div key={`${entry.hash}-${index}`} className="ChangelogModal__entry">
+                        {(groupedEntries[date] ?? []).map(
+                          (entry: ChangelogEntry, index: number) => (
                             <div
-                              className="ChangelogModal__entryType"
-                              style={{
-                                backgroundColor: TYPE_COLORS[entry.type] || TYPE_COLORS.other,
-                                color: entry.type === 'docs' || entry.type === 'chore' ? 'var(--v2-bg)' : 'white',
-                              }}
-                              title={TYPE_LABELS[entry.type]}
+                              key={`${entry.hash}-${index}`}
+                              className="ChangelogModal__entry"
                             >
-                              {entry.type.charAt(0).toUpperCase()}
-                            </div>
+                              <div
+                                className="ChangelogModal__entryType"
+                                style={{
+                                  backgroundColor:
+                                    TYPE_COLORS[entry.type] ||
+                                    TYPE_COLORS.other,
+                                  color:
+                                    entry.type === 'docs' ||
+                                    entry.type === 'chore'
+                                      ? 'var(--v2-bg)'
+                                      : 'white',
+                                }}
+                                title={TYPE_LABELS[entry.type]}
+                              >
+                                {entry.type.charAt(0).toUpperCase()}
+                              </div>
 
-                            <div className="ChangelogModal__entryContent">
-                              <p className="ChangelogModal__entryDescription">{entry.description}</p>
+                              <div className="ChangelogModal__entryContent">
+                                <p className="ChangelogModal__entryDescription">
+                                  {entry.description}
+                                </p>
 
-                              <div className="ChangelogModal__entryMeta">
-                                <span className="ChangelogModal__entryCategory">{entry.category}</span>
-                                <span className="ChangelogModal__entryHash" title={entry.message}>
-                                  {entry.hash}
-                                </span>
+                                <div className="ChangelogModal__entryMeta">
+                                  <span className="ChangelogModal__entryCategory">
+                                    {entry.category}
+                                  </span>
+                                  <span
+                                    className="ChangelogModal__entryHash"
+                                    title={entry.message}
+                                  >
+                                    {entry.hash}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ),
+                        )}
                       </div>
                     </div>
                   ))}
@@ -234,7 +306,8 @@ export function ChangelogPanel() {
               <span className="ChangelogModal__footerText">
                 {timeline?.dateRange && (
                   <>
-                    Showing changes from {formatDate(timeline.dateRange.from)} to {formatDate(timeline.dateRange.to)}
+                    Showing changes from {formatDate(timeline.dateRange.from)}{' '}
+                    to {formatDate(timeline.dateRange.to)}
                   </>
                 )}
               </span>

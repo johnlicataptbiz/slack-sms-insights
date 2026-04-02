@@ -1,11 +1,6 @@
 import { Client } from 'pg';
 
-const targets = [
-  'Dylan McLean',
-  'Adrian Ferreira',
-  'Alexander Leto',
-  'Anthony Meyer',
-];
+const targets = ['Dylan McLean', 'Adrian Ferreira', 'Alexander Leto', 'Anthony Meyer'];
 
 const main = async () => {
   const databaseUrl = process.env.DATABASE_URL;

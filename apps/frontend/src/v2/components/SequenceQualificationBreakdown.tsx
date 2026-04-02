@@ -83,7 +83,10 @@ const QualificationBadge: React.FC<{
       onMouseLeave={() => setShowTooltip(false)}
     >
       <span className="QualificationBadge__label">{label}</span>
-      <span className="QualificationBadge__value" style={{ color: colorMap[color] }}>
+      <span
+        className="QualificationBadge__value"
+        style={{ color: colorMap[color] }}
+      >
         {pct.toFixed(0)}%
       </span>
       <span className="QualificationBadge__count">({count})</span>
@@ -91,7 +94,9 @@ const QualificationBadge: React.FC<{
       {showTooltip && sampleQuote && (
         <div className="QualificationBadge__tooltip">
           <div className="QualificationBadge__tooltipLabel">Sample quote:</div>
-          <div className="QualificationBadge__tooltipQuote">"{sampleQuote}"</div>
+          <div className="QualificationBadge__tooltipQuote">
+            "{sampleQuote}"
+          </div>
         </div>
       )}
     </div>
@@ -117,45 +122,70 @@ const MondayOutcomesSummary: React.FC<{
   outcomes: SequenceQualificationItem['mondayOutcomes'];
 }> = ({ outcomes }) => {
   if (!outcomes || outcomes.totalOutcomes === 0) {
-    return <div className="MondayOutcomesSummary__empty">No Monday outcomes linked</div>;
+    return (
+      <div className="MondayOutcomesSummary__empty">
+        No Monday outcomes linked
+      </div>
+    );
   }
 
   return (
     <div className="MondayOutcomesSummary">
       <div className="MondayOutcomesSummary__header">
-        <span className="MondayOutcomesSummary__linked">{outcomes.linkedContacts} contacts linked</span>
-        <span className="MondayOutcomesSummary__total">{outcomes.totalOutcomes} total outcomes</span>
+        <span className="MondayOutcomesSummary__linked">
+          {outcomes.linkedContacts} contacts linked
+        </span>
+        <span className="MondayOutcomesSummary__total">
+          {outcomes.totalOutcomes} total outcomes
+        </span>
       </div>
 
       <div className="MondayOutcomesSummary__grid">
         <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--booked">
           <span className="MondayOutcomesSummary__label">Booked</span>
-          <span className="MondayOutcomesSummary__value">{outcomes.booked}</span>
-          <span className="MondayOutcomesSummary__pct">{outcomes.bookedPct.toFixed(1)}%</span>
+          <span className="MondayOutcomesSummary__value">
+            {outcomes.booked}
+          </span>
+          <span className="MondayOutcomesSummary__pct">
+            {outcomes.bookedPct.toFixed(1)}%
+          </span>
         </div>
 
         <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--closedWon">
           <span className="MondayOutcomesSummary__label">Closed Won</span>
-          <span className="MondayOutcomesSummary__value">{outcomes.closedWon}</span>
-          <span className="MondayOutcomesSummary__pct">{outcomes.closedWonPct.toFixed(1)}%</span>
+          <span className="MondayOutcomesSummary__value">
+            {outcomes.closedWon}
+          </span>
+          <span className="MondayOutcomesSummary__pct">
+            {outcomes.closedWonPct.toFixed(1)}%
+          </span>
         </div>
 
         <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--noShow">
           <span className="MondayOutcomesSummary__label">No Show</span>
-          <span className="MondayOutcomesSummary__value">{outcomes.noShow}</span>
-          <span className="MondayOutcomesSummary__pct">{outcomes.noShowPct.toFixed(1)}%</span>
+          <span className="MondayOutcomesSummary__value">
+            {outcomes.noShow}
+          </span>
+          <span className="MondayOutcomesSummary__pct">
+            {outcomes.noShowPct.toFixed(1)}%
+          </span>
         </div>
 
         <div className="MondayOutcomesSummary__item MondayOutcomesSummary__item--cancelled">
           <span className="MondayOutcomesSummary__label">Cancelled</span>
-          <span className="MondayOutcomesSummary__value">{outcomes.cancelled}</span>
-          <span className="MondayOutcomesSummary__pct">{outcomes.cancelledPct.toFixed(1)}%</span>
+          <span className="MondayOutcomesSummary__value">
+            {outcomes.cancelled}
+          </span>
+          <span className="MondayOutcomesSummary__pct">
+            {outcomes.cancelledPct.toFixed(1)}%
+          </span>
         </div>
       </div>
 
       {outcomes.badTiming > 0 && (
         <div className="MondayOutcomesSummary__other">
-          Bad Timing: {outcomes.badTiming} • Bad Fit: {outcomes.badFit} • Other: {outcomes.other + outcomes.unknown}
+          Bad Timing: {outcomes.badTiming} • Bad Fit: {outcomes.badFit} • Other:{' '}
+          {outcomes.other + outcomes.unknown}
         </div>
       )}
     </div>
@@ -172,35 +202,45 @@ const SequenceCard: React.FC<{
   // Calculate summary stats for collapsed view
   const hasFullTime = item.fullTime.count > item.partTime.count;
   const dominantRevenue =
-    item.mostlyCash.count > item.mostlyInsurance.count && item.mostlyCash.count > item.balancedMix.count
+    item.mostlyCash.count > item.mostlyInsurance.count &&
+    item.mostlyCash.count > item.balancedMix.count
       ? 'Cash'
-      : item.mostlyInsurance.count > item.mostlyCash.count && item.mostlyInsurance.count > item.balancedMix.count
+      : item.mostlyInsurance.count > item.mostlyCash.count &&
+          item.mostlyInsurance.count > item.balancedMix.count
         ? 'Insurance'
         : item.balancedMix.count > 0
           ? 'Mixed'
           : 'Unknown';
 
   const coachingInterest =
-    item.highInterest.count > item.mediumInterest.count && item.highInterest.count > item.lowInterest.count
+    item.highInterest.count > item.mediumInterest.count &&
+    item.highInterest.count > item.lowInterest.count
       ? 'High'
-      : item.mediumInterest.count > item.highInterest.count && item.mediumInterest.count > item.lowInterest.count
+      : item.mediumInterest.count > item.highInterest.count &&
+          item.mediumInterest.count > item.lowInterest.count
         ? 'Medium'
         : item.lowInterest.count > 0
           ? 'Low'
           : 'Unknown';
 
   return (
-    <div className={`SequenceCard ${isExpanded ? 'SequenceCard--expanded' : ''}`}>
+    <div
+      className={`SequenceCard ${isExpanded ? 'SequenceCard--expanded' : ''}`}
+    >
       <div className="SequenceCard__header" onClick={onToggle}>
         <div className="SequenceCard__title">
           <span className="SequenceCard__name">{item.sequenceLabel}</span>
-          <span className="SequenceCard__count">{total.toLocaleString()} conversations</span>
+          <span className="SequenceCard__count">
+            {total.toLocaleString()} conversations
+          </span>
         </div>
 
         {!isExpanded && (
           <div className="SequenceCard__summary">
             <span className="SequenceCard__summaryItem" title="Employment">
-              {hasFullTime ? 'FT' : 'PT'} {(hasFullTime ? item.fullTime.pct : item.partTime.pct).toFixed(0)}%
+              {hasFullTime ? 'FT' : 'PT'}{' '}
+              {(hasFullTime ? item.fullTime.pct : item.partTime.pct).toFixed(0)}
+              %
             </span>
             <span className="SequenceCard__summaryDivider">•</span>
             <span className="SequenceCard__summaryItem" title="Revenue Model">
@@ -216,13 +256,20 @@ const SequenceCard: React.FC<{
               %
             </span>
             <span className="SequenceCard__summaryDivider">•</span>
-            <span className="SequenceCard__summaryItem" title="Coaching Interest">
+            <span
+              className="SequenceCard__summaryItem"
+              title="Coaching Interest"
+            >
               {coachingInterest} Interest
             </span>
           </div>
         )}
 
-        <span className={`SequenceCard__chevron ${isExpanded ? 'SequenceCard__chevron--up' : ''}`}>▼</span>
+        <span
+          className={`SequenceCard__chevron ${isExpanded ? 'SequenceCard__chevron--up' : ''}`}
+        >
+          ▼
+        </span>
       </div>
 
       {isExpanded && (
@@ -331,10 +378,17 @@ const SequenceCard: React.FC<{
           {/* Top Niches */}
           {item.topNiches.length > 0 && (
             <div className="SequenceCard__section">
-              <h5 className="SequenceCard__sectionTitle">Top Niches Mentioned</h5>
+              <h5 className="SequenceCard__sectionTitle">
+                Top Niches Mentioned
+              </h5>
               <div className="SequenceCard__niches">
                 {item.topNiches.map((niche) => (
-                  <NicheTag key={niche.niche} niche={niche.niche} count={niche.count} total={total} />
+                  <NicheTag
+                    key={niche.niche}
+                    niche={niche.niche}
+                    count={niche.count}
+                    total={total}
+                  />
                 ))}
               </div>
             </div>
@@ -343,7 +397,9 @@ const SequenceCard: React.FC<{
           {/* Monday Outcomes */}
           {item.mondayOutcomes && item.mondayOutcomes.totalOutcomes > 0 && (
             <div className="SequenceCard__section">
-              <h5 className="SequenceCard__sectionTitle">Monday.com Outcomes</h5>
+              <h5 className="SequenceCard__sectionTitle">
+                Monday.com Outcomes
+              </h5>
               <MondayOutcomesSummary outcomes={item.mondayOutcomes} />
             </div>
           )}
@@ -353,12 +409,17 @@ const SequenceCard: React.FC<{
   );
 };
 
-export const SequenceQualificationBreakdown: React.FC<SequenceQualificationBreakdownProps> = ({ items, isLoading }) => {
+export const SequenceQualificationBreakdown: React.FC<
+  SequenceQualificationBreakdownProps
+> = ({ items, isLoading }) => {
   const [expandedSequence, setExpandedSequence] = useState<string | null>(null);
 
   if (isLoading) {
     return (
-      <V2Panel title="Lead Qualification by Sequence" caption="Loading qualification data...">
+      <V2Panel
+        title="Lead Qualification by Sequence"
+        caption="Loading qualification data..."
+      >
         <V2Skeleton height={200} />
       </V2Panel>
     );
@@ -384,7 +445,13 @@ export const SequenceQualificationBreakdown: React.FC<SequenceQualificationBreak
           key={item.sequenceLabel}
           item={item}
           isExpanded={expandedSequence === item.sequenceLabel}
-          onToggle={() => setExpandedSequence(expandedSequence === item.sequenceLabel ? null : item.sequenceLabel)}
+          onToggle={() =>
+            setExpandedSequence(
+              expandedSequence === item.sequenceLabel
+                ? null
+                : item.sequenceLabel,
+            )
+          }
         />
       ))}
     </div>

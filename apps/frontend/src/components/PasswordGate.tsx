@@ -43,7 +43,11 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
     <main className="PasswordGate PasswordGate--minimal">
       <div className="PasswordGate__card PasswordGate__card--minimal">
         <div className="PasswordGate__textBlock">
-          <img className="PasswordGate__logo" src="/assets/sms-kit/ptbiz_sms_logo_badge.png" alt="PT Biz SMS" />
+          <img
+            className="PasswordGate__logo"
+            src="/assets/sms-kit/ptbiz_sms_logo_badge.png"
+            alt="PT Biz SMS"
+          />
           <h1>Enter password</h1>
         </div>
 
@@ -70,7 +74,11 @@ export function PasswordGate({ onUnlock }: { onUnlock: () => void }) {
 
           {error && <p className="PasswordGate__error">{error}</p>}
 
-          <button type="submit" className="PasswordGate__submit" disabled={isSubmitting || success}>
+          <button
+            type="submit"
+            className="PasswordGate__submit"
+            disabled={isSubmitting || success}
+          >
             {success ? 'Unlocked' : 'Enter Dashboard'}
           </button>
 

@@ -10,7 +10,9 @@ export function UnattributedAuditTable({ rows }: UnattributedAuditTableProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const sortedRows = useMemo(() => {
-    return [...rows].sort((a, b) => new Date(b.eventTs).getTime() - new Date(a.eventTs).getTime());
+    return [...rows].sort(
+      (a, b) => new Date(b.eventTs).getTime() - new Date(a.eventTs).getTime(),
+    );
   }, [rows]);
 
   if (rows.length === 0) return null;
@@ -21,8 +23,14 @@ export function UnattributedAuditTable({ rows }: UnattributedAuditTableProps) {
       caption="Booked calls from Slack that could not be matched to a known sequence label via fuzzy matching."
     >
       <div className="V2ActionRow">
-        <button type="button" className="V2Btn" onClick={() => setIsExpanded(!isExpanded)}>
-          {isExpanded ? 'Hide Details' : `View ${rows.length} Unattributed Calls`}
+        <button
+          type="button"
+          className="V2Btn"
+          onClick={() => setIsExpanded(!isExpanded)}
+        >
+          {isExpanded
+            ? 'Hide Details'
+            : `View ${rows.length} Unattributed Calls`}
         </button>
       </div>
 
@@ -44,20 +52,31 @@ export function UnattributedAuditTable({ rows }: UnattributedAuditTableProps) {
                 <tr key={row.bookedCallId}>
                   <td className="V2Table__cell--date">
                     <div className="V2DateWrap">
-                      <span className="V2DateWrap__date">{new Date(row.eventTs).toLocaleDateString()}</span>
+                      <span className="V2DateWrap__date">
+                        {new Date(row.eventTs).toLocaleDateString()}
+                      </span>
                       <span className="V2DateWrap__time">
-                        {new Date(row.eventTs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(row.eventTs).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
                       </span>
                     </div>
                   </td>
                   <td>
                     <div className="V2ContactWrap">
-                      <span className="V2ContactWrap__name">{row.contactName || 'Unknown'}</span>
-                      <span className="V2ContactWrap__phone">{row.contactPhone}</span>
+                      <span className="V2ContactWrap__name">
+                        {row.contactName || 'Unknown'}
+                      </span>
+                      <span className="V2ContactWrap__phone">
+                        {row.contactPhone}
+                      </span>
                     </div>
                   </td>
                   <td>
-                    <span className={`V2Badge V2Badge--${row.bucket}`}>{row.bucket}</span>
+                    <span className={`V2Badge V2Badge--${row.bucket}`}>
+                      {row.bucket}
+                    </span>
                   </td>
                   <td className="V2Table__cell--text">
                     <div className="V2AuditText" title={row.text || ''}>
@@ -65,10 +84,14 @@ export function UnattributedAuditTable({ rows }: UnattributedAuditTableProps) {
                     </div>
                   </td>
                   <td>
-                    <div className="V2FuzzyCandidate">{row.bestFuzzyCandidate || 'None'}</div>
+                    <div className="V2FuzzyCandidate">
+                      {row.bestFuzzyCandidate || 'None'}
+                    </div>
                   </td>
                   <td className="V2Table__cell--score">
-                    <div className={`V2Score ${row.bestFuzzyScore > 0.8 ? 'V2Score--high' : ''}`}>
+                    <div
+                      className={`V2Score ${row.bestFuzzyScore > 0.8 ? 'V2Score--high' : ''}`}
+                    >
                       {Math.round(row.bestFuzzyScore * 100)}%
                     </div>
                   </td>

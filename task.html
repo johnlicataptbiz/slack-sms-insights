@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Schema Refactoring: Monthly Partitioning</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        h1, h2 { color: #333; }
+        code { background: #f4f4f4; padding: 2px 4px; border-radius: 4px; }
+        pre { background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Database Schema Refactoring: Monthly Partitioning for sms_events and conversations Tables</h1>
+
+    <h2>Problem Statement</h2>
+    <p>The <code>sms_events</code> and <code>conversations</code> tables in the PostgreSQL database are growing very large, causing query performance to slow down. This impacts dashboard loads and real-time analytics in the PTBiz SMS Insights platform.</p>
+
+    <h2>Chosen Solution: Option 1 - Monthly Range Partitioning</h2>
+    <p>After evaluating two approaches, we selected native PostgreSQL table partitioning with monthly ranges. This converts <code>sms_events</code> (partitioned by <code>event_ts</code>) and <code>conversations</code> (partitioned by <code>created_at</code>) into partitioned tables. PostgreSQL will automatically route queries to the relevant partitions, improving performance for time-based queries.</p>
+
+    <h2>Pros and Cons</h2>
+    <h3>Pros</h3>
+    <ul>
+        <li>Massive performance gains for time-range queries (e.g., last 30 days), as Postgres only scans relevant partitions.</li>
+        <li>Easiest way to archive or delete old data (detach/drop partitions).</li>
+        <li>Transparent to application code—no changes needed in queries.</li>
+    </ul>
+    <h3>Cons</h3>
+    <ul>
+        <li>Prisma doesn't natively support partitioning; migrations must use raw SQL.</li>
+        <li>Requires manual setup of partitions and potentially a background process to create new ones.</li>
+        <li>Increased complexity in database management.</li>
+    </ul>
+
+    <h2>Migration Steps</h2>
+    <p>The migration will be implemented as a raw SQL script in a new Prisma migration file. Here's the high-level process:</p>
+    <ol>
+        <li>Create partitioned versions of the tables.</li>
+        <li>Create initial partitions for existing data (e.g., monthly partitions for the past year).</li>
+        <li>Migrate existing data to the partitioned tables.</li>
+        <li>Drop old tables and rename partitioned ones.</li>
+        <li>Set up a trigger or background job to create future partitions automatically.</li>
+    </ol>
+
+    <h3>Example SQL for sms_events Partitioning</h3>
+    <pre><code>-- Create partitioned table for sms_events
+CREATE TABLE sms_events_partitioned (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    slack_team_id TEXT,
+    slack_channel_id TEXT,
+    slack_message_ts TEXT,
+    event_ts TIMESTAMPTZ NOT NULL,
+    direction "SmsDirection",
+    contact_id TEXT,
+    contact_phone TEXT,
+    normalized_contact_key TEXT,
+    normalized_phone TEXT,
+    contact_name TEXT,
+    aloware_user TEXT,
+    body TEXT,
+    line TEXT,
+    sequence TEXT,
+    sequence_id UUID,
+    sequence_version_id UUID,
+    event_role TEXT,
+    raw JSONB,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    conversation_id UUID,
+    UNIQUE (slack_channel_id, slack_message_ts)
+) PARTITION BY RANGE (event_ts);
+
+-- Create example partition for January 2024
+CREATE TABLE sms_events_2024_01 PARTITION OF sms_events_partitioned
+    FOR VALUES FROM ('2024-01-01') TO ('2024-02-01');
+
+-- Repeat for other months...
+
+-- Migrate data (assuming existing table is sms_events)
+INSERT INTO sms_events_partitioned SELECT * FROM sms_events;
+
+-- Drop old table and rename
+DROP TABLE sms_events;
+ALTER TABLE sms_events_partitioned RENAME TO sms_events;
+
+-- Recreate indexes (adapted from existing migration)
+CREATE INDEX "idx_sms_events_contact_direction_ts" ON "sms_events"("contact_id", "direction", "event_ts" DESC);
+-- Add other indexes as needed</code></pre>
+
+    <h3>Similar Process for conversations Table</h3>
+    <p>Partition <code>conversations</code> by <code>created_at</code> with monthly ranges. Use the same pattern as above, adapting column definitions from the Prisma schema.</p>
+
+    <h2>Code Snippets from Project</h2>
+    <h3>Prisma Schema Model for sms_events</h3>
+    <pre><code>model sms_events {
+  id                  String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slack_team_id       String
+  slack_channel_id    String
+  slack_message_ts    String
+  event_ts            DateTime             @db.Timestamptz(6)
+  direction           SmsDirection
+  contact_id          String?
+  contact_phone       String?
+  normalized_contact_key String?
+  normalized_phone    String?
+  contact_name        String?
+  aloware_user        String?
+  body                String?
+  line                String?
+  sequence            String?
+  sequence_id         String?              @db.Uuid
+  sequence_version_id String?              @db.Uuid
+  event_role          String?
+  raw                 Json?
+  created_at          DateTime             @default(now()) @db.Timestamptz(6)
+  conversation_id     String?              @db.Uuid
+  conversion_examples conversion_examples?
+  draft_suggestions   draft_suggestions[]
+  conversations       Conversation?        @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_sms_events_conversation")
+  sequence_registry   sequence_registry?   @relation(fields: [sequence_id], references: [id], onUpdate: NoAction)
+  work_items          work_items[]
+
+  @@unique([slack_channel_id, slack_message_ts])
+  @@index([contact_id, event_ts(sort: Desc)], map: "idx_sms_events_contact_id_event_ts")
+  @@index([contact_phone, event_ts(sort: Desc)], map: "idx_sms_events_contact_phone_event_ts")
+  @@index([normalized_contact_key, event_ts(sort: Desc)], map: "idx_sms_events_norm_contact_key_event_ts")
+  @@index([normalized_phone, event_ts(sort: Desc)], map: "idx_sms_events_norm_phone_event_ts")
+  @@index([conversation_id, event_ts(sort: Desc)], map: "idx_sms_events_conversation_event_ts")
+  @@index([sequence, event_ts(sort: Desc)], map: "idx_sms_events_sequence_event_ts")
+  @@index([sequence_id, event_ts(sort: Desc)], map: "idx_sms_events_sequence_id_event_ts")
+  @@index([sequence_version_id, event_ts(sort: Desc)], map: "idx_sms_events_sequence_version_event_ts")
+  @@index([event_role, event_ts(sort: Desc)], map: "idx_sms_events_role_event_ts")
+  @@index([event_ts(sort: Desc)], map: "idx_sms_events_event_ts")
+}</code></pre>
+
+    <h3>Existing Migration Example (from 20260319_add_composite_indexes)</h3>
+    <pre><code>-- Add composite indexes for performance optimization
+
+-- 1.1.B sms_events: contact_id + direction + timestamp for conversation direction analysis
+CREATE INDEX "idx_sms_events_contact_direction_ts" ON "sms_events"("contact_id", "direction", "event_ts" DESC);
+
+-- 1.1.B sms_events: normalized phone + direction + timestamp (fallback lookup)
+CREATE INDEX "idx_sms_events_norm_phone_direction_ts" ON "sms_events"("normalized_phone", "direction", "event_ts" DESC);</code></pre>
+
+    <h2>Next Steps</h2>
+    <ul>
+        <li>Create the Prisma migration file with the raw SQL.</li>
+        <li>Test the migration on a staging database.</li>
+        <li>Implement a background job (e.g., in Node.js) to create new partitions monthly.</li>
+        <li>Monitor query performance post-migration.</li>
+    </ul>
+</body>
+</html>

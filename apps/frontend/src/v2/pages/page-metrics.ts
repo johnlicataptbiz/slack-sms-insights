@@ -1,10 +1,15 @@
 import type { RunV2, SalesMetricsV2 } from '../../api/v2-types.js';
-import { parseReport, type RepMetrics, type SequenceRow } from '../../utils/reportParser.js';
+import {
+  type RepMetrics,
+  type SequenceRow,
+  parseReport,
+} from '../../utils/reportParser.js';
 
 const DAILY_SNAPSHOT_TITLE_PATTERN = /PT BIZ - DAILY SMS SNAPSHOT/i;
 const DAILY_SETTER_SUMMARY_PATTERN = /Daily Setter Snapshot/i;
 const TIME_RANGE_LINE_PATTERN = /^Time Range:\s*(.+)$/im;
-const OUTBOUND_CONVERSATIONS_PATTERN = /- Outbound Conversations:\s*([0-9,]+)/gi;
+const OUTBOUND_CONVERSATIONS_PATTERN =
+  /- Outbound Conversations:\s*([0-9,]+)/gi;
 const MESSAGES_SENT_PATTERN = /Messages sent:\s*([0-9,]+)/i;
 const REPLIES_RECEIVED_PATTERN = /Replies received:\s*([0-9,]+)/i;
 const REPLY_RATE_PATTERN = /Replies received:\s*[0-9,]+\s*\(([0-9.]+)%\)/i;
@@ -12,7 +17,12 @@ const CALLS_BOOKED_PATTERN = /Calls booked(?:\s*\(Slack\))?:\s*([0-9,]+)/i;
 const BOOKINGS_ALT_PATTERN = /- Book(?:ings?|ed):\s*([0-9,]+)/i;
 const OPT_OUTS_PATTERN = /Opt-outs:\s*([0-9,]+)/i;
 const OUTBOUND_FROM_SUMMARY_PATTERN = /Outbound conversations:\s*([0-9,]+)/i;
-const SUMMARY_NOISE_PATTERNS = [/^PT BIZ - DAILY SMS SNAPSHOT/i, /^Date:/i, /^Time Range:/i, /^Split By Line/i];
+const SUMMARY_NOISE_PATTERNS = [
+  /^PT BIZ - DAILY SMS SNAPSHOT/i,
+  /^Date:/i,
+  /^Time Range:/i,
+  /^Split By Line/i,
+];
 
 const pad2 = (value: number): string => value.toString().padStart(2, '0');
 
@@ -86,7 +96,9 @@ const matchNumber = (source: string | null, pattern: RegExp): number | null => {
 
 const sumMatches = (source: string | null, pattern: RegExp): number | null => {
   if (!source) return null;
-  const flags = pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`;
+  const flags = pattern.flags.includes('g')
+    ? pattern.flags
+    : `${pattern.flags}g`;
   const globalPattern = new RegExp(pattern.source, flags);
   let found = false;
   let total = 0;
@@ -109,7 +121,10 @@ const normalizeSummaryLines = (summaryText: string | null): string[] => {
   return summaryText
     .split('\n')
     .map((rawLine) => {
-      const withoutMarkdown = rawLine.trim().replace(/^\*+/, '').replace(/\*+$/, '');
+      const withoutMarkdown = rawLine
+        .trim()
+        .replace(/^\*+/, '')
+        .replace(/\*+$/, '');
       return withoutMarkdown.replace(/^-+\s*/, '').trim();
     })
     .filter((line) => line.length > 0);
@@ -117,7 +132,9 @@ const normalizeSummaryLines = (summaryText: string | null): string[] => {
 
 const toTopSequenceLabel = (rep: RepMetrics): string | null => {
   if (!rep.sequences.length) return null;
-  const sorted = [...rep.sequences].sort((a, b) => b.messagesSent - a.messagesSent);
+  const sorted = [...rep.sequences].sort(
+    (a, b) => b.messagesSent - a.messagesSent,
+  );
   return sorted[0]?.label || null;
 };
 
@@ -128,10 +145,12 @@ const toSequenceInsight = (row: SequenceRow): RunSequenceInsight => ({
   replyRatePct: row.replyRate,
   booked: row.booked,
   optOuts: row.optOuts,
-  optOutRatePct: row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
+  optOutRatePct:
+    row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
 });
 
-const isSummaryNoiseLine = (line: string): boolean => SUMMARY_NOISE_PATTERNS.some((pattern) => pattern.test(line));
+const isSummaryNoiseLine = (line: string): boolean =>
+  SUMMARY_NOISE_PATTERNS.some((pattern) => pattern.test(line));
 
 export const buildRunViewModel = (run: RunV2): RunViewModel => {
   const fullReport = run.fullReport || '';
@@ -139,10 +158,12 @@ export const buildRunViewModel = (run: RunV2): RunViewModel => {
   const isDailySnapshot =
     DAILY_SNAPSHOT_TITLE_PATTERN.test(fullReport) ||
     summaryLines.some((line) => DAILY_SETTER_SUMMARY_PATTERN.test(line));
-  const parsed = run.status === 'success' && fullReport ? parseReport(fullReport) : null;
+  const parsed =
+    run.status === 'success' && fullReport ? parseReport(fullReport) : null;
   const hasParsedBreakdown = Boolean(parsed && parsed.reps.length > 0);
 
-  const timeRangeLabel = fullReport.match(TIME_RANGE_LINE_PATTERN)?.[1]?.trim() || null;
+  const timeRangeLabel =
+    fullReport.match(TIME_RANGE_LINE_PATTERN)?.[1]?.trim() || null;
 
   const messagesSent = hasParsedBreakdown
     ? (parsed?.totalMessagesSent ?? null)
@@ -153,11 +174,15 @@ export const buildRunViewModel = (run: RunV2): RunViewModel => {
   const replyRatePct = hasParsedBreakdown
     ? (parsed?.overallReplyRate ?? null)
     : matchNumber(run.summaryText, REPLY_RATE_PATTERN);
-  const parsedBookedFromSequences = parsed?.allSequences.reduce((sum, row) => sum + row.booked, 0) ?? null;
+  const parsedBookedFromSequences =
+    parsed?.allSequences.reduce((sum, row) => sum + row.booked, 0) ?? null;
   const booked = hasParsedBreakdown
     ? parsedBookedFromSequences
-    : (matchNumber(run.summaryText, CALLS_BOOKED_PATTERN) ?? matchNumber(run.summaryText, BOOKINGS_ALT_PATTERN));
-  const optOuts = hasParsedBreakdown ? (parsed?.totalOptOuts ?? null) : matchNumber(run.summaryText, OPT_OUTS_PATTERN);
+    : (matchNumber(run.summaryText, CALLS_BOOKED_PATTERN) ??
+      matchNumber(run.summaryText, BOOKINGS_ALT_PATTERN));
+  const optOuts = hasParsedBreakdown
+    ? (parsed?.totalOptOuts ?? null)
+    : matchNumber(run.summaryText, OPT_OUTS_PATTERN);
   const outboundConversations =
     sumMatches(fullReport, OUTBOUND_CONVERSATIONS_PATTERN) ??
     matchNumber(run.summaryText, OUTBOUND_FROM_SUMMARY_PATTERN);
@@ -173,20 +198,34 @@ export const buildRunViewModel = (run: RunV2): RunViewModel => {
   const title = run.status === 'error' ? `${titleBase} (Failed)` : titleBase;
 
   const modeLabel =
-    run.reportType === 'daily' ? '6:00 AM auto-report' : run.reportType === 'manual' ? 'Manual report' : 'Test report';
-  const subtitleParts = [timeRangeLabel, modeLabel].filter((part): part is string => Boolean(part));
+    run.reportType === 'daily'
+      ? '6:00 AM auto-report'
+      : run.reportType === 'manual'
+        ? 'Manual report'
+        : 'Test report';
+  const subtitleParts = [timeRangeLabel, modeLabel].filter(
+    (part): part is string => Boolean(part),
+  );
 
   const metricPreview =
-    messagesSent !== null || repliesReceived !== null || booked !== null || optOuts !== null
+    messagesSent !== null ||
+    repliesReceived !== null ||
+    booked !== null ||
+    optOuts !== null
       ? `Sent ${formatCount(messagesSent)} | Replies ${formatCount(repliesReceived)} | Booked (report) ${formatCount(booked)} | Opt-outs ${formatCount(optOuts)}`
       : null;
   const summaryPreview =
     metricPreview ||
-    summaryLines.find((line) => !DAILY_SETTER_SUMMARY_PATTERN.test(line) && !isSummaryNoiseLine(line)) ||
+    summaryLines.find(
+      (line) =>
+        !DAILY_SETTER_SUMMARY_PATTERN.test(line) && !isSummaryNoiseLine(line),
+    ) ||
     summaryLines.find((line) => !isSummaryNoiseLine(line)) ||
     summaryLines[0] ||
     null;
-  const topSequences = hasParsedBreakdown ? (parsed?.allSequences || []).slice(0, 5).map(toSequenceInsight) : [];
+  const topSequences = hasParsedBreakdown
+    ? (parsed?.allSequences || []).slice(0, 5).map(toSequenceInsight)
+    : [];
   const repRows = hasParsedBreakdown
     ? (parsed?.reps || []).map((rep) => ({
         name: rep.name,
@@ -229,12 +268,17 @@ export const computeSequenceHeaderMetrics = (
   sequences: SalesMetricsV2['sequences'],
 ): SequenceHeaderMetrics => {
   const totalBookedAllChannels = payload.bookedCredit.total;
-  const totalBookedAttributedToRows = sequences.reduce((sum, row) => sum + row.canonicalBookedCalls, 0);
+  const totalBookedAttributedToRows = sequences.reduce(
+    (sum, row) => sum + row.canonicalBookedCalls,
+    0,
+  );
   const attribution = payload.provenance.sequenceBookedAttribution;
   const unattributedCalls =
-    attribution?.unattributedCalls ?? Math.max(0, totalBookedAllChannels - totalBookedAttributedToRows);
+    attribution?.unattributedCalls ??
+    Math.max(0, totalBookedAllChannels - totalBookedAttributedToRows);
   const totalBookedAfterReply = attribution?.strictSmsReplyLinkedCalls ?? 0;
-  const totalBookedNonSmsOrUnknown = attribution?.nonSmsOrUnknownCalls ?? unattributedCalls;
+  const totalBookedNonSmsOrUnknown =
+    attribution?.nonSmsOrUnknownCalls ?? unattributedCalls;
 
   return {
     totalBookedAllChannels,
@@ -245,18 +289,26 @@ export const computeSequenceHeaderMetrics = (
   };
 };
 
-export const computeInsightsBookedBreakdown = (payload: SalesMetricsV2): InsightsBookedBreakdown => {
+export const computeInsightsBookedBreakdown = (
+  payload: SalesMetricsV2,
+): InsightsBookedBreakdown => {
   const bookedTotalAllChannels = payload.bookedCredit.total;
-  const bookedSmsLinkedStrict = payload.provenance.sequenceBookedAttribution?.strictSmsReplyLinkedCalls ?? 0;
+  const bookedSmsLinkedStrict =
+    payload.provenance.sequenceBookedAttribution?.strictSmsReplyLinkedCalls ??
+    0;
   const bookedSelf = payload.bookedCredit.selfBooked;
-  const bookedNonSmsOrUnknown = payload.provenance.sequenceBookedAttribution?.nonSmsOrUnknownCalls ?? 0;
+  const bookedNonSmsOrUnknown =
+    payload.provenance.sequenceBookedAttribution?.nonSmsOrUnknownCalls ?? 0;
 
   return {
     bookedTotalAllChannels,
     bookedSmsLinkedStrict,
     bookedSelf,
     bookedNonSmsOrUnknown,
-    bookedNonSmsOrUnknownExcludingSelf: Math.max(0, bookedNonSmsOrUnknown - bookedSelf),
+    bookedNonSmsOrUnknownExcludingSelf: Math.max(
+      0,
+      bookedNonSmsOrUnknown - bookedSelf,
+    ),
   };
 };
 

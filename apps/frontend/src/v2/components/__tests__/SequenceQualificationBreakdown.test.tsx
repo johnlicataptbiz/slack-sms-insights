@@ -47,16 +47,24 @@ describe('SequenceQualificationBreakdown', () => {
 
   it('renders loading state', () => {
     render(<SequenceQualificationBreakdown items={[]} isLoading={true} />);
-    expect(screen.getByText('Loading qualification data...')).toBeInTheDocument();
+    expect(
+      screen.getByText('Loading qualification data...'),
+    ).toBeInTheDocument();
   });
 
   it('renders empty state', () => {
     render(<SequenceQualificationBreakdown items={[]} isLoading={false} />);
-    expect(screen.getByText('No qualification data available for the selected time period.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'No qualification data available for the selected time period.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('renders sequence data and handles expansion', () => {
-    render(<SequenceQualificationBreakdown items={mockItems} isLoading={false} />);
+    render(
+      <SequenceQualificationBreakdown items={mockItems} isLoading={false} />,
+    );
 
     // Sequence should be visible
     expect(screen.getByText('Test Sequence')).toBeInTheDocument();

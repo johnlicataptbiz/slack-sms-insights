@@ -37,7 +37,10 @@ export interface KpiCardProps {
 /**
  * Sparkline visualization using Unicode block characters
  */
-const Sparkline = ({ trend, color }: { trend: ('up' | 'down' | 'stable')[]; color: string }) => {
+const Sparkline = ({
+  trend,
+  color,
+}: { trend: ('up' | 'down' | 'stable')[]; color: string }) => {
   if (!trend || trend.length === 0) return null;
 
   const blocks = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -47,13 +50,19 @@ const Sparkline = ({ trend, color }: { trend: ('up' | 'down' | 'stable')[]; colo
     .map((direction, index) => {
       const baseHeight = direction === 'up' ? 6 : direction === 'down' ? 2 : 4;
       const variation = Math.sin(index * 0.5) * 1;
-      const heightIndex = Math.floor(Math.max(0, Math.min(7, baseHeight + variation)));
+      const heightIndex = Math.floor(
+        Math.max(0, Math.min(7, baseHeight + variation)),
+      );
       return blocks[heightIndex];
     })
     .join('');
 
   return (
-    <span className="font-mono text-xs tracking-tight" style={{ color }} title={trend.join(', ')}>
+    <span
+      className="font-mono text-xs tracking-tight"
+      style={{ color }}
+      title={trend.join(', ')}
+    >
       {sparkline}
     </span>
   );
@@ -99,7 +108,9 @@ const ProgressBar = ({
 /**
  * Trend arrow indicator
  */
-const TrendIndicator = ({ direction }: { direction: 'up' | 'down' | 'stable' }) => {
+const TrendIndicator = ({
+  direction,
+}: { direction: 'up' | 'down' | 'stable' }) => {
   const config = {
     up: { symbol: '↑', color: colors.success[500] },
     down: { symbol: '↓', color: colors.error[500] },
@@ -109,7 +120,11 @@ const TrendIndicator = ({ direction }: { direction: 'up' | 'down' | 'stable' }) 
   const { symbol, color } = config[direction];
 
   return (
-    <span className="font-semibold text-sm" style={{ color }} aria-label={`Trend: ${direction}`}>
+    <span
+      className="font-semibold text-sm"
+      style={{ color }}
+      aria-label={`Trend: ${direction}`}
+    >
       {symbol}
     </span>
   );
@@ -118,7 +133,11 @@ const TrendIndicator = ({ direction }: { direction: 'up' | 'down' | 'stable' }) 
 /**
  * Format metric value based on type
  */
-const formatValue = (value: number, format?: MetricData['format'], unit?: string): string => {
+const formatValue = (
+  value: number,
+  format?: MetricData['format'],
+  unit?: string,
+): string => {
   let formatted: string;
 
   switch (format) {
@@ -173,7 +192,10 @@ export const KpiCard = ({ title, metric, icon, className }: KpiCardProps) => {
 
   return (
     <div
-      className={cn('rounded-xl p-4 transition-all duration-200 hover:shadow-lg', className)}
+      className={cn(
+        'rounded-xl p-4 transition-all duration-200 hover:shadow-lg',
+        className,
+      )}
       style={{
         backgroundColor: colors.neutral[0],
         boxShadow: shadows.sm,
@@ -187,7 +209,10 @@ export const KpiCard = ({ title, metric, icon, className }: KpiCardProps) => {
               {icon}
             </span>
           )}
-          <span className="text-sm font-medium" style={{ color: colors.neutral[600] }}>
+          <span
+            className="text-sm font-medium"
+            style={{ color: colors.neutral[600] }}
+          >
             {title}
           </span>
         </div>
@@ -197,7 +222,10 @@ export const KpiCard = ({ title, metric, icon, className }: KpiCardProps) => {
       {/* Value */}
       <div className="flex items-end justify-between mb-3">
         <div>
-          <span className="text-3xl font-bold" style={{ color: colors.neutral[900] }}>
+          <span
+            className="text-3xl font-bold"
+            style={{ color: colors.neutral[900] }}
+          >
             {formatValue(value, format, unit)}
           </span>
 
@@ -205,7 +233,8 @@ export const KpiCard = ({ title, metric, icon, className }: KpiCardProps) => {
             <span
               className="ml-2 text-sm font-medium"
               style={{
-                color: changePercent >= 0 ? colors.success[600] : colors.error[600],
+                color:
+                  changePercent >= 0 ? colors.success[600] : colors.error[600],
               }}
             >
               {changePercent >= 0 ? '+' : ''}
@@ -214,18 +243,26 @@ export const KpiCard = ({ title, metric, icon, className }: KpiCardProps) => {
           )}
         </div>
 
-        {trend && trend.length > 0 && <Sparkline trend={trend} color={colors.primary[500]} />}
+        {trend && trend.length > 0 && (
+          <Sparkline trend={trend} color={colors.primary[500]} />
+        )}
       </div>
 
       {/* Progress Bar (if target exists) */}
       {target !== undefined && (
         <div>
-          <div className="flex justify-between text-xs mb-1" style={{ color: colors.neutral[500] }}>
+          <div
+            className="flex justify-between text-xs mb-1"
+            style={{ color: colors.neutral[500] }}
+          >
             <span>Progress</span>
             <span>{progressPercent?.toFixed(0)}%</span>
           </div>
           <ProgressBar value={value} max={target} color={progressColor} />
-          <div className="flex justify-between text-xs mt-1" style={{ color: colors.neutral[400] }}>
+          <div
+            className="flex justify-between text-xs mt-1"
+            style={{ color: colors.neutral[400] }}
+          >
             <span>0</span>
             <span>Target: {formatValue(target, format, unit)}</span>
           </div>
@@ -258,12 +295,19 @@ export interface MetricsDashboardProps {
   className?: string;
 }
 
-export const MetricsDashboard = ({ metrics, period = 'Today', className }: MetricsDashboardProps) => {
+export const MetricsDashboard = ({
+  metrics,
+  period = 'Today',
+  className,
+}: MetricsDashboardProps) => {
   return (
     <div className={cn('space-y-4', className)}>
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold" style={{ color: colors.neutral[900] }}>
+        <h2
+          className="text-lg font-semibold"
+          style={{ color: colors.neutral[900] }}
+        >
           Key Metrics
         </h2>
         <span

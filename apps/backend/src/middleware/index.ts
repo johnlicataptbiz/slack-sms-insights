@@ -7,10 +7,7 @@ export interface MiddlewareContext {
   logger: Logger;
 }
 
-export type MiddlewareFunction = (
-  context: MiddlewareContext,
-  next: () => Promise<void>
-) => Promise<void>;
+export type MiddlewareFunction = (context: MiddlewareContext, next: () => Promise<void>) => Promise<void>;
 
 export class MiddlewareChain {
   private middlewares: MiddlewareFunction[] = [];
@@ -24,7 +21,7 @@ export class MiddlewareChain {
     req: IncomingMessage,
     res: ServerResponse,
     logger: Logger,
-    finalHandler: () => Promise<void>
+    finalHandler: () => Promise<void>,
   ): Promise<void> {
     let index = 0;
 
@@ -97,7 +94,7 @@ export const corsMiddleware: MiddlewareFunction = async (context, next) => {
 
 // Error handling middleware
 export const errorHandlingMiddleware = (
-  errorHandler: (error: unknown, req: IncomingMessage, res: ServerResponse, logger: Logger) => Promise<void>
+  errorHandler: (error: unknown, req: IncomingMessage, res: ServerResponse, logger: Logger) => Promise<void>,
 ): MiddlewareFunction => {
   return async (context, next) => {
     try {

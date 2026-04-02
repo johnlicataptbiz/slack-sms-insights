@@ -1,0 +1,97 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// [Previous enums and models unchanged...]
+
+// Add missing models for compilation
+
+model MondayBoardRegistry {
+  board_id               String    @id
+  board_label            String
+  board_class            String
+  metric_grain           String
+  include_in_funnel      Boolean   @default(false)
+  include_in_exec        Boolean   @default(false)
+  active                 Boolean   @default(true)
+  owner_team             String?
+  notes                  String?
+  created_at             DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  last_sync_completed_at DateTime? @db.Timestamptz(6)
+  last_sync_started_at   DateTime? @db.Timestamptz(6)
+  last_sync_error_at     DateTime? @db.Timestamptz(6)
+
+  @@map("monday_board_registry")
+}
+
+model ActorDirectory {
+  canonical_name String   @id
+  role           String
+  aliases        String[] @default([])
+  active         Boolean  @default(true)
+  notes          String?
+  created_at     DateTime @default(now()) @db.Timestamptz(6)
+  updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@map("actor_directory")
+}
+
+model FactSmsDaily {
+  day              DateTime @db.Date
+  rep_id           String
+  messages_sent    Int      @default(0)
+  unique_contacted Int      @default(0)
+  replies_received Int      @default(0)
+  opt_outs         Int      @default(0)
+
+  @@id([day, rep_id])
+  @@map("fact_sms_daily")
+}
+
+model FactLeadQualityDaily {
+  day                      DateTime @db.Date
+  sequence_id              String   @db.Uuid
+  rep_id                   String
+  leads_count              Int      @default(0)
+  progress_step_0_count    Int      @default(0)
+  progress_step_1_count    Int      @default(0)
+  progress_step_2_count    Int      @default(0)
+  progress_step_3_count    Int      @default(0)
+  progress_step_4_count    Int      @default(0)
+  revenue_mix_mostly_cash  Int      @default(0)
+  revenue_mix_mostly_ins   Int      @default(0)
+  revenue_mix_balanced     Int      @default(0)
+  revenue_mix_unknown      Int      @default(0)
+  employment_full_time     Int      @default(0)
+  employment_part_time     Int      @default(0)
+  employment_unknown       Int      @default(0)
+  coaching_interest_high   Int      @default(0)
+  coaching_interest_medium Int      @default(0)
+  coaching_interest_low    Int      @default(0)
+  coaching_interest_unknown Int     @default(0)
+
+  @@id([day, sequence_id, rep_id])
+  @@map("fact_lead_quality_daily")
+}
+
+model FactSequenceFunnelDaily {
+  day                 DateTime @db.Date
+  sequence_id         String   @db.Uuid
+  rep_id              String
+  new_leads_contacted Int      @default(0)
+  leads_replied       Int      @default(0)
+  qualified_leads     Int      @default(0)
+  booked_calls        Int      @default(0)
+  opt_outs            Int      @default(0)
+
+  @@id([day, sequence_id, rep_id])
+  @@map("fact_sequence_funnel_daily")
+}
+
+// [Rest of schema unchanged...]

@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { closeDatabase, initDatabase, initializeSchema } from '../services/db.js';
 import { refreshBookedCallAttribution } from '../services/booked-call-attribution-refresh.js';
+import { closeDatabase, initDatabase, initializeSchema } from '../services/db.js';
 
 const parseIntOr = (value: string | undefined, fallback: number): number => {
   const parsed = Number.parseInt((value || '').trim(), 10);
@@ -46,4 +46,3 @@ main()
   .finally(async () => {
     await closeDatabase();
   });
-

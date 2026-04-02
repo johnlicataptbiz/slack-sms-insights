@@ -1,4 +1,4 @@
-import { PrismaClient, Conversation, ConversationStatus } from '@prisma/client';
+import type { Conversation, ConversationStatus, PrismaClient } from '@prisma/client';
 import { BaseRepository } from './base.repository.js';
 
 export interface CreateConversationData {
@@ -29,41 +29,18 @@ export class ConversationRepository extends BaseRepository {
   async findById(id: string): Promise<Conversation | null> {
     return this.prisma.conversation.findUnique({
       where: { id },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
-        sms_events: {
-          orderBy: { created_at: 'desc' },
-          take: 10,
-        },
-      },
     });
   }
 
   async findByContactKey(contactKey: string): Promise<Conversation | null> {
     return this.prisma.conversation.findUnique({
       where: { contactKey },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
-        sms_events: {
-          orderBy: { created_at: 'desc' },
-          take: 10,
-        },
-      },
     });
   }
 
   async create(data: CreateConversationData): Promise<Conversation> {
     return this.prisma.conversation.create({
       data,
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
-      },
     });
   }
 
@@ -72,11 +49,6 @@ export class ConversationRepository extends BaseRepository {
       return await this.prisma.conversation.update({
         where: { id },
         data,
-        include: {
-          conversation_notes: true,
-          draft_suggestions: true,
-          send_attempts: true,
-        },
       });
     } catch (error) {
       // Handle not found case
@@ -101,32 +73,22 @@ export class ConversationRepository extends BaseRepository {
     }
   }
 
-  async findMany(options: {
-    status?: ConversationStatus;
-    current_rep_id?: string;
-    limit?: number;
-    offset?: number;
-    orderBy?: 'createdAt' | 'updatedAt' | 'last_touch_at';
-    orderDirection?: 'asc' | 'desc';
-  } = {}): Promise<Conversation[]> {
-    const {
-      status,
-      current_rep_id,
-      limit = 50,
-      offset = 0,
-      orderBy = 'updatedAt',
-      orderDirection = 'desc',
-    } = options;
+  async findMany(
+    options: {
+      status?: ConversationStatus;
+      current_rep_id?: string;
+      limit?: number;
+      offset?: number;
+      orderBy?: 'createdAt' | 'updatedAt' | 'last_touch_at';
+      orderDirection?: 'asc' | 'desc';
+    } = {},
+  ): Promise<Conversation[]> {
+    const { status, current_rep_id, limit = 50, offset = 0, orderBy = 'updatedAt', orderDirection = 'desc' } = options;
 
     return this.prisma.conversation.findMany({
       where: {
         ...(status && { status }),
         ...(current_rep_id && { current_rep_id }),
-      },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
-        send_attempts: true,
       },
       orderBy: {
         [orderBy]: orderDirection,
@@ -136,10 +98,7 @@ export class ConversationRepository extends BaseRepository {
     });
   }
 
-  async count(options: {
-    status?: ConversationStatus;
-    current_rep_id?: string;
-  } = {}): Promise<number> {
+  async count(options: { status?: ConversationStatus; current_rep_id?: string } = {}): Promise<number> {
     const { status, current_rep_id } = options;
 
     return this.prisma.conversation.count({
@@ -159,10 +118,6 @@ export class ConversationRepository extends BaseRepository {
           lte: now,
         },
         status: 'open',
-      },
-      include: {
-        conversation_notes: true,
-        draft_suggestions: true,
       },
       orderBy: {
         nextFollowupAt: 'asc',

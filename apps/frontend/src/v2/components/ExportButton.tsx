@@ -1,6 +1,6 @@
 import {
-  autoUpdate,
   FloatingPortal,
+  autoUpdate,
   flip,
   offset,
   shift,
@@ -25,7 +25,13 @@ interface ExportButtonProps {
   disabled?: boolean;
 }
 
-export function ExportButton({ data, filename, columns, onExport, disabled = false }: ExportButtonProps) {
+export function ExportButton({
+  data,
+  filename,
+  columns,
+  onExport,
+  disabled = false,
+}: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { refs, floatingStyles, context } = useFloating({
@@ -94,7 +100,11 @@ export function ExportButton({ data, filename, columns, onExport, disabled = fal
       <AnimatePresence>
         {isOpen && (
           <FloatingPortal>
-            <div ref={refs.setFloating} style={floatingStyles} {...getFloatingProps({ role: 'menu' })}>
+            <div
+              ref={refs.setFloating}
+              style={floatingStyles}
+              {...getFloatingProps({ role: 'menu' })}
+            >
               <motion.div
                 className="V2ExportButton__dropdown"
                 initial={{ opacity: 0, y: -8 }}
@@ -102,20 +112,41 @@ export function ExportButton({ data, filename, columns, onExport, disabled = fal
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.15 }}
               >
-                <button className="V2ExportButton__option" onClick={() => handleExport('csv')} role="menuitem">
-                  <span className="V2ExportButton__optionIcon" aria-hidden="true">
+                <button
+                  className="V2ExportButton__option"
+                  onClick={() => handleExport('csv')}
+                  role="menuitem"
+                >
+                  <span
+                    className="V2ExportButton__optionIcon"
+                    aria-hidden="true"
+                  >
                     📊
                   </span>
                   <span>Export as CSV</span>
                 </button>
-                <button className="V2ExportButton__option" onClick={() => handleExport('json')} role="menuitem">
-                  <span className="V2ExportButton__optionIcon" aria-hidden="true">
+                <button
+                  className="V2ExportButton__option"
+                  onClick={() => handleExport('json')}
+                  role="menuitem"
+                >
+                  <span
+                    className="V2ExportButton__optionIcon"
+                    aria-hidden="true"
+                  >
                     {}
                   </span>
                   <span>Export as JSON</span>
                 </button>
-                <button className="V2ExportButton__option" onClick={() => handleExport('pdf')} role="menuitem">
-                  <span className="V2ExportButton__optionIcon" aria-hidden="true">
+                <button
+                  className="V2ExportButton__option"
+                  onClick={() => handleExport('pdf')}
+                  role="menuitem"
+                >
+                  <span
+                    className="V2ExportButton__optionIcon"
+                    aria-hidden="true"
+                  >
                     📄
                   </span>
                   <span>Export as PDF</span>
@@ -129,12 +160,20 @@ export function ExportButton({ data, filename, columns, onExport, disabled = fal
   );
 }
 
-function exportAsCSV(data: unknown[], filename: string, columns?: Array<{ key: string; label: string }>) {
+function exportAsCSV(
+  data: unknown[],
+  filename: string,
+  columns?: Array<{ key: string; label: string }>,
+) {
   if (data.length === 0) return;
 
-  const headers = columns ? columns.map((c) => c.label) : Object.keys(data[0] as object);
+  const headers = columns
+    ? columns.map((c) => c.label)
+    : Object.keys(data[0] as object);
 
-  const keys = columns ? columns.map((c) => c.key) : Object.keys(data[0] as object);
+  const keys = columns
+    ? columns.map((c) => c.key)
+    : Object.keys(data[0] as object);
 
   const csvContent = [
     headers.join(','),
@@ -157,11 +196,19 @@ function exportAsJSON(data: unknown[], filename: string) {
   downloadFile(jsonContent, `${filename}.json`, 'application/json');
 }
 
-async function exportAsPDF(data: unknown[], filename: string, columns?: Array<{ key: string; label: string }>) {
+async function exportAsPDF(
+  data: unknown[],
+  filename: string,
+  columns?: Array<{ key: string; label: string }>,
+) {
   // Simple HTML-to-PDF using print
-  const headers = columns ? columns.map((c) => c.label) : Object.keys(data[0] as object);
+  const headers = columns
+    ? columns.map((c) => c.label)
+    : Object.keys(data[0] as object);
 
-  const keys = columns ? columns.map((c) => c.key) : Object.keys(data[0] as object);
+  const keys = columns
+    ? columns.map((c) => c.key)
+    : Object.keys(data[0] as object);
 
   const html = `
     <!DOCTYPE html>

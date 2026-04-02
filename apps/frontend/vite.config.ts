@@ -1,20 +1,23 @@
+import react from '@vitejs/plugin-react';
 /// <reference types="vitest" />
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
-import tailwindcss from "@tailwindcss/vite";
-import path from "path";
+import { defineConfig } from 'vite';
+
+import path from 'path';
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react()],
+  css: {
+    postcss: {},
+  },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
-      "@/v2": path.resolve(__dirname, "./src/v2"),
-      "~types": path.resolve(__dirname, "./src/types"),
-      "~components": path.resolve(__dirname, "./src/components"),
-      "~features": path.resolve(__dirname, "./src/features"),
-      "~lib": path.resolve(__dirname, "./src/lib"),
-      "~utils": path.resolve(__dirname, "./src/utils"),
+      '@': path.resolve(__dirname, './src'),
+      '@/v2': path.resolve(__dirname, './src/v2'),
+      '~types': path.resolve(__dirname, './src/types'),
+      '~components': path.resolve(__dirname, './src/components'),
+      '~features': path.resolve(__dirname, './src/features'),
+      '~lib': path.resolve(__dirname, './src/lib'),
+      '~utils': path.resolve(__dirname, './src/utils'),
     },
   },
   server: {
@@ -22,8 +25,8 @@ export default defineConfig({
       ? undefined
       : {
           // Local dev: avoid CORS by proxying API calls to the backend.
-          "/api": {
-            target: process.env.VITE_API_TARGET ?? "http://localhost:3001",
+          '/api': {
+            target: process.env.VITE_API_TARGET ?? 'http://localhost:3001',
             changeOrigin: true,
             ws: true,
             // When proxying to a remote production target the browser sends
@@ -32,8 +35,8 @@ export default defineConfig({
             ...(process.env.VITE_API_TARGET
               ? {
                   configure: (proxy) => {
-                    proxy.on("proxyReq", (proxyReq) => {
-                      proxyReq.setHeader("Origin", "https://ptbizsms.com");
+                    proxy.on('proxyReq', (proxyReq) => {
+                      proxyReq.setHeader('Origin', 'https://ptbizsms.com');
                     });
                   },
                 }
@@ -42,28 +45,28 @@ export default defineConfig({
         },
   },
   build: {
-    outDir: "dist",
-    target: "esnext",
+    outDir: 'dist',
+    target: 'esnext',
     // Code splitting for better caching and reduced initial load
     rollupOptions: {
       output: {
         manualChunks: {
           // Vendor chunks - rarely change, cached well
-          "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-query": ["@tanstack/react-query"],
-          "vendor-motion": ["framer-motion"],
-          "vendor-ui": ["sonner", "clsx", "tailwind-merge"],
-          "vendor-firebase": ["firebase/app", "firebase/analytics"],
-          "vendor-three": ["three", "@react-three/fiber", "@react-three/drei"],
-          "vendor-charts": ["recharts"],
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-motion': ['framer-motion'],
+          'vendor-ui': ['sonner', 'clsx', 'tailwind-merge'],
+          'vendor-firebase': ['firebase/app', 'firebase/analytics'],
+          'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
+          'vendor-charts': ['recharts'],
           // App chunks
-          "v2-pages": [
-            "./src/v2/pages/InsightsV2.tsx",
-            "./src/v2/pages/SequencesV2.tsx",
-            "./src/v2/pages/RepV2.tsx",
-            "./src/v2/pages/RunsV2.tsx",
+          'v2-pages': [
+            './src/v2/pages/InsightsV2.tsx',
+            './src/v2/pages/SequencesV2.tsx',
+            './src/v2/pages/RepV2.tsx',
+            './src/v2/pages/RunsV2.tsx',
           ],
-          "v2-inbox": ["./src/v2/pages/InboxV2.tsx"],
+          'v2-inbox': ['./src/v2/pages/InboxV2.tsx'],
         },
       },
     },
@@ -72,7 +75,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "jsdom",
-    setupFiles: "./src/setupTests.ts",
+    environment: 'jsdom',
+    setupFiles: './src/setupTests.ts',
   },
 });

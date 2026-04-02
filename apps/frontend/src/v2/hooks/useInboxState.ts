@@ -78,14 +78,15 @@ export const useInboxState = () => {
   });
 
   // Qualification state
-  const [qualificationState, setQualificationState] = useState<QualificationState>({
-    fullOrPartTime: 'unknown',
-    niche: null,
-    revenueMix: 'unknown',
-    deliveryModel: 'unknown',
-    coachingInterest: 'unknown',
-    progressStep: 0,
-  });
+  const [qualificationState, setQualificationState] =
+    useState<QualificationState>({
+      fullOrPartTime: 'unknown',
+      niche: null,
+      revenueMix: 'unknown',
+      deliveryModel: 'unknown',
+      coachingInterest: 'unknown',
+      progressStep: 0,
+    });
 
   // Escalation state
   const [escalationState, setEscalationState] = useState<EscalationState>({
@@ -108,17 +109,23 @@ export const useInboxState = () => {
     setUIState((prev) => ({ ...prev, ...updates }));
   }, []);
 
-  const updateQualification = useCallback((updates: Partial<QualificationState>) => {
-    setQualificationState((prev) => ({ ...prev, ...updates }));
-  }, []);
+  const updateQualification = useCallback(
+    (updates: Partial<QualificationState>) => {
+      setQualificationState((prev) => ({ ...prev, ...updates }));
+    },
+    [],
+  );
 
   const updateEscalation = useCallback((updates: Partial<EscalationState>) => {
     setEscalationState((prev) => ({ ...prev, ...updates }));
   }, []);
 
-  const updateSelectionState = useCallback((updates: Partial<SelectionState>) => {
-    setSelectionState((prev) => ({ ...prev, ...updates }));
-  }, []);
+  const updateSelectionState = useCallback(
+    (updates: Partial<SelectionState>) => {
+      setSelectionState((prev) => ({ ...prev, ...updates }));
+    },
+    [],
+  );
 
   // Shortcut functions for common operations
   const selectConversation = useCallback(

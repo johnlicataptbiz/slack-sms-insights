@@ -147,7 +147,12 @@
 
 /* ─── Issue #11: Skeleton Loaders ───────────────────────────────────────────── */
 .V2Skeleton {
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0%, rgba(0, 0, 0, 0.09) 50%, rgba(0, 0, 0, 0.06) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 0%,
+    rgba(0, 0, 0, 0.09) 50%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
 }

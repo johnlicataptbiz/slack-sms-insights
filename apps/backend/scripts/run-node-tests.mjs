@@ -1,6 +1,6 @@
+import { spawnSync } from 'node:child_process';
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { spawnSync } from 'node:child_process';
 
 const root = process.cwd();
 const testsRoot = join(root, 'tests');

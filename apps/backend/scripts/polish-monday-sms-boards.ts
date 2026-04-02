@@ -8,8 +8,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { queryBoardColumns } from '../services/monday-client.js';
 import { findMissingBoardColumns, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
+import { queryBoardColumns } from '../services/monday-client.js';
 
 type ColumnCreationResult = {
   title: string;
@@ -90,7 +90,10 @@ async function createColumn(
   return Boolean(result.data?.create_column?.id);
 }
 
-async function repairBoard(boardKey: keyof typeof mondaySmsBoardSchemas, boardId: string): Promise<ColumnCreationResult[]> {
+async function repairBoard(
+  boardKey: keyof typeof mondaySmsBoardSchemas,
+  boardId: string,
+): Promise<ColumnCreationResult[]> {
   const schema = mondaySmsBoardSchemas[boardKey];
   const existingColumns = await queryBoardColumns(boardId);
   const missingColumns = findMissingBoardColumns(existingColumns, schema);

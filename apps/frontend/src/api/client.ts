@@ -69,9 +69,13 @@ export const apiFetch = async <T>(
 
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
-  if (!headers.has('Content-Type') && init.body) headers.set('Content-Type', 'application/json');
+  if (!headers.has('Content-Type') && init.body)
+    headers.set('Content-Type', 'application/json');
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  if ((init.method || 'GET').toUpperCase() !== 'GET' && (init.method || 'GET').toUpperCase() !== 'HEAD') {
+  if (
+    (init.method || 'GET').toUpperCase() !== 'GET' &&
+    (init.method || 'GET').toUpperCase() !== 'HEAD'
+  ) {
     const csrfToken = getCsrfToken();
     if (csrfToken && !headers.has('X-CSRF-Token')) {
       headers.set('X-CSRF-Token', csrfToken);
@@ -89,7 +93,10 @@ export const apiFetch = async <T>(
   // If caller provided a signal, abort our controller when theirs aborts.
   if (init.signal) {
     if (init.signal.aborted) controller.abort();
-    else init.signal.addEventListener('abort', () => controller.abort(), { once: true });
+    else
+      init.signal.addEventListener('abort', () => controller.abort(), {
+        once: true,
+      });
   }
 
   let res: Response;
@@ -102,7 +109,10 @@ export const apiFetch = async <T>(
     });
   } catch (e) {
     if (controller.signal.aborted) {
-      throw new ApiError(`Request timed out after ${timeoutMs}ms`, 408, { timeoutMs, path });
+      throw new ApiError(`Request timed out after ${timeoutMs}ms`, 408, {
+        timeoutMs,
+        path,
+      });
     }
     throw e;
   } finally {
@@ -113,7 +123,9 @@ export const apiFetch = async <T>(
   const isJson = contentType.includes('application/json');
   const isHtml = contentType.includes('text/html');
 
-  const body = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
+  const body = isJson
+    ? await res.json().catch(() => null)
+    : await res.text().catch(() => null);
 
   // Dev guardrail: if we asked for JSON from /api/* but got HTML, it almost always means
   // the Vite dev proxy isn't active (e.g. VITE_DISABLE_PROXY set) or is targeting the wrong backend.
@@ -127,7 +139,9 @@ export const apiFetch = async <T>(
 
   if (!res.ok) {
     const message =
-      typeof body === 'object' && body && 'error' in (body as Record<string, unknown>)
+      typeof body === 'object' &&
+      body &&
+      'error' in (body as Record<string, unknown>)
         ? String((body as Record<string, unknown>).error)
         : `Request failed (${res.status})`;
     if (res.status === 401 && _unauthorizedHandler) {
@@ -140,10 +154,20 @@ export const apiFetch = async <T>(
 };
 
 export const client = {
-  get: <T>(path: string, options?: RequestInit) => apiFetch<T>(path, { method: 'GET', ...options }),
+  get: <T>(path: string, options?: RequestInit) =>
+    apiFetch<T>(path, { method: 'GET', ...options }),
   post: <T>(path: string, body: unknown, options?: RequestInit) =>
-    apiFetch<T>(path, { method: 'POST', body: JSON.stringify(body), ...options }),
+    apiFetch<T>(path, {
+      method: 'POST',
+      body: JSON.stringify(body),
+      ...options,
+    }),
   put: <T>(path: string, body: unknown, options?: RequestInit) =>
-    apiFetch<T>(path, { method: 'PUT', body: JSON.stringify(body), ...options }),
-  delete: <T>(path: string, options?: RequestInit) => apiFetch<T>(path, { method: 'DELETE', ...options }),
+    apiFetch<T>(path, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      ...options,
+    }),
+  delete: <T>(path: string, options?: RequestInit) =>
+    apiFetch<T>(path, { method: 'DELETE', ...options }),
 };

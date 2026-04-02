@@ -3,9 +3,9 @@
  * React 19: ref-as-prop, useOptimistic for real-time updates, auto-scroll
  */
 
-import { useEffect, useOptimistic, useRef, useTransition } from 'react';
 import { cn } from '@/lib/utils';
 import type { UseInboxMessagesReturn } from '@/v2/hooks/useInboxMessages';
+import { useEffect, useOptimistic, useRef, useTransition } from 'react';
 
 interface MessageThreadProps {
   messages: UseInboxMessagesReturn;
@@ -32,9 +32,13 @@ function MessageBubble({
 
   return (
     <div
-      className={cn('flex gap-2 animate-message-in', isOutbound ? 'justify-end' : 'justify-start')}
+      className={cn(
+        'flex gap-2 animate-message-in',
+        isOutbound ? 'justify-end' : 'justify-start',
+      )}
       style={{
-        animation: 'messageSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        animation:
+          'messageSlideIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         opacity: 0,
       }}
     >
@@ -83,18 +87,21 @@ export function MessageThread({
   const baseMessages = messages.deduplicatedMessages ?? [];
 
   // Optimistic: surface any in-flight message immediately
-  const [optimisticMessages, addOptimistic] = useOptimistic(baseMessages, (current, newText: string) => [
-    ...current,
-    {
-      id: `opt-${Date.now()}`,
-      conversationId: '',
-      text: newText,
-      timestamp: Date.now(),
-      senderPhone: '',
-      direction: 'outbound' as const,
-      isPending: true,
-    },
-  ]);
+  const [optimisticMessages, addOptimistic] = useOptimistic(
+    baseMessages,
+    (current, newText: string) => [
+      ...current,
+      {
+        id: `opt-${Date.now()}`,
+        conversationId: '',
+        text: newText,
+        timestamp: Date.now(),
+        senderPhone: '',
+        direction: 'outbound' as const,
+        isPending: true,
+      },
+    ],
+  );
 
   // Expose addOptimistic for parent via imperative handle pattern
   useEffect(() => {
@@ -115,7 +122,10 @@ export function MessageThread({
 
   if (optimisticMessages.length === 0) {
     return (
-      <div ref={ref} className="flex h-full items-center justify-center text-muted-foreground">
+      <div
+        ref={ref}
+        className="flex h-full items-center justify-center text-muted-foreground"
+      >
         <p className="text-sm">No messages yet. Send one to get started.</p>
       </div>
     );
@@ -125,9 +135,11 @@ export function MessageThread({
     <div
       ref={(node) => {
         // Support both the scroll ref and any forwarded ref
-        (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+        (scrollRef as React.MutableRefObject<HTMLDivElement | null>).current =
+          node;
         if (typeof ref === 'function') ref(node);
-        else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+        else if (ref)
+          (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       className="flex flex-col gap-2 overflow-y-auto p-4"
     >
@@ -137,7 +149,9 @@ export function MessageThread({
           text={message.text}
           direction={message.direction}
           timestamp={message.timestamp}
-          isPending={'isPending' in message ? Boolean(message.isPending) : false}
+          isPending={
+            'isPending' in message ? Boolean(message.isPending) : false
+          }
           onSelect={() => message.id && onLineSelect(message.id)}
         />
       ))}

@@ -20,7 +20,9 @@ export function ResponseTimeChart({ buckets }: Props) {
               className="ResponseTimeChart__bar"
               style={{
                 height: `${heightPercent}%`,
-                backgroundColor: isHigh ? 'var(--color-error)' : 'var(--color-primary)',
+                backgroundColor: isHigh
+                  ? 'var(--color-error)'
+                  : 'var(--color-primary)',
                 opacity: 0.8 + heightPercent / 500,
               }}
             />

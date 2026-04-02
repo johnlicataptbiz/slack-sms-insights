@@ -14,7 +14,7 @@
  * - Clear error logging when validation fails
  */
 
-import { z } from "zod";
+import { z } from 'zod';
 
 // ============================================================================
 // CONVERSATION SCHEMAS
@@ -28,7 +28,7 @@ export const ConversationListSelectSchema = z.object({
   id: z.string().uuid(),
   contactKey: z.string(),
   current_rep_id: z.string().nullable(),
-  status: z.enum(["open", "closed", "dnc"]),
+  status: z.enum(['open', 'closed', 'dnc']),
   last_touch_at: z.date().nullable(),
   last_inbound_at: z.date().nullable(),
   last_outbound_at: z.date().nullable(),
@@ -37,26 +37,21 @@ export const ConversationListSelectSchema = z.object({
   updated_at: z.date(),
 });
 
-export type ConversationListSelect = z.infer<
-  typeof ConversationListSelectSchema
->;
+export type ConversationListSelect = z.infer<typeof ConversationListSelectSchema>;
 
 /**
  * Full conversation details with all fields
  * Used for detail views and API responses
  */
-export const ConversationDetailSelectSchema =
-  ConversationListSelectSchema.extend({
-    contact_id: z.string().nullable(),
-    contact_phone: z.string().nullable(),
-    next_followup_due_at: z.date().nullable(),
-    first_engagement_at: z.date().nullable(),
-    metadata_updated_at: z.date(),
-  });
+export const ConversationDetailSelectSchema = ConversationListSelectSchema.extend({
+  contact_id: z.string().nullable(),
+  contact_phone: z.string().nullable(),
+  next_followup_due_at: z.date().nullable(),
+  first_engagement_at: z.date().nullable(),
+  metadata_updated_at: z.date(),
+});
 
-export type ConversationDetailSelect = z.infer<
-  typeof ConversationDetailSelectSchema
->;
+export type ConversationDetailSelect = z.infer<typeof ConversationDetailSelectSchema>;
 
 // ============================================================================
 // SMS EVENT SCHEMAS
@@ -72,8 +67,8 @@ export const SmsEventListSelectSchema = z.object({
   contact_id: z.string().nullable(),
   contact_phone: z.string().nullable(),
   normalized_phone: z.string().nullable(),
-  direction: z.enum(["inbound", "outbound", "unknown"]),
-  body: z.string().min(1, "SMS body cannot be empty after Phase 2 backfill"),
+  direction: z.enum(['inbound', 'outbound', 'unknown']),
+  body: z.string().min(1, 'SMS body cannot be empty after Phase 2 backfill'),
   event_ts: z.date(),
   sequence_id: z.string().nullable(),
   created_at: z.date(),
@@ -117,9 +112,7 @@ export const InboxContactProfileSelectSchema = z.object({
   profile_updated_at: z.date(),
 });
 
-export type InboxContactProfileSelect = z.infer<
-  typeof InboxContactProfileSelectSchema
->;
+export type InboxContactProfileSelect = z.infer<typeof InboxContactProfileSelectSchema>;
 
 // ============================================================================
 // SEND ATTEMPT SCHEMAS
@@ -131,15 +124,7 @@ export type InboxContactProfileSelect = z.infer<
 export const SendAttemptSelectSchema = z.object({
   id: z.string().uuid(),
   conversation_id: z.string().uuid(),
-  status: z.enum([
-    "blocked",
-    "pending",
-    "sent",
-    "failed",
-    "throttled",
-    "delivered",
-    "errored",
-  ]),
+  status: z.enum(['blocked', 'pending', 'sent', 'failed', 'throttled', 'delivered', 'errored']),
   message_body: z.string(),
   sender_identity: z.string().nullable(),
   from_number: z.string().nullable(),
@@ -213,7 +198,7 @@ export type SourceDistribution = z.infer<typeof SourceDistributionSchema>;
 export async function validateResult<T>(
   schema: z.ZodSchema<T>,
   data: unknown,
-  context: string = "database result",
+  context = 'database result',
 ): Promise<T> {
   try {
     return await schema.parseAsync(data);
@@ -233,33 +218,156 @@ export async function validateResult<T>(
 export async function validateBatch<T>(
   schema: z.ZodSchema<T>,
   items: unknown[],
-  context: string = "database results",
+  context = 'database results',
 ): Promise<T[]> {
-  return Promise.all(
-    items.map((item, idx) =>
-      validateResult(schema, item, `${context}[${idx}]`),
-    ),
-  );
+  return Promise.all(items.map((item, idx) => validateResult(schema, item, `${context}[${idx}]`)));
 }
 
 // ============================================================================
 // ARRAY SCHEMAS (for .findMany results)
 // ============================================================================
 
-export const ConversationListArraySchema = z.array(
-  ConversationListSelectSchema,
-);
+export const ConversationListArraySchema = z.array(ConversationListSelectSchema);
 export type ConversationListArray = z.infer<typeof ConversationListArraySchema>;
 
 export const SmsEventListArraySchema = z.array(SmsEventListSelectSchema);
 export type SmsEventListArray = z.infer<typeof SmsEventListArraySchema>;
 
-export const InboxContactProfileArraySchema = z.array(
-  InboxContactProfileSelectSchema,
-);
-export type InboxContactProfileArray = z.infer<
-  typeof InboxContactProfileArraySchema
->;
+export const InboxContactProfileArraySchema = z.array(InboxContactProfileSelectSchema);
+export type InboxContactProfileArray = z.infer<typeof InboxContactProfileArraySchema>;
 
 export const SendAttemptArraySchema = z.array(SendAttemptSelectSchema);
 export type SendAttemptArray = z.infer<typeof SendAttemptArraySchema>;
+
+// ============================================================================
+// SELECT PATTERN SCHEMAS (Phase 3 Optimization)
+// ============================================================================
+
+/**
+ * Optimized SELECT pattern for conversation detail views
+ * Reduces payload from ~50-100 fields to ~15 fields
+ */
+export const ConversationDetailSelectPattern = {
+  id: true,
+  contactKey: true,
+  status: true,
+  last_touch_at: true,
+  conversation_notes: {
+    select: {
+      id: true,
+      author: true,
+      text: true,
+      created_at: true,
+    },
+  },
+  draft_suggestions: {
+    select: {
+      id: true,
+      suggestion: true,
+      created_at: true,
+    },
+  },
+  sms_events: {
+    select: {
+      id: true,
+      direction: true,
+      body: true,
+      event_ts: true,
+    },
+    orderBy: { event_ts: 'desc' },
+    take: 10,
+  },
+  send_attempts: {
+    select: {
+      id: true,
+      status: true,
+      created_at: true,
+    },
+    where: { status: { in: ['failed', 'blocked'] } },
+  },
+} as const;
+
+/**
+ * Zod schema for validating conversation SELECT patterns
+ */
+export const ConversationSelectSchema = z.object({
+  id: z.boolean().optional(),
+  contactKey: z.boolean().optional(),
+  status: z.boolean().optional(),
+  last_touch_at: z.boolean().optional(),
+  conversation_notes: z
+    .object({
+      select: z.record(z.boolean()),
+    })
+    .optional(),
+  sms_events: z
+    .object({
+      select: z.record(z.boolean()),
+      orderBy: z.record(z.enum(['asc', 'desc'])).optional(),
+      take: z.number().optional(),
+    })
+    .optional(),
+  send_attempts: z
+    .object({
+      select: z.record(z.boolean()),
+      where: z.record(z.any()).optional(),
+    })
+    .optional(),
+});
+
+/**
+ * Optimized SELECT pattern for SMS events list
+ */
+export const SmsEventsListSelectPattern = {
+  id: true,
+  direction: true,
+  body: true,
+  event_ts: true,
+  contact_id: true,
+  normalized_phone: true,
+} as const;
+
+/**
+ * Batch query patterns for concurrent operations
+ */
+export const BatchQueryPatterns = {
+  /**
+   * Fetch multiple conversations with optimized selects
+   */
+  conversationsWithRecentActivity: (conversationIds: string[]) => ({
+    where: { id: { in: conversationIds } },
+    select: {
+      id: true,
+      contactKey: true,
+      status: true,
+      last_touch_at: true,
+      sms_events: {
+        select: {
+          id: true,
+          direction: true,
+          event_ts: true,
+        },
+        orderBy: { event_ts: 'desc' },
+        take: 5,
+      },
+    },
+  }),
+
+  /**
+   * Fetch send attempts for multiple conversations
+   */
+  sendAttemptsForConversations: (conversationIds: string[]) => ({
+    where: {
+      conversation_id: { in: conversationIds },
+      status: { in: ['failed', 'blocked', 'queued'] },
+    },
+    select: {
+      id: true,
+      conversation_id: true,
+      status: true,
+      created_at: true,
+      error_message: true,
+    },
+    orderBy: { created_at: 'desc' },
+  }),
+} as const;

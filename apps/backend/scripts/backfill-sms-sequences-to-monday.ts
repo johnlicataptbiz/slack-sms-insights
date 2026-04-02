@@ -1,18 +1,13 @@
 #!/usr/bin/env tsx
 /**
- * Backfill SMS sequences to Monday.com
- *
- * This script syncs SMS sequence performance data to Monday.com SMS Sequences board.
- * Usage: npx tsx scripts/backfill-sms-sequences-to-monday.ts [--days 90] [--board-id BOARD_ID]
- *
- * @example
- * npx tsx scripts/backfill-sms-sequences-to-monday.ts
- * npx tsx scripts/backfill-sms-sequences-to-monday.ts --days 30
- * npx tsx scripts/backfill-sms-sequences-to-monday.ts --board-id 1234567890
+ * Backfill SMS sequences to Monday.com - TypeScript clean version.
+ * Fixed: getPrisma → getPrismaClient, proper Prisma typing, camelCase models.
  */
 
 import { syncMondaySmsSequencesBoard } from '../services/monday-sms-sequences.js';
-import { getPrisma } from '../services/prisma.js';
+import { getPrismaClient } from '../services/prisma.js';
+import type { Logger } from '@slack/bolt';
+import type { Prisma } from '@prisma/client';
 
 const args = process.argv.slice(2);
 const daysParam = args.find((arg) => arg.startsWith('--days='));
@@ -22,18 +17,18 @@ const daysBack = daysParam ? Number.parseInt(daysParam.split('=')[1], 10) : 90;
 const boardId = boardIdParam ? boardIdParam.split('=')[1] : process.env.MONDAY_SMS_SEQUENCES_BOARD_ID;
 
 if (!boardId) {
-  console.error('Error: MONDAY_SMS_SEQUENCES_BOARD_ID environment variable or --board-id argument is required');
+  console.error('❌ Error: MONDAY_SMS_SEQUENCES_BOARD_ID env var or --board-id required');
   process.exit(1);
 }
 
-async function main() {
+async function main(): Promise<void> {
   console.log('🚀 Starting SMS Sequences backfill to Monday.com');
   console.log(`📅 Days back: ${daysBack}`);
   console.log(`📱 Board ID: ${boardId}`);
   console.log('');
 
-  const prisma = getPrisma();
-  const logger = {
+  const prisma = getPrismaClient();
+  const logger: Logger = {
     info: (msg: string, data?: Record<string, unknown>) => {
       console.log('ℹ️  [INFO]', msg, data ? JSON.stringify(data) : '');
     },
@@ -46,55 +41,51 @@ async function main() {
     error: (msg: string, data?: Record<string, unknown>) => {
       console.error('❌ [ERROR]', msg, data ? JSON.stringify(data) : '');
     },
-  };
+  } as Logger;
 
   try {
-    // Get the cutoff date
     const cutoffDate = new Date();
     cutoffDate.setUTCDate(cutoffDate.getUTCDate() - daysBack);
-    logger.info('Cutoff date', { cutoffDate: cutoffDate.toISOString() });
+    logger.info('Cutoff date set', { cutoffDate: cutoffDate.toISOString() });
 
-    // Count sequence registry records to be synced
-    const sequenceCount = await prisma.sequence_registry.count({
+    // Count active sequences
+    const sequenceCount = await prisma.sequenceRegistry.count({
       where: {
         created_at: {
           gte: cutoffDate,
         },
       },
     });
-    logger.info('Total sequence registry records to sync', { count: sequenceCount });
+    logger.info('Sequence registry records found', { count: sequenceCount });
 
     if (sequenceCount === 0) {
-      console.log('✅ No sequence registry records to sync');
+      console.log('✅ No sequence registry records need syncing');
       return;
     }
 
-    // Sync the board
     console.log('');
-    console.log('🔄 Starting sync...');
+    console.log('🔄 Executing sync...');
     const result = await syncMondaySmsSequencesBoard(boardId, logger, { force: true });
 
     console.log('');
-    console.log('📊 Sync Result:');
+    console.log('📊 Sync Summary:');
     console.log(`   Status: ${result.status}`);
-    console.log(`   Fetched Items: ${result.fetchedItems}`);
-    console.log(`   Upserted Items: ${result.upsertedItems}`);
-    console.log(`   Started At: ${result.startedAt}`);
-    console.log(`   Finished At: ${result.finishedAt}`);
+    console.log(`   Fetched: ${result.fetchedItems}`);
+    console.log(`   Upserted: ${result.upsertedItems}`);
+    console.log(`   Duration: ${result.finishedAt - result.startedAt}ms`);
+    
     if (result.error) {
       console.log(`   Error: ${result.error}`);
     }
 
     if (result.status === 'success') {
-      console.log('');
-      console.log('✅ SMS Sequences backfill completed successfully!');
+      console.log('\n✅ SMS Sequences backfill **COMPLETELY SUCCESSFUL**');
     } else {
-      console.log('');
-      console.log('❌ SMS Sequences backfill failed');
+      console.log('\n❌ Backfill failed');
       process.exit(1);
     }
   } catch (error) {
-    console.error('❌ Backfill failed:', error);
+    console.error('❌ Fatal backfill error:', error);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
@@ -102,3 +93,4 @@ async function main() {
 }
 
 main();
+

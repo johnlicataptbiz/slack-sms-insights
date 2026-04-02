@@ -1,9 +1,9 @@
 import { Analytics } from '@vercel/analytics/react';
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { ApiError, client, setUnauthorizedHandler } from './api/client';
 import { PasswordGate } from './components/PasswordGate';
-import { parseUiMode, type UiMode } from './uiMode';
+import { type UiMode, parseUiMode } from './uiMode';
 
 const V2App = lazy(() => import('./v2/V2App'));
 
@@ -20,11 +20,18 @@ const AppRoutes = () => (
   <BrowserRouter>
     <Routes>
       <Route path="/legacy" element={<Navigate to="/v2/insights" replace />} />
-      <Route path="/legacy/*" element={<Navigate to="/v2/insights" replace />} />
+      <Route
+        path="/legacy/*"
+        element={<Navigate to="/v2/insights" replace />}
+      />
       <Route
         path="/v2/*"
         element={
-          <Suspense fallback={<div className="text-muted-foreground">Loading dashboard...</div>}>
+          <Suspense
+            fallback={
+              <div className="text-muted-foreground">Loading dashboard...</div>
+            }
+          >
             <V2App />
           </Suspense>
         }

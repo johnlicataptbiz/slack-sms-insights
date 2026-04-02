@@ -17,6 +17,7 @@ import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
 import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
+import { HealthController } from './src/controllers/health.controller.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
 const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
@@ -154,6 +155,13 @@ app.error(async (error) => {
         // Continue with request handling
         void (async () => {
           const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
+
+          // Handle health check
+          if (pathname === '/health') {
+            const controller = new HealthController();
+            await controller.execute({ req, res } as unknown as Parameters<typeof controller.execute>[0]);
+            return;
+          }
 
           // Handle API routes
           if (pathname.startsWith('/api/')) {

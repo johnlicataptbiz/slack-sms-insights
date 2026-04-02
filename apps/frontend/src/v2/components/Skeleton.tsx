@@ -11,23 +11,39 @@ interface SkeletonProps {
   className?: string;
 }
 
-export function Skeleton({ width = '100%', height = '1rem', borderRadius = '4px', className = '' }: SkeletonProps) {
+export function Skeleton({
+  width = '100%',
+  height = '1rem',
+  borderRadius = '4px',
+  className = '',
+}: SkeletonProps) {
   return (
     <motion.div
       className={`V2Skeleton ${className}`}
       style={{ width, height, borderRadius }}
       initial={{ opacity: 0.5 }}
       animate={{ opacity: [0.5, 0.8, 0.5] }}
-      transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: 'easeInOut' }}
+      transition={{
+        duration: 1.5,
+        repeat: Number.POSITIVE_INFINITY,
+        ease: 'easeInOut',
+      }}
       aria-hidden="true"
       role="presentation"
     />
   );
 }
 
-export function SkeletonText({ lines = 3, lastLineWidth = '60%' }: { lines?: number; lastLineWidth?: string }) {
+export function SkeletonText({
+  lines = 3,
+  lastLineWidth = '60%',
+}: { lines?: number; lastLineWidth?: string }) {
   return (
-    <div className="V2Skeleton__text" role="presentation" aria-label="Loading content">
+    <div
+      className="V2Skeleton__text"
+      role="presentation"
+      aria-label="Loading content"
+    >
       {Array.from({ length: lines }).map((_, i) => (
         <Skeleton
           key={i}
@@ -42,7 +58,11 @@ export function SkeletonText({ lines = 3, lastLineWidth = '60%' }: { lines?: num
 
 export function SkeletonCard() {
   return (
-    <div className="V2Skeleton__card" role="presentation" aria-label="Loading card">
+    <div
+      className="V2Skeleton__card"
+      role="presentation"
+      aria-label="Loading card"
+    >
       <div className="V2Skeleton__cardHeader">
         <Skeleton width="60%" height="1.25rem" />
         <Skeleton width="2rem" height="1.25rem" borderRadius="50%" />
@@ -58,7 +78,11 @@ export function SkeletonCard() {
 
 export function SkeletonMetricCard() {
   return (
-    <div className="V2Skeleton__metricCard" role="presentation" aria-label="Loading metric">
+    <div
+      className="V2Skeleton__metricCard"
+      role="presentation"
+      aria-label="Loading metric"
+    >
       <div className="V2Skeleton__metricHeader">
         <Skeleton width="70%" height="0.875rem" />
         <Skeleton width="1.5rem" height="1.5rem" borderRadius="50%" />
@@ -71,9 +95,16 @@ export function SkeletonMetricCard() {
   );
 }
 
-export function SkeletonTable({ rows = 5, columns = 4 }: { rows?: number; columns?: number }) {
+export function SkeletonTable({
+  rows = 5,
+  columns = 4,
+}: { rows?: number; columns?: number }) {
   return (
-    <div className="V2Skeleton__table" role="presentation" aria-label="Loading table">
+    <div
+      className="V2Skeleton__table"
+      role="presentation"
+      aria-label="Loading table"
+    >
       <div className="V2Skeleton__tableHeader">
         {Array.from({ length: columns }).map((_, i) => (
           <Skeleton key={i} width={`${100 / columns - 2}%`} height="1rem" />
@@ -83,7 +114,11 @@ export function SkeletonTable({ rows = 5, columns = 4 }: { rows?: number; column
         {Array.from({ length: rows }).map((_, rowIdx) => (
           <div key={rowIdx} className="V2Skeleton__tableRow">
             {Array.from({ length: columns }).map((_, colIdx) => (
-              <Skeleton key={colIdx} width={`${Math.random() * 40 + 40}%`} height="0.875rem" />
+              <Skeleton
+                key={colIdx}
+                width={`${Math.random() * 40 + 40}%`}
+                height="0.875rem"
+              />
             ))}
           </div>
         ))}
@@ -94,7 +129,11 @@ export function SkeletonTable({ rows = 5, columns = 4 }: { rows?: number; column
 
 export function SkeletonInbox() {
   return (
-    <div className="V2Skeleton__inbox" role="presentation" aria-label="Loading inbox">
+    <div
+      className="V2Skeleton__inbox"
+      role="presentation"
+      aria-label="Loading inbox"
+    >
       <div className="V2Skeleton__inboxList">
         {Array.from({ length: 6 }).map((_, i) => (
           <div key={i} className="V2Skeleton__inboxItem">
@@ -117,8 +156,15 @@ export function SkeletonInbox() {
         </div>
         <div className="V2Skeleton__inboxMessages">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`V2Skeleton__message V2Skeleton__message--${i % 2 === 0 ? 'in' : 'out'}`}>
-              <Skeleton width={`${Math.random() * 30 + 50}%`} height="3rem" borderRadius="12px" />
+            <div
+              key={i}
+              className={`V2Skeleton__message V2Skeleton__message--${i % 2 === 0 ? 'in' : 'out'}`}
+            >
+              <Skeleton
+                width={`${Math.random() * 30 + 50}%`}
+                height="3rem"
+                borderRadius="12px"
+              />
             </div>
           ))}
         </div>
@@ -129,7 +175,11 @@ export function SkeletonInbox() {
 
 export function SkeletonDashboard() {
   return (
-    <div className="V2Skeleton__dashboard" role="presentation" aria-label="Loading dashboard">
+    <div
+      className="V2Skeleton__dashboard"
+      role="presentation"
+      aria-label="Loading dashboard"
+    >
       <div className="V2Skeleton__dashboardHeader">
         <Skeleton width="200px" height="2rem" />
         <div className="V2Skeleton__dashboardActions">
@@ -146,11 +196,19 @@ export function SkeletonDashboard() {
 
       <div className="V2Skeleton__panelsGrid">
         <div className="V2Skeleton__panel V2Skeleton__panel--wide">
-          <Skeleton width="40%" height="1.25rem" className="V2Skeleton__panelTitle" />
+          <Skeleton
+            width="40%"
+            height="1.25rem"
+            className="V2Skeleton__panelTitle"
+          />
           <SkeletonTable rows={5} columns={4} />
         </div>
         <div className="V2Skeleton__panel">
-          <Skeleton width="50%" height="1.25rem" className="V2Skeleton__panelTitle" />
+          <Skeleton
+            width="50%"
+            height="1.25rem"
+            className="V2Skeleton__panelTitle"
+          />
           <SkeletonText lines={4} />
         </div>
       </div>

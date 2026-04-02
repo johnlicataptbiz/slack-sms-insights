@@ -1,7 +1,9 @@
 import pkg from '@prisma/client';
+
 const { PrismaClient } = pkg;
+
 import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -10,7 +12,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const envPath = join(__dirname, '.env');
 try {
   const envContent = readFileSync(envPath, 'utf8');
-  envContent.split('\n').forEach(line => {
+  envContent.split('\n').forEach((line) => {
     const [key, ...valueParts] = line.split('=');
     if (key && valueParts.length) {
       process.env[key.trim()] = valueParts.join('=').replace(/^"|"$/g, '').trim();
@@ -29,8 +31,8 @@ async function checkMeredith() {
       where: {
         OR: [
           { text: { contains: 'Meredith', mode: 'insensitive' } },
-          { text: { contains: 'Atkinson', mode: 'insensitive' } }
-        ]
+          { text: { contains: 'Atkinson', mode: 'insensitive' } },
+        ],
       },
       include: {
         booked_call_reactions: true,
@@ -51,10 +53,10 @@ async function checkMeredith() {
       console.log('Event Time:', call.event_ts);
       console.log('Text:', call.text?.substring(0, 100));
       console.log('\n🎯 Reactions:');
-      call.booked_call_reactions.forEach(r => {
+      call.booked_call_reactions.forEach((r) => {
         console.log(`  - ${r.reaction_name} (count: ${r.reaction_count})`);
       });
-      
+
       // Check if there's a Monday push record
       const push = await prisma.monday_booked_call_push.findFirst({
         where: {
@@ -74,7 +76,6 @@ async function checkMeredith() {
       }
       console.log('');
     }
-
   } catch (error) {
     console.error('Error:', error);
   } finally {

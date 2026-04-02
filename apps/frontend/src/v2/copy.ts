@@ -40,11 +40,13 @@ export const V2_TERM_DEFINITIONS: Record<V2TermKey, V2TermDefinition> = {
   },
   callsBookedCreditSlack: {
     label: 'Calls Booked (Setter)',
-    definition: 'Calls this setter booked, credited from Slack booking records.',
+    definition:
+      'Calls this setter booked, credited from Slack booking records.',
   },
   smsBookingHintsDiagnostic: {
     label: 'Internal Booking Signal',
-    definition: 'Internal QA signal only. This is not used for booked-call credit.',
+    definition:
+      'Internal QA signal only. This is not used for booked-call credit.',
   },
   peopleContacted: {
     label: 'People Reached',
@@ -99,6 +101,11 @@ export const V2_TERM_GROUPS: Array<{ title: string; keys: V2TermKey[] }> = [
   },
   {
     title: 'Where Calls Come From',
-    keys: ['manualReplyRate', 'sequenceReplyRate', 'selfBooked', 'sequenceMatchCoverage'],
+    keys: [
+      'manualReplyRate',
+      'sequenceReplyRate',
+      'selfBooked',
+      'sequenceMatchCoverage',
+    ],
   },
 ];

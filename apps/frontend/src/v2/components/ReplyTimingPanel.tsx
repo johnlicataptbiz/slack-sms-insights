@@ -55,7 +55,9 @@ const DayOfWeekChart: React.FC<{
     <div className="ReplyTimingPanel__dayChart">
       {days.map((day) => (
         <div key={day.dayOfWeek} className="ReplyTimingPanel__dayItem">
-          <div className="ReplyTimingPanel__dayLabel">{day.dayOfWeek.slice(0, 3)}</div>
+          <div className="ReplyTimingPanel__dayLabel">
+            {day.dayOfWeek.slice(0, 3)}
+          </div>
           <div className="ReplyTimingPanel__dayBarWrapper">
             <div
               className="ReplyTimingPanel__dayBar"
@@ -64,7 +66,9 @@ const DayOfWeekChart: React.FC<{
                 backgroundColor: getColor(day.replyRatePct),
               }}
             />
-            <span className="ReplyTimingPanel__dayValue">{day.replyRatePct.toFixed(1)}%</span>
+            <span className="ReplyTimingPanel__dayValue">
+              {day.replyRatePct.toFixed(1)}%
+            </span>
           </div>
         </div>
       ))}
@@ -72,10 +76,17 @@ const DayOfWeekChart: React.FC<{
   );
 };
 
-export const ReplyTimingPanel: React.FC<ReplyTimingPanelProps> = ({ timing, sequences }) => {
+export const ReplyTimingPanel: React.FC<ReplyTimingPanelProps> = ({
+  timing,
+  sequences,
+}) => {
   const fastestSequences = useMemo(() => {
     return [...sequences]
-      .filter((s) => s.medianTimeToFirstReplyMinutes !== null && s.medianTimeToFirstReplyMinutes !== undefined)
+      .filter(
+        (s) =>
+          s.medianTimeToFirstReplyMinutes !== null &&
+          s.medianTimeToFirstReplyMinutes !== undefined,
+      )
       .sort(
         (a, b) =>
           (a.medianTimeToFirstReplyMinutes || Number.POSITIVE_INFINITY) -
@@ -87,7 +98,9 @@ export const ReplyTimingPanel: React.FC<ReplyTimingPanelProps> = ({ timing, sequ
   if (!timing) {
     return (
       <V2Panel title="⏱️ Reply Timing Insights" caption="Loading timing data...">
-        <div className="ReplyTimingPanel__loading">Loading reply timing analytics...</div>
+        <div className="ReplyTimingPanel__loading">
+          Loading reply timing analytics...
+        </div>
       </V2Panel>
     );
   }
@@ -103,15 +116,21 @@ export const ReplyTimingPanel: React.FC<ReplyTimingPanelProps> = ({ timing, sequ
         {/* Main Metric */}
         <div className="ReplyTimingPanel__metrics">
           <div className="ReplyTimingPanel__metric">
-            <div className="ReplyTimingPanel__metricValue">{formatDuration(medianTimeToFirstReplyMinutes)}</div>
-            <div className="ReplyTimingPanel__metricLabel">Median Time to First Reply</div>
+            <div className="ReplyTimingPanel__metricValue">
+              {formatDuration(medianTimeToFirstReplyMinutes)}
+            </div>
+            <div className="ReplyTimingPanel__metricLabel">
+              Median Time to First Reply
+            </div>
           </div>
         </div>
 
         {/* Reply Rate by Day of Week */}
         {replyRateByDayOfWeek && replyRateByDayOfWeek.length > 0 && (
           <div className="ReplyTimingPanel__section">
-            <h4 className="ReplyTimingPanel__sectionTitle">Reply Rate by Day of Week</h4>
+            <h4 className="ReplyTimingPanel__sectionTitle">
+              Reply Rate by Day of Week
+            </h4>
             <DayOfWeekChart days={replyRateByDayOfWeek} />
           </div>
         )}
@@ -119,13 +138,22 @@ export const ReplyTimingPanel: React.FC<ReplyTimingPanelProps> = ({ timing, sequ
         {/* Fastest Responding Sequences */}
         {fastestSequences.length > 0 && (
           <div className="ReplyTimingPanel__section">
-            <h4 className="ReplyTimingPanel__sectionTitle">Fastest Responding Sequences</h4>
+            <h4 className="ReplyTimingPanel__sectionTitle">
+              Fastest Responding Sequences
+            </h4>
             <div className="ReplyTimingPanel__sequenceList">
               {fastestSequences.map((seq, index) => (
                 <div key={seq.label} className="ReplyTimingPanel__sequenceItem">
-                  <span className="ReplyTimingPanel__sequenceRank">#{index + 1}</span>
-                  <span className="ReplyTimingPanel__sequenceName" title={seq.label}>
-                    {seq.label.length > 30 ? `${seq.label.slice(0, 27)}...` : seq.label}
+                  <span className="ReplyTimingPanel__sequenceRank">
+                    #{index + 1}
+                  </span>
+                  <span
+                    className="ReplyTimingPanel__sequenceName"
+                    title={seq.label}
+                  >
+                    {seq.label.length > 30
+                      ? `${seq.label.slice(0, 27)}...`
+                      : seq.label}
                   </span>
                   <span className="ReplyTimingPanel__sequenceTime">
                     {formatDuration(seq.medianTimeToFirstReplyMinutes || null)}

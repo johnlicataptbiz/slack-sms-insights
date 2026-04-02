@@ -1,5 +1,11 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Minus,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface MetricSlide {

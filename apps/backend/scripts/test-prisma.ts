@@ -14,10 +14,10 @@ async function testConnection() {
   for (const config of configs) {
     console.log(`--- Testing: ${config.name} ---`);
     try {
-      // @ts-ignore
+      // @ts-expect-error
       const client = new PrismaClient(config.options);
       console.log(`✅ ${config.name}: Constructor accepted.`);
-      
+
       try {
         await client.$connect();
         console.log(`✅ ${config.name}: $connect() successful.`);

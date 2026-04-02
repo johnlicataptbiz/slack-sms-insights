@@ -64,7 +64,7 @@ export function KPIGrid({ data }: KPIGridProps) {
                             <div className="grid grid-cols-2 gap-2">
                               <div className="flex flex-col">
                                 <span className="text-[0.70rem] uppercase text-muted-foreground">Value</span>
-                                <span className="font-bold text-muted-foreground">{payload[0].value}</span>
+                                <span className="font-bold text-muted-foreground">{payload[0]?.value ?? '-'}</span>
                               </div>
                             </div>
                           </div>

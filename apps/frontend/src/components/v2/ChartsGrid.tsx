@@ -1,3 +1,5 @@
+import type { SalesMetricsV2 } from '@/api/v2-types';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Bar,
   BarChart,
@@ -10,8 +12,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { SalesMetricsV2 } from '@/api/v2-types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ChartsGridProps {
   data: SalesMetricsV2;
@@ -39,7 +39,13 @@ export function ChartsGrid({ data }: ChartsGridProps) {
           <ResponsiveContainer width="100%" height={350}>
             <BarChart data={formattedData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="day" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="day"
+                stroke="#888888"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
               <YAxis
                 stroke="#888888"
                 fontSize={12}
@@ -55,8 +61,18 @@ export function ChartsGrid({ data }: ChartsGridProps) {
                 itemStyle={{ color: 'hsl(var(--foreground))' }}
               />
               <Legend />
-              <Bar dataKey="messagesSent" name="Messages Sent" fill="#8884d8" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="repliesReceived" name="Replies" fill="#82ca9d" radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="messagesSent"
+                name="Messages Sent"
+                fill="#8884d8"
+                radius={[4, 4, 0, 0]}
+              />
+              <Bar
+                dataKey="repliesReceived"
+                name="Replies"
+                fill="#82ca9d"
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -69,7 +85,13 @@ export function ChartsGrid({ data }: ChartsGridProps) {
           <ResponsiveContainer width="100%" height={350}>
             <LineChart data={formattedData}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="day" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="day"
+                stroke="#888888"
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+              />
               <YAxis
                 stroke="#888888"
                 fontSize={12}

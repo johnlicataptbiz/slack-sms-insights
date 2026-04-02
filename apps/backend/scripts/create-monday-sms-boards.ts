@@ -71,7 +71,7 @@ async function callMondayApi(query: string, variables?: Record<string, unknown>)
   return response.json();
 }
 
-async function createBoard(boardName: string, boardKind: string = 'public'): Promise<string> {
+async function createBoard(boardName: string, boardKind = 'public'): Promise<string> {
   const query = `
     mutation ($boardName: String!, $boardKind: BoardKind!) {
       create_board (

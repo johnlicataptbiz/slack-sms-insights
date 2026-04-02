@@ -6,17 +6,17 @@
     "apps/backend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=ptbizsms-api\" \"npm run dev --workspace=ptbizsms-dashboard\"",
+    "dev": "concurrently \"npm run dev --workspace=ptbizsms-api\" \"npm run dev --workspace=ptbizsms-dashboard-unified\"",
     "dev:backend": "npm run dev --workspace=ptbizsms-api",
-    "dev:frontend": "npm run dev --workspace=ptbizsms-dashboard",
-    "build": "npm run --workspace=ptbizsms-api build && npm run --workspace=ptbizsms-dashboard build",
+    "dev:frontend": "npm run dev --workspace=ptbizsms-dashboard-unified",
+    "build": "npm run --workspace=ptbizsms-api build && npm run --workspace=ptbizsms-dashboard-unified build",
     "build:backend": "npm run --workspace=ptbizsms-api build",
-    "build:frontend": "npm run --workspace=ptbizsms-dashboard build",
-    "lint": "npm run --workspace=ptbizsms-api lint && npm run --workspace=ptbizsms-dashboard lint",
+    "build:frontend": "npm run --workspace=ptbizsms-dashboard-unified build",
+    "lint": "npm run --workspace=ptbizsms-api lint && npm run --workspace=ptbizsms-dashboard-unified lint",
     "lint:backend": "npm run --workspace=ptbizsms-api lint",
-    "lint:frontend": "npm run --workspace=ptbizsms-dashboard lint",
-    "test": "npm run --workspace=ptbizsms-api test && npm run --workspace=ptbizsms-dashboard test",
-    "typecheck": "npm run --workspace=ptbizsms-dashboard typecheck:v2"
+    "lint:frontend": "npm run --workspace=ptbizsms-dashboard-unified lint",
+    "test": "npm run --workspace=ptbizsms-dashboard-unified test",
+    "typecheck": "npm run --workspace=ptbizsms-api typecheck && npm run --workspace=ptbizsms-dashboard-unified typecheck"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",

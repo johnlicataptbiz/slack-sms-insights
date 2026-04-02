@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { closeDatabase, initDatabase, initializeSchema } from '../services/db.js';
-import { listMondaySyncBoardIds, syncMondayBoard } from '../services/monday-sync.js';
 import { purgeMondayNormalizedRowsForNonFunnelBoards } from '../services/monday-store.js';
+import { listMondaySyncBoardIds, syncMondayBoard } from '../services/monday-sync.js';
 
 type CliOptions = {
   skipSync: boolean;

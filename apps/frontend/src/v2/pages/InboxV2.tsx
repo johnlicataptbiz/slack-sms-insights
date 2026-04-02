@@ -57,17 +57,10 @@ import {
   useV2UpdateObjectionTags,
   useV2UpdateQualification,
 } from '../../api/v2Queries';
-import { Composer } from '../components/Composer';
-import { ConversationList } from '../components/ConversationList';
-import { MessageThread } from '../components/MessageThread';
 import { SkeletonText } from '../components/Skeleton';
 import { V2State } from '../components/V2Primitives';
 import { V2Select, type V2SelectOption } from '../components/V2Select';
-import { useInboxMessages } from '../hooks/useInboxMessages';
-import { useInboxMutations } from '../hooks/useInboxMutations';
 import { useInboxState } from '../hooks/useInboxState';
-import { useInboxSubscription } from '../hooks/useInboxSubscription';
-import { useSetterIntentDetection } from '../hooks/useSetterIntentDetection';
 import { useToast } from '../hooks/useToast';
 
 const LazyEmojiPicker = lazy(async () => ({
@@ -522,6 +515,49 @@ export default function InboxV2() {
   const { filters, uiState, qualificationState, escalationState, selectionState, setFlashMessage } = inboxState;
   const { selectedConversationId, isComposerModalOpen, composerText, sendStatus } = uiState;
   const { updateFilters, updateUIState, updateQualification, updateEscalation, updateSelectionState } = inboxState;
+  const selectedDraftId = uiState.selectedDraftId;
+  const selectedLineKey = uiState.selectedLineKey;
+  const pendingMessageText = uiState.pendingMessageText;
+  const isGuardrailModalOpen = uiState.isGuardrailModalOpen;
+  const crmNotesText = uiState.crmNotesText;
+  const showDoublePitchWarning = uiState.showDoublePitchWarning;
+  const showTemplates = uiState.showTemplates;
+  const isEmojiPickerOpen = uiState.isEmojiPickerOpen;
+  const flashMessage = uiState.flashMessage;
+  const needsReplyOnly = filters.needsReplyOnly;
+  const sortMode = filters.sortMode;
+  const isNarrowComposerViewport = uiState.isNarrowComposerViewport;
+  const manualPanelOpen = uiState.manualPanelOpen;
+  const localObjectionTags = selectionState.localObjectionTags;
+  const localCallOutcome = selectionState.localCallOutcome;
+
+  const resolveNextValue = <T,>(value: T | ((previous: T) => T), previous: T): T =>
+    typeof value === 'function' ? (value as (previous: T) => T)(previous) : value;
+
+  const setSelectedConversationId = (value: string | null) => updateUIState({ selectedConversationId: value });
+  const setComposerText = (value: string) => updateUIState({ composerText: value });
+  const setCrmNotesText = (value: string) => updateUIState({ crmNotesText: value });
+  const setSelectedDraftId = (value: string | null) => updateUIState({ selectedDraftId: value });
+  const setSelectedLineKey = (value: string) => updateUIState({ selectedLineKey: value });
+  const setShowDoublePitchWarning = (value: boolean) => updateUIState({ showDoublePitchWarning: value });
+  const setIsComposerModalOpen = (value: boolean) => updateUIState({ isComposerModalOpen: value });
+  const setPendingMessageText = (value: string | null) => updateUIState({ pendingMessageText: value });
+  const setIsGuardrailModalOpen = (value: boolean) => updateUIState({ isGuardrailModalOpen: value });
+  const setSearch = (value: string) => updateFilters({ search: value });
+  const setNeedsReplyOnly = (value: boolean | ((previous: boolean) => boolean)) =>
+    updateFilters({ needsReplyOnly: resolveNextValue(value, filters.needsReplyOnly) });
+  const setSortMode = (value: 'recent' | 'oldest' | 'urgent' | 'needs_reply') => updateFilters({ sortMode: value });
+  const setShowTemplates = (value: boolean | ((previous: boolean) => boolean)) =>
+    updateUIState({ showTemplates: resolveNextValue(value, uiState.showTemplates) });
+  const setIsEmojiPickerOpen = (value: boolean | ((previous: boolean) => boolean)) =>
+    updateUIState({ isEmojiPickerOpen: resolveNextValue(value, uiState.isEmojiPickerOpen) });
+  const setManualPanelOpen = (value: boolean | ((previous: boolean) => boolean)) =>
+    updateUIState({ manualPanelOpen: resolveNextValue(value, uiState.manualPanelOpen) });
+  const setQualificationState = (
+    value: QualificationStateV2 | ((previous: QualificationStateV2) => QualificationStateV2),
+  ) => updateQualification(resolveNextValue(value, qualificationState));
+  const setLocalObjectionTags = (value: string[]) => updateSelectionState({ localObjectionTags: value });
+  const setLocalCallOutcome = (value: CallOutcomeV2 | null) => updateSelectionState({ localCallOutcome: value });
 
   // Refs for DOM elements and locks
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -780,7 +816,7 @@ export default function InboxV2() {
     // contact) while the user is still looking at the modal they just sent from.
     if (uiState.isComposerModalOpen) return;
 
-    if (!uiState.uiState.selectedConversationId && conversations.length > 0) {
+    if (!uiState.selectedConversationId && conversations.length > 0) {
       inboxState.selectConversation(conversations[0]?.id || null);
       return;
     }
@@ -1257,7 +1293,7 @@ export default function InboxV2() {
       const snoozedUntil = addHours(new Date(), 24).toISOString();
       void snoozeMutation
         .mutateAsync({
-          conversationId: selectedConversationId,
+          conversationId: uiState.selectedConversationId,
           snoozedUntil,
         })
         .then(() => setFlashMessage('Snoozed for 24 hours.'))

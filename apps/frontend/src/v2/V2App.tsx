@@ -1,5 +1,5 @@
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
-import { lazy, Suspense } from 'react';
+import { AnimatePresence, type Variants, motion } from 'framer-motion';
+import { Suspense, lazy } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
@@ -61,9 +61,18 @@ const V2NotFound = () => (
 
 // Error fallback component
 const PageErrorFallback = () => (
-  <motion.div className="V2Page" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-    <V2Panel title="Something went wrong" caption="An error occurred while loading this page.">
-      <V2State kind="error">Please try refreshing the page or contact support if the issue persists.</V2State>
+  <motion.div
+    className="V2Page"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+  >
+    <V2Panel
+      title="Something went wrong"
+      caption="An error occurred while loading this page."
+    >
+      <V2State kind="error">
+        Please try refreshing the page or contact support if the issue persists.
+      </V2State>
     </V2Panel>
   </motion.div>
 );
@@ -113,8 +122,14 @@ function AnimatedRoutes() {
               </ErrorBoundary>
             }
           />
-          <Route path="rep/jack" element={<Navigate to="/v2/insights?rep=jack" replace />} />
-          <Route path="rep/brandon" element={<Navigate to="/v2/insights?rep=brandon" replace />} />
+          <Route
+            path="rep/jack"
+            element={<Navigate to="/v2/insights?rep=jack" replace />}
+          />
+          <Route
+            path="rep/brandon"
+            element={<Navigate to="/v2/insights?rep=brandon" replace />}
+          />
           <Route
             path="sequences"
             element={
@@ -123,7 +138,10 @@ function AnimatedRoutes() {
               </ErrorBoundary>
             }
           />
-          <Route path="attribution" element={<Navigate to="/v2/sequences" replace />} />
+          <Route
+            path="attribution"
+            element={<Navigate to="/v2/sequences" replace />}
+          />
           <Route path="" element={<Navigate to="insights" replace />} />
           <Route path="*" element={<V2NotFound />} />
         </Routes>

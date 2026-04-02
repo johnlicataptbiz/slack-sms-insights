@@ -35,9 +35,7 @@ export const getPrismaClientConfig = () => {
         url: dbConfig.url,
       },
     },
-    log: isProduction
-      ? ['error', 'warn'] as const
-      : ['query', 'error', 'warn'] as const,
+    log: isProduction ? (['error', 'warn'] as const) : (['query', 'error', 'warn'] as const),
   };
 };
 
@@ -57,7 +55,7 @@ export const parseConnectionString = (url: string) => {
     const parsedUrl = new URL(url);
     return {
       host: parsedUrl.hostname,
-      port: parseInt(parsedUrl.port) || 5432,
+      port: Number.parseInt(parsedUrl.port) || 5432,
       database: parsedUrl.pathname.slice(1),
       username: parsedUrl.username,
       password: parsedUrl.password,

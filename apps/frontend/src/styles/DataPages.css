@@ -18,7 +18,11 @@
   font-size: 2rem;
   font-weight: 800;
   color: var(--color-text);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  background: linear-gradient(
+    135deg,
+    var(--color-primary),
+    var(--color-primary-dark)
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -89,7 +93,11 @@
 
 .DataCard--accent {
   border-color: rgba(99, 102, 241, 0.35);
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.09), rgba(99, 102, 241, 0.02));
+  background: linear-gradient(
+    180deg,
+    rgba(99, 102, 241, 0.09),
+    rgba(99, 102, 241, 0.02)
+  );
 }
 
 .DataCard__label {
@@ -216,7 +224,8 @@
 }
 
 .DataCode {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
   white-space: pre-wrap;
 }

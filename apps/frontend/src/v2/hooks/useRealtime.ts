@@ -43,14 +43,18 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       switch (event.type) {
         case 'sms_event':
           queryClient.invalidateQueries({ queryKey: ['v2', 'sales-metrics'] });
-          queryClient.invalidateQueries({ queryKey: ['v2', 'inbox', 'conversations'] });
+          queryClient.invalidateQueries({
+            queryKey: ['v2', 'inbox', 'conversations'],
+          });
           break;
         case 'booked_call':
           queryClient.invalidateQueries({ queryKey: ['v2', 'sales-metrics'] });
           queryClient.invalidateQueries({ queryKey: ['v2', 'weekly-summary'] });
           break;
         case 'work_item':
-          queryClient.invalidateQueries({ queryKey: ['v2', 'analytics', 'followup-sla'] });
+          queryClient.invalidateQueries({
+            queryKey: ['v2', 'analytics', 'followup-sla'],
+          });
           break;
         case 'conversation_update':
           queryClient.invalidateQueries({ queryKey: ['v2', 'inbox'] });
@@ -102,7 +106,15 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     } catch (err) {
       console.error('Failed to create EventSource:', err);
     }
-  }, [enabled, onConnect, onEvent, onError, invalidateQueries, reconnectInterval, maxRetries]);
+  }, [
+    enabled,
+    onConnect,
+    onEvent,
+    onError,
+    invalidateQueries,
+    reconnectInterval,
+    maxRetries,
+  ]);
 
   const disconnect = useCallback(() => {
     if (eventSourceRef.current) {
@@ -127,7 +139,11 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
 }
 
 // Polling fallback for browsers without EventSource support
-export function usePolling(queryKey: string[], intervalMs = 30000, enabled = true) {
+export function usePolling(
+  queryKey: string[],
+  intervalMs = 30000,
+  enabled = true,
+) {
   const queryClient = useQueryClient();
 
   useEffect(() => {

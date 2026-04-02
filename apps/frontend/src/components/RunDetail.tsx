@@ -27,7 +27,14 @@ export default function RunDetail({ run, onBack }: { run: Run; onBack: () => voi
   };
 
   const businessDay = useMemo(
-    () => resolveRunBusinessDay({ report_date: run.report_date, timestamp: run.timestamp }, DEFAULT_BUSINESS_TIME_ZONE),
+    () =>
+      resolveRunBusinessDay(
+        {
+          ...(run.report_date ? { report_date: run.report_date } : {}),
+          timestamp: run.timestamp,
+        },
+        DEFAULT_BUSINESS_TIME_ZONE,
+      ),
     [run.report_date, run.timestamp],
   );
 

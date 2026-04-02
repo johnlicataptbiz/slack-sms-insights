@@ -13,9 +13,6 @@ permissions:
 jobs:
   frontend-build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
     steps:
     - uses: actions/checkout@v4
       with:
@@ -23,18 +20,17 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: 22
-    - run: npm ci --legacy-peer-deps
+        cache: npm
+        cache-dependency-path: package-lock.json
+    - run: npm ci
     - name: Run tests
-      run: npm run test:run
+      run: npm run --workspace=ptbizsms-dashboard-unified test
     - name: Type check
-      run: npm run typecheck:v2
-    - run: npm run build
+      run: npm run --workspace=ptbizsms-dashboard-unified typecheck
+    - run: npm run --workspace=ptbizsms-dashboard-unified build
 
   backend-build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sms-insights
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres?schema=public
       SKIP_FRONTEND_BUILD: "true"
@@ -45,8 +41,10 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: 22
+        cache: npm
+        cache-dependency-path: package-lock.json
     - run: npm ci
-    - run: npm run build
+    - run: npm run --workspace=ptbizsms-api build
 
   secret-scan:
     runs-on: ubuntu-latest

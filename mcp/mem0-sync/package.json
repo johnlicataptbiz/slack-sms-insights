@@ -1,0 +1,17 @@
+{
+  "name": "mem0-sync",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "mem0ai": "^2.4.5"
+  }
+}

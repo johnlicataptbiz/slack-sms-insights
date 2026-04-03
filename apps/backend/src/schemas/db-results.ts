@@ -130,7 +130,7 @@ export async function validateResult<T>(
   try {
     return await schema.parseAsync(data);
   } catch (error) {
-    const errorMessage = error instanceof z.ZodError ? error.errors : String(error);
+    const errorMessage = error instanceof z.ZodError ? error.issues : String(error);
     console.error(`Validation failed for ${context}:`, {
       error: errorMessage,
       data: JSON.stringify(data),

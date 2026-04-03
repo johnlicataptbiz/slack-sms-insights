@@ -2,7 +2,7 @@ import type { ConversationStatus, PrismaClient } from '@prisma/client';
 import { BaseRepository } from './base.repository.js';
 
 export interface CreateConversationData {
-  contactKey: string;
+  contact_key: string;
   contact_id?: string;
   contact_phone?: string;
   current_rep_id?: string;
@@ -18,7 +18,7 @@ export interface UpdateConversationData {
   last_outbound_at?: Date;
   last_touch_at?: Date;
   unreplied_inbound_count?: number;
-  nextFollowupAt?: Date;
+  next_followup_due_at?: Date;
 }
 
 export class ConversationRepository extends BaseRepository {
@@ -35,7 +35,7 @@ export class ConversationRepository extends BaseRepository {
 
   async findByContactKey(contactKey: string): Promise<unknown | null> {
     return this.prisma.conversations.findUnique({
-      where: { contactKey },
+      where: { contact_key: contactKey },
     });
   }
 
@@ -115,13 +115,13 @@ export class ConversationRepository extends BaseRepository {
 
     return this.prisma.conversations.findMany({
       where: {
-        nextFollowupAt: {
+        next_followup_due_at: {
           lte: now,
         },
         status: 'open',
       },
       orderBy: {
-        nextFollowupAt: 'asc',
+        next_followup_due_at: 'asc',
       },
     });
   }

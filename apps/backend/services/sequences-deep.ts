@@ -131,7 +131,7 @@ leadRows = []; // Placeholder - implement raw query
     logger?.warn?.('sequences-deep: fact_lead_quality_daily unavailable', e);
   }
 
-  let sequenceRows: any[] = [];
+  const sequenceRows: any[] = [];
   try {
 prisma.sequenceRegistry.findMany({
       where: params.status ? { status: params.status } : undefined,
@@ -150,7 +150,7 @@ prisma.sequenceRegistry.findMany({
     logger?.warn?.('sequences-deep: sequence_registry unavailable', e);
   }
 
-  let mondayRows: any[] = [];
+  const mondayRows: any[] = [];
   try {
 prisma.factMondayHealthDaily.findMany({
       where: {
@@ -256,7 +256,7 @@ manualBucketRows = await prisma.sequenceRegistry.findMany({
     warnings.push('attributed_by_label unavailable');
   }
 
-  let rawEventRows: any[] = [];
+  const rawEventRows: any[] = [];
   try {
 await prisma.smsEvents.findMany({
       where: {

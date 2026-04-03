@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import { z } from 'zod';
+import type { z } from 'zod';
 
 export const securityMiddleware = [
   helmet(),

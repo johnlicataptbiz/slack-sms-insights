@@ -1,12 +1,12 @@
 import type { Request, Response } from 'express';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { expect, vi } from 'vitest';
 
 // Test utilities for common patterns
 export const TestUtils = {
   /**
    * Create a mock Express request object
    */
-createMockRequest(overrides: Partial<Request> = {}): Request {
+  createMockRequest(overrides: Partial<Request> = {}): Request {
     return {
       body: {},
       params: {},
@@ -16,12 +16,12 @@ createMockRequest(overrides: Partial<Request> = {}): Request {
       url: '/',
       ...overrides,
     } as Request;
-  }
+  },
 
   /**
    * Create a mock Express response object
    */
-createMockResponse(overrides: Partial<Response> = {}): Response {
+  createMockResponse(overrides: Partial<Response> = {}): Response {
     const res = {
       status: vi.fn().mockReturnThis(),
       json: vi.fn().mockReturnThis(),
@@ -29,31 +29,31 @@ createMockResponse(overrides: Partial<Response> = {}): Response {
       ...overrides,
     };
     return res as Response;
-  }
+  },
 
   /**
    * Create a mock database transaction
    */
-createMockTransaction() {
+  createMockTransaction() {
     return {
       commit: vi.fn(),
       rollback: vi.fn(),
     };
-  }
+  },
 
   /**
    * Wait for a specified amount of time
    */
-async wait(ms: number): Promise<void> {
+  async wait(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
-  }
+  },
 
   /**
    * Create a test database connection string
    */
-getTestDatabaseUrl(): string {
+  getTestDatabaseUrl(): string {
     return process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db';
-  }
+  },
 }
 
 // Common test patterns
@@ -61,7 +61,7 @@ export const testPatterns = {
   /**
    * Test that a function throws an error with specific message
    */
-async expectThrowsAsync<T>(fn: () => Promise<T>, expectedMessage: string) {
+  async expectThrowsAsync<T>(fn: () => Promise<T>, expectedMessage: string) {
     try {
       await fn();
       expect.fail('Expected function to throw');
@@ -73,7 +73,7 @@ async expectThrowsAsync<T>(fn: () => Promise<T>, expectedMessage: string) {
   /**
    * Test that an async operation completes within timeout
    */
-async expectCompletesWithin<T>(fn: () => Promise<T>, timeoutMs: number) {
+  async expectCompletesWithin<T>(fn: () => Promise<T>, timeoutMs: number) {
     const start = Date.now();
     await fn();
     const duration = Date.now() - start;
@@ -86,23 +86,23 @@ export const DatabaseTestHelper = {
   /**
    * Clean up database tables between tests
    */
-async cleanupTables(prisma: PrismaClient, tables: string[]) {
+  async cleanupTables(prisma: PrismaClient, tables: string[]) {
     for (const table of tables) {
       await prisma.$executeRawUnsafe(`TRUNCATE TABLE "${table}" CASCADE`);
     }
-  }
+  },
 
   /**
    * Seed database with test data
    */
-async seedData(prisma: PrismaClient, data: Record<string, any[]>) {
+  async seedData(prisma: PrismaClient, data: Record<string, unknown[]>) {
     for (const [table, records] of Object.entries(data)) {
       for (const record of records) {
         await prisma[table].create({ data: record });
       }
     }
   }
-}
+};
 
 // Mock factories for common services
 export const mockFactories = {

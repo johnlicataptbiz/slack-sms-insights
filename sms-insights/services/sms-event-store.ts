@@ -1,5 +1,5 @@
 import type { Logger } from '@slack/bolt';
-import { Prisma } from '@prisma/client';
+import { DeliveryStatus, Prisma } from '@prisma/client';
 import { getPrismaClient } from './prisma.js';
 import { resolveSequenceId } from './sequence-registry.js';
 
@@ -75,7 +75,7 @@ export const insertSmsEvent = async (
       sequence_id: sequenceId,
       conversation_id: event.conversationId ?? null,
       raw: toNullableJson(event.raw),
-      delivery_status: 'sent',
+      delivery_status: DeliveryStatus.sent,
       delivered_at: null,
       read_at: null,
       media_urls: [],

@@ -14,7 +14,6 @@ jobs:
   frontend-build:
     runs-on: ubuntu-latest
     steps:
-<<<<<<< HEAD
     - uses: actions/checkout@v4
       with:
         fetch-depth: 1
@@ -29,20 +28,6 @@ jobs:
     - name: Type check
       run: npm run --workspace=ptbizsms-dashboard-unified typecheck
     - run: npm run --workspace=ptbizsms-dashboard-unified build
-=======
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - name: Run tests
-        run: npm run test:run
-      - run: npm run build
->>>>>>> abeb1cae (fix(tests+ci): fix failing frontend tests, add test scripts, .nvmrc, and CI frontend test step)
 
   backend-build:
     runs-on: ubuntu-latest

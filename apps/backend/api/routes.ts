@@ -21,4 +21,3 @@ export const handleApiRoute = async (
   logger?.debug?.('Unhandled API route path', { pathname });
   return false;
 };
-

@@ -14,7 +14,7 @@ export const hasRecentPersistentFeedback = async ({
   const prisma = getPrisma();
 
   try {
-const feedback = await prisma.setterFeedbackDedupe.findUnique({
+    const feedback = await prisma.setterFeedbackDedupe.findUnique({
       where: {
         channel_id_thread_ts: {
           channel_id: channelId,
@@ -45,7 +45,7 @@ export const insertPersistentFeedback = async ({
   const prisma = getPrisma();
 
   try {
-await prisma.setterFeedbackDedupe.upsert({
+    await prisma.setterFeedbackDedupe.upsert({
       where: {
         channel_id_thread_ts: {
           channel_id: channelId,
@@ -66,4 +66,3 @@ await prisma.setterFeedbackDedupe.upsert({
     // Ignore errors for dedupe tracking
   }
 };
-

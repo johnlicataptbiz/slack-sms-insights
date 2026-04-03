@@ -115,8 +115,8 @@ export const getSequencesDeep = async (
 
   let bookingRows: any[] = [];
   try {
-// TODO: factBookingDaily table missing - use raw SQL aggregation
-bookingRows = []; // Placeholder - implement raw query
+    // TODO: factBookingDaily table missing - use raw SQL aggregation
+    bookingRows = []; // Placeholder - implement raw query
   } catch (e) {
     warnings.push('fact_booking_daily unavailable');
     logger?.warn?.('sequences-deep: fact_booking_daily unavailable', e);
@@ -124,8 +124,8 @@ bookingRows = []; // Placeholder - implement raw query
 
   let leadRows: any[] = [];
   try {
-// TODO: factLeadQualityDaily table missing - use raw SQL aggregation
-leadRows = []; // Placeholder - implement raw query
+    // TODO: factLeadQualityDaily table missing - use raw SQL aggregation
+    leadRows = []; // Placeholder - implement raw query
   } catch (e) {
     warnings.push('fact_lead_quality_daily unavailable');
     logger?.warn?.('sequences-deep: fact_lead_quality_daily unavailable', e);
@@ -133,7 +133,7 @@ leadRows = []; // Placeholder - implement raw query
 
   const sequenceRows: any[] = [];
   try {
-prisma.sequenceRegistry.findMany({
+    prisma.sequenceRegistry.findMany({
       where: params.status ? { status: params.status } : undefined,
       select: {
         id: true,
@@ -152,7 +152,7 @@ prisma.sequenceRegistry.findMany({
 
   const mondayRows: any[] = [];
   try {
-prisma.factMondayHealthDaily.findMany({
+    prisma.factMondayHealthDaily.findMany({
       where: {
         day: {
           gte: new Date(`${fromDay}T00:00:00.000Z`),
@@ -176,7 +176,7 @@ prisma.factMondayHealthDaily.findMany({
 
   let manualBucketRows: any[] = [];
   try {
-manualBucketRows = await prisma.sequenceRegistry.findMany({
+    manualBucketRows = await prisma.sequenceRegistry.findMany({
       where: { is_manual_bucket: true },
       select: { id: true },
     });
@@ -258,22 +258,23 @@ manualBucketRows = await prisma.sequenceRegistry.findMany({
 
   const rawEventRows: any[] = [];
   try {
-await prisma.smsEvents.findMany({
-      where: {
-        created_at: { gte: scanFrom, lte: params.to },
-        direction: { in: ['inbound', 'outbound'] },
-      },
-      orderBy: { created_at: 'asc' },
-      select: {
-        created_at: true,
-        direction: true,
-        sequence_id: true,
-        body: true,
-        contact_id: true,
-        contact_phone: true,
-      },
-    }).then(rows => rows.map(row => ({...row, event_ts: row.created_at} as any)));
-
+    await prisma.smsEvents
+      .findMany({
+        where: {
+          created_at: { gte: scanFrom, lte: params.to },
+          direction: { in: ['inbound', 'outbound'] },
+        },
+        orderBy: { created_at: 'asc' },
+        select: {
+          created_at: true,
+          direction: true,
+          sequence_id: true,
+          body: true,
+          contact_id: true,
+          contact_phone: true,
+        },
+      })
+      .then((rows) => rows.map((row) => ({ ...row, event_ts: row.created_at }) as any));
   } catch (e) {
     warnings.push('sms_events unavailable');
     logger?.warn?.('sequences-deep: sms_events unavailable', e);
@@ -524,7 +525,9 @@ await prisma.smsEvents.findMany({
     to: params.to,
   }).catch(() => []);
   const smsReplyLinks = await getBookedCallSmsReplyLinks(bookedCallSources).catch(() => []);
-  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(bookedCallSources, undefined, smsReplyLinks).catch(() => new Map() as Map<string, any>);
+  const smsSequenceLookup = await getBookedCallSequenceFromSmsEvents(bookedCallSources, undefined, smsReplyLinks).catch(
+    () => new Map() as Map<string, any>,
+  );
 
   const sequenceAttribution = attributeSlackBookedCallsToSequences(
     sequences.map((row) => ({
@@ -541,8 +544,20 @@ await prisma.smsEvents.findMany({
     bookedCallSources,
     smsReplyLinks,
     smsSequenceLookup,
-  ).catch(() => ({ totals: { matchedCalls: 0, unattributedCalls: 0, manualCalls: 0, bookedAfterSmsReply: 0, smsPhoneMatchedCalls: 0, fuzzyTextMatchedCalls: 0 }, unattributedAuditRows: [] } as any));
-
+  ).catch(
+    () =>
+      ({
+        totals: {
+          matchedCalls: 0,
+          unattributedCalls: 0,
+          manualCalls: 0,
+          bookedAfterSmsReply: 0,
+          smsPhoneMatchedCalls: 0,
+          fuzzyTextMatchedCalls: 0,
+        },
+        unattributedAuditRows: [],
+      }) as any,
+  );
 
   if (mondayRows.length === 0) {
     logger?.warn?.('sequences-deep: no monday health rows in requested window');

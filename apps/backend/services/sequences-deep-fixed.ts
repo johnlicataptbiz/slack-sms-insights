@@ -245,31 +245,38 @@ export const getSequencesDeep = async (
     stat.repliesReceived += 1;
   }
 
-  const sequences = sequenceRows
-    ?.filter((row: any) => !backfillSequenceIds.has(row.id))
-    .map((row: any) => {
-      const stat = summary.get(row.id);
-      return {
-        sequenceId: row.id,
-        label: row.label || 'Unknown',
-        leadMagnet: row.lead_magnet || row.label || 'Unknown',
-        versionTag: row.version_tag || '',
-        status: row.status || 'unknown',
-        ownerRep: row.owner_rep || null,
-        isManualBucket: row.is_manual_bucket || false,
-        messagesSent: stat?.messagesSent || 0,
-        uniqueContacted: stat?.uniqueContacted || 0,
-        inboundTexts: stat?.inboundTexts || 0,
-        repliesReceived: stat?.repliesReceived || 0,
-        replyRatePct: stat ? (stat.repliesReceived / stat.uniqueContacted) * 100 : 0,
-        bookedCalls: 0,
-        bookingRatePct: 0,
-        optOuts: stat?.optOuts || 0,
-        optOutRatePct: stat ? (stat.optOuts / stat.messagesSent) * 100 : 0,
-        bookedBreakdown: { jack: 0, brandon: 0, selfBooked: 0, bookedAfterSmsReply: 0, diagnosticSignals: 0 },
-        leadQuality: { leadsCount: 0, highInterestPct: 0, fullTimePct: 0, mostlyCashPct: 0, progressedToStep3Or4Pct: 0 },
-      };
-    }) || [];
+  const sequences =
+    sequenceRows
+      ?.filter((row: any) => !backfillSequenceIds.has(row.id))
+      .map((row: any) => {
+        const stat = summary.get(row.id);
+        return {
+          sequenceId: row.id,
+          label: row.label || 'Unknown',
+          leadMagnet: row.lead_magnet || row.label || 'Unknown',
+          versionTag: row.version_tag || '',
+          status: row.status || 'unknown',
+          ownerRep: row.owner_rep || null,
+          isManualBucket: row.is_manual_bucket || false,
+          messagesSent: stat?.messagesSent || 0,
+          uniqueContacted: stat?.uniqueContacted || 0,
+          inboundTexts: stat?.inboundTexts || 0,
+          repliesReceived: stat?.repliesReceived || 0,
+          replyRatePct: stat ? (stat.repliesReceived / stat.uniqueContacted) * 100 : 0,
+          bookedCalls: 0,
+          bookingRatePct: 0,
+          optOuts: stat?.optOuts || 0,
+          optOutRatePct: stat ? (stat.optOuts / stat.messagesSent) * 100 : 0,
+          bookedBreakdown: { jack: 0, brandon: 0, selfBooked: 0, bookedAfterSmsReply: 0, diagnosticSignals: 0 },
+          leadQuality: {
+            leadsCount: 0,
+            highInterestPct: 0,
+            fullTimePct: 0,
+            mostlyCashPct: 0,
+            progressedToStep3Or4Pct: 0,
+          },
+        };
+      }) || [];
 
   const boards = mondayRows ? new Set(mondayRows.map((row: any) => row.boardId)).size : 0;
   const staleBoards = mondayRows ? mondayRows.filter((row: any) => row.isStale).length : 0;

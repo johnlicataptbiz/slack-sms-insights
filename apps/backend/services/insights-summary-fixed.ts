@@ -67,21 +67,35 @@ export const getInsightsSummary = async (
   const warnings: string[] = [];
 
   try {
-    smsRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_sms_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`, fromDay, toDay, ...(params.rep ? [params.rep] : []));
+    smsRows = await prisma.$queryRawUnsafe(
+      `SELECT * FROM fact_sms_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`,
+      fromDay,
+      toDay,
+      ...(params.rep ? [params.rep] : []),
+    );
   } catch (e) {
     warnings.push('fact_sms_daily unavailable');
     logger?.warn?.('insights-summary: fact_sms_daily unavailable', e);
   }
 
   try {
-    bookingRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_booking_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`, fromDay, toDay, ...(params.rep ? [params.rep] : []));
+    bookingRows = await prisma.$queryRawUnsafe(
+      `SELECT * FROM fact_booking_daily WHERE day >= $${1}::date AND day <= $${2}::date${params.rep ? ' AND rep_id = $${3}' : ''}`,
+      fromDay,
+      toDay,
+      ...(params.rep ? [params.rep] : []),
+    );
   } catch (e) {
     warnings.push('fact_booking_daily unavailable');
     logger?.warn?.('insights-summary: fact_booking_daily unavailable', e);
   }
 
   try {
-    mondayRows = await prisma.$queryRawUnsafe(`SELECT * FROM fact_monday_health_daily WHERE day >= $${1}::date AND day <= $${2}::date`, fromDay, toDay);
+    mondayRows = await prisma.$queryRawUnsafe(
+      `SELECT * FROM fact_monday_health_daily WHERE day >= $${1}::date AND day <= $${2}::date`,
+      fromDay,
+      toDay,
+    );
   } catch (e) {
     warnings.push('fact_monday_health_daily unavailable');
     logger?.warn?.('insights-summary: fact_monday_health_daily unavailable', e);
@@ -228,4 +242,3 @@ export const getInsightsSummary = async (
     },
   };
 };
-

@@ -16,7 +16,6 @@ export const scheduleDailyReport = async (app: App) => {
     return;
   }
 
-
   // Calculate 6:00 AM CT in UTC
   // CT is currently UTC-6 (Standard Time) or UTC-5 (Daylight Time).
   // For now, we'll use a conservative approach or check the actual offset.
@@ -64,9 +63,8 @@ export const scheduleDailyReport = async (app: App) => {
       token: userToken,
       channel: DAILY_REPORT_CHANNEL_ID,
       latest: (Date.now() / 1000).toString(),
-      oldest: ((Date.now() - 24*60*60*1000) / 1000).toString(),
+      oldest: ((Date.now() - 24 * 60 * 60 * 1000) / 1000).toString(),
     });
-
 
     const alreadyScheduled = (scheduled.scheduled_messages || []).some((m) => {
       return m.post_at === postTimeSeconds && m.text?.includes('daily report');
@@ -76,7 +74,6 @@ export const scheduleDailyReport = async (app: App) => {
       console.info(`Daily report already scheduled for ${nextRun.toLocaleString()}`);
       return;
     }
-
 
     // Schedule the mention
     await app.client.chat.scheduleMessage({
@@ -90,5 +87,4 @@ export const scheduleDailyReport = async (app: App) => {
   } catch (error) {
     console.error('Failed to schedule daily report:', error);
   }
-
 };

@@ -74,10 +74,10 @@ export const listOpenWorkItems = async (
     if (params.overdueOnly) where.due_at = { lt: new Date() };
     if (params.dueBefore) where.due_at = { lt: new Date(params.dueBefore) };
 
-const results = await prisma.workItems.findMany({
+    const results = await prisma.workItems.findMany({
       where,
-include: {
-        conversation: true
+      include: {
+        conversation: true,
       },
       orderBy: [{ due_at: 'asc' }, { id: 'asc' }],
       take: limit + 1,
@@ -100,15 +100,9 @@ include: {
       contact_key: wi.conversation.contactKey,
       contact_id: wi.conversation.contact_id,
       contact_phone: wi.conversation.contact_phone,
-      last_inbound_at: wi.conversation.last_inbound_at
-        ? wi.conversation.last_inbound_at.toISOString()
-        : null,
-      last_outbound_at: wi.conversation.last_outbound_at
-        ? wi.conversation.last_outbound_at.toISOString()
-        : null,
-      last_touch_at: wi.conversation.last_touch_at
-        ? wi.conversation.last_touch_at.toISOString()
-        : null,
+      last_inbound_at: wi.conversation.last_inbound_at ? wi.conversation.last_inbound_at.toISOString() : null,
+      last_outbound_at: wi.conversation.last_outbound_at ? wi.conversation.last_outbound_at.toISOString() : null,
+      last_touch_at: wi.conversation.last_touch_at ? wi.conversation.last_touch_at.toISOString() : null,
       unreplied_inbound_count: wi.conversation.unreplied_inbound_count,
     }));
 
@@ -176,4 +170,3 @@ export const assignWorkItem = async (
 
 export const encodeWorkItemCursor = (cursor: WorkItemCursor): string => encodeCursor(cursor);
 export const decodeWorkItemCursor = (cursor: string): WorkItemCursor => decodeCursor(cursor);
-

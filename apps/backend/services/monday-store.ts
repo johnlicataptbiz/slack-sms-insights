@@ -263,7 +263,7 @@ export const getMondaySyncState = async (
 ): Promise<MondaySyncStateRow | null> => {
   const prisma = getPrisma();
   try {
-const result = await prisma.mondaySyncState.findUnique({
+    const result = await prisma.mondaySyncState.findUnique({
       where: { board_id: boardId },
       select: {
         board_id: true,
@@ -393,7 +393,7 @@ export const listPendingMondayBookedCallPushes = async (
 ): Promise<MondayBookedCallPushRow[]> => {
   const prisma = getPrisma();
   try {
-const result = await prisma.mondayBookedCallPushes.findMany({
+    const result = await prisma.mondayBookedCallPushes.findMany({
       where: { status: 'pending' },
       orderBy: { updated_at: 'asc' },
       select: {
@@ -548,7 +548,7 @@ export const saveMondayColumnMapping = async (
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
-await prisma.mondayColumnMapping.upsert({
+    await prisma.mondayColumnMapping.upsert({
       where: { board_id: boardId },
       update: {
         mapping_json: toJsonValue(mapping),
@@ -571,7 +571,7 @@ export const getMondayColumnMapping = async (
 ): Promise<unknown | null> => {
   const prisma = getPrisma();
   try {
-const result = await prisma.mondayColumnMapping.findUnique({
+    const result = await prisma.mondayColumnMapping.findUnique({
       where: { board_id: boardId },
       select: { mapping_json: true },
     });
@@ -590,7 +590,7 @@ export const deleteMondayCallSnapshots = async (
   const prisma = getPrisma();
   if (!itemIds.length) return;
   try {
-await prisma.mondayCallSnapshots.deleteMany({
+    await prisma.mondayCallSnapshots.deleteMany({
       where: {
         board_id: boardId,
         item_id: { in: itemIds },
@@ -607,7 +607,7 @@ export const upsertMondayCallSnapshot = async (
   const prisma = getPrisma();
   const callDate = toPrismaDate(input.callDate);
   try {
-await prisma.mondayCallSnapshots.upsert({
+    await prisma.mondayCallSnapshots.upsert({
       where: {
         board_id_item_id: {
           board_id: input.boardId,
@@ -1168,7 +1168,7 @@ export const listMondayCallSnapshotsInRange = async (
 ): Promise<MondayCallSnapshotRow[]> => {
   const prisma = getPrisma();
   try {
-  const where: Prisma.MondayCallSnapshotsWhereInput = {
+    const where: Prisma.MondayCallSnapshotsWhereInput = {
       updated_at: {
         gte: params.from,
         lte: params.to,
@@ -1205,7 +1205,7 @@ export const getLatestMondaySyncStatus = async (
 ): Promise<MondaySyncStateRow | null> => {
   const prisma = getPrisma();
   try {
-const result = await prisma.mondaySyncState.findMany({
+    const result = await prisma.mondaySyncState.findMany({
       where: boardId ? { board_id: boardId } : {},
       orderBy: { updated_at: 'desc' },
       take: 1,
@@ -1237,7 +1237,7 @@ export const upsertMondayWeeklyReport = async (
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
-await prisma.mondayWeeklyReports.upsert({
+    await prisma.mondayWeeklyReports.upsert({
       where: { week_start: new Date(params.weekStart) },
       update: {
         source_board_id: params.sourceBoardId ?? null,
@@ -1264,7 +1264,7 @@ export const getMondayWeeklyReport = async (
 ): Promise<MondayWeeklyReportRow | null> => {
   const prisma = getPrisma();
   try {
-const result = await prisma.mondayWeeklyReports.findUnique({
+    const result = await prisma.mondayWeeklyReports.findUnique({
       where: { week_start: new Date(weekStart) },
       select: {
         week_start: true,
@@ -1288,7 +1288,7 @@ export const getMondayBookedCallPush = async (
 ): Promise<MondayBookedCallPushRow | null> => {
   const prisma = getPrisma();
   try {
-const result = await prisma.mondayBookedCallPushes.findFirst({
+    const result = await prisma.mondayBookedCallPushes.findFirst({
       where: {
         slack_channel_id: slackChannelId,
         slack_message_ts: slackMessageTs,

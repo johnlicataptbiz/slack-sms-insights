@@ -52,7 +52,7 @@ export const upsertNeedsReplyWorkItem = async (
     // We'll use a transaction to find and update/create.
 
     return await prisma.$transaction(async (tx) => {
-const existing = await tx.workItems.findFirst({
+      const existing = await tx.workItems.findFirst({
         where: {
           type: 'needs_reply',
           conversation_id: conversation.id,
@@ -61,7 +61,7 @@ const existing = await tx.workItems.findFirst({
       });
 
       if (existing) {
-const updated = await tx.workItems.update({
+        const updated = await tx.workItems.update({
           where: { id: existing.id },
           data: {
             rep_id: existing.rep_id || conversation.current_rep_id,
@@ -72,7 +72,7 @@ const updated = await tx.workItems.update({
         return updated as unknown as WorkItemRow;
       }
 
-const inserted = await tx.workItems.create({
+      const inserted = await tx.workItems.create({
         data: {
           type: 'needs_reply',
           conversation_id: conversation.id,
@@ -101,7 +101,7 @@ export const resolveNeedsReplyOnOutbound = async (
 ): Promise<number> => {
   const prisma = getPrisma();
   try {
-const result = await prisma.workItems.updateMany({
+    const result = await prisma.workItems.updateMany({
       where: {
         type: 'needs_reply',
         conversation_id: conversationId,

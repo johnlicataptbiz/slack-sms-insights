@@ -54,7 +54,7 @@ export const TestUtils = {
   getTestDatabaseUrl(): string {
     return process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/test_db';
   },
-}
+};
 
 // Common test patterns
 export const testPatterns = {
@@ -101,7 +101,7 @@ export const DatabaseTestHelper = {
         await prisma[table].create({ data: record });
       }
     }
-  }
+  },
 };
 
 // Mock factories for common services

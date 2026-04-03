@@ -309,7 +309,11 @@ export const getTeamSummary = (): string => {
 
   if (users.length > 0) {
     const topicSet = new Set<string>();
-    users.forEach((u) => u.topics.forEach((t) => topicSet.add(t)));
+    for (const user of users) {
+      for (const topic of user.topics) {
+        topicSet.add(topic);
+      }
+    }
     const topics = Array.from(topicSet).slice(0, 3);
     if (topics.length > 0) {
       summary += `Y'all mostly talk about: ${topics.join(', ')}`;

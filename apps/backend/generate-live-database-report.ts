@@ -7,8 +7,8 @@
 import 'dotenv/config';
 import fs from 'node:fs';
 import path from 'node:path';
-import { getPrismaClient } from './services/prisma.js';
 import type { Prisma } from '@prisma/client';
+import { getPrismaClient } from './services/prisma.js';
 
 async function generateReport(): Promise<void> {
   console.log('🔍 Generating live database report with Prisma...');
@@ -20,28 +20,28 @@ async function generateReport(): Promise<void> {
     const [snapshotsAgg, boardsCount, leadsCount, attribsCount, sequencesCount] = await Promise.all([
       prisma.mondayCallSnapshots.aggregate({
         _count: { id: true },
-        _max: { updated_at: true }
+        _max: { updated_at: true },
       }),
       prisma.mondayBoardRegistry.count({ where: { active: true } }),
       prisma.leadOutcomes.count(),
       prisma.leadAttributions.count(),
-      prisma.sequenceRegistry.count({ where: { status: 'active' } })
+      prisma.sequenceRegistry.count({ where: { status: 'active' } }),
     ]);
 
     // ===== MONDAY SYNC HEALTH =====
     const syncHealth = await prisma.mondaySyncStates.aggregate({
-      _count: { id: true }
+      _count: { id: true },
     });
 
     // ===== RECENT ACTIVITY =====
     const recentKpis = await prisma.mondayCallSnapshots.aggregate({
       where: {
-        updated_at: { 
-          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) 
-        }
+        updated_at: {
+          gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        },
       },
       _count: true,
-      _sum: { is_booked: true }
+      _sum: { is_booked: true },
     });
 
     const reportContent = `# 📊 LIVE DATABASE REPORT (Prisma v7.6.0)
@@ -80,4 +80,3 @@ async function generateReport(): Promise<void> {
 }
 
 generateReport();
-

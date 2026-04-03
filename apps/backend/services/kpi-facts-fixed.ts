@@ -332,41 +332,41 @@ export const refreshKpiFacts = async (
   const fromDay = dayKey(rangeFrom, params.timeZone);
   const toDay = dayKey(rangeTo, params.timeZone);
 
-interface SequenceRow {
-  id: string;
-  label: string;
-}
+  interface SequenceRow {
+    id: string;
+    label: string;
+  }
 
-interface SequenceRowForAttribution {
-  label: string;
-  messagesSent: number;
-  repliesReceived: number;
-  replyRatePct: number;
-  bookingSignalsSms: number;
-  booked: number;
-  optOuts: number;
-}
+  interface SequenceRowForAttribution {
+    label: string;
+    messagesSent: number;
+    repliesReceived: number;
+    replyRatePct: number;
+    bookingSignalsSms: number;
+    booked: number;
+    optOuts: number;
+  }
 
-const sequenceRows = await prisma.sequenceRegistry.findMany({
-  select: { id: true, label: true },
-});
-const messagesSentBySequenceId = new Map<string, number>();
-for (const row of smsRows) {
-  messagesSentBySequenceId.set(
-    row.sequenceId,
-    (messagesSentBySequenceId.get(row.sequenceId) || 0) + row.messagesSent,
-  );
-}
+  const sequenceRows = await prisma.sequenceRegistry.findMany({
+    select: { id: true, label: true },
+  });
+  const messagesSentBySequenceId = new Map<string, number>();
+  for (const row of smsRows) {
+    messagesSentBySequenceId.set(
+      row.sequenceId,
+      (messagesSentBySequenceId.get(row.sequenceId) || 0) + row.messagesSent,
+    );
+  }
 
-const sequenceRowsForAttribution: SequenceRowForAttribution[] = sequenceRows.map((row) => ({
-  label: row.label,
-  messagesSent: messagesSentBySequenceId.get(row.id) || 0,
-  repliesReceived: 0,
-  replyRatePct: 0,
-  bookingSignalsSms: 0,
-  booked: 0,
-  optOuts: 0,
-}));
+  const sequenceRowsForAttribution: SequenceRowForAttribution[] = sequenceRows.map((row) => ({
+    label: row.label,
+    messagesSent: messagesSentBySequenceId.get(row.id) || 0,
+    repliesReceived: 0,
+    replyRatePct: 0,
+    bookingSignalsSms: 0,
+    booked: 0,
+    optOuts: 0,
+  }));
 
   const bookedCallSources = await getBookedCallAttributionSources({
     from: rangeFrom,
@@ -464,7 +464,7 @@ const sequenceRowsForAttribution: SequenceRowForAttribution[] = sequenceRows.map
      GROUP BY 1`,
     rangeFrom.toISOString(),
     rangeTo.toISOString(),
-    params.timeZone
+    params.timeZone,
   );
 
   const mondayFallbackRows = await prisma.$queryRawUnsafe<
@@ -1112,7 +1112,11 @@ const sequenceRowsForAttribution: SequenceRowForAttribution[] = sequenceRows.map
       rangeTo.toISOString(),
     ),
     conversationJourneyInsert,
-    prisma.$executeRawUnsafe('DELETE FROM fact_sms_daily WHERE day >= $${1}::date AND day <= $${2}::date', fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      'DELETE FROM fact_sms_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      fromDay,
+      toDay,
+    ),
     ...(smsRows.length > 0
       ? [
           prisma.fact_sms_daily.createMany({
@@ -1215,4 +1219,3 @@ const sequenceRowsForAttribution: SequenceRowForAttribution[] = sequenceRows.map
     fallbackBookedTotal,
   };
 };
-

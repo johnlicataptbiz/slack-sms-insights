@@ -1,0 +1,202 @@
+name: ML Infrastructure CI/CD
+
+on:
+  push:
+    branches: 
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'sms-insights/ml/**'
+      - 'tests/ml-infrastructure.test.ts'
+      - 'prisma/schema.unified.prisma'
+
+env:
+  NODE_VERSION: '20.x'
+  POSTGRES_DB: sms_insights_test
+  POSTGRES_USER: ci_user
+  POSTGRES_PASSWORD: ci_password
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Run Biome Lint
+        run: npx @biomejs/biome check sms-insights/ml
+      
+      - name: TypeScript Type Check
+        run: npx tsc --noEmit -p tsconfig.json
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: ${{ env.POSTGRES_DB }}
+          POSTGRES_USER: ${{ env.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.POSTGRES_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Generate Prisma Client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+      
+      - name: Run Vitest
+        run: npm run test:ml
+        env:
+          DATABASE_URL: postgresql://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@localhost:5432/${{ env.POSTGRES_DB }}
+          NODE_ENV: test
+
+  performance-tests:
+    name: Performance Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Run Performance Benchmarks
+        run: npm run benchmark:ml
+        
+  model-validation:
+    name: ML Model Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Validate Model Performance
+        run: npm run validate:ml-models
+        
+  bias-detection:
+    name: Bias Detection Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Use Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install Dependencies
+        run: npm ci
+      
+      - name: Run Bias Detection Tests
+        run: npm run test:ml-bias
+        
+  deployment-staging:
+    name: Deploy to Staging
+    needs: 
+      - lint-and-typecheck
+      - unit-tests
+      - performance-tests
+      - model-validation
+      - bias-detection
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Staging
+        run: |
+          echo "Deploying ML infrastructure to staging environment"
+          # Add actual deployment commands here
+          
+  deployment-production:
+    name: Deploy to Production
+    needs: 
+      - lint-and-typecheck
+      - unit-tests
+      - performance-tests
+      - model-validation
+      - bias-detection
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to Production
+        run: |
+          echo "Deploying ML infrastructure to production environment"
+          # Add actual deployment commands here
+
+  notifications:
+    name: Slack Notifications
+    needs: 
+      - deployment-staging
+      - deployment-production
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Send Slack Notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+
+# Conditional Workflow Control
+permissions:
+  contents: read
+  pull-requests: read

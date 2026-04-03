@@ -1,0 +1,17 @@
+{
+  "servers": {
+    "github.com/github/github-mcp-server": {
+      "type": "local",
+      "path": "mcp/github.com/github/github-mcp-server",
+      "command": "docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN=${input:github_token} ghcr.io/github/github-mcp-server",
+      "inputs": [
+        {
+          "type": "promptString",
+          "id": "github_token",
+          "description": "GitHub Personal Access Token",
+          "password": true
+        }
+      ]
+    }
+  }
+}

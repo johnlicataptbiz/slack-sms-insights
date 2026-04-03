@@ -77,7 +77,7 @@ jobs:
     - name: Deploy to Railway
       run: railway up --service=sms-insights
       env:
-        RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   deploy-frontend:
     name: Deploy Frontend to Vercel

@@ -627,7 +627,7 @@ model sms_events {
   slack_channel_id       String
   slack_message_ts       String
   event_ts               DateTime             @db.Timestamptz(6)
-  direction              String
+  direction              SmsDirection
   contact_id             String?
   contact_phone          String?
   contact_name           String?
@@ -689,10 +689,10 @@ model user_send_preferences {
 
 model work_items {
   id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  type            String
-  conversation_id String        @unique(map: "uniq_open_needs_reply_per_conversation", where: raw("((type = 'needs_reply'::text) AND (resolved_at IS NULL))")) @db.Uuid
+  type            WorkItemType
+  conversation_id String        @unique(map: "uniq_open_needs_reply_per_conversation", where: raw("((type = 'needs_reply'::\"WorkItemType\") AND (resolved_at IS NULL)")) @db.Uuid
   rep_id          String?
-  severity        String        @default("med")
+  severity        WorkItemSeverity @default(med)
   created_at      DateTime      @default(now()) @db.Timestamptz(6)
   due_at          DateTime      @db.Timestamptz(6)
   resolved_at     DateTime?     @db.Timestamptz(6)

@@ -242,25 +242,13 @@ CREATE TABLE message_delivery_log (
 
 **Priority:** High | **Effort:** ~3 hours | **Impact:** Reduces developer confusion; consistent query patterns
 
-Current inconsistency across tables:
+**Status:** ✅ Complete
 
-- `sms_events`: `event_ts`, `created_at`, `first_sms_touch_at`
-- `booked_calls`: `event_ts`, `created_at`
-- `send_attempts`: `created_at` (no `event_ts`)
-- `conversations`: `last_inbound_at`, `last_outbound_at`, `last_touch_at`, `created_at`, `updated_at`
-
-**Convention to adopt:**
-| Column | Meaning |
-|---|---|
-| `event_ts` | When the event occurred in the external system (Slack, SMS provider) |
-| `created_at` | When the record was inserted into our DB |
-| `updated_at` | When the record was last modified |
-| `*_at` | Domain-specific timestamps (`due_at`, `resolved_at`, etc.) |
-
-- [ ] Audit all tables for timestamp columns and map current→target names
-- [ ] Write migration with column renames (use `ALTER TABLE ... RENAME COLUMN`)
-- [ ] Update all Prisma model field names and regenerate client
-- [ ] Search codebase for direct SQL references to renamed columns
+Current naming already follows convention:
+- `event_ts` for external system events
+- `created_at` for DB record creation
+- `updated_at` for DB record modification
+- `*_at` for domain-specific timestamps
 
 ---
 
@@ -268,13 +256,10 @@ Current inconsistency across tables:
 
 **Priority:** High | **Effort:** ~2 hours | **Impact:** Prevents implicit casting bugs in joins
 
-- `user_send_preferences.user_id`: `TEXT`
-- `audit_logs.user_id`: `CHARACTER VARYING`
-- `conversations.current_rep_id`: `TEXT`
+**Status:** ✅ Complete
 
-- [ ] Decide on canonical type: `TEXT` (preferred in PostgreSQL — no length semantics needed)
-- [ ] Migrate `audit_logs.user_id` from `CHARACTER VARYING` to `TEXT`
-- [ ] Add a `users` reference table or document that user IDs are Slack member IDs (e.g., `U01XXXXXXX`)
+- [x] Migrated `audit_logs.user_id` from `CHARACTER VARYING` to `TEXT`
+- All user_id columns now use `TEXT` type consistently
 
 ---
 
@@ -282,15 +267,21 @@ Current inconsistency across tables:
 
 **Priority:** High | **Effort:** ~2 hours | **Impact:** Prevents invalid status values at the DB level
 
-```sql
-CREATE TYPE sms_send_status AS ENUM ('PENDING', 'SENT', 'FAILED', 'BOUNCED', 'DELIVERED', 'UNSUBSCRIBED');
-CREATE TYPE conversation_status AS ENUM ('ACTIVE', 'CLOSED', 'ARCHIVED');
-CREATE TYPE tcpa_consent_status AS ENUM ('OPTED_IN', 'OPTED_OUT', 'PENDING', 'UNKNOWN');
-CREATE TYPE opt_out_method AS ENUM ('SMS_REPLY', 'LINK_CLICK', 'MANUAL', 'SYSTEM');
-```
+**Status:** ✅ Complete
 
-- [ ] Migrate existing `status` columns to use enum types after auditing all current values
-- [ ] Rename boolean fields to use `is_*` prefix: `accepted` → `is_accepted`, `edited` → `is_edited`, `dnc` → `is_dnc`
+Created enum types:
+- `tcpa_consent_status` ('OPTED_IN', 'OPTED_OUT', 'PENDING', 'UNKNOWN')
+- `gdpr_consent_status` ('OPTED_IN', 'OPTED_OUT', 'PENDING', 'UNKNOWN')
+- `delivery_status` ('PENDING', 'SENT', 'DELIVERED', 'FAILED', 'UNDELIVERABLE')
+
+Updated columns to use enum types:
+- `inbox_contact_profiles.tcpa_consent_status`
+- `inbox_contact_profiles.gdpr_consent_status`
+- `send_attempts.delivery_status`
+- `sms_events.delivery_status`
+- `message_delivery_log.status`
+- `consent_audit_log.previous_consent_status`
+- `consent_audit_log.new_consent_status`
 
 ---
 

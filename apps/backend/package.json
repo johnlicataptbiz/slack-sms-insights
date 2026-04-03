@@ -27,6 +27,7 @@
     "test:outcome-keywords-api": "node --import tsx ./scripts/test-outcome-keywords-api.ts",
     "refresh:booked-attribution": "node --import tsx ./scripts/refresh-booked-call-attribution.ts",
     "regenerate:runs": "node --import tsx ./scripts/regenerate-daily-runs.ts",
+    "analyze:data": "node --import tsx ./scripts/data-analysis.ts",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "dev": "node --import tsx app.ts",
     "start": "node ./dist/app.js",

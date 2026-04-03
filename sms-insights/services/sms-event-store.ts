@@ -75,6 +75,16 @@ export const insertSmsEvent = async (
       sequence_id: sequenceId,
       conversation_id: event.conversationId ?? null,
       raw: toNullableJson(event.raw),
+      delivery_status: 'sent',
+      delivered_at: null,
+      read_at: null,
+      media_urls: [],
+      link_clicks: 0,
+      ai_classification: null,
+      sentiment_score: null,
+      is_booking_signal: false,
+      thread_id: null,
+      parent_event_id: null,
     };
 
     const result = await prisma.sms_events.upsert({

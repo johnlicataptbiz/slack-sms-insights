@@ -1,8 +1,773 @@
 {
-  "generatedAt": "2026-03-24T09:31:16.558Z",
+  "generatedAt": "2026-04-03T13:23:19.358Z",
   "daysIncluded": 365,
-  "totalCount": 470,
+  "totalCount": 564,
   "entries": [
+    {
+      "hash": "be8e3a3",
+      "date": "2026-04-02T20:30:12-05:00",
+      "message": "fix: Add analytics schema baseline migration for production database",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add analytics schema baseline migration for production database"
+    },
+    {
+      "hash": "1de6120",
+      "date": "2026-04-02T18:07:44-05:00",
+      "message": "fix: resolve Prisma 7 type errors in conversation repository and schemas",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Resolve Prisma 7 type errors in conversation repository and schemas"
+    },
+    {
+      "hash": "c59b3f7",
+      "date": "2026-04-02T17:55:34-05:00",
+      "message": "feat: configure backend with Prisma adapter-pg and restore routes",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Configure backend with Prisma adapter-pg and restore routes"
+    },
+    {
+      "hash": "2845c80",
+      "date": "2026-04-02T15:40:12-05:00",
+      "message": "refactor: remove duplicate alerts-webhook.ts (consolidated to apps/backend)",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Integrations",
+      "description": "Remove duplicate alerts-webhook.ts (consolidated to apps/backend)"
+    },
+    {
+      "hash": "c44f1cc",
+      "date": "2026-04-02T15:40:04-05:00",
+      "message": "feat: implement conversation_notes and message_templates with Prisma",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement conversation_notes and message_templates with Prisma"
+    },
+    {
+      "hash": "bd0c089",
+      "date": "2026-04-02T15:35:32-05:00",
+      "message": "chore: update frontend package dependencies",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Update frontend package dependencies"
+    },
+    {
+      "hash": "2ec1a0a",
+      "date": "2026-04-02T13:23:35-05:00",
+      "message": "feat: Implement analytics schema bootstrap and KPI facts refresh for V2 insights stability",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement analytics schema bootstrap and KPI facts refresh for V2 insights stability"
+    },
+    {
+      "hash": "b7cfc6a",
+      "date": "2026-04-02T13:13:59-05:00",
+      "message": "Copilot/vscode mn0tntyv 08zh (#54)",
+      "author": "johnlicataptbiz",
+      "type": "other",
+      "category": "General",
+      "description": "Copilot/vscode mn0tntyv 08zh (#54)"
+    },
+    {
+      "hash": "00f622c",
+      "date": "2026-04-02T13:13:11-05:00",
+      "message": "Implement CI enforcer server with GitHub tools (#53)",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Implement CI enforcer server with GitHub tools (#53)"
+    },
+    {
+      "hash": "1308fcb",
+      "date": "2026-04-02T08:16:13-05:00",
+      "message": "chore(ci): retrigger after Vercel root directory fix",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Retrigger after Vercel root directory fix"
+    },
+    {
+      "hash": "08da586",
+      "date": "2026-04-02T08:02:05-05:00",
+      "message": "chore: retrigger CI",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Retrigger CI"
+    },
+    {
+      "hash": "fcc7e47",
+      "date": "2026-04-02T03:44:17Z",
+      "message": "fix(mcp): apply all ci-enforcer.js review feedback",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Apply all ci-enforcer.js review feedback"
+    },
+    {
+      "hash": "9a96306",
+      "date": "2026-04-01T22:41:59-05:00",
+      "message": "Update mcp/ci-enforcer.js",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Update mcp/ci-enforcer.js"
+    },
+    {
+      "hash": "fc32934",
+      "date": "2026-04-01T22:41:46-05:00",
+      "message": "Update mcp/ci-enforcer.js",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Update mcp/ci-enforcer.js"
+    },
+    {
+      "hash": "d4e68d2",
+      "date": "2026-03-22T19:40:48-05:00",
+      "message": "Implement CI enforcer server with GitHub tools",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Implement CI enforcer server with GitHub tools"
+    },
+    {
+      "hash": "8415d85",
+      "date": "2026-04-02T11:49:45-05:00",
+      "message": "fix(api): fallback sales-metrics when analytics schema is missing",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fallback sales-metrics when analytics schema is missing"
+    },
+    {
+      "hash": "14139de",
+      "date": "2026-04-02T11:43:25-05:00",
+      "message": "fix(api): degrade gracefully on Prisma schema drift errors",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Degrade gracefully on Prisma schema drift errors"
+    },
+    {
+      "hash": "fcc6928",
+      "date": "2026-04-02T10:47:48-05:00",
+      "message": "fix(ui): improve password gate formatting and harden broken-route handling",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Authentication",
+      "description": "Improve password gate formatting and harden broken-route handling"
+    },
+    {
+      "hash": "1473f00",
+      "date": "2026-04-02T10:44:24-05:00",
+      "message": "fix(frontend): repair SPA deep-link routing and password-gate formatting",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Repair SPA deep-link routing and password-gate formatting"
+    },
+    {
+      "hash": "01a1c2c",
+      "date": "2026-04-02T10:03:51-05:00",
+      "message": "fix(build): use mutable Prisma log array types",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Use mutable Prisma log array types"
+    },
+    {
+      "hash": "f09a5a0",
+      "date": "2026-04-02T09:59:09-05:00",
+      "message": "fix(runtime): configure Prisma 7 client with adapter or accelerateUrl",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Configure Prisma 7 client with adapter or accelerateUrl"
+    },
+    {
+      "hash": "40863d4",
+      "date": "2026-04-02T09:53:53-05:00",
+      "message": "fix(build): allow structured sms_event raw payload types",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Allow structured sms_event raw payload types"
+    },
+    {
+      "hash": "8f0975e",
+      "date": "2026-04-02T09:49:26-05:00",
+      "message": "fix(railway): include sms-insights in deployment archive",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Include sms-insights in deployment archive"
+    },
+    {
+      "hash": "1a583ce",
+      "date": "2026-04-02T09:30:50-05:00",
+      "message": "fix(railway): make backend tsconfig self-contained for root-directory builds",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Make backend tsconfig self-contained for root-directory builds"
+    },
+    {
+      "hash": "1b519f0",
+      "date": "2026-04-02T09:26:47-05:00",
+      "message": "fix(railway): add explicit backend start command for Nixpacks runtime",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add explicit backend start command for Nixpacks runtime"
+    },
+    {
+      "hash": "444f568",
+      "date": "2026-04-02T09:04:38-05:00",
+      "message": "chore(hotfix): restore sms-insights source path for Railway rootDirectory compatibility",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Restore sms-insights source path for Railway rootDirectory compatibility"
+    },
+    {
+      "hash": "53b613b",
+      "date": "2026-04-02T07:58:26-05:00",
+      "message": "chore: remove accidental probe file",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Remove accidental probe file"
+    },
+    {
+      "hash": "eeb18f3",
+      "date": "2026-04-02T07:58:20-05:00",
+      "message": "probe",
+      "author": "johnlicataptbiz",
+      "type": "other",
+      "category": "General",
+      "description": "Probe"
+    },
+    {
+      "hash": "81feff2",
+      "date": "2026-04-01T22:38:41-05:00",
+      "message": "fix(seo): restore crawlability endpoints and add schema guards",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Restore crawlability endpoints and add schema guards"
+    },
+    {
+      "hash": "c0622ee",
+      "date": "2026-04-01T22:21:32-05:00",
+      "message": "fix(vercel): align frontend root and add missing phone parser dep",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Align frontend root and add missing phone parser dep"
+    },
+    {
+      "hash": "69d3821",
+      "date": "2026-04-01T22:04:45-05:00",
+      "message": "Add MONDAY_AUTO_WRITE_ENABLED safety gate to env samples and improve disable-monday-sync runbook (#46)",
+      "author": "Copilot",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add MONDAY_AUTO_WRITE_ENABLED safety gate to env samples and improve disable-monday-sync runbook ..."
+    },
+    {
+      "hash": "83cf744",
+      "date": "2026-04-01T22:04:30-05:00",
+      "message": "Fix backend biome lint and npm workspace scripts (#51)",
+      "author": "johnlicataptbiz",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix backend biome lint and npm workspace scripts (#51)"
+    },
+    {
+      "hash": "d7637e9",
+      "date": "2026-04-01T21:40:59-05:00",
+      "message": "Commit remaining frontend query updates from inbox/typecheck pass",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Dashboard",
+      "description": "Commit remaining frontend query updates from inbox/typecheck pass"
+    },
+    {
+      "hash": "a18d9df",
+      "date": "2026-04-01T21:39:38-05:00",
+      "message": "Fix frontend strict type errors and re-enable blocking CI checks",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix frontend strict type errors and re-enable blocking CI checks"
+    },
+    {
+      "hash": "046de94",
+      "date": "2026-04-01T20:03:28-05:00",
+      "message": "Add missing backend type dependencies for CI",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add missing backend type dependencies for CI"
+    },
+    {
+      "hash": "b609531",
+      "date": "2026-04-01T20:01:31-05:00",
+      "message": "Fix CI dependency parity for backend and frontend builds",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix CI dependency parity for backend and frontend builds"
+    },
+    {
+      "hash": "d414b31",
+      "date": "2026-04-01T19:59:05-05:00",
+      "message": "Stabilize CI builds and narrow backend TypeScript scope",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Infrastructure",
+      "description": "Stabilize CI builds and narrow backend TypeScript scope"
+    },
+    {
+      "hash": "c7549d4",
+      "date": "2026-04-01T19:49:59-05:00",
+      "message": "Fix frontend CI dependency resolution for tests",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix frontend CI dependency resolution for tests"
+    },
+    {
+      "hash": "53abb9c",
+      "date": "2026-04-01T19:48:20-05:00",
+      "message": "Recover CI-critical files and stabilize frontend tests/build",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Infrastructure",
+      "description": "Recover CI-critical files and stabilize frontend tests/build"
+    },
+    {
+      "hash": "30c543c",
+      "date": "2026-04-01T19:35:03-05:00",
+      "message": "Fix CI workflow workspace/path config and npm setup-node failures",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Fix CI workflow workspace/path config and npm setup-node failures"
+    },
+    {
+      "hash": "1929c01",
+      "date": "2026-04-01T19:30:44-05:00",
+      "message": "Revert \"Implement Monday board intelligence + restore strict TypeScript builds (#52)\"",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Revert \"Implement Monday board intelligence + restore strict TypeScript builds (#52)\""
+    },
+    {
+      "hash": "5b4cd94",
+      "date": "2026-04-01T19:29:28-05:00",
+      "message": "Implement Monday board intelligence + restore strict TypeScript builds (#52)",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Implement Monday board intelligence + restore strict TypeScript builds (#52)"
+    },
+    {
+      "hash": "2af01bb",
+      "date": "2026-03-31T02:05:33-05:00",
+      "message": "Fix 260 TypeScript errors: Prisma model names, missing schema models, syntax fixes",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fix 260 TypeScript errors: Prisma model names, missing schema models, syntax fixes"
+    },
+    {
+      "hash": "7669a6c",
+      "date": "2026-03-31T01:22:31-05:00",
+      "message": "fix(backend): complete TypeScript build + Prisma unification (247 errors fixed)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Complete TypeScript build + Prisma unification (247 errors fixed)"
+    },
+    {
+      "hash": "47a3169",
+      "date": "2026-03-31T01:06:45-05:00",
+      "message": "fix: complete KPI facts pipeline with text pattern filtering",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Complete KPI facts pipeline with text pattern filtering"
+    },
+    {
+      "hash": "89f9488",
+      "date": "2026-03-31T01:02:35-05:00",
+      "message": "fix: resolve TS syntax errors in insights-summary with raw SQL fallbacks",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Resolve TS syntax errors in insights-summary with raw SQL fallbacks"
+    },
+    {
+      "hash": "322dfd3",
+      "date": "2026-03-31T00:49:24-05:00",
+      "message": "fix(insights-summary): resolve TS syntax errors with raw SQL queries + Prisma config",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Resolve TS syntax errors with raw SQL queries + Prisma config"
+    },
+    {
+      "hash": "f791d96",
+      "date": "2026-03-31T00:01:49-05:00",
+      "message": "fix(sms-insights): fixed services + local prisma",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fixed services + local prisma"
+    },
+    {
+      "hash": "eba3908",
+      "date": "2026-03-30T23:53:45-05:00",
+      "message": "fix: schema drift + aloware body + analytics graceful",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Schema drift + aloware body + analytics graceful"
+    },
+    {
+      "hash": "1984557",
+      "date": "2026-03-30T23:45:59-05:00",
+      "message": "fix: force body stringify sms-event-store",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Force body stringify sms-event-store"
+    },
+    {
+      "hash": "cdfaf54",
+      "date": "2026-03-30T23:40:55-05:00",
+      "message": "fix: aloware body validation + schema fallbacks",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Aloware body validation + schema fallbacks"
+    },
+    {
+      "hash": "adb8e85",
+      "date": "2026-03-30T23:31:43-05:00",
+      "message": "fix: biome linting (0 errors)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Biome linting (0 errors)"
+    },
+    {
+      "hash": "8169c03",
+      "date": "2026-03-30T21:24:30-05:00",
+      "message": "fix: address linting issues from branch analysis",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Address linting issues from branch analysis"
+    },
+    {
+      "hash": "30ea29f",
+      "date": "2026-03-30T21:15:58-05:00",
+      "message": "docs: update PROJECT_CONTEXT.md with branch review findings",
+      "author": "Jack Licata",
+      "type": "docs",
+      "category": "General",
+      "description": "Update PROJECT_CONTEXT.md with branch review findings"
+    },
+    {
+      "hash": "42332a8",
+      "date": "2026-03-30T21:10:27-05:00",
+      "message": "feat: implement project rescue recommendations",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Implement project rescue recommendations"
+    },
+    {
+      "hash": "048f3d7",
+      "date": "2026-03-30T20:36:02-05:00",
+      "message": "chore: remove legacy sms-insights backend directory",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Remove legacy sms-insights backend directory"
+    },
+    {
+      "hash": "e9d7698",
+      "date": "2026-03-30T20:31:18-05:00",
+      "message": "chore: comprehensive repository cleanup and deduplication",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Comprehensive repository cleanup and deduplication"
+    },
+    {
+      "hash": "3948acd",
+      "date": "2026-03-30T20:22:41-05:00",
+      "message": "chore: organize project folders - move scattered files to organized directories",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "General",
+      "description": "Organize project folders - move scattered files to organized directories"
+    },
+    {
+      "hash": "eb8e175",
+      "date": "2026-03-30T19:24:27-05:00",
+      "message": "feat: implement database resilience and fix Aloware webhook parsing",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Implement database resilience and fix Aloware webhook parsing"
+    },
+    {
+      "hash": "cb562c8",
+      "date": "2026-03-30T18:42:56-05:00",
+      "message": "Fix TypeScript errors in work-item services for deployment",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Fix TypeScript errors in work-item services for deployment"
+    },
+    {
+      "hash": "8f208dc",
+      "date": "2026-03-30T18:39:47-05:00",
+      "message": "Handle missing fact_booking_daily table gracefully",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Database",
+      "description": "Handle missing fact_booking_daily table gracefully"
+    },
+    {
+      "hash": "735e804",
+      "date": "2026-03-30T18:17:26-05:00",
+      "message": "Fix Prisma connection for Railway deployment",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fix Prisma connection for Railway deployment"
+    },
+    {
+      "hash": "660d867",
+      "date": "2026-03-30T18:15:48-05:00",
+      "message": "Pin Prisma dependencies to exact v7.6.0 for Railway compatibility",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "Database",
+      "description": "Pin Prisma dependencies to exact v7.6.0 for Railway compatibility"
+    },
+    {
+      "hash": "43e3475",
+      "date": "2026-03-30T18:15:06-05:00",
+      "message": "Update Prisma dependencies to v7.6.0 for adapter compatibility",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Database",
+      "description": "Update Prisma dependencies to v7.6.0 for adapter compatibility"
+    },
+    {
+      "hash": "0418fce",
+      "date": "2026-03-30T17:49:09-05:00",
+      "message": "Fix Prisma adapter integration and health endpoint",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fix Prisma adapter integration and health endpoint"
+    },
+    {
+      "hash": "4a812c7",
+      "date": "2026-03-30T17:41:45-05:00",
+      "message": "Fix .gitignore typo and remove tracked node_modules",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix .gitignore typo and remove tracked node_modules"
+    },
+    {
+      "hash": "b67b06d",
+      "date": "2026-03-30T17:40:29-05:00",
+      "message": "Fix Prisma Accelerate P6000 errors by switching to direct PostgreSQL connections with adapter",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Fix Prisma Accelerate P6000 errors by switching to direct PostgreSQL connections with adapter"
+    },
+    {
+      "hash": "38e7a12",
+      "date": "2026-03-30T17:34:15-05:00",
+      "message": "Add deployment marker to health check",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add deployment marker to health check"
+    },
+    {
+      "hash": "5b34886",
+      "date": "2026-03-30T17:34:00-05:00",
+      "message": "Trigger deployment with updated env",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Trigger deployment with updated env"
+    },
+    {
+      "hash": "0f34038",
+      "date": "2026-03-30T17:30:04-05:00",
+      "message": "Update Prisma schema with complete database models from db pull",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Database",
+      "description": "Update Prisma schema with complete database models from db pull"
+    },
+    {
+      "hash": "dd8f1ac",
+      "date": "2026-03-30T17:28:22-05:00",
+      "message": "Add database health check to health endpoint",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add database health check to health endpoint"
+    },
+    {
+      "hash": "315358e",
+      "date": "2026-03-30T15:19:52-05:00",
+      "message": "Implement major backend and frontend updates for SMS insights",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Implement major backend and frontend updates for SMS insights"
+    },
+    {
+      "hash": "34b091b",
+      "date": "2026-03-28T13:29:18-04:00",
+      "message": "fix(build): repair aloware processor sms event import",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Repair aloware processor sms event import"
+    },
+    {
+      "hash": "6ad397b",
+      "date": "2026-03-28T13:25:19-04:00",
+      "message": "fix(sequences): use canonical fact rollups for deep metrics",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Use canonical fact rollups for deep metrics"
+    },
+    {
+      "hash": "df08073",
+      "date": "2026-03-27T12:57:39-04:00",
+      "message": "fix(aloware): persist webhook sms events",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Integrations",
+      "description": "Persist webhook sms events"
+    },
+    {
+      "hash": "cdcf6fb",
+      "date": "2026-03-27T12:56:17-04:00",
+      "message": "fix(v2): expand sequences name column",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Expand sequences name column"
+    },
+    {
+      "hash": "442f5ea",
+      "date": "2026-03-27T12:52:13-04:00",
+      "message": "fix(v2): darken inbox filters and sequences tables",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Darken inbox filters and sequences tables"
+    },
+    {
+      "hash": "9d87eb1",
+      "date": "2026-03-27T12:37:16-04:00",
+      "message": "fix(v2): improve dark theme contrast for inbox and sequences",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Improve dark theme contrast for inbox and sequences"
+    },
+    {
+      "hash": "d7e9fcc",
+      "date": "2026-03-27T11:35:00-04:00",
+      "message": "fix(monday): commit backend sync guardrails",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Commit backend sync guardrails"
+    },
+    {
+      "hash": "c2a3388",
+      "date": "2026-03-27T11:22:23-04:00",
+      "message": "fix(v2): improve inbox and sequences contrast",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Dashboard",
+      "description": "Improve inbox and sequences contrast"
+    },
+    {
+      "hash": "bacbb65",
+      "date": "2026-03-26T11:52:06-04:00",
+      "message": "fix(ci): stabilize frontend/backend builds and report workflow",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Stabilize frontend/backend builds and report workflow"
+    },
+    {
+      "hash": "ee25c5f",
+      "date": "2026-03-24T06:03:06-05:00",
+      "message": "Complete UI overhaul implementation across all phases",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Complete UI overhaul implementation across all phases"
+    },
+    {
+      "hash": "d4c1287",
+      "date": "2026-03-24T06:09:01-05:00",
+      "message": "Fix TS errors by stringifying raw fields",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix TS errors by stringifying raw fields"
+    },
+    {
+      "hash": "73e11d4",
+      "date": "2026-03-24T06:08:10-05:00",
+      "message": "Resolve merge conflict in package-lock.json by accepting theirs",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "General",
+      "description": "Resolve merge conflict in package-lock.json by accepting theirs"
+    },
+    {
+      "hash": "09bde3d",
+      "date": "2026-03-24T04:33:47-05:00",
+      "message": "Regenerate changelog after merge",
+      "author": "Jack Licata",
+      "type": "other",
+      "category": "General",
+      "description": "Regenerate changelog after merge"
+    },
     {
       "hash": "32c7d2e",
       "date": "2026-03-23T15:35:07-04:00",
@@ -85,6 +850,24 @@
       "description": "Complete state migration in InboxV2 - replace legacy setState with useInboxState hook"
     },
     {
+      "hash": "3765f87",
+      "date": "2026-03-23T09:22:13Z",
+      "message": "fix: apply reviewer suggestions — Dockerfile placeholder URL, sms-event-store raw types, heading query in test",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Apply reviewer suggestions — Dockerfile placeholder URL, sms-event-store raw types, heading query..."
+    },
+    {
+      "hash": "6d8be78",
+      "date": "2026-03-23T04:18:31-05:00",
+      "message": "Apply suggestion from @Copilot",
+      "author": "johnlicataptbiz",
+      "type": "other",
+      "category": "AI & ML",
+      "description": "Apply suggestion from @Copilot"
+    },
+    {
       "hash": "7778e39",
       "date": "2026-03-23T04:09:57-05:00",
       "message": "fix: resolve escalationLevel ReferenceError in InboxV2",
@@ -101,6 +884,15 @@
       "type": "refactor",
       "category": "Dashboard",
       "description": "Update qualification labels to match core pre-qualifiers"
+    },
+    {
+      "hash": "e162e6c",
+      "date": "2026-03-23T08:29:30Z",
+      "message": "Fix: Non-null assertion on `.closest()` return value without explicit null check makes test fragile to DOM structure changes",
+      "author": "Vercel",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Non-null assertion on `.closest()` return value without explicit null check makes test fragile to..."
     },
     {
       "hash": "33a955a",
@@ -238,6 +1030,33 @@
       "description": "Add database analysis scripts, reports, and updates"
     },
     {
+      "hash": "36b83e0",
+      "date": "2026-03-22T22:56:39Z",
+      "message": "fix: apply review feedback — health endpoint safety, Prisma postgres:// support, startup error handling, engine constraint alignment",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Apply review feedback — health endpoint safety, Prisma postgres:// support, startup error handlin..."
+    },
+    {
+      "hash": "8a3d799",
+      "date": "2026-03-22T22:48:27Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
+    },
+    {
+      "hash": "9cdbf09",
+      "date": "2026-03-22T17:48:02-05:00",
+      "message": "Update sms-insights/api/routes.ts",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Integrations",
+      "description": "Update sms-insights/api/routes.ts"
+    },
+    {
       "hash": "fb20fc9",
       "date": "2026-03-22T17:45:23-05:00",
       "message": "fix: resolve TypeScript errors in attribution and conversion services",
@@ -283,6 +1102,15 @@
       "description": "Align workflow parity — add --legacy-peer-deps and typecheck:v2 to both workflows"
     },
     {
+      "hash": "19b513b",
+      "date": "2026-03-22T12:11:22-05:00",
+      "message": "fix(railway): restore backend deployment health",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Restore backend deployment health"
+    },
+    {
       "hash": "d0738b9",
       "date": "2026-03-22T15:26:46Z",
       "message": "fix(ci): reconcile cleaned railway branch and unblock backend tests",
@@ -308,6 +1136,24 @@
       "type": "feature",
       "category": "Database",
       "description": "Merge PR #27: Add DATABASE_URL build arg for Prisma generation"
+    },
+    {
+      "hash": "81bd67b",
+      "date": "2026-03-22T01:55:07Z",
+      "message": "fix: reconcile PRs — TS build, Prisma raw field, frontend tests, CI workflows, Dockerfile DATABASE_URL, remove TODO.md",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Reconcile PRs — TS build, Prisma raw field, frontend tests, CI workflows, Dockerfile DATABASE_URL..."
+    },
+    {
+      "hash": "ce19452",
+      "date": "2026-03-22T01:39:59Z",
+      "message": "Initial plan",
+      "author": "copilot-swe-agent[bot]",
+      "type": "other",
+      "category": "General",
+      "description": "Initial plan"
     },
     {
       "hash": "2e1c0ac",

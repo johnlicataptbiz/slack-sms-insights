@@ -25,33 +25,33 @@ export const resolveSequenceId = async (
 
   return await prisma.$transaction(async (tx) => {
     const existingAlias = await tx.sequenceAliases.findUnique({
-      where: { raw_label: trimmed },
+      where: { rawLabel: trimmed },
     });
-    if (existingAlias) return existingAlias.sequence_id;
+    if (existingAlias) return existingAlias.sequenceId;
 
     let registry = await tx.sequenceRegistry.findUnique({
-      where: { normalized_label: normalized },
+      where: { normalizedLabel: normalized },
     });
 
     if (!registry) {
     registry = await tx.sequenceRegistry.create({
 data: {
   label: trimmed,
-  normalized_label: normalized,
+  normalizedLabel: normalized,
 },
       });
     }
 
     await tx.sequenceAliases.upsert({
-      where: { raw_label: trimmed },
+      where: { rawLabel: trimmed },
       update: {
-        normalized_label: normalized,
-        sequence_id: registry.id,
+        normalizedLabel: normalized,
+        sequenceId: registry.id,
       },
       create: {
-        raw_label: trimmed,
-        normalized_label: normalized,
-        sequence_id: registry.id,
+        rawLabel: trimmed,
+        normalizedLabel: normalized,
+        sequenceId: registry.id,
       },
     });
 

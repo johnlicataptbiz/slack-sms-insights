@@ -100,18 +100,18 @@ export const getSequencesDeep = async (
         },
       },
       select: {
-        sequence_id: true,
-        booked_total: true,
-        booked_jack: true,
-        booked_brandon: true,
-        booked_self: true,
-        booked_after_sms_reply: true,
-        diagnostic_booking_signals: true,
+        sequenceId: true,
+        bookedTotal: true,
+        bookedJack: true,
+        bookedBrandon: true,
+        bookedSelf: true,
+        bookedAfterSmsReply: true,
+        diagnosticBookingSignals: true,
       },
     });
   } catch (e) {
-    warnings.push('fact_booking_daily unavailable');
-    logger?.warn?.('sequences-deep-fixed: fact_booking_daily unavailable', e);
+    warnings.push('factBookingDaily unavailable');
+    logger?.warn?.('sequences-deep-fixed: factBookingDaily unavailable', e);
   }
 
   let sequenceRows: any[] = [];
@@ -121,17 +121,17 @@ export const getSequencesDeep = async (
       select: {
         id: true,
         label: true,
-        lead_magnet: true,
-        version_tag: true,
-        owner_rep: true,
+        leadMagnet: true,
+        versionTag: true,
+        ownerRep: true,
         status: true,
-        is_manual_bucket: true,
+        isManualBucket: true,
       },
       orderBy: { label: 'asc' },
     });
   } catch (e) {
-    warnings.push('sequence_registry unavailable');
-    logger?.warn?.('sequences-deep-fixed: sequence_registry unavailable', e);
+    warnings.push('sequenceRegistry unavailable');
+    logger?.warn?.('sequences-deep-fixed: sequenceRegistry unavailable', e);
   }
 
   let mondayRows: any[] = [];
@@ -144,40 +144,40 @@ export const getSequencesDeep = async (
         },
       },
       select: {
-        board_id: true,
-        is_stale: true,
-        sync_status: true,
-        source_coverage_pct: true,
-        campaign_coverage_pct: true,
-        set_by_coverage_pct: true,
-        touchpoints_coverage_pct: true,
+        boardId: true,
+        isStale: true,
+        syncStatus: true,
+        sourceCoveragePct: true,
+        campaignCoveragePct: true,
+        setByCoveragePct: true,
+        touchpointsCoveragePct: true,
       },
     });
   } catch (e) {
-    warnings.push('fact_monday_health_daily unavailable');
-    logger?.warn?.('sequences-deep-fixed: fact_monday_health_daily unavailable', e);
+    warnings.push('factMondayHealthDaily unavailable');
+    logger?.warn?.('sequences-deep-fixed: factMondayHealthDaily unavailable', e);
   }
 
   let rawEventRows: any[] = [];
   try {
     rawEventRows = await prisma.smsEvents.findMany({
       where: {
-        event_ts: { gte: scanFrom, lte: params.to },
+        eventTs: { gte: scanFrom, lte: params.to },
         direction: { in: ['inbound', 'outbound'] },
       },
-      orderBy: { event_ts: 'asc' },
+      orderBy: { eventTs: 'asc' },
       select: {
-        event_ts: true,
+        eventTs: true,
         direction: true,
-        sequence_id: true,
+        sequenceId: true,
         body: true,
-        contact_id: true,
-        contact_phone: true,
+        contactId: true,
+        contactPhone: true,
       },
     });
   } catch (e) {
-    warnings.push('sms_events unavailable');
-    logger?.warn?.('sequences-deep-fixed: sms_events unavailable', e);
+    warnings.push('smsEvents unavailable');
+    logger?.warn?.('sequences-deep-fixed: smsEvents unavailable', e);
   }
 
   const manualSequenceId = sequenceRows?.find((row: any) => row.is_manual_bucket)?.id || null;
@@ -271,9 +271,9 @@ export const getSequencesDeep = async (
       };
     }) || [];
 
-  const boards = mondayRows ? new Set(mondayRows.map((row: any) => row.board_id)).size : 0;
-  const staleBoards = mondayRows ? mondayRows.filter((row: any) => row.is_stale).length : 0;
-  const erroredBoards = mondayRows ? mondayRows.filter((row: any) => row.sync_status === 'error').length : 0;
+  const boards = mondayRows ? new Set(mondayRows.map((row: any) => row.boardId)).size : 0;
+  const staleBoards = mondayRows ? mondayRows.filter((row: any) => row.isStale).length : 0;
+  const erroredBoards = mondayRows ? mondayRows.filter((row: any) => row.syncStatus === 'error').length : 0;
 
   return {
     window: {

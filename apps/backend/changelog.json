@@ -1,8 +1,44 @@
 {
-  "generatedAt": "2026-04-02T23:06:54.122Z",
+  "generatedAt": "2026-04-03T17:50:38.309Z",
   "daysIncluded": 365,
-  "totalCount": 556,
+  "totalCount": 566,
   "entries": [
+    {
+      "hash": "d8ea73f",
+      "date": "2026-04-03T12:43:18-05:00",
+      "message": "fix: Update TypeScript code to use snake_case field names from Prisma schema",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Update TypeScript code to use snake_case field names from Prisma schema"
+    },
+    {
+      "hash": "72ec270",
+      "date": "2026-04-03T12:38:04-05:00",
+      "message": "feat: Complete DB-005, DB-006, DB-007 database infrastructure tasks",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Complete DB-005, DB-006, DB-007 database infrastructure tasks"
+    },
+    {
+      "hash": "be8e3a3",
+      "date": "2026-04-02T20:30:12-05:00",
+      "message": "fix: Add analytics schema baseline migration for production database",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add analytics schema baseline migration for production database"
+    },
+    {
+      "hash": "1de6120",
+      "date": "2026-04-02T18:07:44-05:00",
+      "message": "fix: resolve Prisma 7 type errors in conversation repository and schemas",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Resolve Prisma 7 type errors in conversation repository and schemas"
+    },
     {
       "hash": "c59b3f7",
       "date": "2026-04-02T17:55:34-05:00",
@@ -65,6 +101,60 @@
       "type": "feature",
       "category": "Infrastructure",
       "description": "Implement CI enforcer server with GitHub tools (#53)"
+    },
+    {
+      "hash": "1308fcb",
+      "date": "2026-04-02T08:16:13-05:00",
+      "message": "chore(ci): retrigger after Vercel root directory fix",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Retrigger after Vercel root directory fix"
+    },
+    {
+      "hash": "08da586",
+      "date": "2026-04-02T08:02:05-05:00",
+      "message": "chore: retrigger CI",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Retrigger CI"
+    },
+    {
+      "hash": "fcc7e47",
+      "date": "2026-04-02T03:44:17Z",
+      "message": "fix(mcp): apply all ci-enforcer.js review feedback",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Apply all ci-enforcer.js review feedback"
+    },
+    {
+      "hash": "9a96306",
+      "date": "2026-04-01T22:41:59-05:00",
+      "message": "Update mcp/ci-enforcer.js",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Update mcp/ci-enforcer.js"
+    },
+    {
+      "hash": "fc32934",
+      "date": "2026-04-01T22:41:46-05:00",
+      "message": "Update mcp/ci-enforcer.js",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Update mcp/ci-enforcer.js"
+    },
+    {
+      "hash": "d4e68d2",
+      "date": "2026-03-22T19:40:48-05:00",
+      "message": "Implement CI enforcer server with GitHub tools",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Implement CI enforcer server with GitHub tools"
     },
     {
       "hash": "8415d85",

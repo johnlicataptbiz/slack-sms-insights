@@ -1,54 +1,65 @@
-import type { Logger } from '@slack/bolt';
+import type { Logger } from "@slack/bolt";
 import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
-} from './booked-calls.js';
-import { getPrismaClient } from './prisma.js';
-import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
+} from "./booked-calls.js";
+import { getPrismaClient } from "./prisma.js";
+import { attributeSlackBookedCallsToSequences } from "./sequence-booked-attribution.js";
 
 const getPrisma = () => getPrismaClient();
 
-const MANUAL_LABEL = 'No sequence (manual/direct)';
-const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
-const SOCIAL_MEDIA_BACKFILL_LABEL = 'Social Media (Monday backfill)';
-const SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL = 'Social Media - Instagram (Monday backfill)';
-const SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL = 'Social Media - Facebook Ads (Monday backfill)';
-const SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL = 'Social Media - Facebook Group (Monday backfill)';
-const SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL = 'Social Media - LinkedIn (Monday backfill)';
-const SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL = 'Social Media - Organic (Monday backfill)';
-const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
+const MANUAL_LABEL = "No sequence (manual/direct)";
+const MONDAY_BACKFILL_LABEL = "Monday backfill (sequence unresolved)";
+const SOCIAL_MEDIA_BACKFILL_LABEL = "Social Media (Monday backfill)";
+const SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL =
+  "Social Media - Instagram (Monday backfill)";
+const SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL =
+  "Social Media - Facebook Ads (Monday backfill)";
+const SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL =
+  "Social Media - Facebook Group (Monday backfill)";
+const SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL =
+  "Social Media - LinkedIn (Monday backfill)";
+const SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL =
+  "Social Media - Organic (Monday backfill)";
+const DEFAULT_SALES_TEAM_BOARD_ID = "5077164868";
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
-const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
-const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
+const BOOKED_CONFIRMATION_LINK_PATTERN =
+  /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
+const CANCELLATION_PATTERN =
+  /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
 
 const normalizeRep = (value: string | null | undefined): string => {
-  const normalized = (value || '').trim().toLowerCase();
-  if (!normalized) return 'unknown';
-  if (normalized.includes('jack')) return 'jack';
-  if (normalized.includes('brandon')) return 'brandon';
-  if (normalized.includes('john')) return 'john';
-  if (normalized.includes('toni') || normalized.includes('tony')) return 'toni';
+  const normalized = (value || "").trim().toLowerCase();
+  if (!normalized) return "unknown";
+  if (normalized.includes("jack")) return "jack";
+  if (normalized.includes("brandon")) return "brandon";
+  if (normalized.includes("john")) return "john";
+  if (normalized.includes("toni") || normalized.includes("tony")) return "toni";
   return normalized;
 };
 
-const contactKeyFor = (event: { contact_id: string | null; contact_phone: string | null }): string | null => {
+const contactKeyFor = (event: {
+  contact_id: string | null;
+  contact_phone: string | null;
+}): string | null => {
   if (event.contact_id) return `contact:${event.contact_id}`;
-  if (event.contact_phone) return `phone:${event.contact_phone.replace(/\D/g, '')}`;
+  if (event.contact_phone)
+    return `phone:${event.contact_phone.replace(/\D/g, "")}`;
   return null;
 };
 
 const dayKey = (value: Date, timeZone: string): string => {
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).formatToParts(value);
-  const year = parts.find((part) => part.type === 'year')?.value || '1970';
-  const month = parts.find((part) => part.type === 'month')?.value || '01';
-  const day = parts.find((part) => part.type === 'day')?.value || '01';
+  const year = parts.find((part) => part.type === "year")?.value || "1970";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
   return `${year}-${month}-${day}`;
 };
 
@@ -57,19 +68,30 @@ const toDayDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 const isBookingSignal = (direction: string, body: string): boolean => {
   if (!body) return false;
   if (BOOKED_CONFIRMATION_LINK_PATTERN.test(body)) return true;
-  return direction === 'inbound' && HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) && !CANCELLATION_PATTERN.test(body);
+  return (
+    direction === "inbound" &&
+    HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) &&
+    !CANCELLATION_PATTERN.test(body)
+  );
 };
 
 const isOptOutSignal = (direction: string, body: string): boolean =>
-  direction === 'inbound' && CANCELLATION_PATTERN.test(body);
-const resolveSocialMondayBackfillLabel = (source: string | null | undefined): string => {
-  const normalized = (source || '').trim().toLowerCase();
+  direction === "inbound" && CANCELLATION_PATTERN.test(body);
+const resolveSocialMondayBackfillLabel = (
+  source: string | null | undefined,
+): string => {
+  const normalized = (source || "").trim().toLowerCase();
   if (!normalized) return SOCIAL_MEDIA_BACKFILL_LABEL;
-  if (normalized.includes('instagram')) return SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL;
-  if (normalized.includes('facebook group')) return SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL;
-  if (normalized.includes('facebook ads') || normalized === 'facebook') return SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL;
-  if (normalized.includes('linkedin')) return SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL;
-  if (normalized.includes('organic social')) return SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL;
+  if (normalized.includes("instagram"))
+    return SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL;
+  if (normalized.includes("facebook group"))
+    return SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL;
+  if (normalized.includes("facebook ads") || normalized === "facebook")
+    return SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL;
+  if (normalized.includes("linkedin"))
+    return SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL;
+  if (normalized.includes("organic social"))
+    return SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL;
   return SOCIAL_MEDIA_BACKFILL_LABEL;
 };
 
@@ -91,37 +113,39 @@ export type KpiFactRefreshResult = {
 
 export const refreshKpiFacts = async (
   params: FactRefreshParams,
-  logger?: Pick<Logger, 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "warn" | "error">,
 ): Promise<KpiFactRefreshResult> => {
   const prisma = getPrisma();
-  const salesTeamBoardId = (process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID).trim();
+  const salesTeamBoardId = (
+    process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID
+  ).trim();
 
   const manual = await prisma.sequence_registry.upsert({
-    where: { normalized_label: 'no sequence manual direct' },
+    where: { normalized_label: "no sequence manual direct" },
     update: { is_manual_bucket: true },
     create: {
       label: MANUAL_LABEL,
-      normalized_label: 'no sequence manual direct',
+      normalized_label: "no sequence manual direct",
       is_manual_bucket: true,
     },
     select: { id: true },
   });
   const mondayBackfill = await prisma.sequence_registry.upsert({
-    where: { normalized_label: 'monday backfill sequence unresolved' },
+    where: { normalized_label: "monday backfill sequence unresolved" },
     update: { is_manual_bucket: false },
     create: {
       label: MONDAY_BACKFILL_LABEL,
-      normalized_label: 'monday backfill sequence unresolved',
+      normalized_label: "monday backfill sequence unresolved",
       is_manual_bucket: false,
     },
     select: { id: true },
   });
   const socialMediaBackfill = await prisma.sequence_registry.upsert({
-    where: { normalized_label: 'social media monday backfill' },
+    where: { normalized_label: "social media monday backfill" },
     update: { is_manual_bucket: false },
     create: {
       label: SOCIAL_MEDIA_BACKFILL_LABEL,
-      normalized_label: 'social media monday backfill',
+      normalized_label: "social media monday backfill",
       is_manual_bucket: false,
     },
     select: { id: true },
@@ -134,51 +158,53 @@ export const refreshKpiFacts = async (
     socialOrganicBackfill,
   ] = await Promise.all([
     prisma.sequence_registry.upsert({
-      where: { normalized_label: 'social media instagram monday backfill' },
+      where: { normalized_label: "social media instagram monday backfill" },
       update: { is_manual_bucket: false },
       create: {
         label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
-        normalized_label: 'social media instagram monday backfill',
+        normalized_label: "social media instagram monday backfill",
         is_manual_bucket: false,
       },
       select: { id: true },
     }),
     prisma.sequence_registry.upsert({
-      where: { normalized_label: 'social media facebook ads monday backfill' },
+      where: { normalized_label: "social media facebook ads monday backfill" },
       update: { is_manual_bucket: false },
       create: {
         label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
-        normalized_label: 'social media facebook ads monday backfill',
+        normalized_label: "social media facebook ads monday backfill",
         is_manual_bucket: false,
       },
       select: { id: true },
     }),
     prisma.sequence_registry.upsert({
-      where: { normalized_label: 'social media facebook group monday backfill' },
+      where: {
+        normalized_label: "social media facebook group monday backfill",
+      },
       update: { is_manual_bucket: false },
       create: {
         label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
-        normalized_label: 'social media facebook group monday backfill',
+        normalized_label: "social media facebook group monday backfill",
         is_manual_bucket: false,
       },
       select: { id: true },
     }),
     prisma.sequence_registry.upsert({
-      where: { normalized_label: 'social media linkedin monday backfill' },
+      where: { normalized_label: "social media linkedin monday backfill" },
       update: { is_manual_bucket: false },
       create: {
         label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
-        normalized_label: 'social media linkedin monday backfill',
+        normalized_label: "social media linkedin monday backfill",
         is_manual_bucket: false,
       },
       select: { id: true },
     }),
     prisma.sequence_registry.upsert({
-      where: { normalized_label: 'social media organic monday backfill' },
+      where: { normalized_label: "social media organic monday backfill" },
       update: { is_manual_bucket: false },
       create: {
         label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
-        normalized_label: 'social media organic monday backfill',
+        normalized_label: "social media organic monday backfill",
         is_manual_bucket: false,
       },
       select: { id: true },
@@ -192,9 +218,9 @@ export const refreshKpiFacts = async (
   const rows = await prisma.sms_events.findMany({
     where: {
       event_ts: { gte: scanFrom, lte: rangeTo },
-      direction: { in: ['inbound', 'outbound'] },
+      direction: { in: ["inbound", "outbound"] },
     },
-    orderBy: { event_ts: 'asc' },
+    orderBy: { event_ts: "asc" },
     select: {
       event_ts: true,
       direction: true,
@@ -207,7 +233,12 @@ export const refreshKpiFacts = async (
     },
   });
 
-  type Event = (typeof rows)[number] & { _contactKey: string; _rep: string; _seqId: string; _day: string };
+  type Event = (typeof rows)[number] & {
+    _contactKey: string;
+    _rep: string;
+    _seqId: string;
+    _day: string;
+  };
   const events: Event[] = [];
   for (const row of rows) {
     const key = contactKeyFor(row);
@@ -266,11 +297,12 @@ export const refreshKpiFacts = async (
   };
 
   const inRangeDay = (day: string): boolean =>
-    day >= dayKey(rangeFrom, params.timeZone) && day <= dayKey(rangeTo, params.timeZone);
+    day >= dayKey(rangeFrom, params.timeZone) &&
+    day <= dayKey(rangeTo, params.timeZone);
 
   for (const event of events) {
     if (!inRangeDay(event._day)) continue;
-    if (event.direction !== 'outbound') continue;
+    if (event.direction !== "outbound") continue;
     const stat = ensure(event._day, event._seqId, event._rep);
     stat.messagesSent += 1;
     stat.uniqueContactedSet.add(event._contactKey);
@@ -278,7 +310,8 @@ export const refreshKpiFacts = async (
 
   for (const contactEvents of eventsByContact.values()) {
     for (const inbound of contactEvents) {
-      if (!inRangeDay(inbound._day) || inbound.direction !== 'inbound') continue;
+      if (!inRangeDay(inbound._day) || inbound.direction !== "inbound")
+        continue;
 
       const inboundTs = inbound.event_ts.getTime();
       let attributed: Event | null = null;
@@ -286,12 +319,12 @@ export const refreshKpiFacts = async (
       let latestSequenced: Event | null = null;
 
       for (const candidate of contactEvents) {
-        if (candidate.direction !== 'outbound') continue;
+        if (candidate.direction !== "outbound") continue;
         const ts = candidate.event_ts.getTime();
         if (ts > inboundTs) break;
         if (inboundTs - ts > 14 * 24 * 60 * 60 * 1000) continue;
         latestAny = candidate;
-        if ((candidate.sequence || '').trim()) latestSequenced = candidate;
+        if ((candidate.sequence || "").trim()) latestSequenced = candidate;
       }
 
       attributed = latestSequenced || latestAny;
@@ -303,8 +336,11 @@ export const refreshKpiFacts = async (
         stat.repliesReceived += 1;
       }
 
-      const body = (inbound.body || '').trim();
-      if (isOptOutSignal(inbound.direction, body) && !stat.optOutSet.has(inbound._contactKey)) {
+      const body = (inbound.body || "").trim();
+      if (
+        isOptOutSignal(inbound.direction, body) &&
+        !stat.optOutSet.has(inbound._contactKey)
+      ) {
         stat.optOutSet.add(inbound._contactKey);
         stat.optOuts += 1;
       }
@@ -324,8 +360,12 @@ export const refreshKpiFacts = async (
     repliesReceived: row.repliesReceived,
     optOuts: row.optOuts,
     bookingSignalsSms: row.bookingSignalsSms,
-    replyRatePct: row.uniqueContactedSet.size > 0 ? (row.repliesReceived / row.uniqueContactedSet.size) * 100 : 0,
-    optOutRatePct: row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
+    replyRatePct:
+      row.uniqueContactedSet.size > 0
+        ? (row.repliesReceived / row.uniqueContactedSet.size) * 100
+        : 0,
+    optOutRatePct:
+      row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
   }));
 
   const fromDay = dayKey(rangeFrom, params.timeZone);
@@ -356,7 +396,9 @@ export const refreshKpiFacts = async (
     from: rangeFrom,
     to: rangeTo,
   });
-  const attributionLogger = logger ? { ...logger, debug: logger.info } : undefined;
+  const attributionLogger = logger
+    ? { ...logger, debug: logger.info }
+    : undefined;
   const [smsReplyLinks, smsSequenceLookup] = await Promise.all([
     getBookedCallSmsReplyLinks(bookedCallSources, attributionLogger),
     getBookedCallSequenceFromSmsEvents(bookedCallSources, attributionLogger),
@@ -385,11 +427,16 @@ export const refreshKpiFacts = async (
   const bumpBookingRow = (input: {
     eventTs: string;
     sequenceLabel: string;
-    bucket: 'jack' | 'brandon' | 'selfBooked';
+    bucket: "jack" | "brandon" | "selfBooked";
     strictSmsReplyLinked: boolean;
   }) => {
     const dayKeyValue = dayKey(new Date(input.eventTs), params.timeZone);
-    const setter = input.bucket === 'jack' ? 'jack' : input.bucket === 'brandon' ? 'brandon' : 'unknown';
+    const setter =
+      input.bucket === "jack"
+        ? "jack"
+        : input.bucket === "brandon"
+          ? "brandon"
+          : "unknown";
     const key = `${dayKeyValue}|${input.sequenceLabel}|${setter}`;
     const row = bookingRowsMap.get(key) || {
       day_key: dayKeyValue,
@@ -402,14 +449,17 @@ export const refreshKpiFacts = async (
       booked_after_sms_reply: 0,
     };
     row.booked_total += 1;
-    if (input.bucket === 'jack') row.booked_jack += 1;
-    else if (input.bucket === 'brandon') row.booked_brandon += 1;
+    if (input.bucket === "jack") row.booked_jack += 1;
+    else if (input.bucket === "brandon") row.booked_brandon += 1;
     else row.booked_self += 1;
     if (input.strictSmsReplyLinked) row.booked_after_sms_reply += 1;
     bookingRowsMap.set(key, row);
   };
 
-  for (const [sequenceLabel, breakdown] of sequenceAttribution.byLabel.entries()) {
+  for (const [
+    sequenceLabel,
+    breakdown,
+  ] of sequenceAttribution.byLabel.entries()) {
     for (const auditRow of breakdown.auditRows) {
       bumpBookingRow({
         eventTs: auditRow.eventTs,
@@ -421,7 +471,9 @@ export const refreshKpiFacts = async (
   }
   for (const missing of sequenceAttribution.unattributedAuditRows) {
     const fallbackSequenceLabel =
-      missing.bucket === 'jack' || missing.bucket === 'brandon' ? SOCIAL_MEDIA_BACKFILL_LABEL : MANUAL_LABEL;
+      missing.bucket === "jack" || missing.bucket === "brandon"
+        ? SOCIAL_MEDIA_BACKFILL_LABEL
+        : MANUAL_LABEL;
     bumpBookingRow({
       eventTs: missing.eventTs,
       sequenceLabel: fallbackSequenceLabel,
@@ -519,10 +571,37 @@ export const refreshKpiFacts = async (
     salesTeamBoardId,
   );
 
-  // If Slack attribution is incomplete, backfill residual counts from Monday as historical source of truth.
-  const fallbackDayTotals = new Map(rawBookedFallbackRows.map((row) => [row.day_key, row.booked_total]));
+  // If Slack/booked_calls attribution is incomplete (or unavailable),
+  // backfill residual counts from Monday as historical source of truth.
+  const mondayDayTotals = new Map<string, number>();
+  for (const row of mondayFallbackRows) {
+    mondayDayTotals.set(
+      row.day_key,
+      (mondayDayTotals.get(row.day_key) || 0) + (row.booked_total || 0),
+    );
+  }
+
+  const fallbackDayTotals = new Map<string, number>();
+  const slackDayTotals = new Map(
+    rawBookedFallbackRows.map((row) => [row.day_key, row.booked_total]),
+  );
+  const allFallbackDays = new Set<string>([
+    ...slackDayTotals.keys(),
+    ...mondayDayTotals.keys(),
+  ]);
+  for (const day of allFallbackDays) {
+    // Use the best available total for the day. When booked_calls is empty,
+    // this allows Monday-derived totals to drive booking fact backfill.
+    fallbackDayTotals.set(
+      day,
+      Math.max(slackDayTotals.get(day) || 0, mondayDayTotals.get(day) || 0),
+    );
+  }
   for (const row of bookingRows) {
-    fallbackDayTotals.set(row.day_key, Math.max(0, (fallbackDayTotals.get(row.day_key) || 0) - row.booked_total));
+    fallbackDayTotals.set(
+      row.day_key,
+      Math.max(0, (fallbackDayTotals.get(row.day_key) || 0) - row.booked_total),
+    );
   }
   const mondayRowsByDay = new Map<
     string,
@@ -538,7 +617,7 @@ export const refreshKpiFacts = async (
     list.push({
       sequence_key: row.sequence_key || MANUAL_LABEL,
       source_key: row.source_key || null,
-      setter: normalizeRep(row.setter || 'unknown'),
+      setter: normalizeRep(row.setter || "unknown"),
       remaining: Math.max(0, row.booked_total || 0),
     });
     mondayRowsByDay.set(row.day_key, list);
@@ -561,7 +640,9 @@ export const refreshKpiFacts = async (
       if (take <= 0) continue;
 
       const setter = candidate.setter;
-      const isSocialSource = /social|instagram|facebook|linkedin/i.test(candidate.source_key || '');
+      const isSocialSource = /social|instagram|facebook|linkedin/i.test(
+        candidate.source_key || "",
+      );
       const mondayResolvedSequenceKey =
         candidate.sequence_key === MANUAL_LABEL
           ? isSocialSource
@@ -573,9 +654,9 @@ export const refreshKpiFacts = async (
         sequence_key: mondayResolvedSequenceKey,
         setter,
         booked_total: take,
-        booked_jack: setter === 'jack' ? take : 0,
-        booked_brandon: setter === 'brandon' ? take : 0,
-        booked_self: setter === 'jack' || setter === 'brandon' ? 0 : take,
+        booked_jack: setter === "jack" ? take : 0,
+        booked_brandon: setter === "brandon" ? take : 0,
+        booked_self: setter === "jack" || setter === "brandon" ? 0 : take,
         booked_after_sms_reply: 0,
       });
       candidate.remaining -= take;
@@ -588,7 +669,7 @@ export const refreshKpiFacts = async (
       bookingRows.push({
         day_key: dayKey,
         sequence_key: MANUAL_LABEL,
-        setter: 'unknown',
+        setter: "unknown",
         booked_total: residualBooked,
         booked_jack: 0,
         booked_brandon: 0,
@@ -628,7 +709,9 @@ export const refreshKpiFacts = async (
   }
   const mergedBookingRows = Array.from(mergedBookingRowsMap.values());
 
-  const bookingAliases = Array.from(new Set(mergedBookingRows.map((row) => row.sequence_key).filter(Boolean)));
+  const bookingAliases = Array.from(
+    new Set(mergedBookingRows.map((row) => row.sequence_key).filter(Boolean)),
+  );
   const aliasRows =
     bookingAliases.length > 0
       ? await prisma.sequence_aliases.findMany({
@@ -636,18 +719,38 @@ export const refreshKpiFacts = async (
           select: { raw_label: true, sequence_id: true },
         })
       : [];
-  const aliasByRawLabel = new Map(aliasRows.map((row) => [row.raw_label, row.sequence_id]));
+  const aliasByRawLabel = new Map(
+    aliasRows.map((row) => [row.raw_label, row.sequence_id]),
+  );
   aliasByRawLabel.set(MONDAY_BACKFILL_LABEL, mondayBackfill.id);
   aliasByRawLabel.set(SOCIAL_MEDIA_BACKFILL_LABEL, socialMediaBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL, socialInstagramBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL, socialFacebookAdsBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL, socialFacebookGroupBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL, socialLinkedInBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL, socialOrganicBackfill.id);
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
+    socialInstagramBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
+    socialFacebookAdsBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
+    socialFacebookGroupBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
+    socialLinkedInBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
+    socialOrganicBackfill.id,
+  );
   const smsBaseMap = new Map(
     smsRows.map((row) => [
       `${row.day}|${row.sequenceId}|${row.repId}`,
-      { uniqueContacted: row.uniqueContacted, bookingSignalsSms: row.bookingSignalsSms },
+      {
+        uniqueContacted: row.uniqueContacted,
+        bookingSignalsSms: row.bookingSignalsSms,
+      },
     ]),
   );
 
@@ -665,7 +768,8 @@ export const refreshKpiFacts = async (
       booked_brandon: row.booked_brandon,
       booked_self: row.booked_self,
       booked_after_sms_reply: row.booked_after_sms_reply,
-      booking_rate_pct: uniqueContacted > 0 ? (row.booked_total / uniqueContacted) * 100 : 0,
+      booking_rate_pct:
+        uniqueContacted > 0 ? (row.booked_total / uniqueContacted) * 100 : 0,
       diagnostic_booking_signals: smsBase?.bookingSignalsSms || 0,
     };
   });
@@ -812,7 +916,11 @@ export const refreshKpiFacts = async (
   }
 
   for (const row of bookingFactRows) {
-    const funnel = ensureFunnelRow(row.day.toISOString().slice(0, 10), row.sequence_id, row.rep_id);
+    const funnel = ensureFunnelRow(
+      row.day.toISOString().slice(0, 10),
+      row.sequence_id,
+      row.rep_id,
+    );
     funnel.booked_calls = row.booked_total;
   }
 
@@ -1078,7 +1186,7 @@ export const refreshKpiFacts = async (
     board_id: row.board_id,
     board_class: row.board_class,
     sync_status: row.sync_status,
-    is_stale: row.sync_status !== 'success',
+    is_stale: row.sync_status !== "success",
     source_coverage_pct: Number(row.source_coverage_pct || 0),
     campaign_coverage_pct: Number(row.campaign_coverage_pct || 0),
     set_by_coverage_pct: Number(row.set_by_coverage_pct || 0),
@@ -1095,7 +1203,11 @@ export const refreshKpiFacts = async (
       rangeTo.toISOString(),
     ),
     conversationJourneyInsert,
-    prisma.$executeRawUnsafe('DELETE FROM fact_sms_daily WHERE day >= $1::date AND day <= $2::date', fromDay, toDay),
+    prisma.$executeRawUnsafe(
+      "DELETE FROM fact_sms_daily WHERE day >= $1::date AND day <= $2::date",
+      fromDay,
+      toDay,
+    ),
     ...(smsRows.length > 0
       ? [
           prisma.fact_sms_daily.createMany({
@@ -1115,7 +1227,7 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_booking_daily WHERE day >= $1::date AND day <= $2::date',
+      "DELETE FROM fact_booking_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1127,7 +1239,7 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_lead_quality_daily WHERE day >= $1::date AND day <= $2::date',
+      "DELETE FROM fact_lead_quality_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1139,7 +1251,7 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_sequence_funnel_daily WHERE day >= $1::date AND day <= $2::date',
+      "DELETE FROM fact_sequence_funnel_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1151,19 +1263,19 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_attribution_method_daily WHERE day >= $1::date AND day <= $2::date',
+      "DELETE FROM fact_attribution_method_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
     attributionMethodInsert,
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_rep_response_daily WHERE day >= $1::date AND day <= $2::date',
+      "DELETE FROM fact_rep_response_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
     repResponseInsert,
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_monday_health_daily WHERE day >= $1::date AND day <= $2::date',
+      "DELETE FROM fact_monday_health_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1178,7 +1290,7 @@ export const refreshKpiFacts = async (
 
   await prisma.$transaction(writes);
 
-  logger?.info?.('kpi-facts: refreshed daily facts', {
+  logger?.info?.("kpi-facts: refreshed daily facts", {
     fromDay,
     toDay,
     smsRows: smsRows.length,

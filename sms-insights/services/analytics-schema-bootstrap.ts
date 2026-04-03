@@ -115,6 +115,21 @@ const statements: string[] = [
   "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS slack_channel_id TEXT",
   "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS slack_message_ts TEXT",
   "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW()",
+  // Enhanced analytics columns
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS delivery_status VARCHAR(20) DEFAULT 'sent'",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMPTZ(6)",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ(6)",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS media_urls JSONB DEFAULT '[]'::jsonb",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS link_clicks INTEGER DEFAULT 0",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS ai_classification VARCHAR(100)",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS sentiment_score DECIMAL(4,3)",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS is_booking_signal BOOLEAN DEFAULT false",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS thread_id VARCHAR(255)",
+  "ALTER TABLE sms_events ADD COLUMN IF NOT EXISTS parent_event_id UUID",
+  // Indexes for new analytics columns
+  "CREATE INDEX IF NOT EXISTS idx_sms_events_delivery_status ON sms_events(delivery_status)",
+  "CREATE INDEX IF NOT EXISTS idx_sms_events_booking_signal ON sms_events(is_booking_signal) WHERE is_booking_signal = true",
+  "CREATE INDEX IF NOT EXISTS idx_sms_events_ai_classification ON sms_events(ai_classification)",
 ];
 
 export const ensureAnalyticsSchemaBaseline = async (

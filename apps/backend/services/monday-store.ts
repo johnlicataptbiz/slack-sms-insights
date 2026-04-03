@@ -287,7 +287,7 @@ export const getMondayBoardRegistry = async (
 ): Promise<MondayBoardRegistryRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.mondayBoardRegistry.findUnique({
+    let result = await prisma.mondayBoardRegistry.findUnique({
       where: { board_id: boardId },
       select: {
         board_id: true,
@@ -303,9 +303,40 @@ export const getMondayBoardRegistry = async (
         updated_at: true,
       },
     });
+
+    // Create if missing
+    if (!result) {
+      result = await prisma.mondayBoardRegistry.create({
+        data: {
+          board_id: boardId,
+          board_label: `Unnamed Board ${boardId}`,
+          board_class: 'other',
+          metric_grain: 'lead_item',
+          include_in_funnel: false,
+          include_in_exec: false,
+          active: true,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+        select: {
+          board_id: true,
+          board_label: true,
+          board_class: true,
+          metric_grain: true,
+          include_in_funnel: true,
+          include_in_exec: true,
+          active: true,
+          owner_team: true,
+          notes: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+    }
+
     return result as unknown as MondayBoardRegistryRow | null;
   } catch (error) {
-    logger?.warn?.('Failed to read monday board registry row', error);
+    logger?.warn?.('Failed to read or create monday board registry row', error);
     return null;
   }
 };
@@ -414,7 +445,7 @@ export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Pr
 export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): Promise<ActorDirectoryRow[]> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.actorDirectory.findMany({
+    let result = await prisma.actorDirectory.findMany({
       orderBy: [{ role: 'asc' }, { canonical_name: 'asc' }],
       select: {
         canonical_name: true,
@@ -426,6 +457,48 @@ export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): P
         updated_at: true,
       },
     });
+
+    // Create default actors if directory is empty
+    if (result.length === 0) {
+      const defaultActors = [
+        {
+          canonical_name: 'Jack',
+          role: 'setter',
+          aliases: ['jack', 'jack licata'],
+          active: true,
+          notes: 'Default setter',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+        {
+          canonical_name: 'Brandon',
+          role: 'setter',
+          aliases: ['brandon', 'brandon licata'],
+          active: true,
+          notes: 'Default setter',
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      ];
+
+      await prisma.actorDirectory.createMany({
+        data: defaultActors,
+      });
+
+      result = await prisma.actorDirectory.findMany({
+        orderBy: [{ role: 'asc' }, { canonical_name: 'asc' }],
+        select: {
+          canonical_name: true,
+          role: true,
+          aliases: true,
+          active: true,
+          notes: true,
+          created_at: true,
+          updated_at: true,
+        },
+      });
+    }
+
     return result as unknown as ActorDirectoryRow[];
   } catch (error) {
     logger?.warn?.('Failed to list actor directory', error);

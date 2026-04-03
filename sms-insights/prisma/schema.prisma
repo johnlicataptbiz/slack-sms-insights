@@ -34,6 +34,20 @@ model Conversation {
   last_disposition_at      DateTime?                @db.Timestamptz(6)
   preferred_language       String                   @default("en")
   timezone                 String?
+  // TCPA/GDPR compliance fields
+  has_active_consent             Boolean      @default(false)
+  consent_verified_at            DateTime?    @db.Timestamptz(6)
+  is_opted_out                   Boolean      @default(false)
+  opted_out_at                   DateTime?    @db.Timestamptz(6)
+  opted_out_reason               String?
+  is_dnc_flagged                 Boolean      @default(false)
+  dnc_checked_at                 DateTime?    @db.Timestamptz(6)
+  preferred_contact_time_start   DateTime?    @db.Time
+  preferred_contact_time_end     DateTime?    @db.Time
+  preferred_contact_timezone     String?
+  messages_sent_today            Int          @default(0)
+  messages_sent_this_week        Int          @default(0)
+  last_message_sent_at           DateTime?    @db.Timestamptz(6)
   conversation_notes       conversation_notes[]
   conversation_state       conversation_state?
   draft_suggestions        draft_suggestions[]
@@ -42,6 +56,9 @@ model Conversation {
   sms_events               sms_events[]
   work_items               work_items?
   call_events              call_events[]
+  booked_calls             booked_calls[]
+  opt_out_events           opt_out_events[]
+  message_delivery_log     message_delivery_log[]
 
   @@index([contactKey], map: "idx_conversations_contact_key")
   @@index([nextFollowupAt], map: "idx_conversations_next_followup_due")
@@ -154,8 +171,10 @@ model booked_calls {
   raw                      Json?
   created_at               DateTime                  @default(now()) @db.Timestamptz(6)
   first_sms_touch_at       DateTime?                 @db.Timestamptz(6)
+  conversation_id          String?                   @db.Uuid
   attribution_review_queue attribution_review_queue?
   booked_call_reactions    booked_call_reactions[]
+  conversations            Conversation?             @relation(fields: [conversation_id], references: [id], onUpdate: NoAction)
 
   @@unique([slack_channel_id, slack_message_ts])
   @@index([slack_channel_id, slack_message_ts], map: "idx_booked_calls_channel_ts")
@@ -335,7 +354,18 @@ model inbox_contact_profiles {
   linkedin_url          String?
   company_name          String?
   job_title             String?
+  // TCPA/GDPR compliance fields
+  tcpa_consent_status   String        @default("UNKNOWN")
+  tcpa_consent_date     DateTime?     @db.Timestamptz(6)
+  tcpa_consent_method   String?
+  dnc_list_checked_at   DateTime?     @db.Timestamptz(6)
+  dnc_list_source       String?
+  gdpr_consent_status   String?
+  gdpr_consent_date     DateTime?     @db.Timestamptz(6)
+  last_consent_update_by String?
+  consent_update_reason String?
   conversations         Conversation? @relation(fields: [conversation_id], references: [id], onUpdate: NoAction)
+  consent_audit_log     consent_audit_log[]
 
   @@index([contact_key], map: "idx_inbox_contact_profiles_contact_key")
   @@index([last_engagement_at(sort: Desc)], map: "idx_inbox_contact_profiles_last_engagement_at")
@@ -558,6 +588,16 @@ model send_attempts {
   error_message      String?
   created_at         DateTime          @default(now()) @db.Timestamptz(6)
   status             SendAttemptStatus @default(sent)
+  // TCPA/GDPR compliance fields
+  compliance_check_passed    Boolean      @default(false)
+  compliance_check_details   Json?
+  delivery_status            String?
+  delivery_timestamp         DateTime?    @db.Timestamptz(6)
+  carrier_error_code         String?
+  carrier_error_description  String?
+  opt_out_detected           Boolean      @default(false)
+  opt_out_timestamp          DateTime?    @db.Timestamptz(6)
+  message_delivery_log       message_delivery_log[]
   conversations      Conversation      @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([conversation_id, idempotency_key], map: "uniq_send_attempts_conversation_idempotency", where: raw("(idempotency_key IS NOT NULL)"))
@@ -777,6 +817,15 @@ model sms_events {
   is_booking_signal      Boolean              @default(false)
   thread_id              String?
   parent_event_id        String?              @db.Uuid
+  // TCPA/GDPR compliance fields
+  was_compliant             Boolean      @default(true)
+  compliance_notes          String?
+  delivery_timestamp        DateTime?    @db.Timestamptz(6)
+  carrier_code              String?
+  carrier_message           String?
+  contains_opt_out_keyword  Boolean      @default(false)
+  message_type              String?
+  campaign_id               String?
   conversion_examples    conversion_examples?
   draft_suggestions      draft_suggestions[]
   conversations          Conversation?        @relation(fields: [conversation_id], references: [id], onUpdate: NoAction, map: "fk_sms_events_conversation")
@@ -984,6 +1033,72 @@ enum WorkItemType {
 }
 
 // ============ NEW MODELS FOR ENHANCED DATA COVERAGE ============
+
+/// Consent audit trail for TCPA/GDPR compliance
+model consent_audit_log {
+  id                      String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contact_id              String
+  contact_key             String
+  previous_consent_status String?
+  new_consent_status      String
+  changed_by              String?
+  change_reason           String?
+  created_at              DateTime  @default(now()) @db.Timestamptz(6)
+  inbox_contact_profiles  inbox_contact_profiles? @relation(fields: [contact_key], references: [contact_key], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([contact_key], map: "idx_consent_audit_contact_key")
+  @@index([created_at(sort: Desc)], map: "idx_consent_audit_created_at")
+  @@map("consent_audit_log")
+}
+
+/// DNC check log for compliance tracking
+model dnc_check_log {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contact_id   String
+  phone        String
+  dnc_status   Boolean
+  checked_at   DateTime  @default(now()) @db.Timestamptz(6)
+  check_source String?
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+
+  @@index([phone], map: "idx_dnc_check_phone")
+  @@index([created_at(sort: Desc)], map: "idx_dnc_check_created_at")
+  @@map("dnc_check_log")
+}
+
+/// Opt-out events tracking
+model opt_out_events {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversation_id   String    @db.Uuid
+  contact_id        String
+  contact_phone     String
+  opt_out_method    String
+  opt_out_timestamp DateTime  @db.Timestamptz(6)
+  created_at        DateTime  @default(now()) @db.Timestamptz(6)
+  conversations     Conversation? @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([conversation_id], map: "idx_opt_out_events_conversation")
+  @@index([created_at(sort: Desc)], map: "idx_opt_out_events_created_at")
+  @@map("opt_out_events")
+}
+
+/// Message delivery status log for compliance
+model message_delivery_log {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  send_attempt_id  String    @db.Uuid
+  conversation_id  String    @db.Uuid
+  status           String
+  status_timestamp DateTime  @db.Timestamptz(6)
+  carrier_code     String?
+  carrier_message  String?
+  created_at       DateTime  @default(now()) @db.Timestamptz(6)
+  send_attempts    send_attempts? @relation(fields: [send_attempt_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  conversations    Conversation? @relation(fields: [conversation_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([send_attempt_id], map: "idx_message_delivery_send_attempt")
+  @@index([created_at(sort: Desc)], map: "idx_message_delivery_created_at")
+  @@map("message_delivery_log")
+}
 
 model call_events {
   id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

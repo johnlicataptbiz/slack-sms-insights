@@ -1,0 +1,33 @@
+{
+  "name": "@ptbiz/sms-ml-classifier",
+  "version": "0.1.0",
+  "description": "Machine Learning Sentiment and Intent Classifier for SMS Insights",
+  "main": "dist/sentiment-classifier.js",
+  "types": "dist/sentiment-classifier.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "train": "tsx train-model.ts",
+    "test": "vitest run",
+    "lint": "biome check .",
+    "prepare": "npm run build"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs-node": "^4.16.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.4.1",
+    "@types/node": "^20.10.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.0"
+  },
+  "keywords": [
+    "machine-learning",
+    "sentiment-analysis",
+    "sms-classification",
+    "tensorflow"
+  ],
+  "author": "PTBiz SMS Insights Team",
+  "license": "UNLICENSED"
+}

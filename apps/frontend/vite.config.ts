@@ -18,6 +18,7 @@ export default defineConfig({
       '~features': path.resolve(__dirname, './src/features'),
       '~lib': path.resolve(__dirname, './src/lib'),
       '~utils': path.resolve(__dirname, './src/utils'),
+      three: path.resolve(__dirname, './node_modules/three'),
     },
   },
   server: {

@@ -69,7 +69,7 @@ async function generateReport(): Promise<void> {
 *Powered by Prisma Client v7.6.0*
 `;
 
-    fs.writeFileSync(path.resolve('../LIVE-DATABASE-REPORT.md'), reportContent);
+    fs.writeFileSync(path.resolve('LIVE-DATABASE-REPORT.md'), reportContent);
     console.log('✅ LIVE-DATABASE-REPORT.md generated successfully!');
   } catch (error) {
     console.error('❌ Report generation failed:', error);

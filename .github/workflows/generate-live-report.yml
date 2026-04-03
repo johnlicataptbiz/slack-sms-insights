@@ -11,9 +11,6 @@ jobs:
   generate-report:
     name: Generate LIVE-DATABASE-REPORT.md
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./sms-insights
 
     steps:
     - uses: actions/checkout@v4
@@ -25,7 +22,7 @@ jobs:
       with:
         node-version: '22'
         cache: npm
-        cache-dependency-path: ./sms-insights/package-lock.json
+        cache-dependency-path: ./package-lock.json
 
     - name: Install dependencies
       run: npm ci
@@ -44,7 +41,7 @@ jobs:
 
     - name: Generate live database report
       if: steps.db_secret.outputs.available == 'true'
-      run: npm run generate:db-report
+      run: npm run --workspace=ptbizsms-api generate:db-report
       env:
         DATABASE_URL: ${{ secrets.DATABASE_PUBLIC_URL }}
         NODE_ENV: production
@@ -56,15 +53,15 @@ jobs:
         author_name: 'github-actions[bot]'
         author_email: '41898282+github-actions[bot]@users.noreply.github.com'
         message: 'docs: update LIVE-DATABASE-REPORT.md'
-        add: 'sms-insights/LIVE-DATABASE-REPORT.md'
+        add: 'apps/backend/LIVE-DATABASE-REPORT.md'
         pull: '--rebase --autostash'
 
     - name: Report generation status
       run: |
         if [ "${{ steps.db_secret.outputs.available }}" = "true" ]; then
           echo "✅ Live database report generated and committed"
-          echo "📊 Report location: sms-insights/LIVE-DATABASE-REPORT.md"
-          head -20 LIVE-DATABASE-REPORT.md
+          echo "📊 Report location: apps/backend/LIVE-DATABASE-REPORT.md"
+          head -20 apps/backend/LIVE-DATABASE-REPORT.md
         else
           echo "⚠️ Skipped report generation: DATABASE_PUBLIC_URL is not configured."
         fi

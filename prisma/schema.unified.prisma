@@ -1,97 +1,152 @@
+// This is a unified Prisma schema for the SMS Insights project
+// Last updated: 2026-04-03
+
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["partialIndexes"]
+  provider = "prisma-client-js"
+  previewFeatures = ["jsonProtocol", "fullTextSearch", "fullTextIndex"]
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// [Previous enums and models unchanged...]
-
-// Add missing models for compilation
-
-model MondayBoardRegistry {
-  board_id               String    @id
-  board_label            String
-  board_class            String
-  metric_grain           String
-  include_in_funnel      Boolean   @default(false)
-  include_in_exec        Boolean   @default(false)
-  active                 Boolean   @default(true)
-  owner_team             String?
-  notes                  String?
-  created_at             DateTime  @default(now()) @db.Timestamptz(6)
-  updated_at             DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
-  last_sync_completed_at DateTime? @db.Timestamptz(6)
-  last_sync_started_at   DateTime? @db.Timestamptz(6)
-  last_sync_error_at     DateTime? @db.Timestamptz(6)
-
-  @@map("monday_board_registry")
+// Existing SMS Events Model (enhanced)
+model SmsEvent {
+  id                   String    @id @default(cuid())
+  body                 String?
+  direction            String?
+  sender               String?
+  recipient            String?
+  threadId             String?
+  deliveryStatus       String?
+  
+  // AI Classification Columns
+  aiSentimentLabel     String?
+  aiConfidenceScore    Float?
+  aiIntentCategory     String?
+  
+  // Multilingual Support
+  detectedLanguage     String?
+  
+  // Metadata
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  
+  // Manual Review Flag
+  manuallyReviewed     Boolean   @default(false)
+  
+  // Indexes for performance
+  @@index([threadId])
+  @@index([sender])
+  @@index([recipient])
+  @@index([aiSentimentLabel])
+  @@index([detectedLanguage])
 }
 
-model ActorDirectory {
-  canonical_name String   @id
-  role           String
-  aliases        String[] @default([])
-  active         Boolean  @default(true)
-  notes          String?
-  created_at     DateTime @default(now()) @db.Timestamptz(6)
-  updated_at     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
-
-  @@map("actor_directory")
+// Machine Learning Model Performance Tracking
+model MlModelPerformance {
+  id                   String    @id @default(cuid())
+  timestamp            DateTime  @default(now())
+  
+  // Core Performance Metrics
+  accuracy             Float
+  precision            Float
+  recall               Float
+  f1Score              Float
+  
+  // Detailed Confusion Matrix
+  confusionMatrix      Json?
+  
+  // Contextual Information
+  modelVersion         String?
+  trainingDataSize     Int?
+  
+  @@index([timestamp])
+  @@index([modelVersion])
 }
 
-model FactSmsDaily {
-  day              DateTime @db.Date
-  rep_id           String
-  messages_sent    Int      @default(0)
-  unique_contacted Int      @default(0)
-  replies_received Int      @default(0)
-  opt_outs         Int      @default(0)
-
-  @@id([day, rep_id])
-  @@map("fact_sms_daily")
+// Bias Detection Metrics
+model MlBiasDetection {
+  id                   String    @id @default(cuid())
+  timestamp            DateTime  @default(now())
+  
+  // Comprehensive Bias Metrics
+  biasMetrics          Json
+  
+  // Attributes Analyzed
+  analyzedAttributes   String[]
+  
+  // Deviation Scores
+  maxDeviationScore    Float?
+  
+  @@index([timestamp])
+  @@index([analyzedAttributes])
 }
 
-model FactLeadQualityDaily {
-  day                      DateTime @db.Date
-  sequence_id              String   @db.Uuid
-  rep_id                   String
-  leads_count              Int      @default(0)
-  progress_step_0_count    Int      @default(0)
-  progress_step_1_count    Int      @default(0)
-  progress_step_2_count    Int      @default(0)
-  progress_step_3_count    Int      @default(0)
-  progress_step_4_count    Int      @default(0)
-  revenue_mix_mostly_cash  Int      @default(0)
-  revenue_mix_mostly_ins   Int      @default(0)
-  revenue_mix_balanced     Int      @default(0)
-  revenue_mix_unknown      Int      @default(0)
-  employment_full_time     Int      @default(0)
-  employment_part_time     Int      @default(0)
-  employment_unknown       Int      @default(0)
-  coaching_interest_high   Int      @default(0)
-  coaching_interest_medium Int      @default(0)
-  coaching_interest_low    Int      @default(0)
-  coaching_interest_unknown Int     @default(0)
-
-  @@id([day, sequence_id, rep_id])
-  @@map("fact_lead_quality_daily")
+// Machine Learning Model Storage
+model MlModel {
+  id                   String    @id @default(cuid())
+  version              String    @unique
+  filename             String
+  
+  // Training Metadata
+  timestamp            DateTime  @default(now())
+  trainingDataSize     Int?
+  
+  // Performance Metrics
+  metrics              Json
+  
+  // Model Configuration
+  hyperparameters      Json?
+  tags                 String[]
+  
+  @@index([version])
+  @@index([timestamp])
+  @@index([tags])
 }
 
-model FactSequenceFunnelDaily {
-  day                 DateTime @db.Date
-  sequence_id         String   @db.Uuid
-  rep_id              String
-  new_leads_contacted Int      @default(0)
-  leads_replied       Int      @default(0)
-  qualified_leads     Int      @default(0)
-  booked_calls        Int      @default(0)
-  opt_outs            Int      @default(0)
-
-  @@id([day, sequence_id, rep_id])
-  @@map("fact_sequence_funnel_daily")
+// Language Detection and Translation Tracking
+model LanguageDetectionLog {
+  id                   String    @id @default(cuid())
+  originalText         String
+  detectedLanguage     String
+  confidence           Float
+  
+  // Translation Details (if applicable)
+  translatedText       String?
+  targetLanguage       String?
+  
+  timestamp            DateTime  @default(now())
+  
+  @@index([detectedLanguage])
+  @@index([timestamp])
 }
 
-// [Rest of schema unchanged...]
+// Sentiment Classification Training Log
+model SentimentTrainingLog {
+  id                   String    @id @default(cuid())
+  trainingRun          String
+  
+  // Training Dataset Metrics
+  totalSamples         Int
+  positiveSamples      Int
+  negativeSamples      Int
+  neutralSamples       Int
+  
+  // Performance Metrics
+  accuracy             Float
+  precisionPositive    Float
+  precisionNegative    Float
+  precisionNeutral     Float
+  
+  // Contextual Information
+  languagesIncluded    String[]
+  modelVersion         String
+  
+  timestamp            DateTime  @default(now())
+  
+  @@index([trainingRun])
+  @@index([timestamp])
+  @@index([modelVersion])
+}

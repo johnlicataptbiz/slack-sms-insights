@@ -29,7 +29,7 @@ const isDryRun = args.includes('--dry-run');
 
 const daysBack = daysParam ? Number.parseInt(daysParam.split('=')[1], 10) : 90;
 
-// Booking signal keywords
+// Expanded booking signal keywords
 const BOOKING_KEYWORDS = [
   'book',
   'schedule',
@@ -41,9 +41,21 @@ const BOOKING_KEYWORDS = [
   'calendar',
   'time',
   'available',
+  'slot',
+  'reserve',
+  'confirm',
+  'when are you',
+  'free time',
+  'booking',
+  'availability',
+  'set up',
+  'discuss',
+  'talk about',
+  'interested in meeting',
+  'want to schedule',
 ];
 
-// Positive sentiment keywords
+// Expanded positive sentiment keywords
 const POSITIVE_KEYWORDS = [
   'great',
   'awesome',
@@ -56,9 +68,26 @@ const POSITIVE_KEYWORDS = [
   'yes',
   'interested',
   'ready',
+  'amazing',
+  'fantastic',
+  'wonderful',
+  'super',
+  'cool',
+  'nice',
+  'good',
+  'helpful',
+  'excited',
+  'looking forward',
+  'sounds good',
+  'sounds great',
+  'absolutely',
+  'definitely',
+  'sure',
+  'happy',
+  'pleased',
 ];
 
-// Negative sentiment keywords
+// Expanded negative sentiment keywords
 const NEGATIVE_KEYWORDS = [
   'not interested',
   'no thanks',
@@ -72,6 +101,24 @@ const NEGATIVE_KEYWORDS = [
   'upset',
   'terrible',
   'worst',
+  'bad',
+  'horrible',
+  'awful',
+  'disappointing',
+  'frustrated',
+  'annoyed',
+  'mad',
+  'cancel',
+  'not now',
+  'later',
+  'busy',
+  'no time',
+  'not possible',
+  'not interested right now',
+  'leave me alone',
+  'go away',
+  'not now',
+  'never',
 ];
 
 interface SmsEvent {

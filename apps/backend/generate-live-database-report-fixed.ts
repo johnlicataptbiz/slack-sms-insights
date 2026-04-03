@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Generate Live Database Report - POOL.QUERY FIXED VERSION
- * Creates LIVE-DATABASE-REPORT.md using real sms-insights schema/tables
+ * Creates LIVE-DATABASE-REPORT.md using the current backend schema/tables
  * Uses pool.query → result.rows[0] pattern from check-db-status.ts
  */
 
@@ -143,12 +143,12 @@ ${trends.join('\\n')}
 ${anomalies.length ? anomalies.join('\\n') : '**All healthy!** ✅'}
 
 ---
-    *Powered by sms-insights* • **Report complete in ${Date.now() - startedAt}ms**
+    *Powered by ptbizsms-api* • **Report complete in ${Date.now() - startedAt}ms**
 `;
 
     fs.writeFileSync(path.resolve('LIVE-DATABASE-REPORT.md'), report);
     console.log('✅ **LIVE-DATABASE-REPORT.md** generated!');
-    console.log('📁 Check `sms-insights/LIVE-DATABASE-REPORT.md`');
+    console.log('📁 Check `apps/backend/LIVE-DATABASE-REPORT.md`');
   } catch (error) {
     console.error('❌ Error during analysis:', error);
     process.exit(1);

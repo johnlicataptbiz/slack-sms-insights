@@ -1,44 +1,39 @@
-import { afterAll, beforeAll, vi } from 'vitest';
+import { beforeEach, afterEach } from 'vitest';
+import { getPrismaClient } from '../services/prisma';
+import { redisCache } from '../src/utils/redis-cache';
 
-// Mock environment variables for tests
-beforeAll(() => {
-  // Set up test environment variables
-  process.env.NODE_ENV = 'test';
-  process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/test_db';
+// Global setup for database and cache cleanup
+beforeEach(async () => {
+  // Initialize Prisma client
+  const prisma = getPrismaClient();
 
-  // Mock console methods to reduce noise in tests
-  vi.spyOn(console, 'log').mockImplementation(() => {});
-  vi.spyOn(console, 'info').mockImplementation(() => {});
-  vi.spyOn(console, 'warn').mockImplementation(() => {});
-  vi.spyOn(console, 'error').mockImplementation(() => {});
+  // Optional: Clear database tables before each test
+  // Be cautious with this in production environments
+  await prisma.user.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.smsEvents.deleteMany();
 });
 
-afterAll(() => {
-  // Restore console methods
-  vi.restoreAllMocks();
+afterEach(async () => {
+  // Clear Redis cache after each test
+  await redisCache.clear();
 });
 
-// Global test utilities
-global.testUtils = {
-  // Helper to create mock request/response objects
-  createMockReq: (overrides = {}) => ({
-    body: {},
-    params: {},
-    query: {},
-    headers: {},
-    ...overrides,
-  }),
-
-  createMockRes: (overrides = {}) => {
-    const res = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-      send: vi.fn().mockReturnThis(),
-      ...overrides,
-    };
-    return res;
+// Optional: Add global mocks or test utilities
+export const testUtils = {
+  // Helper functions for test setup
+  createMockUser: async (userData = {}) => {
+    const prisma = getPrismaClient();
+    return prisma.user.create({
+      data: {
+        email: 'test@example.com',
+        passwordHash: 'mock-hash',
+        firstName: 'Test',
+        lastName: 'User',
+        ...userData
+      }
+    });
   },
 
-  // Helper to wait for async operations
-  wait: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+  // Add more utility functions as needed
 };

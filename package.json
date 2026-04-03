@@ -13,16 +13,22 @@
     "build:backend": "npm run --workspace=ptbizsms-api build",
     "build:frontend": "npm run --workspace=ptbizsms-dashboard-unified build",
     "lint": "npm run --workspace=ptbizsms-api lint && npm run --workspace=ptbizsms-dashboard-unified lint",
-    "lint:backend": "npm run --workspace=ptbizsms-api lint",
+    "lint:backend": "npx @biomejs/biome check apps/backend",
     "lint:frontend": "npm run --workspace=ptbizsms-dashboard-unified lint",
     "test": "npm run --workspace=ptbizsms-dashboard-unified test",
-    "typecheck": "npm run --workspace=ptbizsms-api typecheck && npm run --workspace=ptbizsms-dashboard-unified typecheck"
+    "typecheck": "npm run --workspace=ptbizsms-api typecheck && npm run --workspace=ptbizsms-dashboard-unified typecheck",
+    "test:backend": "npx vitest run apps/backend",
+    "test:backend:coverage": "npx vitest run apps/backend --coverage",
+    "typecheck:backend": "npx tsc -p apps/backend/tsconfig.json",
+    "db:diagnose": "tsx scripts/db-connection-diagnostic.ts",
+    "db:migrate:diagnose": "bash scripts/migration-diagnostic.sh"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.4.2",
+    "@types/node": "^25.3.0",
+    "@vitest/coverage-v8": "^4.1.2",
     "concurrently": "^8.2.2",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.0",
-    "@biomejs/biome": "^2.4.2",
-    "@types/node": "^25.3.0"
+    "vitest": "^4.1.2"
   }
 }

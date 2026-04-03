@@ -1,33 +1,58 @@
-import type { Logger } from '@slack/bolt';
-import type { NextFunction, Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
-interface ErrorResponse {
-  success: false;
-  error: string;
-  message: string;
-  stack?: string;
-}
+/**
+ * Centralized error handling middleware
+ */
+export function errorHandlerMiddleware(
+  err: Error, 
+  req: Request, 
+  res: Response, 
+  next: NextFunction
+) {
+  // Log the error for internal tracking
+  console.error('Unhandled Error:', err);
 
-export const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction): void => {
-  const statusCode = res.statusCode !== 200 ? res.statusCode : 500;
-  const errorResponse: ErrorResponse = {
-    success: false,
-    error: error.name || 'InternalServerError',
-    message: error.message || 'An unexpected error occurred',
-  };
-
-  // Include stack trace in development
-  if (process.env.NODE_ENV !== 'production') {
-    errorResponse.stack = error.stack;
+  // Handle specific error types
+  if (err instanceof ZodError) {
+    // Validation error
+    return res.status(400).json({
+      error: 'Validation Failed',
+      details: err.errors.map(e => ({
+        path: e.path.join('.'),
+        message: e.message
+      }))
+    });
   }
 
-  console.error('Error:', {
-    message: error.message,
-    stack: error.stack,
-    url: req.url,
-    method: req.method,
-    ip: req.ip,
-  });
+  if (err instanceof PrismaClientKnownRequestError) {
+    // Prisma-specific error handling
+    switch (err.code) {
+      case 'P2002':
+        return res.status(409).json({
+          error: 'Unique Constraint Violation',
+          details: 'A record with these details already exists'
+        });
+      case 'P2025':
+        return res.status(404).json({
+          error: 'Record Not Found',
+          details: 'The requested resource could not be found'
+        });
+      default:
+        // Generic database error
+        return res.status(500).json({
+          error: 'Database Error',
+          details: err.message
+        });
+    }
+  }
 
-  res.status(statusCode).json(errorResponse);
-};
+  // Generic error handler
+  res.status(500).json({
+    error: 'Internal Server Error',
+    details: process.env.NODE_ENV === 'production' 
+      ? 'An unexpected error occurred' 
+      : err.message
+  });
+}

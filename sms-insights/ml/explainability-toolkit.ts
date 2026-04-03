@@ -1,275 +1,174 @@
 import { PrismaClient } from '@prisma/client'
 import { logger } from '@/lib/logger'
-import * as tf from '@tensorflow/tfjs-node'
 
-export interface ExplanationResult {
-  predictionLabel: string
-  confidence: number
-  topFeatures: Array<{
-    feature: string
-    importance: number
-    impact: 'positive' | 'negative'
-  }>
-  localExplanation: {
-    inputTokens: string[]
-    tokenImportance: Array<{
-      token: string
-      importance: number
-    }>
-  }
-  globalExplanation: {
-    mostInfluentialFeatures: Array<{
-      feature: string
-      overallImportance: number
-    }>
-  }
+export interface FeatureImportance {
+  feature: string
+  importance: number
 }
 
-export class ModelExplainabilityToolkit {
+export interface PredictionExplanation {
+  sentiment: string
+  topFeatures: FeatureImportance[]
+  confidenceScore: number
+  decisionBoundary: string
+}
+
+export class ExplainabilityToolkit {
   private prisma: PrismaClient
 
   constructor() {
     this.prisma = new PrismaClient()
   }
 
-  async explainPrediction(text: string): Promise<ExplanationResult> {
+  async explainPrediction(message: string): Promise<PredictionExplanation> {
     try {
-      // Load the current sentiment classification model
-      const model = await this.loadLatestModel()
+      // Simulate feature extraction and importance calculation
+      const features = this.extractFeatures(message)
+      const topFeatures = this.calculateFeatureImportance(features)
       
-      // Preprocess input text
-      const preprocessedInput = this.preprocessText(text)
+      // Simulate sentiment prediction
+      const sentiment = this.predictSentiment(message)
       
-      // Generate prediction
-      const prediction = await model.predict(preprocessedInput)
+      // Simulate confidence score calculation
+      const confidenceScore = this.calculateConfidenceScore(topFeatures)
       
-      // Extract top features and their importance
-      const topFeatures = await this.extractTopFeatures(preprocessedInput, prediction)
-      
-      // Generate local explanation (token-level importance)
-      const localExplanation = this.generateLocalExplanation(preprocessedInput)
-      
-      // Generate global explanation
-      const globalExplanation = await this.generateGlobalExplanation()
+      // Determine decision boundary
+      const decisionBoundary = this.determineDecisionBoundary(sentiment, topFeatures)
+
+      // Log explanation for audit purposes
+      this.logExplanation(message, sentiment, topFeatures)
 
       return {
-        predictionLabel: this.decodePrediction(prediction),
-        confidence: this.calculateConfidence(prediction),
+        sentiment,
         topFeatures,
-        localExplanation,
-        globalExplanation
+        confidenceScore,
+        decisionBoundary
       }
     } catch (error) {
-      logger.error('Error in model explainability', { error, text })
+      logger.error('Error in prediction explanation', { error, message })
       throw error
     }
   }
 
-  private async loadLatestModel(): Promise<any> {
-    try {
-      // Fetch the latest model from database
-      const latestModelRecord = await this.prisma.mlModel.findFirst({
-        orderBy: { timestamp: 'desc' },
-        select: { filename: true }
-      })
-
-      if (!latestModelRecord) {
-        throw new Error('No model found')
-      }
-
-      // Load the model from file storage
-      const modelPath = `file://ml-models/${latestModelRecord.filename}`
-      return await tf.loadLayersModel(modelPath)
-    } catch (error) {
-      logger.error('Error loading model for explainability', { error })
-      throw error
+  private extractFeatures(message: string): Record<string, number> {
+    // Advanced feature extraction
+    const features: Record<string, number> = {
+      positiveWordCount: this.countPositiveWords(message),
+      negativeWordCount: this.countNegativeWords(message),
+      punctuationIntensity: this.calculatePunctuationIntensity(message),
+      messageLength: message.length,
+      capitalizedWordRatio: this.calculateCapitalizedWordRatio(message),
+      sentenceComplexity: this.calculateSentenceComplexity(message)
     }
+
+    return features
   }
 
-  private preprocessText(text: string): tf.Tensor {
-    // Implement text preprocessing
-    // This would include tokenization, padding, etc.
-    // Return a tensor representation of the text
-    const tokens = this.tokenize(text)
-    return tf.tensor(tokens)
-  }
-
-  private tokenize(text: string): number[] {
-    // Implement tokenization logic
-    // This is a simplified example
-    return text.toLowerCase()
-      .split(/\s+/)
-      .map(token => this.getTokenIndex(token))
-  }
-
-  private getTokenIndex(token: string): number {
-    // Implement token to index mapping
-    // This would use a pre-trained tokenizer
-    return 0 // Placeholder
-  }
-
-  private async extractTopFeatures(
-    input: tf.Tensor, 
-    prediction: tf.Tensor
-  ): Promise<ExplanationResult['topFeatures']> {
-    try {
-      // Implement feature importance extraction
-      // This could use techniques like SHAP (SHapley Additive exPlanations)
-      const features = await this.calculateFeatureImportance(input, prediction)
-      
-      return features.map(feature => ({
-        feature: feature.name,
-        importance: feature.importance,
-        impact: feature.importance > 0 ? 'positive' : 'negative'
+  private calculateFeatureImportance(features: Record<string, number>): FeatureImportance[] {
+    return Object.entries(features)
+      .map(([feature, value]) => ({
+        feature,
+        importance: Math.abs(value) // Simplified importance calculation
       }))
+      .sort((a, b) => b.importance - a.importance)
+      .slice(0, 5) // Top 5 features
+  }
+
+  private predictSentiment(message: string): string {
+    // Simplified sentiment prediction logic
+    const positiveWords = this.countPositiveWords(message)
+    const negativeWords = this.countNegativeWords(message)
+
+    if (positiveWords > negativeWords) return 'positive'
+    if (negativeWords > positiveWords) return 'negative'
+    return 'neutral'
+  }
+
+  private calculateConfidenceScore(topFeatures: FeatureImportance[]): number {
+    // Calculate confidence based on feature importance
+    const totalImportance = topFeatures.reduce((sum, feature) => sum + feature.importance, 0)
+    return Math.min(totalImportance / 10, 1) // Normalize to 0-1 range
+  }
+
+  private determineDecisionBoundary(sentiment: string, topFeatures: FeatureImportance[]): string {
+    // Explain the key factors that led to the sentiment classification
+    const keyFeatures = topFeatures
+      .map(f => `${f.feature}: ${f.importance.toFixed(2)}`)
+      .join(', ')
+
+    return `Sentiment determined by: ${keyFeatures}`
+  }
+
+  private countPositiveWords(message: string): number {
+    const positiveWordList = [
+      'good', 'great', 'excellent', 'amazing', 'wonderful', 'fantastic', 
+      'happy', 'pleased', 'delighted', 'satisfied', 'awesome'
+    ]
+    return positiveWordList.filter(word => 
+      message.toLowerCase().includes(word)
+    ).length
+  }
+
+  private countNegativeWords(message: string): number {
+    const negativeWordList = [
+      'bad', 'terrible', 'awful', 'horrible', 'disappointing', 
+      'unhappy', 'frustrated', 'angry', 'worst', 'poor'
+    ]
+    return negativeWordList.filter(word => 
+      message.toLowerCase().includes(word)
+    ).length
+  }
+
+  private calculatePunctuationIntensity(message: string): number {
+    const punctuationMarks = message.match(/[!?\.]/g) || []
+    return punctuationMarks.length
+  }
+
+  private calculateCapitalizedWordRatio(message: string): number {
+    const words = message.split(/\s+/)
+    const capitalizedWords = words.filter(word => 
+      word.length > 1 && word[0] === word[0].toUpperCase()
+    )
+    return capitalizedWords.length / words.length
+  }
+
+  private calculateSentenceComplexity(message: string): number {
+    const words = message.split(/\s+/)
+    const averageWordLength = words.reduce((sum, word) => sum + word.length, 0) / words.length
+    return averageWordLength
+  }
+
+  private async logExplanation(
+    message: string, 
+    sentiment: string, 
+    topFeatures: FeatureImportance[]
+  ): Promise<void> {
+    try {
+      await this.prisma.mlPredictionExplanation.create({
+        data: {
+          timestamp: new Date(),
+          message,
+          sentiment,
+          topFeatures: JSON.stringify(topFeatures)
+        }
+      })
     } catch (error) {
-      logger.error('Error extracting top features', { error })
+      logger.error('Error logging prediction explanation', { error })
+    }
+  }
+
+  async getHistoricalExplanations(limit: number = 100): Promise<any[]> {
+    try {
+      return await this.prisma.mlPredictionExplanation.findMany({
+        orderBy: { timestamp: 'desc' },
+        take: limit
+      })
+    } catch (error) {
+      logger.error('Error retrieving historical explanations', { error })
       return []
     }
   }
-
-  private async calculateFeatureImportance(
-    input: tf.Tensor, 
-    prediction: tf.Tensor
-  ): Promise<Array<{
-    name: string
-    importance: number
-  }>> {
-    // Implement feature importance calculation
-    // This is a placeholder implementation
-    return [
-      { name: 'positive_sentiment_words', importance: 0.7 },
-      { name: 'negative_sentiment_words', importance: -0.3 }
-    ]
-  }
-
-  private generateLocalExplanation(
-    preprocessedInput: tf.Tensor
-  ): ExplanationResult['localExplanation'] {
-    // Generate token-level importance
-    const tokens = this.detokenize(preprocessedInput)
-    
-    return {
-      inputTokens: tokens,
-      tokenImportance: tokens.map((token, index) => ({
-        token,
-        importance: this.calculateTokenImportance(token, index)
-      }))
-    }
-  }
-
-  private detokenize(tensor: tf.Tensor): string[] {
-    // Convert tensor back to tokens
-    // This is a placeholder implementation
-    return ['example', 'tokens']
-  }
-
-  private calculateTokenImportance(token: string, index: number): number {
-    // Calculate importance of individual tokens
-    // This is a simplified example
-    const importanceMap: {[key: string]: number} = {
-      'good': 0.8,
-      'bad': -0.7
-    }
-    return importanceMap[token] || 0
-  }
-
-  private async generateGlobalExplanation(): Promise<ExplanationResult['globalExplanation']> {
-    try {
-      // Analyze overall feature importance across multiple predictions
-      const globalFeatures = await this.calculateGlobalFeatureImportance()
-      
-      return {
-        mostInfluentialFeatures: globalFeatures.map(feature => ({
-          feature: feature.name,
-          overallImportance: feature.importance
-        }))
-      }
-    } catch (error) {
-      logger.error('Error generating global explanation', { error })
-      return { mostInfluentialFeatures: [] }
-    }
-  }
-
-  private async calculateGlobalFeatureImportance(): Promise<Array<{
-    name: string
-    importance: number
-  }>> {
-    // Analyze feature importance across multiple samples
-    // This would involve aggregating feature importances
-    return [
-      { name: 'sentiment_keywords', importance: 0.9 },
-      { name: 'context_words', importance: 0.7 }
-    ]
-  }
-
-  private decodePrediction(prediction: tf.Tensor): string {
-    // Convert model output to human-readable label
-    // This is a placeholder implementation
-    const labels = ['negative', 'neutral', 'positive']
-    const predictionArray = prediction.arraySync() as number[]
-    const maxIndex = predictionArray.indexOf(Math.max(...predictionArray))
-    return labels[maxIndex]
-  }
-
-  private calculateConfidence(prediction: tf.Tensor): number {
-    // Calculate prediction confidence
-    const predictionArray = prediction.arraySync() as number[]
-    return Math.max(...predictionArray)
-  }
-
-  async generateModelCard(): Promise<string> {
-    try {
-      // Fetch latest model information
-      const latestModel = await this.prisma.mlModel.findFirst({
-        orderBy: { timestamp: 'desc' },
-        select: {
-          version: true,
-          timestamp: true,
-          metrics: true,
-          trainingDataSize: true
-        }
-      })
-
-      if (!latestModel) {
-        throw new Error('No model found')
-      }
-
-      // Generate comprehensive model card
-      return JSON.stringify({
-        modelVersion: latestModel.version,
-        trainedAt: latestModel.timestamp,
-        performanceMetrics: latestModel.metrics,
-        trainingDataSize: latestModel.trainingDataSize,
-        explainabilityCapabilities: {
-          localExplanation: true,
-          globalExplanation: true,
-          featureImportance: true
-        },
-        ethicalConsiderations: {
-          biasMitigationTechniques: ['stratified sampling', 'weighted loss'],
-          protectedAttributes: ['language', 'sentiment_origin']
-        }
-      }, null, 2)
-    } catch (error) {
-      logger.error('Error generating model card', { error })
-      throw error
-    }
-  }
-
-  async logExplanation(explanation: ExplanationResult): Promise<void> {
-    try {
-      await this.prisma.mlExplanationLog.create({
-        data: {
-          predictionLabel: explanation.predictionLabel,
-          confidence: explanation.confidence,
-          topFeatures: explanation.topFeatures as any,
-          localExplanation: explanation.localExplanation as any,
-          globalExplanation: explanation.globalExplanation as any
-        }
-      })
-    } catch (error) {
-      logger.error('Error logging explanation', { error })
-    }
-  }
 }
+
+// Export a singleton instance for easy use
+export const explainabilityToolkit = new ExplainabilityToolkit()

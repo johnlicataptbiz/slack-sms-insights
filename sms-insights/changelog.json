@@ -1,8 +1,161 @@
 {
-  "generatedAt": "2026-04-03T13:23:19.358Z",
+  "generatedAt": "2026-04-03T20:01:16.500Z",
   "daysIncluded": 365,
-  "totalCount": 564,
+  "totalCount": 581,
   "entries": [
+    {
+      "hash": "c787686",
+      "date": "2026-04-03T14:56:26-05:00",
+      "message": "fix(deploy): pass Railway project and environment in CI",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Pass Railway project and environment in CI"
+    },
+    {
+      "hash": "726b143",
+      "date": "2026-04-03T14:52:52-05:00",
+      "message": "fix(ci): use RAILWAY_API_TOKEN for Railway CLI auth",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Use RAILWAY_API_TOKEN for Railway CLI auth"
+    },
+    {
+      "hash": "a447e0f",
+      "date": "2026-04-03T14:38:04-05:00",
+      "message": "fix(frontend): resolve three module for hoisted workspace builds",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Resolve three module for hoisted workspace builds"
+    },
+    {
+      "hash": "c00bd3c",
+      "date": "2026-04-03T14:35:02-05:00",
+      "message": "fix(ci): resolve workflow merge markers and restore test deps",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Resolve workflow merge markers and restore test deps"
+    },
+    {
+      "hash": "66645f6",
+      "date": "2026-04-03T14:29:28-05:00",
+      "message": "Trigger fresh CI run to verify fixes",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Authentication",
+      "description": "Trigger fresh CI run to verify fixes"
+    },
+    {
+      "hash": "6e9aa76",
+      "date": "2026-04-03T14:26:58-05:00",
+      "message": "Apply biome lint fixes: const declarations and type-only imports",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Apply biome lint fixes: const declarations and type-only imports"
+    },
+    {
+      "hash": "a92dc8f",
+      "date": "2026-04-03T14:26:26-05:00",
+      "message": "Fix biome.json configuration and test-helpers.ts syntax errors",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Fix biome.json configuration and test-helpers.ts syntax errors"
+    },
+    {
+      "hash": "c4f1786",
+      "date": "2026-04-03T13:38:21-05:00",
+      "message": "fix: Remove broken git submodule references to fix CI",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Remove broken git submodule references to fix CI"
+    },
+    {
+      "hash": "4bf072b",
+      "date": "2026-04-03T13:32:22-05:00",
+      "message": "chore: Remove comfyui-mcp-server submodule (broken reference)",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Bug Fixes",
+      "description": "Remove comfyui-mcp-server submodule (broken reference)"
+    },
+    {
+      "hash": "00bb1f0",
+      "date": "2026-04-03T13:30:42-05:00",
+      "message": "chore: Update project documentation and backend services",
+      "author": "Jack Licata",
+      "type": "docs",
+      "category": "General",
+      "description": "Update project documentation and backend services"
+    },
+    {
+      "hash": "fca4286",
+      "date": "2026-04-03T13:29:43-05:00",
+      "message": "chore: Add frontend .gitignore configuration",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add frontend .gitignore configuration"
+    },
+    {
+      "hash": "7841d46",
+      "date": "2026-04-03T13:29:32-05:00",
+      "message": "feat: Add MCP tools for enhanced AI capabilities",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add MCP tools for enhanced AI capabilities"
+    },
+    {
+      "hash": "4175492",
+      "date": "2026-04-03T13:29:20-05:00",
+      "message": "feat: Add analytics migration scripts and documentation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add analytics migration scripts and documentation"
+    },
+    {
+      "hash": "9ec289b",
+      "date": "2026-04-03T13:29:10-05:00",
+      "message": "feat: Add backend data analysis and Aloware controller",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add backend data analysis and Aloware controller"
+    },
+    {
+      "hash": "e51098d",
+      "date": "2026-04-03T13:28:58-05:00",
+      "message": "feat: Complete DB-001 through DB-004 database infrastructure",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Complete DB-001 through DB-004 database infrastructure"
+    },
+    {
+      "hash": "d8ea73f",
+      "date": "2026-04-03T12:43:18-05:00",
+      "message": "fix: Update TypeScript code to use snake_case field names from Prisma schema",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Update TypeScript code to use snake_case field names from Prisma schema"
+    },
+    {
+      "hash": "72ec270",
+      "date": "2026-04-03T12:38:04-05:00",
+      "message": "feat: Complete DB-005, DB-006, DB-007 database infrastructure tasks",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Complete DB-005, DB-006, DB-007 database infrastructure tasks"
+    },
     {
       "hash": "be8e3a3",
       "date": "2026-04-02T20:30:12-05:00",

@@ -11,9 +11,6 @@
     "indentStyle": "space",
     "indentWidth": 2
   },
-  "files": {
-    "ignore": ["dist/**", "**/*.min.js", "node_modules/**"]
-  },
   "javascript": {
     "formatter": {
       "quoteStyle": "single"

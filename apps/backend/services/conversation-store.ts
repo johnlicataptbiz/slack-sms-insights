@@ -13,7 +13,7 @@ export const getConversationById = async (
 ): Promise<ConversationRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation.findUnique({
+    const result = await prisma.conversations.findUnique({
       where: { id },
       select: {
         id: true,

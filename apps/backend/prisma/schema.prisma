@@ -297,6 +297,102 @@ model fact_rep_response_daily {
   @@index([rep_id, day], map: "idx_fact_rep_response_daily_rep_day")
 }
 
+model fact_sequence_funnel_daily {
+  day                   DateTime @db.Date
+  sequence_id           String   @db.Uuid
+  rep_id                String   @db.Uuid
+  new_leads_contacted   Int      @default(0)
+  leads_replied         Int      @default(0)
+  qualified_leads       Int      @default(0)
+  booked_calls          Int      @default(0)
+  opt_outs              Int      @default(0)
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day, sequence_id, rep_id])
+  @@index([day], map: "idx_fact_sequence_funnel_daily_day")
+}
+
+model fact_sms_daily {
+  day             DateTime @db.Date
+  rep_id          String?
+  total_sms       Int      @default(0)
+  inbound_count   Int      @default(0)
+  outbound_count  Int      @default(0)
+  unique_contacts Int      @default(0)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day, rep_id])
+  @@index([day], map: "idx_fact_sms_daily_day")
+}
+
+model fact_booking_daily {
+  day             DateTime @db.Date
+  rep_id          String?
+  booked_total    Int      @default(0)
+  booked_jack     Int      @default(0)
+  booked_brandon  Int      @default(0)
+  booked_self     Int      @default(0)
+  booked_after_sms_reply Int @default(0)
+  diagnostic_booking_signals Int @default(0)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day, rep_id])
+  @@index([day], map: "idx_fact_booking_daily_day")
+}
+
+model fact_lead_quality_daily {
+  day                        DateTime @db.Date
+  rep_id                     String?
+  leads_count                Int      @default(0)
+  coaching_interest_high     Int      @default(0)
+  employment_full_time       Int      @default(0)
+  revenue_mix_mostly_cash    Int      @default(0)
+  progress_step_3_count      Int      @default(0)
+  progress_step_4_count      Int      @default(0)
+  created_at                 DateTime @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day, rep_id])
+  @@index([day], map: "idx_fact_lead_quality_daily_day")
+}
+
+model fact_monday_health_daily {
+  day                   DateTime @db.Date
+  board_id              String
+  board_name            String?
+  sync_status           String?  @default("ok")
+  is_stale              Boolean  @default(false)
+  last_sync_at          DateTime? @db.Timestamptz(6)
+  items_count           Int      @default(0)
+  errors_count          Int      @default(0)
+  source_coverage_pct   Decimal? @db.Decimal(5, 2)
+  campaign_coverage_pct Decimal? @db.Decimal(5, 2)
+  set_by_coverage_pct   Decimal? @db.Decimal(5, 2)
+  touchpoints_coverage_pct Decimal? @db.Decimal(5, 2)
+  created_at            DateTime @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day, board_id])
+  @@index([day], map: "idx_fact_monday_health_daily_day")
+}
+
+model sequence_registry {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label             String   @unique
+  lead_magnet       String?
+  version_tag       String?
+  status            String   @default("active")
+  owner_rep         String?
+  is_manual_bucket  Boolean  @default(false)
+  created_at        DateTime @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([status], map: "idx_sequence_registry_status")
+}
+
 model goals {
   id         String    @id @db.VarChar(100)
   name       String    @db.VarChar(255)

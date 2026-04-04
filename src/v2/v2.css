@@ -2399,6 +2399,10 @@
     display: none;
   }
 
+  .V2Shell__navSignal {
+    display: none;
+  }
+
   .V2Shell__brandLogo {
     height: 40px;
     transform: translateX(-5px) translateY(-4px);
@@ -2410,7 +2414,9 @@
   }
 
   .V2Shell__navLabelShort {
-    display: inline;
+    display: block;
+    width: 100%;
+    text-align: center;
   }
 
   .V2SplitStat {

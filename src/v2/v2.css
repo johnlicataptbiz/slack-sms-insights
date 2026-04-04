@@ -145,8 +145,9 @@
 }
 
 .V2Shell__brandCopy {
-  display: grid;
-  gap: 0.14rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
   min-width: 0;
 }
 
@@ -171,23 +172,29 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 0.55rem;
+  gap: 0.65rem;
 }
 
 .V2Shell__quickLink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 2rem;
-  padding: 0.35rem 0.75rem;
+  min-height: 2.1rem;
+  padding: 0.38rem 0.82rem;
   border-radius: 999px;
-  border: 1px solid rgba(145, 237, 248, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(232, 247, 255, 0.82);
+  border: 1px solid rgba(145, 237, 248, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(232, 247, 255, 0.85);
   font-size: 0.73rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.V2Shell__quickLink:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(145, 237, 248, 0.25);
 }
 
 .V2Shell__body {
@@ -226,13 +233,19 @@
   display: grid;
   gap: 0.32rem;
   width: 100%;
-  padding: 1rem 1rem 0.95rem;
+  padding: 1.05rem 1.05rem;
   border-radius: 1.25rem;
-  border: 1px solid rgba(145, 237, 248, 0.18);
+  border: 1px solid rgba(145, 237, 248, 0.2);
   background:
-    linear-gradient(145deg, rgba(17, 184, 214, 0.15), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.02);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    linear-gradient(145deg, rgba(17, 184, 214, 0.18), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 16px rgba(2, 6, 13, 0.12);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.V2Shell__sidebarWordmark:hover {
+  border-color: rgba(145, 237, 248, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 20px rgba(2, 6, 13, 0.16);
 }
 
 .V2Shell__sidebarWordmarkLine {
@@ -293,7 +306,7 @@
 
 .V2Shell__nav {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.75rem;
   flex: 1;
 }
 
@@ -302,13 +315,13 @@
   display: grid;
   grid-template-columns: 0.55rem 2.3rem minmax(0, 1fr);
   align-items: start;
-  gap: 0.85rem;
+  gap: 0.9rem;
   text-decoration: none;
-  color: rgba(235, 244, 255, 0.88);
+  color: rgba(235, 244, 255, 0.9);
   border-radius: 1rem;
-  padding: 0.95rem 0.95rem 0.92rem;
-  border: 1px solid rgba(145, 237, 248, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+  padding: 1rem 1rem 0.95rem;
+  border: 1px solid rgba(145, 237, 248, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.025));
   transition:
     transform 200ms ease,
     border-color 200ms ease,
@@ -318,21 +331,21 @@
 
 .V2Shell__navItem:hover,
 .V2Shell__navItem:focus-visible {
-  transform: translateX(3px);
-  border-color: rgba(145, 237, 248, 0.22);
-  background: linear-gradient(180deg, rgba(17, 184, 214, 0.12), rgba(255, 255, 255, 0.03));
-  box-shadow: 0 12px 24px rgba(2, 6, 13, 0.24);
+  transform: translateX(4px);
+  border-color: rgba(145, 237, 248, 0.28);
+  background: linear-gradient(180deg, rgba(17, 184, 214, 0.14), rgba(255, 255, 255, 0.04));
+  box-shadow: 0 14px 28px rgba(2, 6, 13, 0.28);
   outline: none;
 }
 
 .V2Shell__navItem.is-active {
-  border-color: rgba(145, 237, 248, 0.36);
+  border-color: rgba(145, 237, 248, 0.42);
   background:
-    linear-gradient(90deg, rgba(17, 184, 214, 0.22), rgba(17, 184, 214, 0.08)),
-    rgba(255, 255, 255, 0.04);
+    linear-gradient(90deg, rgba(17, 184, 214, 0.26), rgba(17, 184, 214, 0.1)),
+    rgba(255, 255, 255, 0.05);
   box-shadow:
-    inset 0 0 0 1px rgba(145, 237, 248, 0.14),
-    0 18px 34px rgba(3, 10, 20, 0.28);
+    inset 0 0 0 1px rgba(145, 237, 248, 0.18),
+    0 20px 38px rgba(3, 10, 20, 0.32);
 }
 
 .V2Shell__navBullet {
@@ -376,6 +389,7 @@
 .V2Shell__navLabel {
   font-size: 0.96rem;
   font-weight: 800;
+  line-height: 1.2;
 }
 
 .V2Shell__navSignal {
@@ -383,10 +397,10 @@
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  padding: 0.2rem 0.42rem;
-  background: rgba(255, 255, 255, 0.08);
-  color: rgba(220, 242, 255, 0.72);
-  font-size: 0.62rem;
+  padding: 0.18rem 0.48rem;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(220, 242, 255, 0.68);
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -413,12 +427,19 @@
 .V2Shell__statusCard {
   display: grid;
   gap: 0.85rem;
-  padding: 1rem;
+  padding: 1.05rem;
   border-radius: 1.2rem;
-  border: 1px solid rgba(145, 237, 248, 0.14);
+  border: 1px solid rgba(145, 237, 248, 0.16);
   background:
-    linear-gradient(180deg, rgba(17, 184, 214, 0.12), rgba(255, 255, 255, 0.03)),
-    rgba(255, 255, 255, 0.02);
+    linear-gradient(180deg, rgba(17, 184, 214, 0.14), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.025);
+  box-shadow: 0 4px 16px rgba(2, 6, 13, 0.1);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.V2Shell__statusCard:hover {
+  border-color: rgba(145, 237, 248, 0.24);
+  box-shadow: 0 8px 24px rgba(2, 6, 13, 0.14);
 }
 
 .V2Shell__statusEyebrow {
@@ -506,14 +527,14 @@
 .V2Shell__content {
   position: relative;
   min-width: 0;
-  padding: clamp(1rem, 2vw, 1.5rem);
+  padding: clamp(1.25rem, 2vw, 2rem) clamp(1.25rem, 3vw, 2.5rem);
   overflow: auto;
 }
 
 .V2Shell__contentHeader {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.95fr);
-  gap: 1rem;
+  gap: 1.5rem;
   align-items: stretch;
   margin-bottom: var(--v2-space-5);
 }
@@ -521,31 +542,39 @@
 .V2Shell__brandBlock,
 .V2Shell__headerCard {
   border-radius: 1.4rem;
-  border: 1px solid rgba(145, 237, 248, 0.14);
+  border: 1px solid rgba(145, 237, 248, 0.16);
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
-    rgba(8, 17, 31, 0.58);
-  backdrop-filter: blur(16px);
-  box-shadow: 0 18px 50px rgba(2, 8, 18, 0.22);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.035)),
+    rgba(8, 17, 31, 0.6);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 18px 50px rgba(2, 8, 18, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.V2Shell__brandBlock:hover,
+.V2Shell__headerCard:hover {
+  border-color: rgba(145, 237, 248, 0.24);
+  box-shadow: 0 22px 58px rgba(2, 8, 18, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
 .V2Shell__brandBlock {
-  padding: 1.2rem 1.25rem;
+  padding: 1.5rem 1.75rem;
 }
 
 .V2Shell__contextEyebrow {
-  display: inline-flex;
-  margin-bottom: 0.7rem;
+  display: block;
+  margin-bottom: 0.85rem;
   color: var(--v2-accent-soft);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 .V2Shell__context {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.75rem;
 }
 
 .V2Shell__contextTitle {
@@ -559,50 +588,51 @@
 .V2Shell__contextSubtitle {
   margin: 0;
   max-width: 64ch;
-  color: rgba(220, 242, 255, 0.76);
-  font-size: 0.95rem;
-  line-height: 1.55;
+  color: rgba(220, 242, 255, 0.78);
+  font-size: 0.96rem;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
 }
 
 .V2Shell__headerRail {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.9rem;
 }
 
 .V2Shell__headerCard {
-  padding: 1rem 1.05rem;
+  padding: 1.15rem 1.2rem;
 }
 
 .V2Shell__headerLabel {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: rgba(220, 242, 255, 0.62);
+  color: rgba(220, 242, 255, 0.65);
   font-size: 0.67rem;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
 }
 
 .V2Shell__headerValue {
-  margin: 0.55rem 0 0;
+  margin: 0.6rem 0 0;
   color: #f7fbff;
   font-family: var(--v2-font-display);
   font-size: 1.14rem;
-  line-height: 1.15;
+  line-height: 1.25;
 }
 
 .V2Shell__headerMeta {
-  margin: 0.42rem 0 0;
-  color: rgba(220, 242, 255, 0.72);
+  margin: 0.48rem 0 0;
+  color: rgba(220, 242, 255, 0.74);
   font-size: 0.82rem;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .V2Shell__topbarPills {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 0.65rem;
   align-items: center;
 }
 
@@ -610,33 +640,33 @@
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  min-height: 2rem;
-  padding: 0.36rem 0.72rem;
+  min-height: 2.1rem;
+  padding: 0.38rem 0.78rem;
   border-radius: 999px;
-  border: 1px solid rgba(145, 237, 248, 0.14);
+  border: 1px solid rgba(145, 237, 248, 0.16);
   background: rgba(255, 255, 255, 0.05);
-  color: rgba(232, 247, 255, 0.82);
+  color: rgba(232, 247, 255, 0.85);
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.V2Shell__topbarPill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(145, 237, 248, 0.25);
 }
 
 .V2Shell__contentInner {
   min-width: 0;
   display: grid;
-  gap: var(--v2-space-5);
+  gap: clamp(1.5rem, 3vw, 2rem);
 }
-.V2Shell * {
 .V2Shell__navLabelShort {
   color: rgba(255, 255, 255, 0.56);
   font-size: 0.68rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-}
-
-.V2Shell__content {
-  padding: var(--v2-space-5);
-  min-width: 0;
 }
 
 .V2Page {

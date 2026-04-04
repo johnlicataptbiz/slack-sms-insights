@@ -161,6 +161,34 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
   const prismaAny = client as any;
   const store = getCompatStore();
 
+  // Bridge legacy camelCase delegate usage to current snake_case Prisma models.
+  const delegateAliases: Array<[legacy: string, current: string]> = [
+    ['conversation', 'conversations'],
+    ['sequenceRegistry', 'sequence_registry'],
+    ['dailyRun', 'daily_runs'],
+    ['mondaySyncState', 'monday_sync_state'],
+    ['mondayColumnMapping', 'monday_column_mappings'],
+    ['mondayBoardRegistry', 'monday_board_registry'],
+    ['mondayBookedCallPushes', 'monday_booked_call_pushes'],
+    ['mondayCallSnapshots', 'monday_call_snapshots'],
+    ['mondayWeeklyReports', 'monday_weekly_reports'],
+    ['mondayMetricFacts', 'monday_metric_facts'],
+    ['actorDirectory', 'actor_directory'],
+    ['leadOutcomes', 'lead_outcomes'],
+    ['leadAttribution', 'lead_attribution'],
+    ['setterActivity', 'setter_activity'],
+    ['mondayCallColumnLatest', 'monday_call_column_latest'],
+    ['mondayCallColumnHistory', 'monday_call_column_history'],
+    ['workItem', 'work_items'],
+    ['smsEvent', 'sms_events'],
+  ];
+
+  for (const [legacy, current] of delegateAliases) {
+    if (!prismaAny[legacy] && prismaAny[current]) {
+      prismaAny[legacy] = prismaAny[current];
+    }
+  }
+
   if (!prismaAny.user) {
     const matchesUserWhere = (user: CompatUser, where: any = {}) => {
       if (where.id) {

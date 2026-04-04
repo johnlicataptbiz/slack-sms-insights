@@ -191,9 +191,12 @@ export class AuthController extends BaseController {
         }
       });
 
-      // TODO: Send email with reset link (implement email service)
-      // This is a placeholder for email sending logic
-      this.logger.info('Password reset requested', { email: validatedData.email });
+      // Log reset token for monitoring; email service integration pending
+      this.logger.info('Password reset requested', {
+        email: validatedData.email,
+        resetToken,
+        expiresAt: new Date(Date.now() + 3600000).toISOString(),
+      });
 
       tracker.stop();
 

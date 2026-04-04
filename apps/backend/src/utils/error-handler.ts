@@ -1,23 +1,72 @@
-{
-  "name": "ptbizsms-api",
-  "version": "2.0.0",
-  "type": "module",
-  "dependencies": {
-    "@prisma/client": "^7.x",
-    "express": "^4.18.2",
-    "zod": "^3.22.4",
-    "uuid": "^9.0.1"
-  },
-  "devDependencies": {
-    "@types/express": "^4.17.17",
-    "@types/node": "^20.x",
-    "@types/uuid": "^9.0.7",
-    "tsx": "^4.7.1",
-    "vitest": "^1.3.1"
-  },
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "test": "vitest",
-    "test:coverage": "vitest run --coverage"
+import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { AppError, ValidationError, NotFoundError, UnauthorizedError, ForbiddenError, ConflictError } from './errors.js';
+
+export { AppError, ValidationError, NotFoundError, UnauthorizedError, ForbiddenError, ConflictError };
+
+export function createApiError(message: string, statusCode: number = 500) {
+  return new AppError(message, statusCode);
+}
+
+/**
+ * Centralized error handling middleware
+ */
+export function errorHandlerMiddleware(
+  err: Error,
+  req: Request,
+  res: Response,
+  _next: NextFunction,
+) {
+  console.error('Unhandled Error:', err);
+
+  // Handle AppError hierarchy
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      success: false,
+      error: err.message,
+    });
   }
+
+  // Handle Zod validation errors
+  if (err instanceof ZodError) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation Failed',
+      details: err.errors.map((e) => ({
+        path: e.path.join('.'),
+        message: e.message,
+      })),
+    });
+  }
+
+  // Handle Prisma errors
+  if (err instanceof PrismaClientKnownRequestError) {
+    switch (err.code) {
+      case 'P2002':
+        return res.status(409).json({
+          success: false,
+          error: 'Unique Constraint Violation',
+          details: 'A record with these details already exists',
+        });
+      case 'P2025':
+        return res.status(404).json({
+          success: false,
+          error: 'Record Not Found',
+          details: 'The requested resource could not be found',
+        });
+      default:
+        return res.status(500).json({
+          success: false,
+          error: 'Database Error',
+          details: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message,
+        });
+    }
+  }
+
+  // Generic fallback
+  res.status(500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'production' ? 'Internal Server Error' : err.message,
+  });
 }

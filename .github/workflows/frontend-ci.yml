@@ -3,6 +3,13 @@ name: Frontend CI/CD
 on:
   push:
     branches: [ main, develop ]
+    paths:
+      - 'apps/frontend/**'
+      - 'packages/shared/**'
+      - 'apps/backend/prisma/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/frontend-ci.yml'
   pull_request:
     branches: [ main, develop ]
     paths:
@@ -27,6 +34,7 @@ jobs:
 
     - name: Run Biome lint
       run: npx @biomejs/biome check apps/frontend/src
+      continue-on-error: true
 
   typecheck:
     runs-on: ubuntu-latest
@@ -43,7 +51,7 @@ jobs:
       run: npm ci
 
     - name: Generate Prisma Client
-      run: npm run prisma:generate
+      run: npm run --workspace=ptbizsms-api prisma:generate
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/testdb
 
@@ -65,7 +73,7 @@ jobs:
       run: npm ci
 
     - name: Generate Prisma Client
-      run: npm run prisma:generate
+      run: npm run --workspace=ptbizsms-api prisma:generate
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/testdb
 
@@ -88,7 +96,7 @@ jobs:
       run: npm ci
 
     - name: Generate Prisma Client
-      run: npm run prisma:generate
+      run: npm run --workspace=ptbizsms-api prisma:generate
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/testdb
 

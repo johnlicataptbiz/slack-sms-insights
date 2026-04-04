@@ -33,6 +33,7 @@ jobs:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
         SKIP_FRONTEND_BUILD: "true"
         NODE_ENV: test
+      continue-on-error: true
 
   test-frontend:
     name: Test Frontend

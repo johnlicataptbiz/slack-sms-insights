@@ -5,6 +5,11 @@ on:
     branches: 
       - main
       - develop
+    paths:
+      - 'sms-insights/ml/**'
+      - 'tests/ml-infrastructure.test.ts'
+      - 'prisma/schema.unified.prisma'
+      - '.github/workflows/ml-infrastructure-ci.yml'
   pull_request:
     branches:
       - main

@@ -1,3 +1,0 @@
-User-agent: *
-Allow: /
-Sitemap: https://ptbizsms.com/sitemap.xml

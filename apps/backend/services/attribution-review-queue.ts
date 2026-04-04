@@ -132,7 +132,7 @@ export const listSequenceFunnelDaily = async (params: {
   sequenceId?: string | null;
 }): Promise<SequenceFunnelRow[]> => {
   const prisma = getPrisma();
-  return prisma.fact_sequence_funnel_daily.findMany({
+  return prisma.factSequenceFunnelDaily.findMany({
     where: {
       day: { gte: params.from, lte: params.to },
       ...(params.sequenceId ? { sequence_id: params.sequenceId } : {}),
@@ -146,7 +146,7 @@ export const listAttributionMethodDaily = async (params: {
   to: Date;
 }): Promise<AttributionMethodDailyRow[]> => {
   const prisma = getPrisma();
-  return prisma.fact_attribution_method_daily.findMany({
+  return prisma.factAttributionMethodDaily.findMany({
     where: { day: { gte: params.from, lte: params.to } },
     orderBy: { day: 'asc' },
   });
@@ -154,7 +154,7 @@ export const listAttributionMethodDaily = async (params: {
 
 export const listRepResponseDaily = async (params: { from: Date; to: Date }): Promise<RepResponseDailyRow[]> => {
   const prisma = getPrisma();
-  const rows = await prisma.fact_rep_response_daily.findMany({
+  const rows = await prisma.factRepResponseDaily.findMany({
     where: { day: { gte: params.from, lte: params.to } },
     orderBy: [{ day: 'asc' }, { rep_id: 'asc' }],
   });

@@ -89,7 +89,7 @@ export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
   try {
     const client = getPrismaClient();
     const queryArgs = { select: { id: true }, take: 1 };
-    await client.conversation.findMany(queryArgs);
+    await client.conversations.findMany(queryArgs);
     return {
       status: 'ok',
       configured: true,

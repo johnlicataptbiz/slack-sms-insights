@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/client';
 import { AppError, ValidationError, NotFoundError, UnauthorizedError, ForbiddenError, ConflictError } from './errors.js';
 
 export { AppError, ValidationError, NotFoundError, UnauthorizedError, ForbiddenError, ConflictError };
@@ -33,7 +33,7 @@ export function errorHandlerMiddleware(
     return res.status(400).json({
       success: false,
       error: 'Validation Failed',
-      details: err.errors.map((e) => ({
+      details: err.issues.map((e) => ({
         path: e.path.join('.'),
         message: e.message,
       })),

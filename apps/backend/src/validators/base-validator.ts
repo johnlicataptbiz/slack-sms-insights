@@ -37,36 +37,39 @@ export class BaseValidator {
     toLowerCase?: boolean;
     toUpperCase?: boolean;
   } = {}) {
-    let schema = z.string();
+    let baseSchema = z.string();
 
     if (options.min !== undefined) {
-      schema = schema.min(options.min, `Minimum length is ${options.min}`);
+      baseSchema = baseSchema.min(options.min, `Minimum length is ${options.min}`);
     }
 
     if (options.max !== undefined) {
-      schema = schema.max(options.max, `Maximum length is ${options.max}`);
+      baseSchema = baseSchema.max(options.max, `Maximum length is ${options.max}`);
     }
 
-    // Add transformations
-    schema = schema.transform(val => {
-      let result = val;
-      
-      if (options.trim) {
-        result = result.trim();
-      }
+    const hasTransform = options.trim || options.toLowerCase || options.toUpperCase;
 
-      if (options.toLowerCase) {
-        result = result.toLowerCase();
-      }
+    if (hasTransform) {
+      return baseSchema.transform((val) => {
+        let result = val;
 
-      if (options.toUpperCase) {
-        result = result.toUpperCase();
-      }
+        if (options.trim) {
+          result = result.trim();
+        }
 
-      return result;
-    });
+        if (options.toLowerCase) {
+          result = result.toLowerCase();
+        }
 
-    return schema;
+        if (options.toUpperCase) {
+          result = result.toUpperCase();
+        }
+
+        return result;
+      });
+    }
+
+    return baseSchema;
   }
 
   /**

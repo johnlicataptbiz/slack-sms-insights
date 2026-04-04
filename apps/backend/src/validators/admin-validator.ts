@@ -105,7 +105,7 @@ export class AdminValidator {
     userId: BaseValidator.id().optional(),
     action: z.string().optional(),
     resourceType: z.string().optional(),
-    ipAddress: z.string().ip().optional()
+    ipAddress: z.union([z.ipv4(), z.ipv6()]).optional()
   });
 
   /**

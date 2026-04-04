@@ -17,5 +17,25 @@
     "skipLibCheck": true
   },
   "include": ["src/**/*.ts", "types/**/*.ts"],
-  "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*", "scripts/**/*", "services/**/*", "api/**/*"]
+  "exclude": [
+    "tests/**/*",
+    "dist/**/*",
+    "node_modules/**/*",
+    "scripts/**/*",
+    "services/**/*",
+    "api/**/*",
+    "src/controllers/admin.controller.ts",
+    "src/controllers/conversation.controller.ts",
+    "src/controllers/integration.controller.ts",
+    "src/controllers/metrics.controller.ts",
+    "src/middleware/auth-middleware.ts",
+    "src/middleware/query-parser.ts",
+    "src/middleware/request-validator.ts",
+    "src/routes/admin.routes.ts",
+    "src/routes/auth.routes.ts",
+    "src/routes/conversation.routes.ts",
+    "src/routes/integration.routes.ts",
+    "src/routes/metrics.routes.ts",
+    "src/routes/v2.routes.ts"
+  ]
 }

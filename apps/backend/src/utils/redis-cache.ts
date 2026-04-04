@@ -148,7 +148,7 @@ export class RedisCache {
     const freshData = await fetchFn();
     
     // Store in cache
-    await this.set(key, freshData, ttl);
+    await this.set(key, freshData as string | number | object, ttl);
 
     return freshData;
   }

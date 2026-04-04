@@ -50,10 +50,10 @@ export class PerformanceTracker {
       
       // Patch the response end method to stop tracking
       const originalEnd = res.end;
-      res.end = function(...args: any[]) {
+      res.end = function (this: typeof res, ...args: Parameters<typeof originalEnd>) {
         tracker.stop();
         return originalEnd.apply(this, args);
-      };
+      } as typeof res.end;
 
       next();
     };

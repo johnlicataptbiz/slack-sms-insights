@@ -382,6 +382,7 @@ model fact_monday_health_daily {
 model sequence_registry {
   id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   label             String   @unique
+  normalized_label  String?
   lead_magnet       String?
   version_tag       String?
   status            String   @default("active")
@@ -391,6 +392,7 @@ model sequence_registry {
   updated_at        DateTime @default(now()) @db.Timestamptz(6)
 
   @@index([status], map: "idx_sequence_registry_status")
+  @@index([normalized_label], map: "idx_sequence_registry_normalized_label")
 }
 
 model goals {

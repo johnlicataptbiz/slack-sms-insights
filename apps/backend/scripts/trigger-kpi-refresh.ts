@@ -3,7 +3,7 @@
  * Trigger KPI facts refresh for a given date range.
  * Usage: tsx scripts/trigger-kpi-refresh.ts [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--tz America/Chicago]
  */
-import { refreshKpiFacts } from '../services/kpi-facts.js';
+import { refreshKpiFacts } from '../services/kpi-facts-fixed.js';
 
 const parseArgs = () => {
   const args = process.argv.slice(2);

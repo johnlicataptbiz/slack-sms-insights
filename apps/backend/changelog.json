@@ -1,8 +1,431 @@
 {
-  "generatedAt": "2026-04-03T20:01:23.767Z",
+  "generatedAt": "2026-04-04T14:36:25.876Z",
   "daysIncluded": 365,
-  "totalCount": 581,
+  "totalCount": 642,
   "entries": [
+    {
+      "hash": "1ce63cf",
+      "date": "2026-04-04T09:27:25-05:00",
+      "message": "fix: make test setup resilient to missing tables/redis",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Make test setup resilient to missing tables/redis"
+    },
+    {
+      "hash": "1852965",
+      "date": "2026-04-04T09:20:48-05:00",
+      "message": "fix: simplify biome.json to minimal valid config",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Simplify biome.json to minimal valid config"
+    },
+    {
+      "hash": "fe1a422",
+      "date": "2026-04-04T09:15:03-05:00",
+      "message": "fix: remove assist key from biome.json (not supported in this version)",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Remove assist key from biome.json (not supported in this version)"
+    },
+    {
+      "hash": "8b9ee5e",
+      "date": "2026-04-04T09:12:48-05:00",
+      "message": "fix: biome.json - move ignore to files.ignore key",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Biome.json - move ignore to files.ignore key"
+    },
+    {
+      "hash": "550f4ec",
+      "date": "2026-04-04T09:12:23-05:00",
+      "message": "fix: make rep_id required in fact table models for composite PK",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Make rep_id required in fact table models for composite PK"
+    },
+    {
+      "hash": "5881dae",
+      "date": "2026-04-04T09:08:11-05:00",
+      "message": "fix: CI workflow - use correct Prisma schema path",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "CI workflow - use correct Prisma schema path"
+    },
+    {
+      "hash": "d18c756",
+      "date": "2026-04-04T09:04:33-05:00",
+      "message": "fix: add missing Prisma models to schema",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add missing Prisma models to schema"
+    },
+    {
+      "hash": "1720dd7",
+      "date": "2026-04-04T09:00:15-05:00",
+      "message": "fix: resolve TypeScript build errors blocking CI/CD",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Resolve TypeScript build errors blocking CI/CD"
+    },
+    {
+      "hash": "7b5306b",
+      "date": "2026-04-04T08:52:22-05:00",
+      "message": "fix: update biome.json organizeImports to new assist.actions format",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Update biome.json organizeImports to new assist.actions format"
+    },
+    {
+      "hash": "6c89528",
+      "date": "2026-04-04T08:36:56-05:00",
+      "message": "chore: force rebuild cache bust 1775309816",
+      "author": "Jack Licata",
+      "type": "style",
+      "category": "Performance",
+      "description": "Force rebuild cache bust 1775309816"
+    },
+    {
+      "hash": "f920714",
+      "date": "2026-04-04T08:29:42-05:00",
+      "message": "fix: resolve production runtime errors",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Resolve production runtime errors"
+    },
+    {
+      "hash": "51e8178",
+      "date": "2026-04-04T08:14:53-05:00",
+      "message": "feat: Phase 1-3 V2 API remediation - all 14 endpoints wired up",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Phase 1-3 V2 API remediation - all 14 endpoints wired up"
+    },
+    {
+      "hash": "37b3ae4",
+      "date": "2026-04-04T00:20:50-05:00",
+      "message": "refactor: eliminate any types across backend and frontend, improve type safety",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "General",
+      "description": "Eliminate any types across backend and frontend, improve type safety"
+    },
+    {
+      "hash": "68fe108",
+      "date": "2026-04-04T00:12:28-05:00",
+      "message": "refactor: consolidate error handling, unify prisma clients, remove TODO, delete prisma-local",
+      "author": "Jack Licata",
+      "type": "refactor",
+      "category": "Database",
+      "description": "Consolidate error handling, unify prisma clients, remove TODO, delete prisma-local"
+    },
+    {
+      "hash": "e66acb1",
+      "date": "2026-04-04T00:10:23-05:00",
+      "message": "chore: archive legacy docs and sms-insights, add frontend CI workflow",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Archive legacy docs and sms-insights, add frontend CI workflow"
+    },
+    {
+      "hash": "c33fa88",
+      "date": "2026-04-04T00:09:50-05:00",
+      "message": "chore: update Node.js to v22 in Dockerfile and backend CI",
+      "author": "Jack Licata",
+      "type": "docs",
+      "category": "Dashboard",
+      "description": "Update Node.js to v22 in Dockerfile and backend CI"
+    },
+    {
+      "hash": "df54363",
+      "date": "2026-04-04T00:09:35-05:00",
+      "message": "chore: update vercel config paths and add project context",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Update vercel config paths and add project context"
+    },
+    {
+      "hash": "04944b9",
+      "date": "2026-04-03T23:38:46-05:00",
+      "message": "fix(vercel): redirect trailing-slash routes to canonical paths",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "AI & ML",
+      "description": "Redirect trailing-slash routes to canonical paths"
+    },
+    {
+      "hash": "be41a65",
+      "date": "2026-04-03T23:28:06-05:00",
+      "message": "fix(seo): add robots and sitemap to frontend public assets",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Add robots and sitemap to frontend public assets"
+    },
+    {
+      "hash": "0a737d9",
+      "date": "2026-04-03T23:21:37-05:00",
+      "message": "fix(vercel): switch production build to restored frontend app",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Switch production build to restored frontend app"
+    },
+    {
+      "hash": "f66b949",
+      "date": "2026-04-03T22:48:49-05:00",
+      "message": "docs: Add ML infrastructure deployment changelog",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add ML infrastructure deployment changelog"
+    },
+    {
+      "hash": "2fa08f2",
+      "date": "2026-04-03T22:41:17-05:00",
+      "message": "fix(ui): mobile nav label display and signal hiding",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Bug Fixes",
+      "description": "Mobile nav label display and signal hiding"
+    },
+    {
+      "hash": "14f7a63",
+      "date": "2026-04-03T20:12:20-05:00",
+      "message": "fix: UI enhancements - spacing, hover effects, glass morphism",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "UI enhancements - spacing, hover effects, glass morphism"
+    },
+    {
+      "hash": "3e81dc4",
+      "date": "2026-04-03T17:45:48-05:00",
+      "message": "docs: update ML deployment strategy",
+      "author": "Jack Licata",
+      "type": "docs",
+      "category": "AI & ML",
+      "description": "Update ML deployment strategy"
+    },
+    {
+      "hash": "80b7a2f",
+      "date": "2026-04-03T17:45:13-05:00",
+      "message": "feat: ML infrastructure, testing enhancements, and backend improvements",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "ML infrastructure, testing enhancements, and backend improvements"
+    },
+    {
+      "hash": "b06b04d",
+      "date": "2026-04-03T17:09:42-05:00",
+      "message": "docs(ml): Add production readiness review documentation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add production readiness review documentation"
+    },
+    {
+      "hash": "76bb903",
+      "date": "2026-04-03T17:02:11-05:00",
+      "message": "chore(mcp): Add GitHub MCP server configuration",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add GitHub MCP server configuration"
+    },
+    {
+      "hash": "68cb289",
+      "date": "2026-04-03T17:02:11-05:00",
+      "message": "chore: Add database diagnostic script and enhanced keyword data",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add database diagnostic script and enhanced keyword data"
+    },
+    {
+      "hash": "49af4c7",
+      "date": "2026-04-03T17:02:10-05:00",
+      "message": "feat(ml): Implement model monitoring and performance tracking dashboards",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Implement model monitoring and performance tracking dashboards"
+    },
+    {
+      "hash": "d0c57f8",
+      "date": "2026-04-03T17:02:09-05:00",
+      "message": "feat(ml): Add advanced ML features including anomaly detection and bias monitoring",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add advanced ML features including anomaly detection and bias monitoring"
+    },
+    {
+      "hash": "770dfc6",
+      "date": "2026-04-03T17:02:08-05:00",
+      "message": "feat(ml): Add core sentiment analysis classifier and training infrastructure",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add core sentiment analysis classifier and training infrastructure"
+    },
+    {
+      "hash": "b35698e",
+      "date": "2026-04-03T17:02:06-05:00",
+      "message": "feat(frontend): Add application entry point, dashboard, and styling system",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add application entry point, dashboard, and styling system"
+    },
+    {
+      "hash": "ca989c4",
+      "date": "2026-04-03T17:02:05-05:00",
+      "message": "feat(frontend): Implement hooks and utility libraries",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Implement hooks and utility libraries"
+    },
+    {
+      "hash": "852fb95",
+      "date": "2026-04-03T17:02:05-05:00",
+      "message": "feat(frontend): Add UI components, configuration, and mock server setup",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Add UI components, configuration, and mock server setup"
+    },
+    {
+      "hash": "077cab5",
+      "date": "2026-04-03T17:02:04-05:00",
+      "message": "docs(ml): Add ML deployment strategy documentation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add ML deployment strategy documentation"
+    },
+    {
+      "hash": "ea6687e",
+      "date": "2026-04-03T17:02:03-05:00",
+      "message": "test(backend): Add comprehensive test suite for controllers and ML infrastructure",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add comprehensive test suite for controllers and ML infrastructure"
+    },
+    {
+      "hash": "e95d609",
+      "date": "2026-04-03T16:59:26-05:00",
+      "message": "feat(backend): Add comprehensive input validators for various services",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add comprehensive input validators for various services"
+    },
+    {
+      "hash": "c329f00",
+      "date": "2026-04-03T16:59:25-05:00",
+      "message": "docs(ml): Add model governance, explainability, and validation frameworks",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add model governance, explainability, and validation frameworks"
+    },
+    {
+      "hash": "47ead2e",
+      "date": "2026-04-03T16:59:24-05:00",
+      "message": "docs: Add agent handoff documentation files",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "General",
+      "description": "Add agent handoff documentation files"
+    },
+    {
+      "hash": "38c23bb",
+      "date": "2026-04-03T16:57:33-05:00",
+      "message": "feat(backend): Add utility services and performance tracking modules",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Performance",
+      "description": "Add utility services and performance tracking modules"
+    },
+    {
+      "hash": "eccfdc4",
+      "date": "2026-04-03T16:57:32-05:00",
+      "message": "docs: Add project documentation, contribution guidelines, and system runbooks",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "UI/UX",
+      "description": "Add project documentation, contribution guidelines, and system runbooks"
+    },
+    {
+      "hash": "edfef6c",
+      "date": "2026-04-03T16:57:32-05:00",
+      "message": "ci: Add GitHub workflow configurations for backend, ML infrastructure, and frontend",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Add GitHub workflow configurations for backend, ML infrastructure, and frontend"
+    },
+    {
+      "hash": "5ef8c4e",
+      "date": "2026-04-03T16:55:00-05:00",
+      "message": "chore(archive): Preserve legacy SMS insights scripts and documentation",
+      "author": "Jack Licata",
+      "type": "docs",
+      "category": "General",
+      "description": "Preserve legacy SMS insights scripts and documentation"
+    },
+    {
+      "hash": "d8e581f",
+      "date": "2026-04-03T16:49:59-05:00",
+      "message": "feat(backend): Implement middleware for authentication, caching, query parsing, and request validation",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Authentication",
+      "description": "Implement middleware for authentication, caching, query parsing, and request validation"
+    },
+    {
+      "hash": "db7e20a",
+      "date": "2026-04-03T16:49:59-05:00",
+      "message": "feat(backend): Add new controllers and routes for admin, conversations, integrations, and metrics",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Add new controllers and routes for admin, conversations, integrations, and metrics"
+    },
+    {
+      "hash": "5b50ad5",
+      "date": "2026-04-03T16:47:08-05:00",
+      "message": "chore(backend): Add implementation plan and deployment configurations",
+      "author": "Jack Licata",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add implementation plan and deployment configurations"
+    },
+    {
+      "hash": "e2fa937",
+      "date": "2026-04-03T15:01:51-05:00",
+      "message": "fix(backend): use Prisma DeliveryStatus enum in sms event upsert",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Database",
+      "description": "Use Prisma DeliveryStatus enum in sms event upsert"
+    },
     {
       "hash": "c787686",
       "date": "2026-04-03T14:56:26-05:00",
@@ -236,6 +659,132 @@
       "type": "feature",
       "category": "Infrastructure",
       "description": "Implement CI enforcer server with GitHub tools (#53)"
+    },
+    {
+      "hash": "823ca11",
+      "date": "2026-04-02T08:16:40-05:00",
+      "message": "chore(ci): retrigger after Vercel root directory fix",
+      "author": "Jack Licata",
+      "type": "fix",
+      "category": "Infrastructure",
+      "description": "Retrigger after Vercel root directory fix"
+    },
+    {
+      "hash": "428929f",
+      "date": "2026-04-02T08:02:34-05:00",
+      "message": "chore: retrigger CI",
+      "author": "Jack Licata",
+      "type": "chore",
+      "category": "Infrastructure",
+      "description": "Retrigger CI"
+    },
+    {
+      "hash": "b3b2050",
+      "date": "2026-04-02T12:51:14Z",
+      "message": "fix(review): correct env vars in tests, single quotes, prisma direct mode, migrate:status exit, cleaner test assertions, update docs",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Correct env vars in tests, single quotes, prisma direct mode, migrate:status exit, cleaner test a..."
+    },
+    {
+      "hash": "d2131fe",
+      "date": "2026-04-02T07:41:41-05:00",
+      "message": "Update frontend/src/v2/components/__tests__/SequenceQualificationBreakdown.test.tsx",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Dashboard",
+      "description": "Update frontend/src/v2/components/__tests__/SequenceQualificationBreakdown.test.tsx"
+    },
+    {
+      "hash": "d84f5af",
+      "date": "2026-04-02T07:38:45-05:00",
+      "message": "Update sms-insights/scripts/deploy-migrations.ts",
+      "author": "johnlicataptbiz",
+      "type": "chore",
+      "category": "Database",
+      "description": "Update sms-insights/scripts/deploy-migrations.ts"
+    },
+    {
+      "hash": "98f47dc",
+      "date": "2026-04-02T07:38:32-05:00",
+      "message": "Update frontend/src/v2/v2.css",
+      "author": "johnlicataptbiz",
+      "type": "style",
+      "category": "Dashboard",
+      "description": "Update frontend/src/v2/v2.css"
+    },
+    {
+      "hash": "174abb4",
+      "date": "2026-03-21T21:27:47Z",
+      "message": "fix(sms-event-store): use Prisma.InputJsonValue and Prisma.DbNull for proper Json? field handling",
+      "author": "copilot-swe-agent[bot]",
+      "type": "fix",
+      "category": "Database",
+      "description": "Use Prisma.InputJsonValue and Prisma.DbNull for proper Json? field handling"
+    },
+    {
+      "hash": "996f632",
+      "date": "2026-03-21T21:24:42Z",
+      "message": "fix(tests+ci): fix failing frontend tests, add test scripts, .nvmrc, and CI frontend test step",
+      "author": "copilot-swe-agent[bot]",
+      "type": "feature",
+      "category": "AI & ML",
+      "description": "Fix failing frontend tests, add test scripts, .nvmrc, and CI frontend test step"
+    },
+    {
+      "hash": "8cb5be8",
+      "date": "2026-03-21T21:10:25Z",
+      "message": "Checkpoint from VS Code for cloud agent session",
+      "author": "johnlicataptbiz",
+      "type": "other",
+      "category": "Authentication",
+      "description": "Checkpoint from VS Code for cloud agent session"
+    },
+    {
+      "hash": "970f539",
+      "date": "2026-03-20T17:27:35Z",
+      "message": "docs: add comprehensive production testing and API reference documentation",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Integrations",
+      "description": "Add comprehensive production testing and API reference documentation"
+    },
+    {
+      "hash": "5a1228c",
+      "date": "2026-03-20T17:21:33Z",
+      "message": "fix(lint): address preexisting code quality issues",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Bug Fixes",
+      "description": "Address preexisting code quality issues"
+    },
+    {
+      "hash": "f37b48f",
+      "date": "2026-03-20T17:12:41Z",
+      "message": "feat(ui): modernize dashboard design with refined typography and color palette",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Dashboard",
+      "description": "Modernize dashboard design with refined typography and color palette"
+    },
+    {
+      "hash": "223ec63",
+      "date": "2026-03-20T16:24:10Z",
+      "message": "docs: add production deployment ready guide",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Infrastructure",
+      "description": "Add production deployment ready guide"
+    },
+    {
+      "hash": "a8221e3",
+      "date": "2026-03-20T16:21:10Z",
+      "message": "chore: add railway production migration deployment script and alignment guide",
+      "author": "johnlicataptbiz",
+      "type": "feature",
+      "category": "Database",
+      "description": "Add railway production migration deployment script and alignment guide"
     },
     {
       "hash": "1308fcb",

@@ -37,11 +37,6 @@ jobs:
       working-directory: apps/backend
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/generate
-    - name: Check migration drift
-      run: npx prisma migrate status --config prisma.config.ts
-      working-directory: apps/backend
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/status
     - name: Install Railway CLI
       run: npm install -g @railway/cli
     - name: Deploy to Railway

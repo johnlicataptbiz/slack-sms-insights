@@ -1,10 +1,6 @@
-import '@testing-library/jest-dom'
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
 
-// Polyfill for ResizeObserver
-class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
 }
-
-window.ResizeObserver = ResizeObserver

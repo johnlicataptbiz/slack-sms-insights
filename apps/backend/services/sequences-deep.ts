@@ -529,35 +529,37 @@ export const getSequencesDeep = async (
     () => new Map() as Map<string, any>,
   );
 
-  const sequenceAttribution = attributeSlackBookedCallsToSequences(
-    sequences.map((row) => ({
-      label: row.label,
-      messagesSent: row.messagesSent,
-      repliesReceived: row.repliesReceived,
-      replyRatePct: row.replyRatePct,
-      bookingSignalsSms: row.bookedBreakdown.diagnosticSignals,
-      booked: row.bookedCalls,
-      optOuts: row.optOuts,
-      uniqueContacted: row.uniqueContacted,
-      bookingRatePct: row.bookingRatePct,
-    })),
-    bookedCallSources,
-    smsReplyLinks,
-    smsSequenceLookup,
-  ).catch(
-    () =>
-      ({
-        totals: {
-          matchedCalls: 0,
-          unattributedCalls: 0,
-          manualCalls: 0,
-          bookedAfterSmsReply: 0,
-          smsPhoneMatchedCalls: 0,
-          fuzzyTextMatchedCalls: 0,
-        },
-        unattributedAuditRows: [],
-      }) as any,
-  );
+  let sequenceAttribution: any;
+  try {
+    sequenceAttribution = attributeSlackBookedCallsToSequences(
+      sequences.map((row) => ({
+        label: row.label,
+        messagesSent: row.messagesSent,
+        repliesReceived: row.repliesReceived,
+        replyRatePct: row.replyRatePct,
+        bookingSignalsSms: row.bookedBreakdown.diagnosticSignals,
+        booked: row.bookedCalls,
+        optOuts: row.optOuts,
+        uniqueContacted: row.uniqueContacted,
+        bookingRatePct: row.bookingRatePct,
+      })),
+      bookedCallSources,
+      smsReplyLinks,
+      smsSequenceLookup,
+    );
+  } catch {
+    sequenceAttribution = {
+      totals: {
+        matchedCalls: 0,
+        unattributedCalls: 0,
+        manualCalls: 0,
+        bookedAfterSmsReply: 0,
+        smsPhoneMatchedCalls: 0,
+        fuzzyTextMatchedCalls: 0,
+      },
+      unattributedAuditRows: [],
+    };
+  }
 
   if (mondayRows.length === 0) {
     logger?.warn?.('sequences-deep: no monday health rows in requested window');

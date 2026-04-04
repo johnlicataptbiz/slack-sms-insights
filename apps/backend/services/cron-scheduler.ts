@@ -312,7 +312,7 @@ const loadInboxWatchCounts = async (): Promise<InboxWatchCounts> => {
     FROM conversations c
     LEFT JOIN conversation_state cs ON cs.conversation_id = c.id
     LEFT JOIN open_items oi ON oi.conversation_id = c.id
-    WHERE c.status = 'open'::"ConversationStatus"
+    WHERE c.status = 'open'
     `,
   );
 

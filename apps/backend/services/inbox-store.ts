@@ -1007,7 +1007,7 @@ export const getDraftSuggestionById = async (
 ): Promise<DraftSuggestionRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.draftSuggestions.findUnique({
+    const result = await prisma.draft_suggestions.findUnique({
       where: { id: draftId },
     });
     return result as unknown as DraftSuggestionRow | null;
@@ -1040,7 +1040,7 @@ export const updateDraftSuggestionFeedback = async (
     if (typeof params.edited === 'boolean') updateData.edited = params.edited;
     if (params.sendLinkedEventId !== undefined) updateData.send_linked_event_id = params.sendLinkedEventId;
 
-    const result = await prisma.draftSuggestions.update({
+    const result = await prisma.draft_suggestions.update({
       where: { id: draftId },
       data: updateData,
     });
@@ -1058,7 +1058,7 @@ export const upsertConversionExample = async (
 ): Promise<ConversionExampleRow> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversionExamples.upsert({
+    const result = await prisma.conversion_examples.upsert({
       where: { source_outbound_event_id: input.sourceOutboundEventId },
       update: {
         booked_call_label: input.bookedCallLabel ?? undefined,
@@ -1095,7 +1095,7 @@ export const updateConversationStatus = async (
 ): Promise<{ id: string; status: 'open' | 'closed' | 'dnc' } | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation.update({
+    const result = await prisma.conversations.update({
       where: { id: conversationId },
       data: {
         status: { set: status },
@@ -1183,7 +1183,7 @@ export const snoozeConversation = async (
 ): Promise<{ id: string; next_followup_due_at: Date | null }> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation.update({
+    const result = await prisma.conversations.update({
       where: { id: conversationId },
       data: {
         nextFollowupAt: snoozedUntil ? new Date(snoozedUntil) : null,
@@ -1213,7 +1213,7 @@ export const assignConversation = async (
 ): Promise<{ id: string; owner_label: string | null }> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.conversation.update({
+    const result = await prisma.conversations.update({
       where: { id: conversationId },
       data: {
         current_rep_id: ownerLabel,

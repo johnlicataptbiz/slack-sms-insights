@@ -315,7 +315,7 @@ model fact_sequence_funnel_daily {
 
 model fact_sms_daily {
   day             DateTime @db.Date
-  rep_id          String?
+  rep_id          String   @default("")
   total_sms       Int      @default(0)
   inbound_count   Int      @default(0)
   outbound_count  Int      @default(0)
@@ -329,7 +329,7 @@ model fact_sms_daily {
 
 model fact_booking_daily {
   day             DateTime @db.Date
-  rep_id          String?
+  rep_id          String   @default("")
   booked_total    Int      @default(0)
   booked_jack     Int      @default(0)
   booked_brandon  Int      @default(0)
@@ -345,7 +345,7 @@ model fact_booking_daily {
 
 model fact_lead_quality_daily {
   day                        DateTime @db.Date
-  rep_id                     String?
+  rep_id                     String   @default("")
   leads_count                Int      @default(0)
   coaching_interest_high     Int      @default(0)
   employment_full_time       Int      @default(0)

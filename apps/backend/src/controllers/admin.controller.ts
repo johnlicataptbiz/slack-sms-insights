@@ -4,6 +4,7 @@ import { redisCache } from '../utils/redis-cache';
 import { PerformanceTracker } from '../utils/performance-tracker';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Controller for managing administrative operations
@@ -27,7 +28,7 @@ export class AdminController extends BaseController {
         cacheKey,
         async () => {
           // Construct dynamic query
-          const query: Record<string, any> = {};
+          const query: Prisma.UserWhereInput = {};
 
           if (validatedQuery.role) query.role = validatedQuery.role;
           if (validatedQuery.status) query.status = validatedQuery.status;

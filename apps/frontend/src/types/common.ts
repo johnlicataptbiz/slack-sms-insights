@@ -1,5 +1,5 @@
 // Common types used across the application
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -58,5 +58,5 @@ export interface QueryOptions {
 }
 
 export interface InfiniteQueryOptions extends QueryOptions {
-  getNextPageParam?: (lastPage: any, allPages: any[]) => any;
+  getNextPageParam?: (lastPage: unknown, allPages: unknown[]) => unknown;
 }

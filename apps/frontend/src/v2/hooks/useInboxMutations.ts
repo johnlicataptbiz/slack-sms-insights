@@ -5,6 +5,7 @@
 
 import { useCallback } from 'react';
 import type { UseInboxStateReturn } from './useInboxState';
+import type { UseQueryResult } from '@tanstack/react-query';
 
 export interface MutationHandlers {
   onSend: (messageText: string) => Promise<void>;
@@ -14,10 +15,19 @@ export interface MutationHandlers {
   onUpdateStatus: (status: 'open' | 'closed' | 'dnc') => Promise<void>;
 }
 
+interface InboxMutationSet {
+  sendMutation: { mutateAsync: (data: Record<string, unknown>) => Promise<unknown> };
+  snoozeMutation: { mutateAsync: (data: Record<string, unknown>) => Promise<unknown> };
+  qualificationMutation: { mutateAsync: (data: Record<string, unknown>) => Promise<unknown> };
+  escalationMutation: { mutateAsync: (data: Record<string, unknown>) => Promise<unknown> };
+  assignMutation: { mutateAsync: (data: Record<string, unknown>) => Promise<unknown> };
+  statusMutation: { mutateAsync: (data: Record<string, unknown>) => Promise<unknown> };
+}
+
 export const useInboxMutations = (
   state: UseInboxStateReturn,
-  detailQuery: any, // useV2InboxConversationDetail query
-  mutations: any, // mutation hooks from parent
+  detailQuery: Pick<UseQueryResult<unknown>, 'refetch'>,
+  mutations: InboxMutationSet,
 ): MutationHandlers => {
   const onSend = useCallback(
     async (messageText: string) => {

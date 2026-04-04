@@ -5,6 +5,7 @@ import { PerformanceTracker } from '../utils/performance-tracker';
 import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import type { Prisma } from '@prisma/client';
 
 /**
  * Controller for managing authentication and user-related operations
@@ -311,8 +312,8 @@ export class AuthController extends BaseController {
         cacheKey,
         async () => {
           // Construct dynamic query
-          const query: Record<string, any> = { 
-            userId: context.req.user.id 
+          const query: Prisma.SessionWhereInput = {
+            userId: context.req.user.id,
           };
 
           if (validatedQuery.status) query.status = validatedQuery.status;

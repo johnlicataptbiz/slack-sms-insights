@@ -8,8 +8,8 @@ import { useCallback, useEffect, useRef } from 'react';
 export interface SubscriptionOptions {
   conversationId: string | null;
   enabled?: boolean;
-  onMessageUpdate?: (message: any) => void;
-  onStatusUpdate?: (status: any) => void;
+  onMessageUpdate?: (message: Record<string, unknown>) => void;
+  onStatusUpdate?: (status: Record<string, unknown>) => void;
   onError?: (error: Error) => void;
 }
 

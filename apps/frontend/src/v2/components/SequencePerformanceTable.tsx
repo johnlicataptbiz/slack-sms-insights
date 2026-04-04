@@ -25,7 +25,7 @@ export interface MergedSeqRow {
   canonicalBookedSelf: number;
   optOuts: number;
   optOutRatePct: number;
-  bookedAuditRows: any[];
+  bookedAuditRows: Record<string, unknown>[];
   diagnosticSmsBookingSignals: number;
   isManual: boolean;
   uniqueReplied: number;

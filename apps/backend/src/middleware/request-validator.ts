@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, type Prisma } from '@prisma/client';
 import { queryParserMiddleware, createPaginatedResponse } from '../middleware/query-parser';
 import { createRequestValidator, ValidationSchemas } from '../middleware/request-validator';
 import { errorHandlerMiddleware, createApiError } from '../utils/error-handler';
@@ -10,16 +10,15 @@ const router = Router();
 /**
  * Get conversations endpoint with advanced filtering and pagination
  */
-router.get('/conversations', 
+router.get('/conversations',
   createRequestValidator({ query: ValidationSchemas.PaginationQuery }),
   queryParserMiddleware,
   async (req: Request, res: Response) => {
     try {
       const { pagination, filtering } = req;
 
-      // Build dynamic Prisma query
-      const whereConditions: any = {};
-      const orderBy: any = {};
+      // Build dynamic Prisma query with proper types
+      const whereConditions: Prisma.ConversationWhereInput = {};
 
       // Apply filtering
       if (filtering?.filter) {
@@ -39,21 +38,22 @@ router.get('/conversations',
       }
 
       // Apply sorting
+      const orderByObj: Prisma.ConversationOrderByWithRelationInput = {};
       if (filtering?.sort) {
         Object.entries(filtering.sort).forEach(([key, direction]) => {
-          orderBy[key] = direction;
+          orderByObj[key as keyof Prisma.ConversationOrderByWithRelationInput] = direction as Prisma.SortOrder;
         });
       }
 
       // Fetch total count for pagination
-      const totalCount = await prisma.conversation.count({ 
-        where: whereConditions 
+      const totalCount = await prisma.conversation.count({
+        where: whereConditions
       });
 
       // Fetch paginated conversations
       const conversations = await prisma.conversation.findMany({
         where: whereConditions,
-        orderBy: Object.keys(orderBy).length > 0 ? orderBy : { createdAt: 'desc' },
+        orderBy: Object.keys(orderByObj).length > 0 ? orderByObj : { createdAt: 'desc' },
         take: pagination?.limit,
         skip: pagination ? (pagination.page - 1) * pagination.limit : 0,
         // Optionally select specific fields if requested

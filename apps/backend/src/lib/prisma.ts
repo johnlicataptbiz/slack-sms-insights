@@ -33,9 +33,10 @@ const createPrismaClient = (): PrismaClient => {
   const config = resolvePrismaConfig();
 
   if (config.mode === 'accelerate' && config.url) {
-    return (new PrismaClient({ accelerateUrl: config.url }) as any).$extends(
-      withAccelerate(),
-    ) as unknown as PrismaClient;
+    // Prisma Accelerate requires $extends pattern; type assertion is necessary
+    // because the Accelerate extension adds methods not in the base PrismaClient type
+    const client = new PrismaClient({ accelerateUrl: config.url });
+    return client.$extends(withAccelerate()) as unknown as PrismaClient;
   }
 
   if (config.mode === 'direct' && config.url) {

@@ -117,6 +117,18 @@ export class RedisCache {
   }
 
   /**
+   * Clear all cache keys in the current Redis database.
+   */
+  public async clear(): Promise<void> {
+    try {
+      await this.connect();
+      await this.client.flushDb();
+    } catch {
+      // Cache is best-effort in tests and local environments.
+    }
+  }
+
+  /**
    * Check if a key exists in the cache
    * @param key Cache key to check
    */

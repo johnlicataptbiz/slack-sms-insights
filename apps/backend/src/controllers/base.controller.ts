@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { getPrismaClient } from '../../services/prisma';
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -18,6 +19,7 @@ export interface RequestContext {
 
 export abstract class BaseController {
   protected logger: Console;
+  protected prisma = getPrismaClient() as any;
 
   constructor(logger: Console) {
     this.logger = logger;

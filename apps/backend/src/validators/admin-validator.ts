@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isIP } from 'node:net';
 import { BaseValidator } from './base-validator';
 
 /**
@@ -105,7 +106,10 @@ export class AdminValidator {
     userId: BaseValidator.id().optional(),
     action: z.string().optional(),
     resourceType: z.string().optional(),
-    ipAddress: z.string().ip().optional()
+    ipAddress: z
+      .string()
+      .refine((value) => isIP(value) !== 0, 'Invalid IP address')
+      .optional()
   });
 
   /**

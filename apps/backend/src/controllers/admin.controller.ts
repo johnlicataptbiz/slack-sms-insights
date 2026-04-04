@@ -19,6 +19,17 @@ export class AdminController extends BaseController {
     try {
       // Validate query parameters
       const validatedQuery = AdminValidator.userManagementQuery.parse(context.query);
+      const query: Prisma.UserWhereInput = {};
+
+      if (validatedQuery.role) query.role = validatedQuery.role;
+      if (validatedQuery.status) query.status = validatedQuery.status;
+      if (validatedQuery.searchTerm) {
+        query.OR = [
+          { email: { contains: validatedQuery.searchTerm, mode: 'insensitive' } },
+          { firstName: { contains: validatedQuery.searchTerm, mode: 'insensitive' } },
+          { lastName: { contains: validatedQuery.searchTerm, mode: 'insensitive' } }
+        ];
+      }
 
       // Generate cache key
       const cacheKey = `admin:users:${JSON.stringify(validatedQuery)}`;
@@ -27,19 +38,6 @@ export class AdminController extends BaseController {
       const users = await redisCache.cachedFetch(
         cacheKey,
         async () => {
-          // Construct dynamic query
-          const query: Prisma.UserWhereInput = {};
-
-          if (validatedQuery.role) query.role = validatedQuery.role;
-          if (validatedQuery.status) query.status = validatedQuery.status;
-          if (validatedQuery.searchTerm) {
-            query.OR = [
-              { email: { contains: validatedQuery.searchTerm, mode: 'insensitive' } },
-              { firstName: { contains: validatedQuery.searchTerm, mode: 'insensitive' } },
-              { lastName: { contains: validatedQuery.searchTerm, mode: 'insensitive' } }
-            ];
-          }
-
           return this.prisma.user.findMany({
             where: query,
             select: {
@@ -285,6 +283,10 @@ export class AdminController extends BaseController {
     try {
       // Validate query parameters
       const validatedQuery = AdminValidator.systemConfigQuery.parse(context.query);
+      const query: Record<string, any> = {};
+
+      if (validatedQuery.category) query.category = validatedQuery.category;
+      if (validatedQuery.key) query.key = validatedQuery.key;
 
       // Generate cache key
       const cacheKey = `admin:system-config:${JSON.stringify(validatedQuery)}`;
@@ -293,12 +295,6 @@ export class AdminController extends BaseController {
       const configs = await redisCache.cachedFetch(
         cacheKey,
         async () => {
-          // Construct dynamic query
-          const query: Record<string, any> = {};
-
-          if (validatedQuery.category) query.category = validatedQuery.category;
-          if (validatedQuery.key) query.key = validatedQuery.key;
-
           return this.prisma.systemConfig.findMany({
             where: query,
             take: validatedQuery.limit,
@@ -398,6 +394,17 @@ export class AdminController extends BaseController {
     try {
       // Validate query parameters
       const validatedQuery = AdminValidator.auditLogQuery.parse(context.query);
+      const query: Record<string, any> = {};
+
+      if (validatedQuery.startDate) query.createdAt = { gte: new Date(validatedQuery.startDate) };
+      if (validatedQuery.endDate) {
+        query.createdAt = query.createdAt || {};
+        query.createdAt.lte = new Date(validatedQuery.endDate);
+      }
+      if (validatedQuery.userId) query.userId = validatedQuery.userId;
+      if (validatedQuery.action) query.action = validatedQuery.action;
+      if (validatedQuery.resourceType) query.resourceType = validatedQuery.resourceType;
+      if (validatedQuery.ipAddress) query.ipAddress = validatedQuery.ipAddress;
 
       // Generate cache key
       const cacheKey = `admin:audit-logs:${JSON.stringify(validatedQuery)}`;
@@ -406,19 +413,6 @@ export class AdminController extends BaseController {
       const auditLogs = await redisCache.cachedFetch(
         cacheKey,
         async () => {
-          // Construct dynamic query
-          const query: Record<string, any> = {};
-
-          if (validatedQuery.startDate) query.createdAt = { gte: new Date(validatedQuery.startDate) };
-          if (validatedQuery.endDate) {
-            query.createdAt = query.createdAt || {};
-            query.createdAt.lte = new Date(validatedQuery.endDate);
-          }
-          if (validatedQuery.userId) query.userId = validatedQuery.userId;
-          if (validatedQuery.action) query.action = validatedQuery.action;
-          if (validatedQuery.resourceType) query.resourceType = validatedQuery.resourceType;
-          if (validatedQuery.ipAddress) query.ipAddress = validatedQuery.ipAddress;
-
           return this.prisma.auditLog.findMany({
             where: query,
             take: validatedQuery.limit,

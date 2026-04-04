@@ -1132,6 +1132,7 @@ export const refreshKpiFacts = async (
               reply_rate_pct: row.replyRatePct,
               opt_out_rate_pct: row.optOutRatePct,
             })),
+            skipDuplicates: true,
           }),
         ]
       : []),
@@ -1144,6 +1145,7 @@ export const refreshKpiFacts = async (
       ? [
           prisma.fact_booking_daily.createMany({
             data: bookingFactRows,
+            skipDuplicates: true,
           }),
         ]
       : []),
@@ -1156,6 +1158,7 @@ export const refreshKpiFacts = async (
       ? [
           prisma.fact_lead_quality_daily.createMany({
             data: leadFactRows,
+            skipDuplicates: true,
           }),
         ]
       : []),
@@ -1168,6 +1171,7 @@ export const refreshKpiFacts = async (
       ? [
           prisma.fact_sequence_funnel_daily.createMany({
             data: funnelFactRows,
+            skipDuplicates: true,
           }),
         ]
       : []),
@@ -1192,6 +1196,7 @@ export const refreshKpiFacts = async (
       ? [
           prisma.fact_monday_health_daily.createMany({
             data: mondayFactRows,
+            skipDuplicates: true,
           }),
         ]
       : []),

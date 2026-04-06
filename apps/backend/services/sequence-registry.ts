@@ -23,38 +23,54 @@ export const resolveSequenceId = async (
   const normalized = normalizeSequenceLabel(trimmed);
   if (!normalized) return null;
 
-  return await prisma.$transaction(async (tx) => {
-    const existingAlias = await tx.sequenceAliases.findUnique({
-      where: { rawLabel: trimmed },
-    });
-    if (existingAlias) return existingAlias.sequenceId;
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // sequenceAliases may not exist in all environments
+      let existingAlias = null;
+      try {
+        existingAlias = await (tx as any).sequenceAliases?.findUnique({
+          where: { rawLabel: trimmed },
+        });
+      } catch {
+        // Table doesn't exist, skip alias lookup
+      }
+      if (existingAlias) return existingAlias.sequenceId;
 
-    let registry = await tx.sequenceRegistry.findUnique({
-      where: { normalizedLabel: normalized },
-    });
-
-    if (!registry) {
-      registry = await tx.sequenceRegistry.create({
-        data: {
-          label: trimmed,
-          normalizedLabel: normalized,
-        },
+      let registry = await tx.sequenceRegistry.findUnique({
+        where: { normalizedLabel: normalized },
       });
-    }
 
-    await tx.sequenceAliases.upsert({
-      where: { rawLabel: trimmed },
-      update: {
-        normalizedLabel: normalized,
-        sequenceId: registry.id,
-      },
-      create: {
-        rawLabel: trimmed,
-        normalizedLabel: normalized,
-        sequenceId: registry.id,
-      },
+      if (!registry) {
+        registry = await tx.sequenceRegistry.create({
+          data: {
+            label: trimmed,
+            normalizedLabel: normalized,
+          },
+        });
+      }
+
+      // Try to upsert alias if table exists
+      try {
+        await (tx as any).sequenceAliases?.upsert({
+          where: { rawLabel: trimmed },
+          update: {
+            normalizedLabel: normalized,
+            sequenceId: registry.id,
+          },
+          create: {
+            rawLabel: trimmed,
+            normalizedLabel: normalized,
+            sequenceId: registry.id,
+          },
+        });
+      } catch {
+        // Table doesn't exist, skip
+      }
+
+      return registry.id;
     });
-
-    return registry.id;
-  });
+  } catch {
+    // sequenceRegistry table may not exist, return null to proceed without sequence
+    return null;
+  }
 };

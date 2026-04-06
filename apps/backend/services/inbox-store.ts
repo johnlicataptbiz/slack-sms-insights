@@ -1216,15 +1216,15 @@ export const assignConversation = async (
     const result = await prisma.conversations.update({
       where: { id: conversationId },
       data: {
-        current_rep_id: ownerLabel,
+        currentRepId: ownerLabel,
         updatedAt: new Date(),
       },
       select: {
         id: true,
-        current_rep_id: true,
+        currentRepId: true,
       },
     });
-    return { id: result.id, owner_label: result.current_rep_id ?? null };
+    return { id: result.id, owner_label: result.currentRepId ?? null };
   } catch (err) {
     logger?.error('assignConversation failed', err);
     throw err;

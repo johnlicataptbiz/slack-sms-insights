@@ -180,20 +180,20 @@ model conversation_state {
 
 model conversations {
   id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  contact_key             String                   @unique
-  contact_id              String?
-  contact_phone           String?
-  current_rep_id          String?
+  contactKey              String                   @unique @map("contact_key")
+  contactId               String?                  @map("contact_id")
+  contactPhone            String?                  @map("contact_phone")
+  currentRepId            String?                  @map("current_rep_id")
   status                  String                   @default("open")
-  last_inbound_at         DateTime?                @db.Timestamptz(6)
-  last_outbound_at        DateTime?                @db.Timestamptz(6)
-  last_touch_at           DateTime?                @db.Timestamptz(6)
-  unreplied_inbound_count Int                      @default(0)
-  next_followup_due_at    DateTime?                @db.Timestamptz(6)
-  created_at              DateTime                 @default(now()) @db.Timestamptz(6)
-  updated_at              DateTime                 @default(now()) @db.Timestamptz(6)
-  first_engagement_at     DateTime?                @db.Timestamptz(6)
-  metadata_updated_at     DateTime?                @default(now()) @db.Timestamptz(6)
+  lastInboundAt           DateTime?                @map("last_inbound_at") @db.Timestamptz(6)
+  lastOutboundAt          DateTime?                @map("last_outbound_at") @db.Timestamptz(6)
+  lastTouchAt             DateTime?                @map("last_touch_at") @db.Timestamptz(6)
+  unrepliedInboundCount   Int                      @default(0) @map("unreplied_inbound_count")
+  nextFollowupAt          DateTime?                @map("next_followup_due_at") @db.Timestamptz(6)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(6)
+  firstEngagementAt       DateTime?                @map("first_engagement_at") @db.Timestamptz(6)
+  metadataUpdatedAt       DateTime?                @default(now()) @map("metadata_updated_at") @db.Timestamptz(6)
   conversation_notes      conversation_notes[]
   conversation_state      conversation_state?
   draft_suggestions       draft_suggestions[]
@@ -202,11 +202,13 @@ model conversations {
   sms_events              sms_events[]
   work_items              work_items?
 
-  @@index([contact_key], map: "idx_conversations_contact_key")
-  @@index([next_followup_due_at], map: "idx_conversations_next_followup_due")
-  @@index([current_rep_id, last_touch_at(sort: Desc)], map: "idx_conversations_rep_last_touch")
-  @@index([current_rep_id, status, last_touch_at(sort: Desc)], map: "idx_conversations_rep_status_touch")
+  @@index([contactKey], map: "idx_conversations_contact_key")
+  @@index([nextFollowupAt], map: "idx_conversations_next_followup_due")
+  @@index([currentRepId, lastTouchAt(sort: Desc)], map: "idx_conversations_rep_last_touch")
+  @@index([currentRepId, status, lastTouchAt(sort: Desc)], map: "idx_conversations_rep_status_touch")
   @@index([status], map: "idx_conversations_status")
+
+  @@map("conversations")
 }
 
 model conversion_examples {
@@ -380,20 +382,23 @@ model fact_monday_health_daily {
 }
 
 model sequence_registry {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label             String   @unique
-  normalized_label  String?
-  lead_magnet       String?
-  version_tag       String?
-  status            String   @default("active")
-  owner_rep         String?
-  is_manual_bucket  Boolean  @default(false)
-  created_at        DateTime @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime @default(now()) @db.Timestamptz(6)
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label            String   @unique
+  normalizedLabel  String?  @map("normalized_label")
+  leadMagnet       String?  @map("lead_magnet")
+  versionTag       String?  @map("version_tag")
+  status           String   @default("active")
+  ownerRep         String?  @map("owner_rep")
+  isManualBucket   Boolean  @default(false) @map("is_manual_bucket")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
 
   @@index([status], map: "idx_sequence_registry_status")
-  @@index([normalized_label], map: "idx_sequence_registry_normalized_label")
+  @@index([normalizedLabel], map: "idx_sequence_registry_normalized_label")
+
+  @@map("sequence_registry")
 }
+
 
 model goals {
   id         String    @id @db.VarChar(100)

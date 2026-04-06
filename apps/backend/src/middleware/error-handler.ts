@@ -56,3 +56,6 @@ export function errorHandlerMiddleware(
       : err.message
   });
 }
+
+// Alias used by src/app.ts
+export const errorHandler = errorHandlerMiddleware;

@@ -99,31 +99,31 @@ export const refreshKpiFacts = async (
 
   const manual = await prisma.sequenceRegistry.upsert({
     where: { label: MANUAL_LABEL },
-    update: { is_manual_bucket: true, normalized_label: 'no sequence manual direct' },
+    update: { isManualBucket: true, normalizedLabel: 'no sequence manual direct' },
     create: {
       label: MANUAL_LABEL,
-      normalized_label: 'no sequence manual direct',
-      is_manual_bucket: true,
+      normalizedLabel: 'no sequence manual direct',
+      isManualBucket: true,
     },
     select: { id: true },
   });
   const mondayBackfill = await prisma.sequenceRegistry.upsert({
     where: { label: MONDAY_BACKFILL_LABEL },
-    update: { is_manual_bucket: false, normalized_label: 'monday backfill sequence unresolved' },
+    update: { isManualBucket: false, normalizedLabel: 'monday backfill sequence unresolved' },
     create: {
       label: MONDAY_BACKFILL_LABEL,
-      normalized_label: 'monday backfill sequence unresolved',
-      is_manual_bucket: false,
+      normalizedLabel: 'monday backfill sequence unresolved',
+      isManualBucket: false,
     },
     select: { id: true },
   });
   const socialMediaBackfill = await prisma.sequenceRegistry.upsert({
     where: { label: SOCIAL_MEDIA_BACKFILL_LABEL },
-    update: { is_manual_bucket: false, normalized_label: 'social media monday backfill' },
+    update: { isManualBucket: false, normalizedLabel: 'social media monday backfill' },
     create: {
       label: SOCIAL_MEDIA_BACKFILL_LABEL,
-      normalized_label: 'social media monday backfill',
-      is_manual_bucket: false,
+      normalizedLabel: 'social media monday backfill',
+      isManualBucket: false,
     },
     select: { id: true },
   });
@@ -136,51 +136,51 @@ export const refreshKpiFacts = async (
   ] = await Promise.all([
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL },
-      update: { is_manual_bucket: false, normalized_label: 'social media instagram monday backfill' },
+      update: { isManualBucket: false, normalizedLabel: 'social media instagram monday backfill' },
       create: {
         label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
-        normalized_label: 'social media instagram monday backfill',
-        is_manual_bucket: false,
+        normalizedLabel: 'social media instagram monday backfill',
+        isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL },
-      update: { is_manual_bucket: false, normalized_label: 'social media facebook ads monday backfill' },
+      update: { isManualBucket: false, normalizedLabel: 'social media facebook ads monday backfill' },
       create: {
         label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
-        normalized_label: 'social media facebook ads monday backfill',
-        is_manual_bucket: false,
+        normalizedLabel: 'social media facebook ads monday backfill',
+        isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL },
-      update: { is_manual_bucket: false, normalized_label: 'social media facebook group monday backfill' },
+      update: { isManualBucket: false, normalizedLabel: 'social media facebook group monday backfill' },
       create: {
         label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
-        normalized_label: 'social media facebook group monday backfill',
-        is_manual_bucket: false,
+        normalizedLabel: 'social media facebook group monday backfill',
+        isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL },
-      update: { is_manual_bucket: false, normalized_label: 'social media linkedin monday backfill' },
+      update: { isManualBucket: false, normalizedLabel: 'social media linkedin monday backfill' },
       create: {
         label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
-        normalized_label: 'social media linkedin monday backfill',
-        is_manual_bucket: false,
+        normalizedLabel: 'social media linkedin monday backfill',
+        isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL },
-      update: { is_manual_bucket: false, normalized_label: 'social media organic monday backfill' },
+      update: { isManualBucket: false, normalizedLabel: 'social media organic monday backfill' },
       create: {
         label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
-        normalized_label: 'social media organic monday backfill',
-        is_manual_bucket: false,
+        normalizedLabel: 'social media organic monday backfill',
+        isManualBucket: false,
       },
       select: { id: true },
     }),

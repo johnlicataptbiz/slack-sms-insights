@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildUpdateMarkdown,
+  classifyMondayWritebackError,
   readPersonalMappingFromEnv,
 } from '../../services/monday-personal-writeback.js';
 
@@ -59,5 +60,32 @@ describe('monday personal writeback mapping', () => {
     );
     assert.match(markdown, /Needs review: no/);
     assert.match(markdown, /Thread context: Already cash based!/);
+  });
+
+  it('classifies common monday writeback failure modes', () => {
+    assert.equal(
+      classifyMondayWritebackError(
+        new Error('MONDAY_API_TOKEN is not configured'),
+      ),
+      'configuration',
+    );
+    assert.equal(
+      classifyMondayWritebackError(new Error('429 rate limit exceeded')),
+      'rate_limit',
+    );
+    assert.equal(
+      classifyMondayWritebackError(new Error('invalid_auth for this token')),
+      'auth',
+    );
+    assert.equal(
+      classifyMondayWritebackError(
+        new Error('Column mapping invalid value for status'),
+      ),
+      'schema_mapping',
+    );
+    assert.equal(
+      classifyMondayWritebackError(new Error('fetch failed: ECONNRESET')),
+      'network',
+    );
   });
 });

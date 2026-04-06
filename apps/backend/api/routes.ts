@@ -1,40 +1,133 @@
+import { timingSafeEqual } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Logger } from '@slack/bolt';
-import { timingSafeEqual } from 'node:crypto';
-
+import {
+  getAlowarePollingState,
+  pollAlowareSmsEvents,
+} from '../services/aloware-sms-poller.js';
+import {
+  type AlowareWebhookPayload,
+  handleAlowareWebhook,
+  validateWebhookSignature,
+} from '../services/aloware-webhook-handler.js';
+import { getAttributionLagStatus } from '../services/attribution-health.js';
+import {
+  listAttributionMethodDaily,
+  listOpenAttributionReviewItems,
+  listRepResponseDaily,
+  listSequenceFunnelDaily,
+  listUnresolvedAttributions,
+} from '../services/attribution-review-queue.js';
+import {
+  getChannelsWithRuns,
+  getDailyRuns,
+} from '../services/daily-run-logger.js';
+import {
+  listInboxConversations,
+  listMessageTemplates,
+} from '../services/inbox-store.js';
 // Import V2 service functions
 import { getInsightsSummary } from '../services/insights-summary.js';
 import { getSalesMetricsSummary } from '../services/sales-metrics.js';
-import { listInboxConversations, listMessageTemplates } from '../services/inbox-store.js';
 import { listSendLineOptions } from '../services/send-line-catalog.js';
-import { getDailyRuns, getChannelsWithRuns } from '../services/daily-run-logger.js';
-import { getSequencesDeep } from '../services/sequences-deep.js';
-import { getAttributionLagStatus } from '../services/attribution-health.js';
-import {
-  listOpenAttributionReviewItems,
-  listUnresolvedAttributions,
-  listSequenceFunnelDaily,
-  listAttributionMethodDaily,
-  listRepResponseDaily,
-} from '../services/attribution-review-queue.js';
 import { buildSequenceQualificationBreakdown } from '../services/sequence-qualification-analytics.js';
-import { resolveMetricsRange } from '../services/time-range.js';
+import { getSequencesDeep } from '../services/sequences-deep.js';
 import {
   createDashboardSession,
   destroyDashboardSession,
   getDashboardSession,
   getDashboardSessionTtlSeconds,
 } from '../services/session-store.js';
-import {
-  handleAlowareWebhook,
-  validateWebhookSignature,
-} from '../services/aloware-webhook-handler.js';
-import { getAlowarePollingState, pollAlowareSmsEvents } from '../services/aloware-sms-poller.js';
+import { resolveMetricsRange } from '../services/time-range.js';
+
+type AlertCheckType =
+  | 'workload'
+  | 'sla'
+  | 'conversion'
+  | 'health'
+  | 'inbox'
+  | 'attribution';
+
+type AlertSeverity = 'critical' | 'warning' | 'info';
+
+type AlertWebhookPayload = {
+  checkType: AlertCheckType;
+  alertTriggered: boolean;
+  metricValue: number;
+  alertMessage: string;
+  severity: AlertSeverity;
+  timestamp: string;
+  channelId?: string;
+  workflowId?: string;
+};
+
+const isAlertCheckType = (value: unknown): value is AlertCheckType => {
+  if (typeof value !== 'string') return false;
+  return (
+    value === 'workload' ||
+    value === 'sla' ||
+    value === 'conversion' ||
+    value === 'health' ||
+    value === 'inbox' ||
+    value === 'attribution'
+  );
+};
+
+const asNumber = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+};
+
+const formatInboxAlertMessage = (counts: {
+  critical: number;
+  stale: number;
+  unassigned: number;
+  needsReply: number;
+}): string => {
+  return (
+    `Inbox backlog: critical=${counts.critical}, stale=${counts.stale}, ` +
+    `unassigned=${counts.unassigned}, needsReply=${counts.needsReply}`
+  );
+};
+
+const triggerProactiveAlertsWorkflow = async (
+  payload: AlertWebhookPayload,
+): Promise<void> => {
+  console.log('[alerts] Triggering Proactive Alerts workflow:', {
+    checkType: payload.checkType,
+    severity: payload.severity,
+    triggered: payload.alertTriggered,
+  });
+};
+
+const triggerInboxWatchWorkflow = async (
+  payload: AlertWebhookPayload,
+): Promise<void> => {
+  console.log('[alerts] Triggering Inbox Watch workflow:', {
+    severity: payload.severity,
+    message: payload.alertMessage,
+  });
+};
+
+const triggerAttributionHealthWorkflow = async (
+  payload: AlertWebhookPayload,
+): Promise<void> => {
+  console.log('[alerts] Triggering Attribution Health workflow:', {
+    severity: payload.severity,
+    lagHours: payload.metricValue,
+  });
+};
 
 /**
  * Parse cookies from a Cookie header string into a map.
  */
-function parseCookies(cookieHeader: string | undefined): Record<string, string> {
+function parseCookies(
+  cookieHeader: string | undefined,
+): Record<string, string> {
   const result: Record<string, string> = {};
   if (!cookieHeader) return result;
   for (const part of cookieHeader.split(';')) {
@@ -51,7 +144,17 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
 /**
  * Build a Set-Cookie header value.
  */
-function buildSetCookie(name: string, value: string, options: { maxAge?: number; httpOnly?: boolean; secure?: boolean; sameSite?: string; path?: string }): string {
+function buildSetCookie(
+  name: string,
+  value: string,
+  options: {
+    maxAge?: number;
+    httpOnly?: boolean;
+    secure?: boolean;
+    sameSite?: string;
+    path?: string;
+  },
+): string {
   const parts = [`${name}=${encodeURIComponent(value)}`];
   if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
   if (options.httpOnly !== false) parts.push('HttpOnly');
@@ -67,16 +170,25 @@ function buildSetCookie(name: string, value: string, options: { maxAge?: number;
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve) => {
     let body = '';
-    req.on('data', (chunk: string) => { body += chunk; });
-    req.on('end', () => { resolve(body); });
-    req.on('error', () => { resolve(''); });
+    req.on('data', (chunk: string) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      resolve(body);
+    });
+    req.on('error', () => {
+      resolve('');
+    });
   });
 }
 
 /**
  * Parse JSON body with size limit.
  */
-async function parseJsonBody(req: IncomingMessage, maxBytes = 1024 * 1024): Promise<Record<string, unknown>> {
+async function parseJsonBody(
+  req: IncomingMessage,
+  maxBytes = 1024 * 1024,
+): Promise<Record<string, unknown>> {
   const raw = await readBody(req);
   if (Buffer.byteLength(raw, 'utf8') > maxBytes) {
     throw new Error('PAYLOAD_TOO_LARGE');
@@ -87,7 +199,10 @@ async function parseJsonBody(req: IncomingMessage, maxBytes = 1024 * 1024): Prom
 /**
  * Extract session and CSRF info from cookies.
  */
-function getSessionFromCookies(req: IncomingMessage): { session: ReturnType<typeof getDashboardSession>; csrfToken: string | null } {
+function getSessionFromCookies(req: IncomingMessage): {
+  session: ReturnType<typeof getDashboardSession>;
+  csrfToken: string | null;
+} {
   const cookies = parseCookies(req.headers.cookie);
   const session = getDashboardSession(cookies.ptbizsms_session);
   const csrfToken = cookies.ptbizsms_csrf ?? null;
@@ -97,7 +212,10 @@ function getSessionFromCookies(req: IncomingMessage): { session: ReturnType<type
 /**
  * Validate CSRF token from header against cookie.
  */
-function validateCsrfToken(csrfCookie: string | null, csrfHeader: string | null): boolean {
+function validateCsrfToken(
+  csrfCookie: string | null,
+  csrfHeader: string | null,
+): boolean {
   if (!csrfCookie || !csrfHeader) return false;
   const a = Buffer.from(csrfCookie, 'utf8');
   const b = Buffer.from(csrfHeader, 'utf8');
@@ -133,7 +251,12 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 /**
  * Send error response
  */
-function sendError(res: ServerResponse, status: number, error: string, details?: string): void {
+function sendError(
+  res: ServerResponse,
+  status: number,
+  error: string,
+  details?: string,
+): void {
   sendJson(res, status, {
     success: false,
     error,
@@ -144,7 +267,11 @@ function sendError(res: ServerResponse, status: number, error: string, details?:
 /**
  * Send success response with V2 envelope
  */
-function sendSuccess(res: ServerResponse, data: unknown, timeZone = 'America/Chicago'): void {
+function sendSuccess(
+  res: ServerResponse,
+  data: unknown,
+  timeZone = 'America/Chicago',
+): void {
   sendJson(res, 200, {
     success: true,
     data,
@@ -168,8 +295,146 @@ export const handleApiRoute = async (
 ): Promise<boolean> => {
   if (pathname === '/api/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, source: 'api-routes', ts: new Date().toISOString() }));
+    res.end(
+      JSON.stringify({
+        ok: true,
+        source: 'api-routes',
+        ts: new Date().toISOString(),
+      }),
+    );
     return true;
+  }
+
+  // ─── Alerts Webhook Endpoints ───────────────────────────────────────────
+  if (pathname === '/api/alerts/status' && req.method === 'GET') {
+    sendJson(res, 200, {
+      success: true,
+      data: {
+        timestamp: new Date().toISOString(),
+        alerts: {
+          inbox: {
+            lastAlertAt: null,
+            isHealthy: true,
+            openCount: 0,
+          },
+          attribution: {
+            lastAlertAt: null,
+            isHealthy: true,
+            lagHours: 0,
+          },
+        },
+      },
+    });
+    return true;
+  }
+
+  if (
+    (pathname === '/api/alerts/webhook' ||
+      pathname === '/api/alerts/inbox' ||
+      pathname === '/api/alerts/attribution') &&
+    req.method === 'POST'
+  ) {
+    let body: Record<string, unknown>;
+    try {
+      body = await parseJsonBody(req);
+    } catch (error) {
+      if ((error as Error).message === 'PAYLOAD_TOO_LARGE') {
+        sendJson(res, 413, { success: false, error: 'Payload too large' });
+        return true;
+      }
+      sendJson(res, 400, { success: false, error: 'Invalid JSON' });
+      return true;
+    }
+
+    try {
+      let payload: AlertWebhookPayload;
+
+      if (pathname === '/api/alerts/inbox') {
+        const critical = asNumber(body.critical);
+        const stale = asNumber(body.stale);
+        const unassigned = asNumber(body.unassigned);
+        const needsReply = asNumber(body.needsReply);
+        payload = {
+          checkType: 'inbox',
+          alertTriggered: critical > 0 || stale > 0 || unassigned > 0,
+          metricValue: needsReply,
+          alertMessage: formatInboxAlertMessage({
+            critical,
+            stale,
+            unassigned,
+            needsReply,
+          }),
+          severity: critical > 0 ? 'critical' : stale > 0 ? 'warning' : 'info',
+          timestamp: new Date().toISOString(),
+          channelId:
+            (process.env.INBOX_ALERT_CHANNEL_ID || '').trim() || undefined,
+        };
+      } else if (pathname === '/api/alerts/attribution') {
+        const lagHours = asNumber(body.lagHours);
+        payload = {
+          checkType: 'attribution',
+          alertTriggered: lagHours > 24,
+          metricValue: lagHours,
+          alertMessage: `Attribution lag: ${lagHours}h (booked_calls: ${String(body.maxBookedCallsTs ?? 'n/a')}, attribution: ${String(body.maxAttributionTs ?? 'n/a')})`,
+          severity: lagHours > 24 ? 'warning' : 'info',
+          timestamp: new Date().toISOString(),
+          channelId:
+            (process.env.ATTRIBUTION_ALERT_CHANNEL_ID || '').trim() ||
+            undefined,
+        };
+      } else {
+        if (!isAlertCheckType(body.checkType)) {
+          sendJson(res, 400, {
+            success: false,
+            error: `Unknown checkType: ${String(body.checkType ?? '')}`,
+          });
+          return true;
+        }
+        payload = {
+          checkType: body.checkType,
+          alertTriggered: Boolean(body.alertTriggered),
+          metricValue: asNumber(body.metricValue),
+          alertMessage: String(body.alertMessage ?? ''),
+          severity:
+            body.severity === 'critical' ||
+            body.severity === 'warning' ||
+            body.severity === 'info'
+              ? body.severity
+              : 'info',
+          timestamp:
+            typeof body.timestamp === 'string'
+              ? body.timestamp
+              : new Date().toISOString(),
+          channelId:
+            typeof body.channelId === 'string' ? body.channelId : undefined,
+          workflowId:
+            typeof body.workflowId === 'string' ? body.workflowId : undefined,
+        };
+      }
+
+      if (payload.checkType === 'inbox') {
+        await triggerInboxWatchWorkflow(payload);
+      } else if (payload.checkType === 'attribution') {
+        await triggerAttributionHealthWorkflow(payload);
+      } else {
+        await triggerProactiveAlertsWorkflow(payload);
+      }
+
+      sendJson(res, 200, {
+        success: true,
+        message: `Alert webhook processed: ${payload.checkType}`,
+        severity: payload.severity,
+      });
+      return true;
+    } catch (error) {
+      sendError(
+        res,
+        500,
+        'Failed to process alert webhook',
+        error instanceof Error ? error.message : String(error),
+      );
+      return true;
+    }
   }
 
   // ─── Auth Endpoints ──────────────────────────────────────────────────────
@@ -191,8 +456,14 @@ export const handleApiRoute = async (
   if (pathname === '/api/auth/password' && req.method === 'POST') {
     let body: Record<string, unknown>;
     try {
-      const maxBytes = Number.parseInt(process.env.API_JSON_BODY_MAX_BYTES || '', 10);
-      body = await parseJsonBody(req, Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : 1024 * 1024);
+      const maxBytes = Number.parseInt(
+        process.env.API_JSON_BODY_MAX_BYTES || '',
+        10,
+      );
+      body = await parseJsonBody(
+        req,
+        Number.isFinite(maxBytes) && maxBytes > 0 ? maxBytes : 1024 * 1024,
+      );
     } catch (e) {
       if ((e as Error).message === 'PAYLOAD_TOO_LARGE') {
         sendJson(res, 413, { error: 'Payload too large' });
@@ -210,8 +481,17 @@ export const handleApiRoute = async (
     }
 
     const session = createDashboardSession(
-      { user_id: 'dashboard-user', user: 'dashboard', email: 'dashboard@ptbiz.com' },
-      { ttlSeconds: body.stayLoggedIn === true ? 60 * 60 * 24 * 30 : getDashboardSessionTtlSeconds() },
+      {
+        user_id: 'dashboard-user',
+        user: 'dashboard',
+        email: 'dashboard@ptbiz.com',
+      },
+      {
+        ttlSeconds:
+          body.stayLoggedIn === true
+            ? 60 * 60 * 24 * 30
+            : getDashboardSessionTtlSeconds(),
+      },
     );
 
     const ttlSeconds = getDashboardSessionTtlSeconds();
@@ -404,13 +684,17 @@ export const handleApiRoute = async (
       }
 
       if (routePath === '/attribution/review-queue') {
-        const data = await listOpenAttributionReviewItems(Math.min(Number(query.limit) || 50, 100));
+        const data = await listOpenAttributionReviewItems(
+          Math.min(Number(query.limit) || 50, 100),
+        );
         sendSuccess(res, data);
         return true;
       }
 
       if (routePath === '/attribution/unresolved') {
-        const data = await listUnresolvedAttributions(Math.min(Number(query.limit) || 50, 100));
+        const data = await listUnresolvedAttributions(
+          Math.min(Number(query.limit) || 50, 100),
+        );
         sendSuccess(res, data);
         return true;
       }
@@ -468,7 +752,10 @@ export const handleApiRoute = async (
       return true;
     }
 
-    const result = await handleAlowareWebhook(payload as any, logger);
+    const result = await handleAlowareWebhook(
+      payload as AlowareWebhookPayload,
+      logger,
+    );
 
     if (result.status === 'success') {
       sendJson(res, 200, { success: true, data: result });

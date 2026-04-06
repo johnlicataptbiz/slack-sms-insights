@@ -17,10 +17,19 @@ ALTER TABLE "sms_events" DROP COLUMN IF EXISTS "event_role";
 ALTER TABLE "sms_events" DROP COLUMN IF EXISTS "recorded_at";
 ALTER TABLE "sms_events" DROP COLUMN IF EXISTS "last_modified_at";
 
--- Change direction column from SmsDirection enum to plain TEXT (nullable-safe)
--- First drop default if any, then change type
-ALTER TABLE "sms_events" ALTER COLUMN "direction" DROP DEFAULT;
-ALTER TABLE "sms_events" ALTER COLUMN "direction" TYPE TEXT USING "direction"::TEXT;
+-- Change direction column from SmsDirection enum to plain TEXT (nullable-safe).
+-- Some production databases still have analytics views that depend on the enum
+-- column type (for example analytics_booked_call_attribution_v). In that case
+-- Postgres raises SQLSTATE 0A000. We skip the type conversion instead of failing
+-- the entire migration so other safe schema fixes can still apply.
+DO $$
+BEGIN
+  ALTER TABLE "sms_events" ALTER COLUMN "direction" DROP DEFAULT;
+  ALTER TABLE "sms_events" ALTER COLUMN "direction" TYPE TEXT USING "direction"::TEXT;
+EXCEPTION
+  WHEN feature_not_supported THEN
+    RAISE NOTICE 'Skipping sms_events.direction TYPE conversion due to dependent views/rules';
+END $$;
 
 -- Add new columns added in c5170454
 ALTER TABLE "sms_events" ADD COLUMN IF NOT EXISTS "delivery_status" TEXT;

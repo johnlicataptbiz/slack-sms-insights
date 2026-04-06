@@ -18,6 +18,13 @@ import { mondayConfig } from './monday-sync.js';
 import { DEFAULT_BUSINESS_TIMEZONE, dayKeyInTimeZone } from './time-range.js';
 
 type PersonalSetterBucket = 'jack' | 'brandon' | 'selfBooked';
+type MondayWritebackErrorClass =
+  | 'configuration'
+  | 'rate_limit'
+  | 'auth'
+  | 'schema_mapping'
+  | 'network'
+  | 'unknown';
 
 type ManualSyncParams = {
   contactName: string;
@@ -436,6 +443,48 @@ const mapSourceToMondaySource = (firstConversion: string | null): string => {
   return 'Direct Outreach';
 };
 
+export const classifyMondayWritebackError = (
+  error: unknown,
+): MondayWritebackErrorClass => {
+  const message = (
+    error instanceof Error ? error.message : String(error || '')
+  ).toLowerCase();
+
+  if (
+    message.includes('not configured') ||
+    message.includes('missing required environment variable') ||
+    message.includes('board id')
+  ) {
+    return 'configuration';
+  }
+  if (message.includes('rate limit') || message.includes('too many requests')) {
+    return 'rate_limit';
+  }
+  if (
+    message.includes('invalid_auth') ||
+    message.includes('unauthorized') ||
+    message.includes('forbidden')
+  ) {
+    return 'auth';
+  }
+  if (
+    message.includes('column') ||
+    message.includes('mapping') ||
+    message.includes('invalid value')
+  ) {
+    return 'schema_mapping';
+  }
+  if (
+    message.includes('fetch') ||
+    message.includes('timeout') ||
+    message.includes('network') ||
+    message.includes('econn')
+  ) {
+    return 'network';
+  }
+  return 'unknown';
+};
+
 const addColumnValue = (
   out: Record<string, unknown>,
   columnsById: Map<string, MondayBoardColumn>,
@@ -586,6 +635,15 @@ export const loadBoardMapping = async (
     );
   }
   await saveMondayColumnMapping(boardId, mapping, logger);
+  logger?.debug?.('Loaded monday personal writeback mapping', {
+    boardId,
+    hasCallDate: Boolean(mapping.callDateColumnId),
+    hasContactName: Boolean(mapping.contactNameColumnId),
+    hasPhone: Boolean(mapping.phoneColumnId),
+    hasSetter: Boolean(mapping.setterColumnId),
+    hasStage: Boolean(mapping.stageColumnId),
+    hasLink: Boolean(mapping.slackLinkColumnId),
+  });
   return {
     mapping,
     columnsById: new Map(columns.map((column) => [column.id, column])),
@@ -801,6 +859,14 @@ const pushOne = async (
     );
     return 'synced';
   } catch (error) {
+    const errorClass = classifyMondayWritebackError(error);
+    logger?.error?.('Monday personal writeback push failed', {
+      boardId: params.boardId,
+      slackChannelId: source.slackChannelId,
+      slackMessageTs: source.slackMessageTs,
+      errorClass,
+      error: error instanceof Error ? error.message : String(error),
+    });
     await upsertMondayBookedCallPush(
       {
         boardId: params.boardId,
@@ -934,8 +1000,15 @@ export const syncRecentSetterBookedCallsToMonday = async (
     return { status: 'success', pushed: 0, checked: 0 };
   }
 
-  const { mapping, columnsById } = await loadBoardMapping(boardId, logger);
   const includeSelfBooked = isPersonalSelfBookedEnabled();
+  const { mapping, columnsById } = await loadBoardMapping(boardId, logger);
+  logger?.info?.('Starting monday personal writeback sync run', {
+    boardId,
+    forceResync: Boolean(options.forceResync),
+    includeSelfBooked,
+    lookbackDays: options.lookbackDays || personalLookbackDays(),
+    candidateRows: rows.length,
+  });
 
   let pushed = 0;
   for (const row of rows) {

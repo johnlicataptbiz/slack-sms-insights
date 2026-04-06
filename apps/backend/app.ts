@@ -265,9 +265,13 @@ app.error(async (error) => {
       mondayTokenLength: safeEnvLen(process.env.MONDAY_API_TOKEN),
     });
 
+    // 🕒 KPI facts refresh — runs independently of Slack auth.
+    //    Keeps fact_sms_daily / fact_booking_daily current even when Slack is misconfigured.
+    const { startKpiRefreshCron, startDailyReportCron, startLrnRefreshCron } = await import('./services/cron-scheduler.js');
+    startKpiRefreshCron(logger.app);
+
     // 🕒 Daily Report Cron — fires at 6:00 AM CT every day via user token
     if (slackStarted) {
-      const { startDailyReportCron, startLrnRefreshCron } = await import('./services/cron-scheduler.js');
       await startDailyReportCron(app);
       startLrnRefreshCron(app);
     }

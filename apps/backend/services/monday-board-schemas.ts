@@ -27,25 +27,24 @@ export const mondaySmsBoardSchemas: Record<MondayBoardSchema['key'], MondayBoard
     key: 'events',
     boardName: 'SMS Events',
     columns: [
-      buildStatusColumn('Signal Type', ['Inbound', 'Outbound', 'System']),
-      buildStatusColumn('Next Step', ['Reply', 'Monitor', 'Book', 'Archive']),
+      // Core identity
       { title: 'Contact Name', type: 'text' },
       { title: 'Phone Number', type: 'phone' },
-      { title: 'Event Date', type: 'date' },
-      buildStatusColumn('Channel', [
-        'Circle DM',
-        'Aloware SMS',
-        'Email Marketing',
-        'Instagram DM',
-        'Game Plan Call',
-        'SELF BOOK',
-      ]),
-      { title: 'Setter', type: 'text' },
-      { title: 'Slack Link', type: 'link' },
-      { title: 'Summary', type: 'long_text' },
-      { title: 'Conversation ID', type: 'text' },
+      // Status and action
+      buildStatusColumn('Direction', ['Inbound', 'Outbound', 'System']),
+      buildStatusColumn('Priority', ['Hot', 'Normal', 'Low']),
+      buildStatusColumn('Next Step', ['Reply', 'Follow Up', 'Book', 'Archive', 'Escalate']),
+      // Context
+      { title: 'Latest Message', type: 'long_text' },
+      { title: 'Channel', type: 'text' },
+      { title: 'Assigned To', type: 'text' },
       { title: 'Sequence', type: 'text' },
-      // Computed metrics
+      { title: 'Slack Thread', type: 'link' },
+      { title: 'Summary', type: 'long_text' },
+      // Timestamps
+      { title: 'Last Reply', type: 'date' },
+      { title: 'Conversation ID', type: 'text' },
+      // Computed metrics (Phase 2+)
       { title: 'Reply Rate %', type: 'numbers' },
       { title: 'Response Time Hours', type: 'numbers' },
       { title: 'Conversation Quality Score', type: 'numbers' },
@@ -55,43 +54,48 @@ export const mondaySmsBoardSchemas: Record<MondayBoardSchema['key'], MondayBoard
     key: 'sequences',
     boardName: 'SMS Sequences',
     columns: [
+      // Core identity
       { title: 'Sequence Name', type: 'text' },
       { title: 'Owner', type: 'text' },
       buildStatusColumn('Status', ['Active', 'Paused', 'Testing', 'Archived']),
       { title: 'Time Window', type: 'text' },
+      // Performance metrics
       { title: 'Messages Sent', type: 'numbers' },
       { title: 'Replies', type: 'numbers' },
       { title: 'Reply Rate %', type: 'numbers' },
       { title: 'Booked Calls', type: 'numbers' },
       { title: 'Booking Rate %', type: 'numbers' },
+      // Trends
       buildStatusColumn('Trend', ['Up', 'Flat', 'Down']),
+      { title: 'WoW Change %', type: 'numbers' },
+      { title: 'Engagement Score', type: 'numbers' },
+      // Timestamps and notes
       { title: 'Last Updated', type: 'date' },
       { title: 'Optimization Notes', type: 'long_text' },
-      // Computed metrics
-      { title: 'Week over Week Change %', type: 'numbers' },
-      { title: 'Engagement Score', type: 'numbers' },
     ],
   },
   reports: {
     key: 'reports',
     boardName: 'SMS Daily Reports',
     columns: [
+      // Core identity
       { title: 'Week Start', type: 'date' },
       { title: 'Reporting Period', type: 'text' },
-      { title: 'Booked Calls Total', type: 'numbers' },
+      // Booked calls breakdown
+      { title: 'Total Booked', type: 'numbers' },
       { title: 'Jack', type: 'numbers' },
       { title: 'Brandon', type: 'numbers' },
       { title: 'Self Booked', type: 'numbers' },
+      // Trends and health
+      { title: 'vs Last Week', type: 'numbers' },
       buildStatusColumn('Trend', ['Up', 'Flat', 'Down']),
       buildStatusColumn('Health', ['Good', 'Watch', 'Action']),
+      { title: 'Health Score', type: 'numbers' },
+      // Notes
       { title: 'Key Notes', type: 'long_text' },
       { title: 'Actions Next Week', type: 'long_text' },
       { title: 'Exceptions', type: 'long_text' },
       { title: 'Last Synced', type: 'date' },
-      // Computed metrics
-      { title: 'Total Booked', type: 'numbers' },
-      { title: 'vs Last Week', type: 'numbers' },
-      { title: 'Health Score', type: 'numbers' },
     ],
   },
 };

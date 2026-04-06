@@ -41,8 +41,9 @@ const state: MonitorState = {
   lastWarningTotalSkipped: 0,
 };
 
-const previewText = (value: string | undefined): string => {
-  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+const previewText = (value: unknown): string => {
+  const str = typeof value === 'string' ? value : String(value ?? '');
+  const normalized = str.replace(/\s+/g, ' ').trim();
   if (!normalized) return '';
   return normalized.length > 220 ? `${normalized.slice(0, 217)}...` : normalized;
 };

@@ -36,7 +36,7 @@ export const resolveSequenceId = async (
       }
       if (existingAlias) return existingAlias.sequenceId;
 
-      let registry = await tx.sequenceRegistry.findUnique({
+      let registry = await tx.sequenceRegistry.findFirst({
         where: { normalizedLabel: normalized },
       });
 

@@ -69,26 +69,32 @@ const processMessage = async (
 ): Promise<void> => {
   stats.total += 1;
 
-  // Skip non-bot messages and non-Aloware bot messages
+  // Only skip non-Aloware bot messages. All other messages from the channel
+  // are processed — the parser handles direction/contact validation.
   const botId = message.bot_id;
-  if (!botId) {
+  if (botId && botId !== 'B09U5588XU1') {
     stats.skipped += 1;
     return;
   }
 
   const text = message.text || '';
   const attachments = message.attachments as any[] | undefined;
-  const firstAttachmentTitle = attachments?.[0]?.title as string | undefined;
 
   // Parse the message
   const parsed = parseAlowareMessage(text, attachments);
 
-  if (parsed.direction === 'unknown') {
-    stats.skipped += 1;
-    return;
+  // If parser can't determine direction, try to infer from context
+  let direction = parsed.direction;
+  if (direction === 'unknown') {
+    // Aloware messages in Slack always have attachments with titles like
+    // "X has sent an SMS" or "X has received an SMS" — check attachment titles
+    const title = attachments?.[0]?.title || '';
+    if (/\bsent\b/i.test(title)) direction = 'outbound';
+    else if (/\breceived\b/i.test(title)) direction = 'inbound';
   }
 
-  if (!parsed.contactId && !parsed.contactPhone) {
+  // Skip only if we truly can't determine direction AND have no contact info
+  if (direction === 'unknown' && !parsed.contactId && !parsed.contactPhone) {
     stats.skipped += 1;
     return;
   }
@@ -108,7 +114,7 @@ const processMessage = async (
         slackChannelId: getChannelId(),
         slackMessageTs: messageTs,
         eventTs,
-        direction: parsed.direction,
+        direction: direction || 'unknown',
         contactId: parsed.contactId || null,
         contactPhone: parsed.contactPhone || null,
         contactName: parsed.contactName || null,

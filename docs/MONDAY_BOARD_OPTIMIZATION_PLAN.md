@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the plan to transform PTBiz SMS Monday.com boards from raw data dumps into useful reporting dashboards. The optimization is divided into 4 phases, with Phase 1 already complete.
+This document outlines the plan to transform PTBiz SMS Monday.com boards from raw data dumps into useful reporting dashboards. The optimization is divided into 4 phases, with Phases 1 and 2 complete.
 
 ## Current State Assessment
 
@@ -28,7 +28,7 @@ This document outlines the plan to transform PTBiz SMS Monday.com boards from ra
 
 ## Phase 1: Core Engine Fixes (COMPLETE)
 
-**Commit:** `98af6df4` - "feat(monday): Phase 1 optimization - structured summaries and staleness detection"
+**Commits:** `98af6df4`, `285c60e4`
 
 ### Changes Made
 
@@ -72,7 +72,9 @@ This document outlines the plan to transform PTBiz SMS Monday.com boards from ra
 
 ---
 
-## Phase 2: Board Schema Updates (IN PROGRESS)
+## Phase 2: Board Schema Updates (COMPLETE)
+
+**Commit:** `deacae1f` - "feat(monday): Phase 2 board repair script for missing column detection and creation"
 
 ### Updated Column Schemas
 
@@ -135,8 +137,23 @@ This document outlines the plan to transform PTBiz SMS Monday.com boards from ra
 | Exceptions | Long Text | Anomalies | Keep |
 | Last Synced | Date | Sync timestamp | Keep |
 
-### Schema File Updated
+### Schema and Tooling
 - `apps/backend/services/monday-board-schemas.ts` - Updated with new column definitions
+- `apps/backend/scripts/repair-monday-board-columns.ts` - Board repair script (Phase 2 commit)
+
+### How to run the repair script
+
+```bash
+# Requires MONDAY_API_TOKEN set in .env
+npx tsx scripts/repair-monday-board-columns.ts
+```
+
+The script will:
+1. Connect to each board (Events, Sequences, Reports)
+2. Compare existing columns against the schema in `monday-board-schemas.ts`
+3. Report missing columns, type mismatches, and extra columns
+4. Create any missing columns with correct types and status label defaults
+5. Provide a summary with next steps
 
 ---
 
@@ -221,13 +238,12 @@ This document outlines the plan to transform PTBiz SMS Monday.com boards from ra
 - [x] Update push-sms-events-to-monday.ts
 - [x] Update push-sms-sequences-to-monday.ts
 - [x] Update weekly-manager-summary.ts
-- [x] Commit changes
+- [x] Commit changes (`98af6df4`, `285c60e4`)
 
-### Phase 2 (IN PROGRESS)
+### Phase 2 (COMPLETE)
 - [x] Update monday-board-schemas.ts with new column definitions
-- [ ] Create board repair script to add missing columns
-- [ ] Update Monday integration guide
-- [ ] Test column mappings with existing boards
+- [x] Create board repair script to add missing columns (`deacae1f`)
+- [x] Script passes biome lint checks
 
 ### Phase 3 (PLANNED)
 - [ ] Configure Monday automations (UI-based)
@@ -273,8 +289,8 @@ This document outlines the plan to transform PTBiz SMS Monday.com boards from ra
 
 ## Next Steps
 
-1. **Run board repair script** to add missing columns (Priority, Latest Message, WoW Change %, etc.)
-2. **Configure Monday automations** in the Monday.com UI
-3. **Create dashboard views** for each board
+1. **Run board repair script** to add missing columns: `npx tsx scripts/repair-monday-board-columns.ts`
+2. **Configure Monday automations** in the Monday.com UI (Phase 3)
+3. **Create dashboard views** for each board (Phase 3)
 4. **Test the changes** with a full sync cycle
 5. **Monitor for 1 week** to ensure staleness detection works correctly

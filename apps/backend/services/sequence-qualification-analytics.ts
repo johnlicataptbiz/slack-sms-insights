@@ -1,5 +1,6 @@
 import type { Logger } from '@slack/bolt';
 import { getPrismaClient } from './prisma.js';
+import { hasTableColumn, isMissingSchemaError } from './schema-compat.js';
 
 export type QualificationMetric = {
   count: number;
@@ -132,11 +133,19 @@ export const buildSequenceQualificationBreakdown = async (params: {
 }): Promise<SequenceQualificationBreakdown[]> => {
   const { from, to, timezone, minConversations = 5, logger } = params;
   const prisma = getPrisma();
+  const hasQualificationDeliveryModel = await hasTableColumn(
+    prisma,
+    'conversation_state',
+    'qualification_delivery_model',
+  ).catch(() => false);
+  const deliveryModelExpr = hasQualificationDeliveryModel ? 'cs.qualification_delivery_model' : `'unknown'::text`;
 
   logger?.debug?.('[sequence-qualification] Building breakdown', { from, to, timezone });
 
-  const rows = await prisma.$queryRawUnsafe<any[]>(
-    `
+  let rows: any[] = [];
+  try {
+    rows = await prisma.$queryRawUnsafe<any[]>(
+      `
     WITH sequence_first_touch AS (
       -- Find the first outbound message per conversation and its sequence
       SELECT DISTINCT ON (conversation_id)
@@ -156,7 +165,7 @@ export const buildSequenceQualificationBreakdown = async (params: {
         cs.conversation_id,
         cs.qualification_full_or_part_time,
         cs.qualification_revenue_mix,
-        cs.qualification_delivery_model,
+        ${deliveryModelExpr} AS qualification_delivery_model,
         cs.qualification_coaching_interest,
         cs.qualification_niche
       FROM sequence_first_touch sft
@@ -236,11 +245,18 @@ export const buildSequenceQualificationBreakdown = async (params: {
     HAVING COUNT(*) >= $3
     ORDER BY total_conversations DESC
     `,
-    from,
-    to,
-    minConversations,
-    timezone,
-  );
+      from,
+      to,
+      minConversations,
+      timezone,
+    );
+  } catch (error) {
+    if (!isMissingSchemaError(error)) {
+      throw error;
+    }
+    logger?.warn?.('[sequence-qualification] Schema not ready; returning empty qualification breakdown');
+    return [];
+  }
 
   const [sampleQuotesBySequence, topNichesBySequence] = await Promise.all([
     fetchSampleQuotesBySequence(from, to),
@@ -383,6 +399,12 @@ async function fetchSampleQuotesBySequence(
   to: string,
 ): Promise<Map<string, Partial<Record<SampleQuoteMetricKey, string>>>> {
   const prisma = getPrisma();
+  const hasQualificationDeliveryModel = await hasTableColumn(
+    prisma,
+    'conversation_state',
+    'qualification_delivery_model',
+  ).catch(() => false);
+  const deliveryModelExpr = hasQualificationDeliveryModel ? 'cs.qualification_delivery_model' : `'unknown'::text`;
   const metricSql = SAMPLE_QUOTE_METRICS.map(
     (metric) => `
       SELECT
@@ -395,10 +417,12 @@ async function fetchSampleQuotesBySequence(
     `,
   ).join('\nUNION ALL\n');
 
-  const results = await prisma.$queryRawUnsafe<
-    Array<{ sequence_label: string; metric_key: SampleQuoteMetricKey; body: string }>
-  >(
-    `
+  let results: Array<{ sequence_label: string; metric_key: SampleQuoteMetricKey; body: string }> = [];
+  try {
+    results = await prisma.$queryRawUnsafe<
+      Array<{ sequence_label: string; metric_key: SampleQuoteMetricKey; body: string }>
+    >(
+      `
     WITH sequence_first_touch AS (
       SELECT DISTINCT ON (conversation_id)
         conversation_id,
@@ -416,7 +440,7 @@ async function fetchSampleQuotesBySequence(
         sft.sequence_label,
         cs.qualification_full_or_part_time,
         cs.qualification_revenue_mix,
-        cs.qualification_delivery_model,
+        ${deliveryModelExpr} AS qualification_delivery_model,
         cs.qualification_coaching_interest,
         se.body,
         se.event_ts
@@ -443,9 +467,15 @@ async function fetchSampleQuotesBySequence(
     SELECT sequence_label, metric_key, body
     FROM ranked
     `,
-    from,
-    to,
-  );
+      from,
+      to,
+    );
+  } catch (error) {
+    if (!isMissingSchemaError(error)) {
+      throw error;
+    }
+    return new Map();
+  }
 
   const quotesBySequence = new Map<string, Partial<Record<SampleQuoteMetricKey, string>>>();
   for (const row of results) {

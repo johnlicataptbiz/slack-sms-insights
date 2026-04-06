@@ -8,6 +8,7 @@ import type {
   RevenueMixCategory,
 } from './inbox-contact-profiles.js';
 import { getPrismaClient } from './prisma.js';
+import { hasTableColumn } from './schema-compat.js';
 
 const toNullableJson = (value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull => {
   if (value == null) return Prisma.DbNull;
@@ -385,6 +386,15 @@ export const listInboxConversations = async (
 ): Promise<InboxConversationListRow[]> => {
   const prisma = getPrisma();
   try {
+    const hasQualificationDeliveryModel = await hasTableColumn(
+      prisma,
+      'conversation_state',
+      'qualification_delivery_model',
+    ).catch(() => false);
+    const deliveryModelExpr = hasQualificationDeliveryModel
+      ? 's.qualification_delivery_model'
+      : `'unknown'::text`;
+
     const where: string[] = [];
     const values: Array<string | number | boolean | null> = [];
     let index = 1;
@@ -478,7 +488,7 @@ export const listInboxConversations = async (
         s.qualification_full_or_part_time AS state_qualification_full_or_part_time,
         s.qualification_niche AS state_qualification_niche,
         s.qualification_revenue_mix AS state_qualification_revenue_mix,
-        s.qualification_delivery_model AS state_qualification_delivery_model,
+        ${deliveryModelExpr} AS state_qualification_delivery_model,
         s.qualification_coaching_interest AS state_qualification_coaching_interest,
         s.qualification_progress_step AS state_qualification_progress_step,
         s.escalation_level AS state_escalation_level,
@@ -532,6 +542,15 @@ export const getInboxConversationById = async (
 ): Promise<InboxConversationListRow | null> => {
   const prisma = getPrisma();
   try {
+    const hasQualificationDeliveryModel = await hasTableColumn(
+      prisma,
+      'conversation_state',
+      'qualification_delivery_model',
+    ).catch(() => false);
+    const deliveryModelExpr = hasQualificationDeliveryModel
+      ? 's.qualification_delivery_model'
+      : `'unknown'::text`;
+
     const sql = `
       WITH open_items AS (
         SELECT
@@ -588,7 +607,7 @@ export const getInboxConversationById = async (
         s.qualification_full_or_part_time AS state_qualification_full_or_part_time,
         s.qualification_niche AS state_qualification_niche,
         s.qualification_revenue_mix AS state_qualification_revenue_mix,
-        s.qualification_delivery_model AS state_qualification_delivery_model,
+        ${deliveryModelExpr} AS state_qualification_delivery_model,
         s.qualification_coaching_interest AS state_qualification_coaching_interest,
         s.qualification_progress_step AS state_qualification_progress_step,
         s.escalation_level AS state_escalation_level,

@@ -12,6 +12,7 @@ import SequencesV2 from './pages/SequencesV2';
 import { easing } from './utils/motion';
 import './v2.css';
 import './styles/components.css';
+import './styles/enhancements.css';
 
 const InboxV2 = lazy(() => import('./pages/InboxV2'));
 

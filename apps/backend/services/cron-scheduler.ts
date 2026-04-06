@@ -613,6 +613,52 @@ export const startLrnRefreshCron = (app: App): void => {
   }, CHECK_INTERVAL_MS);
 };
 
+type SimpleLogger = Pick<Console, 'info' | 'warn' | 'error'>;
+
+let kpiIntervalId: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Starts a standalone KPI facts refresh cron that does NOT require the Slack
+ * Bolt app to be running.  It fires once per day at KPI_REFRESH_HOUR_CT CT
+ * and recomputes fact_sms_daily + fact_booking_daily for the last
+ * KPI_REFRESH_LOOKBACK_DAYS days.
+ *
+ * This is intentionally decoupled from startDailyReportCron so that KPI data
+ * is kept current even when Slack auth is unavailable or misconfigured.
+ */
+export const startKpiRefreshCron = (logger: SimpleLogger = console): void => {
+  if (kpiIntervalId !== null) return; // already running
+
+  logger.info(
+    `[cron] KPI refresh cron started — fires at ${KPI_REFRESH_HOUR_CT}:${String(KPI_REFRESH_MINUTE_CT).padStart(2, '0')} CT`,
+  );
+
+  let kpiRefreshInFlight = false;
+
+  kpiIntervalId = setInterval(() => {
+    void (async () => {
+      const { date, hour, minute } = getCTDateParts();
+
+      if (hour !== KPI_REFRESH_HOUR_CT || minute !== KPI_REFRESH_MINUTE_CT) return;
+      if (lastKpiRefreshDate === date) return;
+      if (kpiRefreshInFlight) return;
+
+      kpiRefreshInFlight = true;
+      try {
+        const now = new Date();
+        const from = new Date(now.getTime() - KPI_REFRESH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+        await refreshKpiFacts({ from, to: now, timeZone: BUSINESS_TIMEZONE }, logger as Pick<import('@slack/bolt').Logger, 'info' | 'warn' | 'error'>);
+        lastKpiRefreshDate = date;
+        logger.info(`[cron] KPI facts refresh complete — from=${from.toISOString()} to=${now.toISOString()}`);
+      } catch (error) {
+        logger.error('[cron] KPI facts refresh failed:', error);
+      } finally {
+        kpiRefreshInFlight = false;
+      }
+    })();
+  }, CHECK_INTERVAL_MS);
+};
+
 /**
  * Stops the cron interval. Useful for graceful shutdown or tests.
  */
@@ -624,6 +670,10 @@ export const stopDailyReportCron = (): void => {
   if (lrnIntervalId !== null) {
     clearInterval(lrnIntervalId);
     lrnIntervalId = null;
+  }
+  if (kpiIntervalId !== null) {
+    clearInterval(kpiIntervalId);
+    kpiIntervalId = null;
   }
 };
 // cache-bust-1775309816

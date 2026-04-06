@@ -1,4 +1,5 @@
 import { getPrismaClient } from './prisma.js';
+import { isMissingSchemaError } from './schema-compat.js';
 
 const getPrisma = () => getPrismaClient();
 
@@ -62,11 +63,18 @@ export type RepResponseDailyRow = {
 
 export const listOpenAttributionReviewItems = async (take = 50): Promise<AttributionReviewQueueItem[]> => {
   const prisma = getPrisma();
-  return prisma.attribution_review_queue.findMany({
-    where: { status: { in: ['open', 'pending', 'needs_review'] } },
-    orderBy: [{ priority: 'desc' }, { created_at: 'desc' }],
-    take,
-  });
+  try {
+    return await prisma.attribution_review_queue.findMany({
+      where: { status: { in: ['open', 'pending', 'needs_review'] } },
+      orderBy: [{ priority: 'desc' }, { created_at: 'desc' }],
+      take,
+    });
+  } catch (error) {
+    if (!isMissingSchemaError(error)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const upsertAttributionReviewItem = async (input: {
@@ -106,24 +114,31 @@ export const upsertAttributionReviewItem = async (input: {
 
 export const listUnresolvedAttributions = async (take = 100): Promise<UnresolvedAttributionRow[]> => {
   const prisma = getPrisma();
-  return prisma.$queryRawUnsafe<UnresolvedAttributionRow[]>(
-    `SELECT
-      booked_call_id,
-      booked_event_ts,
-      attribution_status,
-      needs_review,
-      review_reason,
-      mapper_version,
-      conversation_id,
-      resolved_sequence_id,
-      resolved_sequence_label,
-      created_at
-    FROM booked_call_attribution
-    WHERE COALESCE(needs_review, false) = true OR attribution_status IS NULL
-    ORDER BY booked_event_ts DESC
-    LIMIT $1`,
-    take,
-  );
+  try {
+    return await prisma.$queryRawUnsafe<UnresolvedAttributionRow[]>(
+      `SELECT
+        booked_call_id,
+        booked_event_ts,
+        attribution_status,
+        needs_review,
+        review_reason,
+        mapper_version,
+        conversation_id,
+        resolved_sequence_id,
+        resolved_sequence_label,
+        created_at
+      FROM booked_call_attribution
+      WHERE COALESCE(needs_review, false) = true OR attribution_status IS NULL
+      ORDER BY booked_event_ts DESC
+      LIMIT $1`,
+      take,
+    );
+  } catch (error) {
+    if (!isMissingSchemaError(error)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const listSequenceFunnelDaily = async (params: {
@@ -132,13 +147,20 @@ export const listSequenceFunnelDaily = async (params: {
   sequenceId?: string | null;
 }): Promise<SequenceFunnelRow[]> => {
   const prisma = getPrisma();
-  return prisma.fact_sequence_funnel_daily.findMany({
-    where: {
-      day: { gte: params.from, lte: params.to },
-      ...(params.sequenceId ? { sequence_id: params.sequenceId } : {}),
-    },
-    orderBy: [{ day: 'asc' }, { sequence_id: 'asc' }, { rep_id: 'asc' }],
-  });
+  try {
+    return await prisma.fact_sequence_funnel_daily.findMany({
+      where: {
+        day: { gte: params.from, lte: params.to },
+        ...(params.sequenceId ? { sequence_id: params.sequenceId } : {}),
+      },
+      orderBy: [{ day: 'asc' }, { sequence_id: 'asc' }, { rep_id: 'asc' }],
+    });
+  } catch (error) {
+    if (!isMissingSchemaError(error)) {
+      throw error;
+    }
+    return [];
+  }
 };
 
 export const listAttributionMethodDaily = async (params: {

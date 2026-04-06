@@ -15,6 +15,7 @@ import { startMondaySmsReportsSyncJobs } from './services/monday-sms-reports.js'
 import { startMondaySmsSequencesSyncJobs } from './services/monday-sms-sequences.js';
 import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
+import { startAlowareSmsPollingJobs } from './services/aloware-sms-poller.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
 import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
 import { HealthController } from './src/controllers/health.controller.js';
@@ -278,6 +279,9 @@ app.error(async (error) => {
     startMondaySmsSyncJobs(app.logger);
     startMondaySmsSequencesSyncJobs(app.logger);
     startMondaySmsReportsSyncJobs(app.logger);
+
+    // Aloware SMS polling jobs (direct API polling, feature-flag gated)
+    startAlowareSmsPollingJobs(app.logger);
   } catch (error) {
     logger.app.error(`[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`);
     await reportError(app, error, 'Startup Failure');

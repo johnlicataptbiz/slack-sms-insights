@@ -25,6 +25,11 @@ import {
   getDashboardSession,
   getDashboardSessionTtlSeconds,
 } from '../services/session-store.js';
+import {
+  handleAlowareWebhook,
+  validateWebhookSignature,
+} from '../services/aloware-webhook-handler.js';
+import { getAlowarePollingState, pollAlowareSmsEvents } from '../services/aloware-sms-poller.js';
 
 /**
  * Parse cookies from a Cookie header string into a map.
@@ -436,6 +441,68 @@ export const handleApiRoute = async (
       );
       return true;
     }
+  }
+
+  // ─── Aloware Webhook Endpoint ──────────────────────────────────────────────
+  // Supports both /api/webhooks/aloware and /api/webhooks/aloware/sms (Aloware dashboard URL)
+  if (pathname.startsWith('/api/webhooks/aloware') && req.method === 'POST') {
+    const signature = req.headers['x-aloware-signature'] as string | undefined;
+    let bodyStr: string;
+    try {
+      bodyStr = await readBody(req);
+    } catch {
+      sendError(res, 400, 'Invalid request body');
+      return true;
+    }
+
+    if (!validateWebhookSignature(bodyStr, signature)) {
+      sendJson(res, 403, { success: false, error: 'Invalid signature' });
+      return true;
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(bodyStr);
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Invalid JSON' });
+      return true;
+    }
+
+    const result = await handleAlowareWebhook(payload as any, logger);
+
+    if (result.status === 'success') {
+      sendJson(res, 200, { success: true, data: result });
+    } else if (result.status === 'skipped') {
+      sendJson(res, 202, { success: true, data: result });
+    } else {
+      sendJson(res, 500, { success: false, error: result.reason });
+    }
+    return true;
+  }
+
+  // ─── Aloware Polling Admin Endpoint ────────────────────────────────────────
+  if (pathname === '/api/admin/aloware/poll' && req.method === 'POST') {
+    const { session } = getSessionFromCookies(req);
+    if (!session) {
+      sendJson(res, 401, { success: false, error: 'Not authenticated' });
+      return true;
+    }
+
+    const result = await pollAlowareSmsEvents(logger);
+    sendJson(res, 200, { success: true, data: result });
+    return true;
+  }
+
+  if (pathname === '/api/admin/aloware/status' && req.method === 'GET') {
+    const { session } = getSessionFromCookies(req);
+    if (!session) {
+      sendJson(res, 401, { success: false, error: 'Not authenticated' });
+      return true;
+    }
+
+    const status = getAlowarePollingState();
+    sendJson(res, 200, { success: true, data: status });
+    return true;
   }
 
   // Route module intentionally keeps unknown API paths unhandled so callers can fallback.

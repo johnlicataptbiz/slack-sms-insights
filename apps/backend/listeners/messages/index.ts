@@ -46,14 +46,17 @@ const register = (app: App) => {
 
     // If message is from a bot, check if we should skip it
     if (botId) {
+      // Allow the Aloware Slack app bot (sends SMS notifications)
+      const isAlowareBot = botId === 'B09U5588XU1';
+
       const isDailySnapshot =
         (text?.toLowerCase().includes('daily snapshot') ||
           firstAttachmentTitle?.toLowerCase().includes('daily snapshot')) &&
         (text?.toLowerCase().includes('aloware') || firstAttachmentTitle?.toLowerCase().includes('aloware'));
 
-      if (!isDailySnapshot) {
+      if (!isAlowareBot && !isDailySnapshot) {
         // Skip non-Aloware bot messages; they'll be filtered by parse stage anyway but this saves processing
-        logger.debug('Skipping message from other app/bot (not Aloware daily snapshot).', { botId });
+        logger.debug('Skipping message from other app/bot (not Aloware).', { botId });
         recordAlowareIngestSkip({
           reason: 'other_app_post',
           channelId,

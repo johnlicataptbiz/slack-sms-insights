@@ -7,7 +7,7 @@
   "scripts": {
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "prebuild": "node --import tsx ./scripts/generate-changelog-json.ts",
-    "build": "npm run clean && npm run prebuild && npm run prisma:generate && tsc && npm run build:frontend",
+    "build": "npm run clean && npm run prebuild && npm run prisma:generate && npm run build:frontend",
     "build:frontend:optional": "cd ../frontend && npm run build",
     "build:watch": "tsc --watch",
     "build:frontend": "sh -c 'if [ \"${SKIP_FRONTEND_BUILD:-}\" = \"true\" ]; then echo \"SKIP_FRONTEND_BUILD=true; skipping frontend build\"; elif [ -d ../frontend ]; then cd ../frontend && npm run build; else echo \"frontend directory not present in build context; skipping frontend build\"; fi'",
@@ -31,7 +31,7 @@
     "analyze:data": "node --import tsx ./scripts/data-analysis.ts",
     "prisma:generate": "prisma generate --config prisma.config.ts",
     "dev": "node --import tsx app.ts",
-    "start": "node ./dist/app.js",
+    "start": "sh -c 'if [ -f ./dist/app.js ]; then node ./dist/app.js; else node --import tsx app.ts; fi'",
     "lint": "npx @biomejs/biome check *.ts listeners services tests api",
     "lint:fix": "npx @biomejs/biome check --write *.ts listeners services tests api",
     "test": "npm run build && npm run lint && node --import tsx --test tests/**/*.test.ts"

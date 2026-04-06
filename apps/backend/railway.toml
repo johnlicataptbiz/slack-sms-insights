@@ -6,11 +6,12 @@ builder = "nixpacks"
 # Use Node.js 22 LTS
 nodeVersion = "22"
 
-# Build command
-buildCmd = "npm ci && prisma generate && prisma db push --accept-data-loss && npm run build"
+# Build command: install deps and generate Prisma client; skip full tsc build
+# because the deploy runtime starts directly from TypeScript via tsx.
+buildCmd = "npm ci && prisma generate --config prisma.config.ts && prisma db push --accept-data-loss"
 
 # Start command
-startCmd = "npm start"
+startCmd = "node --import tsx app.ts"
 
 [deploy]
 # Health check configuration

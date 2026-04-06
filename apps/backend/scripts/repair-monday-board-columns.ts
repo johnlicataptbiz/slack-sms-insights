@@ -26,7 +26,7 @@ import {
 // Environment Setup
 // ─────────────────────────────────────────────────────────────────────────────
 
-const envPath = path.join(process.cwd(), '.env');
+const envPath = '/Users/jl/Developer/slack-sms-insights/apps/backend/.env';
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf-8');
   for (const line of envContent.split('\n')) {

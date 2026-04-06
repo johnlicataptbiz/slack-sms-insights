@@ -1,6 +1,13 @@
 import type { Logger } from '@slack/bolt';
-import { type BookedCallAttributionSource, getBookedCallAttributionSources } from './booked-calls.js';
-import { type MondayBoardColumn, queryBoardColumns, upsertBookedCallItem } from './monday-client.js';
+import {
+  type BookedCallAttributionSource,
+  getBookedCallAttributionSources,
+} from './booked-calls.js';
+import {
+  type MondayBoardColumn,
+  queryBoardColumns,
+  upsertBookedCallItem,
+} from './monday-client.js';
 import {
   getMondayBookedCallPush,
   getMondayColumnMapping,
@@ -48,7 +55,10 @@ const parseJsonMapping = (raw: string | undefined): unknown => {
 
 const normalize = (value: string) => value.trim().toLowerCase();
 
-const findColumnBySignals = (columns: MondayBoardColumn[], signals: string[]): string | null => {
+const findColumnBySignals = (
+  columns: MondayBoardColumn[],
+  signals: string[],
+): string | null => {
   const normalizedSignals = signals.map((signal) => signal.toLowerCase());
   for (const column of columns) {
     const haystack = `${normalize(column.id)} ${normalize(column.title)} ${normalize(column.type)}`;
@@ -59,19 +69,54 @@ const findColumnBySignals = (columns: MondayBoardColumn[], signals: string[]): s
   return null;
 };
 
-const inferPersonalMapping = (columns: MondayBoardColumn[]): PersonalBoardColumnMapping => ({
-  callDateColumnId: findColumnBySignals(columns, ['call date', 'appointment date', 'date']),
-  contactNameColumnId: findColumnBySignals(columns, ['contact name', 'lead name', 'name']),
+const inferPersonalMapping = (
+  columns: MondayBoardColumn[],
+): PersonalBoardColumnMapping => ({
+  callDateColumnId: findColumnBySignals(columns, [
+    'call date',
+    'appointment date',
+    'date',
+  ]),
+  contactNameColumnId: findColumnBySignals(columns, [
+    'contact name',
+    'lead name',
+    'name',
+  ]),
   phoneColumnId: findColumnBySignals(columns, ['phone', 'mobile']),
   setterColumnId: findColumnBySignals(columns, ['setter', 'rep', 'owner']),
-  stageColumnId: findColumnBySignals(columns, ['status', 'stage', 'outcome', 'disposition']),
-  firstConversionColumnId: findColumnBySignals(columns, ['first conversion', 'conversion', 'campaign']),
+  stageColumnId: findColumnBySignals(columns, [
+    'status',
+    'stage',
+    'outcome',
+    'disposition',
+  ]),
+  firstConversionColumnId: findColumnBySignals(columns, [
+    'first conversion',
+    'conversion',
+    'campaign',
+  ]),
   lineColumnId: findColumnBySignals(columns, ['line']),
-  sourceColumnId: findColumnBySignals(columns, ['source type', 'source', 'origin']),
-  slackLinkColumnId: findColumnBySignals(columns, ['slack', 'thread link', 'link']),
+  sourceColumnId: findColumnBySignals(columns, [
+    'source type',
+    'source',
+    'origin',
+  ]),
+  slackLinkColumnId: findColumnBySignals(columns, [
+    'slack',
+    'thread link',
+    'link',
+  ]),
   notesColumnId: findColumnBySignals(columns, ['notes', 'summary', 'details']),
-  dateHeldColumnId: findColumnBySignals(columns, ['date held', 'appointment date', 'appt date']),
-  advisorColumnId: findColumnBySignals(columns, ['advisor', 'contact owner', 'owner']),
+  dateHeldColumnId: findColumnBySignals(columns, [
+    'date held',
+    'appointment date',
+    'appt date',
+  ]),
+  advisorColumnId: findColumnBySignals(columns, [
+    'advisor',
+    'contact owner',
+    'owner',
+  ]),
 });
 
 const asNullableString = (value: unknown): string | null => {
@@ -79,7 +124,9 @@ const asNullableString = (value: unknown): string | null => {
   return null;
 };
 
-const coercePersonalMapping = (value: unknown): PersonalBoardColumnMapping | null => {
+const coercePersonalMapping = (
+  value: unknown,
+): PersonalBoardColumnMapping | null => {
   if (typeof value !== 'object' || value === null) return null;
   const row = value as Record<string, unknown>;
   return {
@@ -98,8 +145,12 @@ const coercePersonalMapping = (value: unknown): PersonalBoardColumnMapping | nul
   };
 };
 
-export const readPersonalMappingFromEnv = (raw?: string): PersonalBoardColumnMapping | null => {
-  return coercePersonalMapping(parseJsonMapping(raw ?? process.env.MONDAY_PERSONAL_COLUMN_MAP_JSON));
+export const readPersonalMappingFromEnv = (
+  raw?: string,
+): PersonalBoardColumnMapping | null => {
+  return coercePersonalMapping(
+    parseJsonMapping(raw ?? process.env.MONDAY_PERSONAL_COLUMN_MAP_JSON),
+  );
 };
 
 const mergeMappings = (
@@ -109,14 +160,17 @@ const mergeMappings = (
   if (!persisted) return inferred;
   return {
     callDateColumnId: persisted.callDateColumnId || inferred.callDateColumnId,
-    contactNameColumnId: persisted.contactNameColumnId || inferred.contactNameColumnId,
+    contactNameColumnId:
+      persisted.contactNameColumnId || inferred.contactNameColumnId,
     phoneColumnId: persisted.phoneColumnId || inferred.phoneColumnId,
     setterColumnId: persisted.setterColumnId || inferred.setterColumnId,
     stageColumnId: persisted.stageColumnId || inferred.stageColumnId,
-    firstConversionColumnId: persisted.firstConversionColumnId || inferred.firstConversionColumnId,
+    firstConversionColumnId:
+      persisted.firstConversionColumnId || inferred.firstConversionColumnId,
     lineColumnId: persisted.lineColumnId || inferred.lineColumnId,
     sourceColumnId: persisted.sourceColumnId || inferred.sourceColumnId,
-    slackLinkColumnId: persisted.slackLinkColumnId || inferred.slackLinkColumnId,
+    slackLinkColumnId:
+      persisted.slackLinkColumnId || inferred.slackLinkColumnId,
     notesColumnId: persisted.notesColumnId || inferred.notesColumnId,
     dateHeldColumnId: persisted.dateHeldColumnId || inferred.dateHeldColumnId,
     advisorColumnId: persisted.advisorColumnId || inferred.advisorColumnId,
@@ -130,11 +184,13 @@ const mergePersonalOverrides = (
   if (!override) return base;
   return {
     callDateColumnId: override.callDateColumnId || base.callDateColumnId,
-    contactNameColumnId: override.contactNameColumnId || base.contactNameColumnId,
+    contactNameColumnId:
+      override.contactNameColumnId || base.contactNameColumnId,
     phoneColumnId: override.phoneColumnId || base.phoneColumnId,
     setterColumnId: override.setterColumnId || base.setterColumnId,
     stageColumnId: override.stageColumnId || base.stageColumnId,
-    firstConversionColumnId: override.firstConversionColumnId || base.firstConversionColumnId,
+    firstConversionColumnId:
+      override.firstConversionColumnId || base.firstConversionColumnId,
     lineColumnId: override.lineColumnId || base.lineColumnId,
     sourceColumnId: override.sourceColumnId || base.sourceColumnId,
     slackLinkColumnId: override.slackLinkColumnId || base.slackLinkColumnId,
@@ -147,7 +203,12 @@ const mergePersonalOverrides = (
 const parseBucket = (value: string | undefined): PersonalSetterBucket => {
   const normalized = (value || '').trim().toLowerCase();
   if (normalized === 'brandon') return 'brandon';
-  if (normalized === 'self' || normalized === 'selfbooked' || normalized === 'self_booked') return 'selfBooked';
+  if (
+    normalized === 'self' ||
+    normalized === 'selfbooked' ||
+    normalized === 'self_booked'
+  )
+    return 'selfBooked';
   return 'jack';
 };
 
@@ -172,7 +233,10 @@ const normalizeContactName = (value: string | null): string | null => {
   if (!trimmed) return null;
   // Drop obvious phone-like strings so we do not create numeric-only Monday item names.
   const digitsOnly = trimmed.replace(/\D/g, '');
-  if (digitsOnly.length >= 7 && digitsOnly.length >= trimmed.replace(/\s+/g, '').length - 2) {
+  if (
+    digitsOnly.length >= 7 &&
+    digitsOnly.length >= trimmed.replace(/\s+/g, '').length - 2
+  ) {
     return null;
   }
   return trimmed;
@@ -204,7 +268,9 @@ const slackPermalink = (channelId: string, messageTs: string): string => {
 };
 
 const resolveCallDate = (eventTs: string): string => {
-  const tz = (process.env.ALOWARE_REPORT_TIMEZONE || '').trim() || DEFAULT_BUSINESS_TIMEZONE;
+  const tz =
+    (process.env.ALOWARE_REPORT_TIMEZONE || '').trim() ||
+    DEFAULT_BUSINESS_TIMEZONE;
   return dayKeyInTimeZone(eventTs, tz) || eventTs.slice(0, 10);
 };
 
@@ -236,7 +302,10 @@ const parseMDYDate = (value: string | null): string | null => {
  */
 const parseFallbackField = (fallback: string, label: string): string | null => {
   if (!fallback) return null;
-  const pattern = new RegExp(`\\*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\*:\\s*(.*)$`, 'im');
+  const pattern = new RegExp(
+    `\\*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\*:\\s*(.*)$`,
+    'im',
+  );
   const match = fallback.match(pattern);
   const value = (match?.[1] || '')
     .trim()
@@ -273,7 +342,10 @@ const parseDateHeldFromSlackRaw = (raw: unknown): string | null => {
   }
 
   // Fallback to "Date of last meeting booked"
-  const lastMeeting = parseFallbackField(fallback, 'Date of last meeting booked');
+  const lastMeeting = parseFallbackField(
+    fallback,
+    'Date of last meeting booked',
+  );
   if (lastMeeting) {
     const parsed = parseMDYDate(lastMeeting);
     if (parsed) return parsed;
@@ -295,22 +367,34 @@ const parseAdvisorFromSlackRaw = (raw: unknown): string | null => {
   return owner || null;
 };
 
-const setterMondayUserId = Number.parseInt((process.env.MONDAY_PERSONAL_SETTER_MONDAY_USER_ID || '').trim(), 10);
+const setterMondayUserId = Number.parseInt(
+  (process.env.MONDAY_PERSONAL_SETTER_MONDAY_USER_ID || '').trim(),
+  10,
+);
 
-const mapStageToSwing = (): string => 'First Swing';
+const mapStageToSwing = (): string => 'Call Booked';
 
 const mapLineToChannel = (line: string | null): string => {
   const normalized = (line || '').trim().toLowerCase();
   if (!normalized) return 'Aloware SMS';
 
-  if (normalized.includes('game plan') || normalized.includes('strategy call') || normalized.includes('call')) {
+  if (
+    normalized.includes('game plan') ||
+    normalized.includes('strategy call') ||
+    normalized.includes('call')
+  ) {
     return 'Game Plan Call';
   }
   if (normalized.includes('self')) return 'SELF BOOK';
-  if (normalized.includes('instagram') || normalized.includes('ig')) return 'Instagram DM';
+  if (normalized.includes('instagram') || normalized.includes('ig'))
+    return 'Instagram DM';
   if (normalized.includes('email')) return 'Email Marketing';
   if (normalized.includes('circle')) return 'Circle DM';
-  if (normalized.includes('aloware') || normalized.includes('sms') || normalized.includes('text')) {
+  if (
+    normalized.includes('aloware') ||
+    normalized.includes('sms') ||
+    normalized.includes('text')
+  ) {
     return 'Aloware SMS';
   }
 
@@ -321,17 +405,29 @@ const mapSourceToMondaySource = (firstConversion: string | null): string => {
   const normalized = (firstConversion || '').trim().toLowerCase();
   if (!normalized) return 'Direct Outreach';
 
-  if (normalized.includes('self book') || normalized.includes('self_book') || normalized.includes('signature')) {
+  if (
+    normalized.includes('self book') ||
+    normalized.includes('self_book') ||
+    normalized.includes('signature')
+  ) {
     return 'Signature Self Book';
   }
   if (normalized.includes('circle')) return 'Circle Group';
-  if (normalized.includes('book buyer') || normalized.includes('book_buyer')) return 'Book Buyer';
-  if (normalized.includes('checklist') || normalized.includes('start-up') || normalized.includes('startup')) {
+  if (normalized.includes('book buyer') || normalized.includes('book_buyer'))
+    return 'Book Buyer';
+  if (
+    normalized.includes('checklist') ||
+    normalized.includes('start-up') ||
+    normalized.includes('startup')
+  ) {
     return 'Start-Up Checklist';
   }
-  if (normalized.includes('rates') || normalized.includes('raise your rates')) return 'Raise Your Rates';
-  if (normalized.includes('space') || normalized.includes('stand alone')) return 'Stand Alone Space Setup Guide';
-  if (normalized.includes('marketing email') || normalized.includes('email')) return 'Marketing Email';
+  if (normalized.includes('rates') || normalized.includes('raise your rates'))
+    return 'Raise Your Rates';
+  if (normalized.includes('space') || normalized.includes('stand alone'))
+    return 'Stand Alone Space Setup Guide';
+  if (normalized.includes('marketing email') || normalized.includes('email'))
+    return 'Marketing Email';
   if (normalized.includes('social')) return 'Social Media';
   if (normalized.includes('hiring')) return 'Hiring Guide';
   if (normalized.includes('webinar')) return 'Webinar';
@@ -362,7 +458,14 @@ const addColumnValue = (
   // formula: computed, read-only.
   // name: item name is set via the rename mutation in upsertBookedCallItem, not here.
   // checkbox: only accepts boolean true/false, not text strings.
-  const SKIP_TYPES = new Set(['board_relation', 'mirror', 'lookup', 'formula', 'name', 'checkbox']);
+  const SKIP_TYPES = new Set([
+    'board_relation',
+    'mirror',
+    'lookup',
+    'formula',
+    'name',
+    'checkbox',
+  ]);
   if (SKIP_TYPES.has(column.type)) return;
 
   if (options?.isDate || column.type.includes('date')) {
@@ -414,21 +517,41 @@ const addColumnValue = (
   out[columnId] = value;
 };
 
-export const buildUpdateMarkdown = (source: BookedCallAttributionSource): string => {
+export const buildUpdateMarkdown = (
+  source: BookedCallAttributionSource,
+): string => {
   const setter = formatSetter(source.bucket);
   const contactName = normalizeContactName(source.contactName);
+  const confidencePct =
+    typeof source.matchConfidence === 'number' &&
+    Number.isFinite(source.matchConfidence)
+      ? `${Math.round(source.matchConfidence * 100)}%`
+      : null;
+  const attributionSummary = [
+    source.attributionStatus || null,
+    source.attributionConfidenceBand
+      ? `${source.attributionConfidenceBand} confidence`
+      : null,
+    confidencePct,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+  const compactThread = source.text
+    ? source.text.replace(/\s+/g, ' ').slice(0, 280)
+    : null;
+
   const lines = [
-    `# Slack Booked Call (${setter})`,
+    `# Booked Call (${setter})`,
     '',
-    `Booked at: ${source.eventTs}`,
-    `Contact: ${contactName || source.contactPhone || 'Unknown'}`,
-    `Phone: ${source.contactPhone || 'n/a'}`,
-    `Line: ${source.line || 'n/a'}`,
-    `Rep: ${source.rep || setter}`,
-    `First conversion: ${source.firstConversion || 'n/a'}`,
+    `Contact: ${contactName || source.contactPhone || 'Unknown'} • ${source.contactPhone || 'n/a'}`,
+    `Booked: ${source.eventTs}`,
+    `Setter: ${source.rep || setter} • Channel: ${mapLineToChannel(source.line)} • Source: ${mapSourceToMondaySource(source.firstConversion)}`,
+    `Attribution: ${attributionSummary || 'pending'}`,
+    `Method: ${source.mappingMethod || 'n/a'}${source.resolvedSequenceLabel ? ` • Sequence: ${source.resolvedSequenceLabel}` : ''}`,
+    `Needs review: ${source.needsReview ? 'yes' : 'no'}${source.reviewReason ? ` (${source.reviewReason})` : ''}`,
     `Slack: ${slackPermalink(source.slackChannelId, source.slackMessageTs)}`,
     '',
-    source.text ? `Raw text: ${source.text}` : 'Raw text: n/a',
+    compactThread ? `Thread context: ${compactThread}` : 'Thread context: n/a',
   ];
   return lines.join('\n');
 };
@@ -452,9 +575,15 @@ export const loadBoardMapping = async (
   ]);
   const inferred = inferPersonalMapping(columns);
   const envOverride = readPersonalMappingFromEnv();
-  const mapping = mergePersonalOverrides(mergeMappings(coercePersonalMapping(persisted), inferred), envOverride);
+  const mapping = mergePersonalOverrides(
+    mergeMappings(coercePersonalMapping(persisted), inferred),
+    envOverride,
+  );
   if (envOverride) {
-    logger?.info?.('Using MONDAY_PERSONAL_COLUMN_MAP_JSON override for monday personal writeback mapping', { boardId });
+    logger?.info?.(
+      'Using MONDAY_PERSONAL_COLUMN_MAP_JSON override for monday personal writeback mapping',
+      { boardId },
+    );
   }
   await saveMondayColumnMapping(boardId, mapping, logger);
   return {
@@ -476,16 +605,43 @@ export const toColumnValues = (
   addColumnValue(values, columnsById, mapping.callDateColumnId, callDate, {
     isDate: true,
   });
-  addColumnValue(values, columnsById, mapping.contactNameColumnId, normalizeContactName(source.contactName));
-  addColumnValue(values, columnsById, mapping.phoneColumnId, source.contactPhone, { isPhone: true });
-  const setterValue = source.bucket === 'selfBooked' ? 'Self Booked' : source.rep || setter;
+  addColumnValue(
+    values,
+    columnsById,
+    mapping.contactNameColumnId,
+    normalizeContactName(source.contactName),
+  );
+  addColumnValue(
+    values,
+    columnsById,
+    mapping.phoneColumnId,
+    source.contactPhone,
+    { isPhone: true },
+  );
+  const setterValue =
+    source.bucket === 'selfBooked' ? 'Self Booked' : source.rep || setter;
   addColumnValue(values, columnsById, mapping.setterColumnId, setterValue, {
     isSetter: source.bucket !== 'selfBooked',
   });
   addColumnValue(values, columnsById, mapping.stageColumnId, mapStageToSwing());
-  addColumnValue(values, columnsById, mapping.firstConversionColumnId, source.firstConversion);
-  addColumnValue(values, columnsById, mapping.lineColumnId, mapLineToChannel(source.line));
-  addColumnValue(values, columnsById, mapping.sourceColumnId, mapSourceToMondaySource(source.firstConversion));
+  addColumnValue(
+    values,
+    columnsById,
+    mapping.firstConversionColumnId,
+    source.firstConversion,
+  );
+  addColumnValue(
+    values,
+    columnsById,
+    mapping.lineColumnId,
+    mapLineToChannel(source.line),
+  );
+  addColumnValue(
+    values,
+    columnsById,
+    mapping.sourceColumnId,
+    mapSourceToMondaySource(source.firstConversion),
+  );
   addColumnValue(values, columnsById, mapping.slackLinkColumnId, link, {
     isLink: true,
   });
@@ -493,7 +649,12 @@ export const toColumnValues = (
     values,
     columnsById,
     mapping.notesColumnId,
-    [source.text, source.firstConversion ? `First conversion: ${source.firstConversion}` : null]
+    [
+      source.text,
+      source.firstConversion
+        ? `First conversion: ${source.firstConversion}`
+        : null,
+    ]
       .filter(Boolean)
       .join('\n'),
   );
@@ -510,7 +671,9 @@ export const toColumnValues = (
   return values;
 };
 
-const buildManualSource = (params: ManualSyncParams): BookedCallAttributionSource => {
+const buildManualSource = (
+  params: ManualSyncParams,
+): BookedCallAttributionSource => {
   const eventTs = params.eventTs || new Date().toISOString();
   return {
     bookedCallId: `manual-${Date.now()}`,
@@ -541,7 +704,10 @@ export const createManualMondayBookedCall = async (
   const source = buildManualSource(params);
   const { mapping, columnsById } = await loadBoardMapping(boardId, logger);
   const columnValues = toColumnValues(source, mapping, columnsById);
-  const itemName = buildManualItemName(source.contactName || params.contactName, source.eventTs);
+  const itemName = buildManualItemName(
+    source.contactName || params.contactName,
+    source.eventTs,
+  );
   const result = await upsertBookedCallItem(
     boardId,
     {
@@ -563,15 +729,24 @@ const pushOne = async (
     mapping: PersonalBoardColumnMapping;
     columnsById: Map<string, MondayBoardColumn>;
     includeSelfBooked?: boolean;
+    forceResync?: boolean;
   },
   logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<'synced' | 'skipped' | 'error'> => {
   if (source.bucket === 'selfBooked' && !params.includeSelfBooked) {
     return 'skipped';
   }
-  const existing = await getMondayBookedCallPush(source.slackChannelId, source.slackMessageTs, logger);
+  const existing = await getMondayBookedCallPush(
+    source.slackChannelId,
+    source.slackMessageTs,
+    logger,
+  );
 
-  if (existing?.status === 'synced' && existing.monday_item_id) {
+  if (
+    !params.forceResync &&
+    existing?.status === 'synced' &&
+    existing.monday_item_id
+  ) {
     return 'skipped';
   }
 
@@ -595,7 +770,11 @@ const pushOne = async (
   );
 
   try {
-    const columnValues = toColumnValues(source, params.mapping, params.columnsById);
+    const columnValues = toColumnValues(
+      source,
+      params.mapping,
+      params.columnsById,
+    );
     const result = await upsertBookedCallItem(
       params.boardId,
       {
@@ -639,19 +818,29 @@ const pushOne = async (
   }
 };
 
-const targetBucket = (): PersonalSetterBucket => parseBucket(process.env.MONDAY_PERSONAL_SETTER_BUCKET || 'jack');
+const targetBucket = (): PersonalSetterBucket =>
+  parseBucket(process.env.MONDAY_PERSONAL_SETTER_BUCKET || 'jack');
 
 const isPersonalSelfBookedEnabled = (): boolean => {
-  const normalized = (process.env.MONDAY_PERSONAL_SELF_BOOKED_ENABLED || '').trim().toLowerCase();
+  const normalized = (process.env.MONDAY_PERSONAL_SELF_BOOKED_ENABLED || '')
+    .trim()
+    .toLowerCase();
   return normalized === 'true';
 };
 
 const personalBoardId = (): string => {
-  return (process.env.MONDAY_PERSONAL_BOARD_ID || mondayConfig.myCallsBoardId || '').trim();
+  return (
+    process.env.MONDAY_PERSONAL_BOARD_ID ||
+    mondayConfig.myCallsBoardId ||
+    ''
+  ).trim();
 };
 
 const personalLookbackDays = (): number => {
-  const raw = Number.parseInt(process.env.MONDAY_PERSONAL_PUSH_LOOKBACK_DAYS || '14', 10);
+  const raw = Number.parseInt(
+    process.env.MONDAY_PERSONAL_PUSH_LOOKBACK_DAYS || '14',
+    10,
+  );
   if (!Number.isFinite(raw) || raw < 1) return 14;
   return raw;
 };
@@ -659,9 +848,16 @@ const personalLookbackDays = (): number => {
 const loadRelevantSources = async (params: {
   channelId?: string;
   slackMessageTs?: string;
+  lookbackDays?: number;
 }): Promise<BookedCallAttributionSource[]> => {
   const to = new Date();
-  const from = new Date(to.getTime() - personalLookbackDays() * 24 * 60 * 60 * 1000);
+  const lookbackDays =
+    params.lookbackDays && Number.isFinite(params.lookbackDays)
+      ? params.lookbackDays
+      : personalLookbackDays();
+  const from = new Date(
+    to.getTime() - Math.max(1, lookbackDays) * 24 * 60 * 60 * 1000,
+  );
   const rows = await getBookedCallAttributionSources({
     from,
     to,
@@ -671,27 +867,69 @@ const loadRelevantSources = async (params: {
 
   const bucket = targetBucket();
   const includeSelfBooked = isPersonalSelfBookedEnabled();
-  return rows.filter((row) => row.bucket === bucket || (includeSelfBooked && row.bucket === 'selfBooked'));
+  return rows.filter(
+    (row) =>
+      row.bucket === bucket ||
+      (includeSelfBooked && row.bucket === 'selfBooked'),
+  );
 };
 
 export const syncRecentSetterBookedCallsToMonday = async (
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+  optionsOrLogger:
+    | {
+        forceResync?: boolean;
+        lookbackDays?: number;
+      }
+    | Pick<Logger, 'info' | 'debug' | 'warn' | 'error'> = {},
+  maybeLogger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
 ): Promise<{
   status: 'skipped' | 'success';
   pushed: number;
   checked: number;
 }> => {
-  if (!mondayConfig.autoWriteEnabled || !mondayConfig.outboundEnabled || !mondayConfig.personalSyncEnabled) {
+  const maybeOptions = optionsOrLogger as {
+    forceResync?: boolean;
+    lookbackDays?: number;
+  };
+  const logger =
+    maybeLogger ||
+    (typeof (
+      optionsOrLogger as Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>
+    )?.info === 'function' ||
+    typeof (
+      optionsOrLogger as Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>
+    )?.warn === 'function' ||
+    typeof (
+      optionsOrLogger as Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>
+    )?.error === 'function'
+      ? (optionsOrLogger as Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>)
+      : undefined);
+  const options = maybeLogger ? maybeOptions : logger ? {} : maybeOptions;
+  if (
+    options.lookbackDays &&
+    (!Number.isFinite(options.lookbackDays) || options.lookbackDays < 1)
+  ) {
+    options.lookbackDays = personalLookbackDays();
+  }
+  if (
+    !mondayConfig.autoWriteEnabled ||
+    !mondayConfig.outboundEnabled ||
+    !mondayConfig.personalSyncEnabled
+  ) {
     return { status: 'skipped', pushed: 0, checked: 0 };
   }
 
   const boardId = personalBoardId();
   if (!boardId) {
-    logger?.warn?.('MONDAY_PERSONAL_BOARD_ID is not configured; skipping personal booked-call sync');
+    logger?.warn?.(
+      'MONDAY_PERSONAL_BOARD_ID is not configured; skipping personal booked-call sync',
+    );
     return { status: 'skipped', pushed: 0, checked: 0 };
   }
 
-  const rows = await loadRelevantSources({});
+  const rows = await loadRelevantSources({
+    lookbackDays: options.lookbackDays,
+  });
   if (!rows.length) {
     return { status: 'success', pushed: 0, checked: 0 };
   }
@@ -701,7 +939,17 @@ export const syncRecentSetterBookedCallsToMonday = async (
 
   let pushed = 0;
   for (const row of rows) {
-    const result = await pushOne(row, { boardId, mapping, columnsById, includeSelfBooked }, logger);
+    const result = await pushOne(
+      row,
+      {
+        boardId,
+        mapping,
+        columnsById,
+        includeSelfBooked,
+        forceResync: options.forceResync,
+      },
+      logger,
+    );
     if (result === 'synced') pushed += 1;
   }
 
@@ -741,7 +989,11 @@ export const syncBookedCallToPersonalBoardFromSlackMessage = async (
     channelId: params.channelId,
     slackMessageTs: params.messageTs,
   });
-  const match = rows.find((row) => row.slackChannelId === params.channelId && row.slackMessageTs === params.messageTs);
+  const match = rows.find(
+    (row) =>
+      row.slackChannelId === params.channelId &&
+      row.slackMessageTs === params.messageTs,
+  );
   if (!match) {
     return {
       status: 'skipped',
@@ -750,6 +1002,14 @@ export const syncBookedCallToPersonalBoardFromSlackMessage = async (
   }
 
   const { mapping, columnsById } = await loadBoardMapping(boardId, logger);
-  const result = await pushOne(match, { boardId, mapping, columnsById, includeSelfBooked: true }, logger);
-  return result === 'error' ? { status: 'error' } : result === 'synced' ? { status: 'synced' } : { status: 'skipped' };
+  const result = await pushOne(
+    match,
+    { boardId, mapping, columnsById, includeSelfBooked: true },
+    logger,
+  );
+  return result === 'error'
+    ? { status: 'error' }
+    : result === 'synced'
+      ? { status: 'synced' }
+      : { status: 'skipped' };
 };

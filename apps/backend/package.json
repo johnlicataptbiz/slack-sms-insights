@@ -17,6 +17,7 @@
     "backfill:hubspot": "node --import tsx ./scripts/hubspot-backfill.ts",
     "backfill:slack": "node --import tsx ./scripts/backfill-slack-events.ts",
     "backfill:booked-calls": "node --import tsx ./scripts/backfill-booked-calls.ts",
+    "backfill:monday:personal": "node --import tsx ./scripts/backfill-monday-personal-board.ts",
     "backfill:contact-profiles": "node --import tsx ./scripts/backfill-contact-profiles.ts",
     "backfill:contact-profiles-lrn": "node --import tsx ./scripts/backfill-contact-profiles-lrn.ts",
     "check:monday:lead-normalization": "node --import tsx ./scripts/check-monday-lead-normalization.ts",

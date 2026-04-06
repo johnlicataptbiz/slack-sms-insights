@@ -38,12 +38,25 @@ export type BookedCallAttributionSource = {
   slackMessageTs: string;
   text: string | null;
   raw: unknown; // Add raw field to access Slack message attachments
+  mappingMethod?: string | null;
+  matchConfidence?: number | null;
+  attributionStatus?: string | null;
+  attributionConfidenceBand?: string | null;
+  fallbackUsed?: boolean | null;
+  needsReview?: boolean | null;
+  reviewReason?: string | null;
+  attributionPath?: string | null;
+  resolvedSequenceLabel?: string | null;
 };
 
 export type BookedCallSmsReplyLink = {
   hasPriorReply: boolean;
   latestReplyAt: string | null;
-  reason: 'matched_reply_before_booking' | 'no_contact_phone' | 'no_reply_before_booking' | 'invalid_booking_timestamp';
+  reason:
+    | 'matched_reply_before_booking'
+    | 'no_contact_phone'
+    | 'no_reply_before_booking'
+    | 'invalid_booking_timestamp';
 };
 
 type NormalizedBookedCallLookup = {
@@ -69,17 +82,25 @@ const normalizeEmailKey = (value: string | null | undefined): string | null => {
   return normalized.length > 0 ? normalized : null;
 };
 
-export const normalizeContactNameKey = (value: string | null | undefined): string | null => {
+export const normalizeContactNameKey = (
+  value: string | null | undefined,
+): string | null => {
   if (!value) return null;
   const normalized = value.trim().toLowerCase().replace(/\s+/g, ' ');
   return normalized.length > 0 ? normalized : null;
 };
 
 export const bookedCallSourceKey = (
-  source: Pick<BookedCallAttributionSource, 'slackChannelId' | 'slackMessageTs'>,
+  source: Pick<
+    BookedCallAttributionSource,
+    'slackChannelId' | 'slackMessageTs'
+  >,
 ): string => `${source.slackChannelId}::${source.slackMessageTs}`;
 
-const findLatestAtOrBefore = (values: number[], upperBoundMs: number): number | null => {
+const findLatestAtOrBefore = (
+  values: number[],
+  upperBoundMs: number,
+): number | null => {
   if (values.length === 0) return null;
   let left = 0;
   let right = values.length - 1;
@@ -99,7 +120,10 @@ const findLatestAtOrBefore = (values: number[], upperBoundMs: number): number | 
 };
 
 const parseGraceSeconds = (): number => {
-  const raw = Number.parseInt(process.env.BOOKED_CALL_ATTRIBUTION_GRACE_SECONDS || '300', 10);
+  const raw = Number.parseInt(
+    process.env.BOOKED_CALL_ATTRIBUTION_GRACE_SECONDS || '300',
+    10,
+  );
   if (!Number.isFinite(raw) || raw < 0) return 300;
   return raw;
 };
@@ -121,7 +145,10 @@ const hasReaction = (
 
 const parseFallbackField = (fallback: string, label: string): string | null => {
   if (!fallback) return null;
-  const pattern = new RegExp(`\\*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\*:\\s*(.*)$`, 'im');
+  const pattern = new RegExp(
+    `\\*${label.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}\\*:\\s*(.*)$`,
+    'im',
+  );
   const match = fallback.match(pattern);
   const value = (match?.[1] || '')
     .trim()
@@ -139,7 +166,9 @@ const fallbackFromRaw = (raw: unknown): string => {
 };
 
 const parseContactNameFromFallback = (fallback: string): string | null => {
-  const explicit = parseFallbackField(fallback, 'Name') || parseFallbackField(fallback, 'Contact Name');
+  const explicit =
+    parseFallbackField(fallback, 'Name') ||
+    parseFallbackField(fallback, 'Contact Name');
   if (explicit) return explicit;
 
   const first = parseFallbackField(fallback, 'First Name');
@@ -168,7 +197,10 @@ const parseContactPhoneFromFallback = (fallback: string): string | null => {
 
 export const resolveBookedCallSmsReplyLink = (
   call: NormalizedBookedCallLookup,
-  lookups: { inboundByPhone: Map<string, number[]>; inboundByName: Map<string, number[]> },
+  lookups: {
+    inboundByPhone: Map<string, number[]>;
+    inboundByName: Map<string, number[]>;
+  },
 ): BookedCallSmsReplyLink => {
   if (!Number.isFinite(call.bookingTs)) {
     return {
@@ -185,7 +217,11 @@ export const resolveBookedCallSmsReplyLink = (
     latestReplyTs = findLatestAtOrBefore(phoneCandidates, call.bookingTs);
   }
 
-  if ((!latestReplyTs || latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS) && call.contactNameKey) {
+  if (
+    (!latestReplyTs ||
+      latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS) &&
+    call.contactNameKey
+  ) {
     const nameCandidates = lookups.inboundByName.get(call.contactNameKey) || [];
     const nameMatch = findLatestAtOrBefore(nameCandidates, call.bookingTs);
     if (nameMatch && nameMatch >= call.bookingTs - ATTRIBUTION_WINDOW_MS) {
@@ -193,7 +229,10 @@ export const resolveBookedCallSmsReplyLink = (
     }
   }
 
-  if (!latestReplyTs || latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS) {
+  if (
+    !latestReplyTs ||
+    latestReplyTs < call.bookingTs - ATTRIBUTION_WINDOW_MS
+  ) {
     if (!call.phoneKey && !call.contactNameKey) {
       return {
         hasPriorReply: false,
@@ -232,7 +271,13 @@ export const getBookedCallsSummary = async (
   const trendMap = new Map<string, BookedCallsTrendPoint>();
 
   const bump = (day: string, bucket: 'jack' | 'brandon' | 'selfBooked') => {
-    const point = trendMap.get(day) || { day, booked: 0, jack: 0, brandon: 0, selfBooked: 0 };
+    const point = trendMap.get(day) || {
+      day,
+      booked: 0,
+      jack: 0,
+      brandon: 0,
+      selfBooked: 0,
+    };
     point.booked += 1;
     point[bucket] += 1;
     trendMap.set(day, point);
@@ -245,7 +290,9 @@ export const getBookedCallsSummary = async (
     bump(day, c.bucket);
   }
 
-  const trendByDay = [...trendMap.values()].sort((a, b) => a.day.localeCompare(b.day));
+  const trendByDay = [...trendMap.values()].sort((a, b) =>
+    a.day.localeCompare(b.day),
+  );
   const totals = trendByDay.reduce(
     (acc, d) => {
       acc.booked += d.booked;
@@ -270,19 +317,46 @@ export const getBookedCallAttributionSources = async (params: {
   channelId?: string;
   slackMessageTs?: string;
 }): Promise<BookedCallAttributionSource[]> => {
+  const prisma = getPrismaClient();
   const calls = await listBookedCallsInRange({
     from: params.from,
     to: params.to,
     channelId: params.channelId,
     slackMessageTs: params.slackMessageTs,
   });
+  const attributionRows =
+    calls.length === 0
+      ? []
+      : await prisma.booked_call_attribution.findMany({
+          where: { booked_call_id: { in: calls.map((call) => call.id) } },
+          select: {
+            booked_call_id: true,
+            mapping_method: true,
+            match_confidence: true,
+            attribution_status: true,
+            attribution_confidence_band: true,
+            fallback_used: true,
+            needs_review: true,
+            review_reason: true,
+            attribution_path: true,
+            resolved_sequence_label: true,
+          },
+        });
+  const attributionByBookedCallId = new Map(
+    attributionRows.map((row) => [row.booked_call_id, row]),
+  );
   const jackId = process.env.ALOWARE_WATCHER_JACK_USER_ID;
   const brandonId = process.env.ALOWARE_WATCHER_BRANDON_USER_ID;
 
   const looksLikeBookedCall = (text: string | null): boolean => {
     const t = (text || '').toLowerCase();
     if (!t) return false;
-    return t.includes('call booked') || t.includes('booked') || t.includes('appointment') || t.includes('scheduled');
+    return (
+      t.includes('call booked') ||
+      t.includes('booked') ||
+      t.includes('appointment') ||
+      t.includes('scheduled')
+    );
   };
 
   const looksLikeManualOneOff = (text: string | null): boolean => {
@@ -301,16 +375,23 @@ export const getBookedCallAttributionSources = async (params: {
 
     const fallback = fallbackFromRaw(c.raw);
     const firstConversion = parseFallbackField(fallback, 'First Conversion');
-    const rep = parseFallbackField(fallback, 'Rep') || parseFallbackField(fallback, 'Contact owner');
+    const rep =
+      parseFallbackField(fallback, 'Rep') ||
+      parseFallbackField(fallback, 'Contact owner');
     const line = parseFallbackField(fallback, 'Line');
     const contactName = parseContactNameFromFallback(fallback);
     const contactPhone = parseContactPhoneFromFallback(fallback);
     // parseFallbackField strips <mailto:email|email> → plain email address
-    const contactEmail = parseFallbackField(fallback, 'Email')?.toLowerCase().trim() || null;
-    const hasStructuredBookingFields = Boolean(firstConversion || contactEmail || contactName);
+    const contactEmail =
+      parseFallbackField(fallback, 'Email')?.toLowerCase().trim() || null;
+    const hasStructuredBookingFields = Boolean(
+      firstConversion || contactEmail || contactName,
+    );
 
     const isValid = hasAttribution
-      ? looksLikeBookedCall(c.text) || looksLikeManualOneOff(c.text) || hasStructuredBookingFields
+      ? looksLikeBookedCall(c.text) ||
+        looksLikeManualOneOff(c.text) ||
+        hasStructuredBookingFields
       : looksLikeBookedCall(c.text) || hasStructuredBookingFields;
     if (!isValid) continue;
 
@@ -325,7 +406,12 @@ export const getBookedCallAttributionSources = async (params: {
       }
     }
 
-    const bucket: BookedCallAttributionBucket = isJack ? 'jack' : isBrandon ? 'brandon' : 'selfBooked';
+    const bucket: BookedCallAttributionBucket = isJack
+      ? 'jack'
+      : isBrandon
+        ? 'brandon'
+        : 'selfBooked';
+    const attribution = attributionByBookedCallId.get(c.id);
 
     normalized.push({
       bookedCallId: c.id,
@@ -341,6 +427,16 @@ export const getBookedCallAttributionSources = async (params: {
       slackMessageTs: c.slack_message_ts,
       text: c.text,
       raw: c.raw, // Add raw field to pass Slack message attachments
+      mappingMethod: attribution?.mapping_method ?? null,
+      matchConfidence: attribution?.match_confidence ?? null,
+      attributionStatus: attribution?.attribution_status ?? null,
+      attributionConfidenceBand:
+        attribution?.attribution_confidence_band ?? null,
+      fallbackUsed: attribution?.fallback_used ?? null,
+      needsReview: attribution?.needs_review ?? null,
+      reviewReason: attribution?.review_reason ?? null,
+      attributionPath: attribution?.attribution_path ?? null,
+      resolvedSequenceLabel: attribution?.resolved_sequence_label ?? null,
     });
   }
 
@@ -353,7 +449,11 @@ export type BookedCallSmsSequenceLookup = {
   conversationId: string | null;
 };
 
-type SequenceLookupEvidence = 'conversation_id' | 'profile_email' | 'phone' | 'profile_name';
+type SequenceLookupEvidence =
+  | 'conversation_id'
+  | 'profile_email'
+  | 'phone'
+  | 'profile_name';
 
 type SequenceLookupCandidate = {
   sequenceLabel: string;
@@ -370,14 +470,19 @@ type ResolvedSequenceLookupCandidate = {
 
 const SMS_SEQUENCE_LOOKBACK_DAYS = 30;
 
-const SEQUENCE_LOOKUP_EVIDENCE_PRIORITY: Record<SequenceLookupEvidence, number> = {
+const SEQUENCE_LOOKUP_EVIDENCE_PRIORITY: Record<
+  SequenceLookupEvidence,
+  number
+> = {
   conversation_id: 4,
   profile_email: 3,
   phone: 2,
   profile_name: 1,
 };
 
-const chooseBestSequenceEvidence = (evidence: Set<SequenceLookupEvidence>): SequenceLookupEvidence | null => {
+const chooseBestSequenceEvidence = (
+  evidence: Set<SequenceLookupEvidence>,
+): SequenceLookupEvidence | null => {
   let best: SequenceLookupEvidence | null = null;
   let bestPriority = -1;
   for (const item of evidence) {
@@ -392,7 +497,11 @@ const chooseBestSequenceEvidence = (evidence: Set<SequenceLookupEvidence>): Sequ
 
 const getOrCreateSequenceCandidate = (
   candidates: Map<string, SequenceLookupCandidate>,
-  candidate: { sequenceLabel: string; latestOutboundTs: number; conversationId: string | null },
+  candidate: {
+    sequenceLabel: string;
+    latestOutboundTs: number;
+    conversationId: string | null;
+  },
 ): SequenceLookupCandidate => {
   const key = `${candidate.sequenceLabel}::${candidate.conversationId || ''}::${candidate.latestOutboundTs}`;
   const existing = candidates.get(key);
@@ -426,7 +535,11 @@ export const resolveBestSequenceLookupCandidate = (
     if (!evidence) continue;
     if (!Number.isFinite(candidate.latestOutboundTs)) continue;
     if (candidate.latestOutboundTs > bookingTs) continue;
-    if (bookingTs - candidate.latestOutboundTs > SMS_SEQUENCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000) continue;
+    if (
+      bookingTs - candidate.latestOutboundTs >
+      SMS_SEQUENCE_LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+    )
+      continue;
 
     const ageMs = bookingTs - candidate.latestOutboundTs;
     const recencyScore = Math.max(0, 14 - ageMs / (24 * 60 * 60 * 1000));
@@ -437,7 +550,8 @@ export const resolveBestSequenceLookupCandidate = (
     if (
       !best ||
       score > best.score ||
-      (score === best.score && candidate.latestOutboundTs > best.latestOutboundTs) ||
+      (score === best.score &&
+        candidate.latestOutboundTs > best.latestOutboundTs) ||
       (score === best.score &&
         candidate.latestOutboundTs === best.latestOutboundTs &&
         candidate.sequenceLabel.localeCompare(best.sequenceLabel) < 0)
@@ -499,13 +613,24 @@ export const getBookedCallSequenceFromSmsEvents = async (
 
     const sourceKey = bookedCallSourceKey(call);
     const replyLink = replyLinks.get(sourceKey);
-    const replyTs = replyLink?.latestReplyAt ? new Date(replyLink.latestReplyAt).getTime() : Number.NaN;
-    const targetTs = replyLink?.hasPriorReply && Number.isFinite(replyTs) ? replyTs : bookingTs;
+    const replyTs = replyLink?.latestReplyAt
+      ? new Date(replyLink.latestReplyAt).getTime()
+      : Number.NaN;
+    const targetTs =
+      replyLink?.hasPriorReply && Number.isFinite(replyTs)
+        ? replyTs
+        : bookingTs;
 
     const phoneKey = normalizePhoneKey(call.contactPhone);
     const emailKey = normalizeEmailKey(call.contactEmail);
     const nameKey = normalizeContactNameKey(call.contactName);
-    const entry = { bookedCallId: call.bookedCallId, bookingTs: targetTs, phoneKey, emailKey, nameKey };
+    const entry = {
+      bookedCallId: call.bookedCallId,
+      bookingTs: targetTs,
+      phoneKey,
+      emailKey,
+      nameKey,
+    };
 
     // Email is primary — always add to email map when available (email → profile → phone is most accurate).
     if (emailKey) {
@@ -532,7 +657,12 @@ export const getBookedCallSequenceFromSmsEvents = async (
     }
   }
 
-  if (phoneKeyToEntries.size === 0 && emailKeyToEntries.size === 0 && nameKeyToEntries.size === 0) return results;
+  if (
+    phoneKeyToEntries.size === 0 &&
+    emailKeyToEntries.size === 0 &&
+    nameKeyToEntries.size === 0
+  )
+    return results;
 
   // Compute overall time range across all entries
   const allEntries = [
@@ -548,13 +678,22 @@ export const getBookedCallSequenceFromSmsEvents = async (
   const toIso = new Date(maxBookingTs).toISOString();
 
   try {
-    const sequenceCandidatesByBookedCallId = new Map<string, Map<string, SequenceLookupCandidate>>();
+    const sequenceCandidatesByBookedCallId = new Map<
+      string,
+      Map<string, SequenceLookupCandidate>
+    >();
     const addCandidate = (
       bookedCallId: string,
-      candidate: { sequenceLabel: string; latestOutboundTs: number; conversationId: string | null },
+      candidate: {
+        sequenceLabel: string;
+        latestOutboundTs: number;
+        conversationId: string | null;
+      },
       evidence: SequenceLookupEvidence,
     ) => {
-      const map = sequenceCandidatesByBookedCallId.get(bookedCallId) || new Map<string, SequenceLookupCandidate>();
+      const map =
+        sequenceCandidatesByBookedCallId.get(bookedCallId) ||
+        new Map<string, SequenceLookupCandidate>();
       const resolved = getOrCreateSequenceCandidate(map, candidate);
       resolved.evidence.add(evidence);
       sequenceCandidatesByBookedCallId.set(bookedCallId, map);
@@ -594,14 +733,26 @@ export const getBookedCallSequenceFromSmsEvents = async (
             nameKeys,
           );
 
-    const emailToProfiles = new Map<string, Array<{ phoneKey: string | null; conversationId: string | null }>>();
-    const phoneToProfiles = new Map<string, Array<{ conversationId: string | null }>>();
-    const nameToProfiles = new Map<string, Array<{ conversationId: string | null; phoneKey: string | null }>>();
+    const emailToProfiles = new Map<
+      string,
+      Array<{ phoneKey: string | null; conversationId: string | null }>
+    >();
+    const phoneToProfiles = new Map<
+      string,
+      Array<{ conversationId: string | null }>
+    >();
+    const nameToProfiles = new Map<
+      string,
+      Array<{ conversationId: string | null; phoneKey: string | null }>
+    >();
 
     for (const row of profileRows) {
       if (row.email_key) {
         const list = emailToProfiles.get(row.email_key) || [];
-        list.push({ phoneKey: row.phone_key || null, conversationId: row.conversation_id || null });
+        list.push({
+          phoneKey: row.phone_key || null,
+          conversationId: row.conversation_id || null,
+        });
         emailToProfiles.set(row.email_key, list);
       }
       if (row.phone_key) {
@@ -611,20 +762,33 @@ export const getBookedCallSequenceFromSmsEvents = async (
       }
       if (row.name_key) {
         const list = nameToProfiles.get(row.name_key) || [];
-        list.push({ conversationId: row.conversation_id || null, phoneKey: row.phone_key || null });
+        list.push({
+          conversationId: row.conversation_id || null,
+          phoneKey: row.phone_key || null,
+        });
         nameToProfiles.set(row.name_key, list);
       }
     }
 
     const conversationIds = [
-      ...new Set(profileRows.map((row) => row.conversation_id).filter((value): value is string => Boolean(value))),
+      ...new Set(
+        profileRows
+          .map((row) => row.conversation_id)
+          .filter((value): value is string => Boolean(value)),
+      ),
     ];
     const outboundByConversationId = new Map<
       string,
-      Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>
+      Array<{
+        sequenceLabel: string;
+        latestOutboundTs: number;
+        conversationId: string | null;
+      }>
     >();
     if (conversationIds.length > 0) {
-      const rows = await prisma.$queryRawUnsafe<{ conversation_id: string; sequence: string; event_ts: Date }[]>(
+      const rows = await prisma.$queryRawUnsafe<
+        { conversation_id: string; sequence: string; event_ts: Date }[]
+      >(
         `
         SELECT conversation_id, TRIM(sequence) AS sequence, event_ts
         FROM sms_events
@@ -641,20 +805,34 @@ export const getBookedCallSequenceFromSmsEvents = async (
       );
       for (const row of rows) {
         const ts = new Date(row.event_ts).getTime();
-        if (!row.conversation_id || !row.sequence || !Number.isFinite(ts)) continue;
+        if (!row.conversation_id || !row.sequence || !Number.isFinite(ts))
+          continue;
         const list = outboundByConversationId.get(row.conversation_id) || [];
-        list.push({ sequenceLabel: row.sequence, latestOutboundTs: ts, conversationId: row.conversation_id });
+        list.push({
+          sequenceLabel: row.sequence,
+          latestOutboundTs: ts,
+          conversationId: row.conversation_id,
+        });
         outboundByConversationId.set(row.conversation_id, list);
       }
     }
 
     const outboundByPhone = new Map<
       string,
-      Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>
+      Array<{
+        sequenceLabel: string;
+        latestOutboundTs: number;
+        conversationId: string | null;
+      }>
     >();
     if (phoneKeys.length > 0) {
       const rows = await prisma.$queryRawUnsafe<
-        { phone_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]
+        {
+          phone_key: string;
+          sequence: string;
+          event_ts: Date;
+          conversation_id: string | null;
+        }[]
       >(
         `
         SELECT
@@ -679,18 +857,31 @@ export const getBookedCallSequenceFromSmsEvents = async (
         const ts = new Date(row.event_ts).getTime();
         if (!row.phone_key || !row.sequence || !Number.isFinite(ts)) continue;
         const list = outboundByPhone.get(row.phone_key) || [];
-        list.push({ sequenceLabel: row.sequence, latestOutboundTs: ts, conversationId: row.conversation_id });
+        list.push({
+          sequenceLabel: row.sequence,
+          latestOutboundTs: ts,
+          conversationId: row.conversation_id,
+        });
         outboundByPhone.set(row.phone_key, list);
       }
     }
 
     const outboundByName = new Map<
       string,
-      Array<{ sequenceLabel: string; latestOutboundTs: number; conversationId: string | null }>
+      Array<{
+        sequenceLabel: string;
+        latestOutboundTs: number;
+        conversationId: string | null;
+      }>
     >();
     if (nameKeys.length > 0) {
       const rows = await prisma.$queryRawUnsafe<
-        { contact_name_key: string; sequence: string; event_ts: Date; conversation_id: string | null }[]
+        {
+          contact_name_key: string;
+          sequence: string;
+          event_ts: Date;
+          conversation_id: string | null;
+        }[]
       >(
         `
         SELECT
@@ -713,9 +904,14 @@ export const getBookedCallSequenceFromSmsEvents = async (
       );
       for (const row of rows) {
         const ts = new Date(row.event_ts).getTime();
-        if (!row.contact_name_key || !row.sequence || !Number.isFinite(ts)) continue;
+        if (!row.contact_name_key || !row.sequence || !Number.isFinite(ts))
+          continue;
         const list = outboundByName.get(row.contact_name_key) || [];
-        list.push({ sequenceLabel: row.sequence, latestOutboundTs: ts, conversationId: row.conversation_id });
+        list.push({
+          sequenceLabel: row.sequence,
+          latestOutboundTs: ts,
+          conversationId: row.conversation_id,
+        });
         outboundByName.set(row.contact_name_key, list);
       }
     }
@@ -724,12 +920,15 @@ export const getBookedCallSequenceFromSmsEvents = async (
       if (entry.emailKey) {
         for (const profile of emailToProfiles.get(entry.emailKey) || []) {
           if (profile.conversationId) {
-            for (const outbound of outboundByConversationId.get(profile.conversationId) || []) {
+            for (const outbound of outboundByConversationId.get(
+              profile.conversationId,
+            ) || []) {
               addCandidate(entry.bookedCallId, outbound, 'conversation_id');
             }
           }
           if (profile.phoneKey) {
-            for (const outbound of outboundByPhone.get(profile.phoneKey) || []) {
+            for (const outbound of outboundByPhone.get(profile.phoneKey) ||
+              []) {
               addCandidate(entry.bookedCallId, outbound, 'profile_email');
             }
           }
@@ -742,7 +941,9 @@ export const getBookedCallSequenceFromSmsEvents = async (
         }
         for (const profile of phoneToProfiles.get(entry.phoneKey) || []) {
           if (!profile.conversationId) continue;
-          for (const outbound of outboundByConversationId.get(profile.conversationId) || []) {
+          for (const outbound of outboundByConversationId.get(
+            profile.conversationId,
+          ) || []) {
             addCandidate(entry.bookedCallId, outbound, 'conversation_id');
           }
         }
@@ -754,12 +955,15 @@ export const getBookedCallSequenceFromSmsEvents = async (
         }
         for (const profile of nameToProfiles.get(entry.nameKey) || []) {
           if (profile.conversationId) {
-            for (const outbound of outboundByConversationId.get(profile.conversationId) || []) {
+            for (const outbound of outboundByConversationId.get(
+              profile.conversationId,
+            ) || []) {
               addCandidate(entry.bookedCallId, outbound, 'conversation_id');
             }
           }
           if (profile.phoneKey) {
-            for (const outbound of outboundByPhone.get(profile.phoneKey) || []) {
+            for (const outbound of outboundByPhone.get(profile.phoneKey) ||
+              []) {
               addCandidate(entry.bookedCallId, outbound, 'profile_name');
             }
           }
@@ -768,9 +972,13 @@ export const getBookedCallSequenceFromSmsEvents = async (
     }
 
     for (const [bookedCallId, candidates] of sequenceCandidatesByBookedCallId) {
-      const callEntry = allEntries.find((entry) => entry.bookedCallId === bookedCallId);
+      const callEntry = allEntries.find(
+        (entry) => entry.bookedCallId === bookedCallId,
+      );
       if (!callEntry) continue;
-      const best = resolveBestSequenceLookupCandidate(callEntry.bookingTs, [...candidates.values()]);
+      const best = resolveBestSequenceLookupCandidate(callEntry.bookingTs, [
+        ...candidates.values(),
+      ]);
       if (!best) continue;
       results.set(bookedCallId, {
         sequenceLabel: best.sequenceLabel,
@@ -779,7 +987,10 @@ export const getBookedCallSequenceFromSmsEvents = async (
       });
     }
   } catch (error) {
-    logger?.error?.('Failed to compute booked-call sequence from SMS events', error);
+    logger?.error?.(
+      'Failed to compute booked-call sequence from SMS events',
+      error,
+    );
     throw error;
   }
 
@@ -808,7 +1019,9 @@ export const getBookedCallSmsReplyLinks = async (
     };
   });
 
-  const validTimestamps = normalizedCalls.map((row) => row.bookingTs).filter((value) => Number.isFinite(value));
+  const validTimestamps = normalizedCalls
+    .map((row) => row.bookingTs)
+    .filter((value) => Number.isFinite(value));
   if (validTimestamps.length === 0) {
     for (const row of normalizedCalls) {
       results.set(row.key, {
@@ -826,17 +1039,27 @@ export const getBookedCallSmsReplyLinks = async (
   const toIso = new Date(maxBookingTs).toISOString();
 
   const phoneKeys = [
-    ...new Set(normalizedCalls.map((row) => row.phoneKey).filter((value): value is string => Boolean(value))),
+    ...new Set(
+      normalizedCalls
+        .map((row) => row.phoneKey)
+        .filter((value): value is string => Boolean(value)),
+    ),
   ];
   const contactNameKeys = [
-    ...new Set(normalizedCalls.map((row) => row.contactNameKey).filter((value): value is string => Boolean(value))),
+    ...new Set(
+      normalizedCalls
+        .map((row) => row.contactNameKey)
+        .filter((value): value is string => Boolean(value)),
+    ),
   ];
   const inboundByPhone = new Map<string, number[]>();
   const inboundByName = new Map<string, number[]>();
 
   try {
     if (phoneKeys.length > 0) {
-      const rows = await prisma.$queryRawUnsafe<{ phone_key: string; event_ts: Date }[]>(
+      const rows = await prisma.$queryRawUnsafe<
+        { phone_key: string; event_ts: Date }[]
+      >(
         `
         SELECT
           RIGHT(regexp_replace(contact_phone, '\\D', '', 'g'), 10) AS phone_key,
@@ -865,7 +1088,9 @@ export const getBookedCallSmsReplyLinks = async (
     }
 
     if (contactNameKeys.length > 0) {
-      const rows = await prisma.$queryRawUnsafe<{ contact_name_key: string; event_ts: Date }[]>(
+      const rows = await prisma.$queryRawUnsafe<
+        { contact_name_key: string; event_ts: Date }[]
+      >(
         `
         SELECT
           LOWER(regexp_replace(TRIM(contact_name), '\\s+', ' ', 'g')) AS contact_name_key,
@@ -898,7 +1123,10 @@ export const getBookedCallSmsReplyLinks = async (
   }
 
   for (const call of normalizedCalls) {
-    results.set(call.key, resolveBookedCallSmsReplyLink(call, { inboundByPhone, inboundByName }));
+    results.set(
+      call.key,
+      resolveBookedCallSmsReplyLink(call, { inboundByPhone, inboundByName }),
+    );
   }
 
   return results;

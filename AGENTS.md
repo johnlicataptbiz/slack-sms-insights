@@ -2,6 +2,10 @@
 
 This file provides guidance to agents when working with code in this repository.
 
+## Governance
+- Agent execution policy is defined in `AGENT_GOVERNANCE.md`.
+- Agents must follow the "When doing X, must use Y" requirements in that file for skills, MCP usage, and validation.
+
 ## Stack & Structure
 - Monorepo with npm workspaces: `apps/backend` (ptbizsms-api) + `apps/frontend` (ptbizsms-dashboard-unified)
 - Backend: Express + Prisma 7 + PostgreSQL, runs via `tsx` (not compiled during dev)

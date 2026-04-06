@@ -1,7 +1,15 @@
 import 'dotenv/config';
-import { closeDatabase, initDatabase, initializeSchema } from '../services/db.js';
+import {
+  closeDatabase,
+  initDatabase,
+  initializeSchema,
+} from '../services/db.js';
 import { syncRecentSetterBookedCallsToMonday } from '../services/monday-personal-writeback.js';
-import { listMondaySyncBoardIds, mondayConfig, syncMondayBoard } from '../services/monday-sync.js';
+import {
+  listMondaySyncBoardIds,
+  mondayConfig,
+  syncMondayBoard,
+} from '../services/monday-sync.js';
 import { syncWeeklySummaryToMonday } from '../services/weekly-manager-summary.js';
 
 type CliOptions = {
@@ -10,6 +18,8 @@ type CliOptions = {
   writeback: boolean;
   personal: boolean;
   force: boolean;
+  personalForce: boolean;
+  personalLookbackDays?: number;
   weekStart?: string;
   timeZone?: string;
 };
@@ -21,6 +31,7 @@ const parseArgs = (argv: string[]): CliOptions => {
     writeback: false,
     personal: false,
     force: false,
+    personalForce: false,
   };
 
   for (const arg of argv) {
@@ -40,8 +51,21 @@ const parseArgs = (argv: string[]): CliOptions => {
       options.allBoards = true;
       continue;
     }
+    if (arg === '--personal-force') {
+      options.personalForce = true;
+      continue;
+    }
     if (arg.startsWith('--board=')) {
       options.boardId = arg.slice('--board='.length).trim() || options.boardId;
+      continue;
+    }
+    if (arg.startsWith('--personal-lookback-days=')) {
+      const parsed = Number.parseInt(
+        arg.slice('--personal-lookback-days='.length).trim(),
+        10,
+      );
+      options.personalLookbackDays =
+        Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
       continue;
     }
     if (arg.startsWith('--week-start=')) {
@@ -116,7 +140,9 @@ const main = async (): Promise<void> => {
 
   if (options.allBoards) {
     const boardIds = listMondaySyncBoardIds();
-    console.log(`Starting monday sync for ${boardIds.length} board(s): ${boardIds.join(', ')}`);
+    console.log(
+      `Starting monday sync for ${boardIds.length} board(s): ${boardIds.join(', ')}`,
+    );
     for (const boardId of boardIds) {
       const result = await syncBoardFully(boardId, options.force);
       console.log(`Sync result (${boardId}):`, JSON.stringify(result, null, 2));
@@ -141,8 +167,17 @@ const main = async (): Promise<void> => {
 
   if (options.personal) {
     console.log('Running personal booked-call writeback...');
-    const personalResult = await syncRecentSetterBookedCallsToMonday(console);
-    console.log('Personal writeback result:', JSON.stringify(personalResult, null, 2));
+    const personalResult = await syncRecentSetterBookedCallsToMonday(
+      {
+        forceResync: options.personalForce,
+        lookbackDays: options.personalLookbackDays,
+      },
+      console,
+    );
+    console.log(
+      'Personal writeback result:',
+      JSON.stringify(personalResult, null, 2),
+    );
   }
 };
 

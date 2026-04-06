@@ -2,10 +2,12 @@
 /**
  * Push SMS sequence performance to Monday.com board.
  * Fixed: getPrisma() → getPrismaClient(), sequenceRegistry camelCase, proper typing.
+ *
+ * Phase 1 optimization: Structured summaries instead of raw text dumps.
  */
 
 import { findColumnIdByTitle, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
-import { queryBoardColumns, upsertBookedCallItem } from '../services/monday-client.js';
+import { queryBoardColumns, upsertBookedCallItem, truncateLongText } from '../services/monday-client.js';
 import { getPrismaClient } from '../services/prisma.js';
 import type { Prisma } from '@prisma/client';
 
@@ -39,18 +41,45 @@ const trendLabel = (replyRatePct: number, bookingRatePct: number): 'Up' | 'Flat'
   return 'Down';
 };
 
+/**
+ * Build structured optimization notes with actionable formatting.
+ * Phase 1 change: Replaces raw metadata dumps with bullet-point format.
+ */
 const buildNotes = (sequence: SequenceMetrics): string => {
-  const notes = [
-    `Owner: ${formatOwner(sequence.owner_rep)}`,
-    sequence.lead_magnet ? `Lead magnet: ${sequence.lead_magnet}` : null,
-    sequence.version_tag ? `Version: ${sequence.version_tag}` : null,
-    `Last updated: ${sequence.updated_at.toISOString().slice(0, 10)}`,
-  ].filter(Boolean) as string[];
-  return notes.join('\n');
+  const bulletPoints = [
+    `• Owner: ${formatOwner(sequence.owner_rep)}`,
+    sequence.lead_magnet ? `• Lead magnet: ${sequence.lead_magnet}` : null,
+    sequence.version_tag ? `• Version: ${sequence.version_tag}` : null,
+    `• Updated: ${sequence.updated_at.toISOString().slice(0, 10)}`,
+    `• Messages: ${sequence.messages_sent.toLocaleString()}`,
+    `• Replies: ${sequence.replies_received.toLocaleString()} (${sequence.reply_rate_pct.toFixed(1)}%)`,
+    `• Booked: ${sequence.booked_calls} (${sequence.booking_rate_pct.toFixed(1)}%)`,
+    `• Trend: ${sequence.trend}`,
+  ].filter(Boolean);
+
+  // Add actionable recommendation based on metrics
+  if (sequence.reply_rate_pct < 8 && sequence.messages_sent > 50) {
+    bulletPoints.push('⚠️ Low reply rate — review opener copy');
+  } else if (sequence.booking_rate_pct < 1 && sequence.replies_received > 10) {
+    bulletPoints.push('⚠️ Low booking rate — improve CTA or follow-up');
+  } else if (sequence.trend === 'Down') {
+    bulletPoints.push('⚠️ Declining performance — consider A/B testing');
+  } else if (sequence.trend === 'Up' && sequence.booking_rate_pct >= 5) {
+    bulletPoints.push('✓ Strong performer — consider scaling volume');
+  }
+
+  return truncateLongText(bulletPoints.join('\n'), 500);
 };
 
-const buildItemName = (sequence: SequenceMetrics): string =>
-  sequence.label || sequence.normalized_label || `Sequence ${sequence.sequence_id}`;
+/**
+ * Build item name: clean sequence name without metadata clutter.
+ */
+const buildItemName = (sequence: SequenceMetrics): string => {
+  const label = sequence.label || sequence.normalized_label || `Sequence ${sequence.sequence_id}`;
+  // Add brief status indicator to item name for quick scanning
+  const statusIcon = sequence.status === 'active' ? '' : ' [paused]';
+  return `${label}${statusIcon}`;
+};
 
 const buildColumnValues = (
   sequence: SequenceMetrics,
@@ -70,10 +99,19 @@ const buildColumnValues = (
   if (columnsById.lastUpdated)
     values[columnsById.lastUpdated] = { date: sequence.updated_at.toISOString().slice(0, 10) };
   if (columnsById.notes) values[columnsById.notes] = buildNotes(sequence);
+  // Computed metrics
+  if (columnsById.wowChange) values[columnsById.wowChange] = 0; // TODO: Calculate week-over-week
+  if (columnsById.engagement) {
+    const score = Math.round(
+      Math.min(sequence.reply_rate_pct / 20, 1) * 50 +
+      Math.min(sequence.booking_rate_pct / 5, 1) * 50
+    );
+    values[columnsById.engagement] = score;
+  }
   return values;
 };
 
-async function getColumnIds(prisma: PrismaClient): Promise<Record<string, string | null>> {
+async function getColumnIds(): Promise<Record<string, string | null>> {
   const columns = await queryBoardColumns(BOARD_ID);
   return {
     sequenceName: findColumnIdByTitle(columns, ['Sequence Name', 'Name']),
@@ -88,6 +126,8 @@ async function getColumnIds(prisma: PrismaClient): Promise<Record<string, string
     trend: findColumnIdByTitle(columns, ['Trend']),
     lastUpdated: findColumnIdByTitle(columns, ['Last Updated', 'Updated']),
     notes: findColumnIdByTitle(columns, ['Optimization Notes', 'Notes']),
+    wowChange: findColumnIdByTitle(columns, ['Week over Week Change %', 'WoW Change %']),
+    engagement: findColumnIdByTitle(columns, ['Engagement Score', 'Engagement']),
   };
 }
 
@@ -101,8 +141,8 @@ async function main(): Promise<void> {
 
   try {
     console.log('📋 Fetching board columns...');
-    const columnIds = await getColumnIds(prisma);
-    console.log('✅ Column mapping:', columnIds);
+    const columnIds = await getColumnIds();
+    console.log('✅ Column mapping complete');
     console.log('');
 
     const cutoff = new Date();

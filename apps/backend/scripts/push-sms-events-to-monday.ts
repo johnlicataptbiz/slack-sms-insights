@@ -2,10 +2,18 @@
 /**
  * Push SMS conversation summaries to Monday.com - TypeScript clean.
  * Fixed: getPrisma → getPrismaClient, sms_events → smsEvents, proper typing.
+ *
+ * Phase 1 optimization: Structured summaries instead of raw text dumps.
  */
 
 import { findColumnIdByTitle, mondaySmsBoardSchemas } from '../services/monday-board-schemas.js';
-import { queryBoardColumns, upsertBookedCallItem } from '../services/monday-client.js';
+import {
+  queryBoardColumns,
+  upsertBookedCallItem,
+  extractFirstSentence,
+  truncateText,
+  truncateLongText,
+} from '../services/monday-client.js';
 import { getPrismaClient } from '../services/prisma.js';
 import type { Prisma } from '@prisma/client';
 
@@ -57,25 +65,37 @@ const nextStepLabel = (direction: string): 'Reply' | 'Monitor' | 'Book' | 'Archi
   return 'Reply';
 };
 
+/**
+ * Build a structured, readable summary for a single SMS event.
+ *
+ * Phase 1 change: Replaces raw text dumps with structured bullet format.
+ * Uses intelligent truncation to keep summaries readable.
+ */
 const buildSummary = (event: SummaryRow): string => {
-  const snippet = event.body.trim().slice(0, 220);
-  return [
-    `Latest touch: ${signalLabel(event.direction)} message`,
-    `Phone: ${event.contact_phone || 'n/a'}`,
-    `Line: ${event.line || 'n/a'}`,
-    event.sequence ? `Sequence: ${event.sequence}` : null,
-    event.aloware_user ? `Setter: ${event.aloware_user}` : null,
-    '',
-    snippet,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const snippets = [
+    `• Latest: ${signalLabel(event.direction)} message`,
+    `• Phone: ${event.contact_phone || 'n/a'}`,
+    `• Channel: ${mapLineToChannel(event.line)}`,
+    event.sequence ? `• Sequence: ${event.sequence}` : null,
+    event.aloware_user ? `• Owner: ${event.aloware_user}` : null,
+  ].filter(Boolean);
+
+  // Extract first meaningful sentence from body instead of raw truncation
+  const bodyText = event.body.trim();
+  if (bodyText) {
+    snippets.push('');
+    snippets.push(extractFirstSentence(bodyText, 200));
+  }
+
+  return truncateLongText(snippets.join('\n'), 500);
 };
 
+/**
+ * Build item name: clean contact-first format without noisy metadata.
+ * Format: "Contact Name" (just the name, rest is in columns)
+ */
 const buildItemName = (event: SummaryRow): string => {
-  const name = normalizeContactName(event.contact_name || event.contact_phone);
-  const date = event.event_ts.toISOString().slice(0, 10);
-  return `${name} • ${signalLabel(event.direction)} • ${date}`;
+  return normalizeContactName(event.contact_name || event.contact_phone);
 };
 
 const buildColumnValueMap = (
@@ -102,23 +122,29 @@ const buildColumnValueMap = (
   if (columnsById.summary) values[columnsById.summary] = buildSummary(event);
   if (columnsById.conversationId) values[columnsById.conversationId] = event.conversation_id || event.id;
   if (columnsById.sequence && event.sequence) values[columnsById.sequence] = event.sequence;
+  // Structured snippet: first sentence only, not raw body dump
+  if (columnsById.latestMessage) {
+    const snippet = extractFirstSentence(event.body.trim(), 180);
+    values[columnsById.latestMessage] = snippet || '—';
+  }
   return values;
 };
 
 async function getColumnIds(): Promise<Record<string, string | null>> {
   const columns = await queryBoardColumns(BOARD_ID);
   return {
-    signalType: findColumnIdByTitle(columns, ['Signal Type', 'Event Type', 'Type']),
-    nextStep: findColumnIdByTitle(columns, ['Next Step', 'Priority', 'Action Status']),
+    signalType: findColumnIdByTitle(columns, ['Signal Type', 'Event Type', 'Direction', 'Type']),
+    nextStep: findColumnIdByTitle(columns, ['Next Step', 'Priority', 'Action', 'Action Status']),
     contactName: findColumnIdByTitle(columns, ['Contact Name', 'Lead Name', 'Name']),
     phone: findColumnIdByTitle(columns, ['Phone Number', 'Phone', 'Mobile']),
-    eventDate: findColumnIdByTitle(columns, ['Event Date', 'Call Date', 'Timestamp']),
+    eventDate: findColumnIdByTitle(columns, ['Event Date', 'Call Date', 'Timestamp', 'Last Updated', 'Last Reply']),
     channel: findColumnIdByTitle(columns, ['Channel']),
-    setter: findColumnIdByTitle(columns, ['Setter', 'Rep', 'Owner']),
-    slackLink: findColumnIdByTitle(columns, ['Slack Link', 'Slack Thread', 'Link']),
-    summary: findColumnIdByTitle(columns, ['Summary', 'Notes', 'Message Summary']),  
+    setter: findColumnIdByTitle(columns, ['Setter', 'Rep', 'Owner', 'Assigned To']),
+    slackLink: findColumnIdByTitle(columns, ['Slack Link', 'Slack Thread', 'Link', 'Slack Thread']),
+    summary: findColumnIdByTitle(columns, ['Summary', 'Notes', 'Message Summary', 'Conversation Summary']),
     conversationId: findColumnIdByTitle(columns, ['Conversation ID', 'Conversation']),
-    sequence: findColumnIdByTitle(columns, ['Sequence']),
+    sequence: findColumnIdByTitle(columns, ['Sequence', 'Sequence Context']),
+    latestMessage: findColumnIdByTitle(columns, ['Latest Message', 'Last Message', 'Message Preview']),
   };
 }
 

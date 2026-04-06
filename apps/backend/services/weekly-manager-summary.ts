@@ -1,7 +1,7 @@
 import type { Logger } from '@slack/bolt';
 import { getBookedCallAttributionSources, getBookedCallsSummary } from './booked-calls.js';
 import { findColumnIdByTitle } from './monday-board-schemas.js';
-import { queryBoardColumns, upsertWeeklySummaryItem } from './monday-client.js';
+import { queryBoardColumns, upsertWeeklySummaryItem, truncateLongText } from './monday-client.js';
 import {
   getLatestMondaySyncStatus,
   getMondayWeeklyReport,
@@ -384,7 +384,43 @@ export const getWeeklyManagerSummary = async (
   };
 };
 
-const buildWeeklySummaryMarkdown = (summary: WeeklyManagerSummary): string => {
+/**
+ * Build structured weekly summary with bullet-point formatting.
+ *
+ * Phase 1 change: Replaces raw markdown dump with structured, scannable bullets.
+ * Optimized for Monday.com reading experience (500 char limit per update).
+ */
+const buildWeeklySummaryMarkdown = (summary: WeeklyManagerSummary, concise: boolean = true): string => {
+  if (concise) {
+    // Concise version for Monday updates - bullet format, under 500 chars
+    const bullets = [
+      `📊 Week of ${summary.window.weekStart}: ${summary.teamTotals.messagesSent} sent, ${summary.teamTotals.repliesReceived} replies (${summary.teamTotals.replyRatePct.toFixed(1)}%), ${summary.teamTotals.canonicalBookedCalls} booked, ${summary.teamTotals.optOuts} opt-outs`,
+      `• Jack: ${summary.setters.jack.canonicalBookedCalls} booked | ${summary.setters.jack.outboundConversations} outbound`,
+      `• Brandon: ${summary.setters.brandon.canonicalBookedCalls} booked | ${summary.setters.brandon.outboundConversations} outbound`,
+      `• Pipeline: ${summary.mondayPipeline.totalCalls} calls (${summary.mondayPipeline.booked} booked, ${summary.mondayPipeline.noShow} no-show)`,
+    ];
+
+    // Top wins (1-liner)
+    if (summary.topWins.length > 0) {
+      const top = summary.topWins[0];
+      bullets.push(`🏆 Top: ${top.sequence} — ${top.canonicalBookedCalls} booked, ${top.replyRatePct.toFixed(1)}% reply`);
+    }
+
+    // Risk flags (compact)
+    if (summary.atRiskFlags.length > 0) {
+      const risks = summary.atRiskFlags.slice(0, 2).map(f => `⚠️ ${f.title}`);
+      bullets.push(...risks);
+    }
+
+    // Actions (first one only)
+    if (summary.actionsNextWeek.length > 0) {
+      bullets.push(`→ ${summary.actionsNextWeek[0]}`);
+    }
+
+    return truncateLongText(bullets.join('\n'), 500);
+  }
+
+  // Full version for API / frontend consumption
   const lines = [
     `# PTBizSMS Weekly Manager Summary (${summary.window.weekStart} to ${summary.window.weekEnd})`,
     '',
@@ -439,7 +475,7 @@ export const syncWeeklySummaryToMonday = async (
     return { status: 'skipped', weekStart: summary.window.weekStart, itemId: null };
   }
   const existing = await getMondayWeeklyReport(summary.window.weekStart, logger);
-  const markdown = buildWeeklySummaryMarkdown(summary);
+  const markdown = buildWeeklySummaryMarkdown(summary, true); // concise for Monday
   const title = `PTBizSMS Weekly Summary - ${summary.window.weekStart}`;
   const existingItemId = existing?.source_board_id === targetBoardId ? existing?.monday_item_id || null : null;
   const previousBookedCalls =

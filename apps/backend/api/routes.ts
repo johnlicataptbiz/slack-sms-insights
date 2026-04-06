@@ -260,6 +260,13 @@ export const handleApiRoute = async (
 
   // Handle V2 routes
   if (pathname.startsWith('/api/v2/')) {
+    // All V2 endpoints require an authenticated session
+    const { session } = getSessionFromCookies(req);
+    if (!session) {
+      sendJson(res, 401, { ok: false, error: 'Not authenticated' });
+      return true;
+    }
+
     const query = parseQuery(req.url);
     const routePath = pathname.replace('/api/v2', '');
 

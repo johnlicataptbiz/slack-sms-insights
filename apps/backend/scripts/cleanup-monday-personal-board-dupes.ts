@@ -73,7 +73,6 @@ async function getAllBoardItems(boardId: string) {
             updated_at
             column_values {
               id
-              title
               text
             }
           }
@@ -92,7 +91,6 @@ async function getAllBoardItems(boardId: string) {
           updated_at: string;
           column_values?: Array<{
             id: string;
-            title: string;
             text: string | null;
           }>;
         }>;

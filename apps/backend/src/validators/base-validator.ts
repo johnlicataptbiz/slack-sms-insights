@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 /**
  * Base validator utility for creating consistent validation schemas
@@ -18,10 +18,10 @@ export class BaseValidator {
    */
   static pagination() {
     return z.object({
-      page: z.number().int().positive().optional().default(1),
-      limit: z.number().int().positive().optional().default(10),
+      page: z.coerce.number().int().positive().optional().default(1),
+      limit: z.coerce.number().int().positive().max(100).optional().default(10),
       sortBy: z.string().optional(),
-      sortOrder: z.enum(['asc', 'desc']).optional().default('desc')
+      sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
     });
   }
 
@@ -30,13 +30,15 @@ export class BaseValidator {
    * @param options Validation options
    * @returns Zod string schema
    */
-  static string(options: {
-    min?: number;
-    max?: number;
-    trim?: boolean;
-    toLowerCase?: boolean;
-    toUpperCase?: boolean;
-  } = {}) {
+  static string(
+    options: {
+      min?: number;
+      max?: number;
+      trim?: boolean;
+      toLowerCase?: boolean;
+      toUpperCase?: boolean;
+    } = {},
+  ) {
     let schema = z.string();
 
     if (options.min !== undefined) {
@@ -48,9 +50,9 @@ export class BaseValidator {
     }
 
     // Add transformations
-    schema = schema.transform(val => {
+    schema = schema.transform((val) => {
       let result = val;
-      
+
       if (options.trim) {
         result = result.trim();
       }
@@ -74,9 +76,10 @@ export class BaseValidator {
    * @returns Zod email schema
    */
   static email() {
-    return z.string()
-      .email('Invalid email format')
-      .transform(val => val.toLowerCase().trim());
+    return z
+      .string()
+      .email("Invalid email format")
+      .transform((val) => val.toLowerCase().trim());
   }
 
   /**
@@ -84,11 +87,15 @@ export class BaseValidator {
    * @returns Zod password schema
    */
   static password() {
-    return z.string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
-      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
-      .regex(/[0-9]/, 'Password must contain at least one number')
-      .regex(/[!@#$%^&*()]/, 'Password must contain at least one special character');
+    return z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+      .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+      .regex(/[0-9]/, "Password must contain at least one number")
+      .regex(
+        /[!@#$%^&*()]/,
+        "Password must contain at least one special character",
+      );
   }
 }

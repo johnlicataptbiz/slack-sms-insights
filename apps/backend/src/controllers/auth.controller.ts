@@ -1,11 +1,15 @@
-import { BaseController } from './base.controller';
-import { AuthValidator } from '../validators/auth-validator';
-import { redisCache } from '../utils/redis-cache';
-import { PerformanceTracker } from '../utils/performance-tracker';
-import { z } from 'zod';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import type { Prisma } from '@prisma/client';
+import { BaseController } from "./base.controller";
+import { AuthValidator } from "../validators/auth-validator";
+import { redisCache } from "../utils/redis-cache";
+import { PerformanceTracker } from "../utils/performance-tracker";
+import { z } from "zod";
+import bcrypt from "bcrypt";
+import crypto from "node:crypto";
+import jwt from "jsonwebtoken";
+import type { Prisma } from "@prisma/client";
+
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) throw new Error("JWT_SECRET environment variable is required");
 
 /**
  * Controller for managing authentication and user-related operations
@@ -15,7 +19,7 @@ export class AuthController extends BaseController {
    * User login
    */
   async login(context: RequestContext) {
-    const tracker = PerformanceTracker.start('userLogin');
+    const tracker = PerformanceTracker.start("userLogin");
 
     try {
       // Validate input
@@ -23,28 +27,31 @@ export class AuthController extends BaseController {
 
       // Find user by email
       const user = await this.prisma.user.findUnique({
-        where: { email: validatedData.email }
+        where: { email: validatedData.email },
       });
 
       // Check if user exists and password is correct
-      if (!user || !await bcrypt.compare(validatedData.password, user.passwordHash)) {
+      if (
+        !user ||
+        !(await bcrypt.compare(validatedData.password, user.passwordHash))
+      ) {
         return {
           success: false,
-          error: 'Invalid credentials',
-          statusCode: 401
+          error: "Invalid credentials",
+          statusCode: 401,
         };
       }
 
       // Generate JWT token
       const token = jwt.sign(
-        { 
-          userId: user.id, 
-          role: user.role 
-        }, 
-        process.env.JWT_SECRET || 'fallback_secret', 
-        { 
-          expiresIn: validatedData.rememberMe ? '30d' : '1d' 
-        }
+        {
+          userId: user.id,
+          role: user.role,
+        },
+        jwtSecret,
+        {
+          expiresIn: validatedData.rememberMe ? "30d" : "1d",
+        },
       );
 
       // Create session record
@@ -52,13 +59,22 @@ export class AuthController extends BaseController {
         data: {
           userId: user.id,
           token,
-          expiresAt: new Date(Date.now() + (validatedData.rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000)),
-          deviceInfo: context.req.headers['user-agent'] || 'Unknown'
-        }
+          expiresAt: new Date(
+            Date.now() +
+              (validatedData.rememberMe
+                ? 30 * 24 * 60 * 60 * 1000
+                : 24 * 60 * 60 * 1000),
+          ),
+          deviceInfo: context.req.headers["user-agent"] || "Unknown",
+        },
       });
 
-      // Cache session for quick validation
-      await redisCache.set(`session:${session.id}`, session, validatedData.rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60);
+      // Cache session for quick validation (keyed by userId to match middleware lookup)
+      await redisCache.set(
+        `session:${user.id}`,
+        session,
+        validatedData.rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60,
+      );
 
       tracker.stop();
 
@@ -69,20 +85,20 @@ export class AuthController extends BaseController {
           user: {
             id: user.id,
             email: user.email,
-            role: user.role
-          }
+            role: user.role,
+          },
         },
-        message: 'Login successful'
+        message: "Login successful",
       };
     } catch (error) {
-      this.logger.error('Login failed', { error });
-      
+      this.logger.error("Login failed", { error });
+
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: 'Validation failed',
+          error: "Validation failed",
           details: error.errors,
-          statusCode: 400
+          statusCode: 400,
         };
       }
 
@@ -94,7 +110,7 @@ export class AuthController extends BaseController {
    * User registration
    */
   async register(context: RequestContext) {
-    const tracker = PerformanceTracker.start('userRegistration');
+    const tracker = PerformanceTracker.start("userRegistration");
 
     try {
       // Validate input
@@ -102,14 +118,14 @@ export class AuthController extends BaseController {
 
       // Check if user already exists
       const existingUser = await this.prisma.user.findUnique({
-        where: { email: validatedData.email }
+        where: { email: validatedData.email },
       });
 
       if (existingUser) {
         return {
           success: false,
-          error: 'User already exists',
-          statusCode: 409
+          error: "User already exists",
+          statusCode: 409,
         };
       }
 
@@ -123,12 +139,12 @@ export class AuthController extends BaseController {
           passwordHash,
           firstName: validatedData.firstName,
           lastName: validatedData.lastName,
-          role: validatedData.role
-        }
+          role: validatedData.role,
+        },
       });
 
       // Invalidate user list cache
-      await redisCache.delete('users:list');
+      await redisCache.delete("users:list");
 
       tracker.stop();
 
@@ -137,19 +153,19 @@ export class AuthController extends BaseController {
         data: {
           id: user.id,
           email: user.email,
-          role: user.role
+          role: user.role,
         },
-        message: 'Registration successful'
+        message: "Registration successful",
       };
     } catch (error) {
-      this.logger.error('Registration failed', { error });
-      
+      this.logger.error("Registration failed", { error });
+
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: 'Validation failed',
+          error: "Validation failed",
           details: error.errors,
-          statusCode: 400
+          statusCode: 400,
         };
       }
 
@@ -161,22 +177,24 @@ export class AuthController extends BaseController {
    * Initiate password reset
    */
   async requestPasswordReset(context: RequestContext) {
-    const tracker = PerformanceTracker.start('passwordResetRequest');
+    const tracker = PerformanceTracker.start("passwordResetRequest");
 
     try {
       // Validate input
-      const validatedData = AuthValidator.passwordResetRequest.parse(context.body);
+      const validatedData = AuthValidator.passwordResetRequest.parse(
+        context.body,
+      );
 
       // Find user by email
       const user = await this.prisma.user.findUnique({
-        where: { email: validatedData.email }
+        where: { email: validatedData.email },
       });
 
       if (!user) {
         // Prevent email enumeration
         return {
           success: true,
-          message: 'If an account exists, a reset link will be sent'
+          message: "If an account exists, a reset link will be sent",
         };
       }
 
@@ -188,14 +206,13 @@ export class AuthController extends BaseController {
         data: {
           userId: user.id,
           token: resetToken,
-          expiresAt: new Date(Date.now() + 3600000) // 1 hour expiration
-        }
+          expiresAt: new Date(Date.now() + 3600000), // 1 hour expiration
+        },
       });
 
-      // Log reset token for monitoring; email service integration pending
-      this.logger.info('Password reset requested', {
+      // Log reset request for monitoring (token intentionally omitted for security)
+      this.logger.info("Password reset requested", {
         email: validatedData.email,
-        resetToken,
         expiresAt: new Date(Date.now() + 3600000).toISOString(),
       });
 
@@ -203,17 +220,17 @@ export class AuthController extends BaseController {
 
       return {
         success: true,
-        message: 'Password reset link sent'
+        message: "Password reset link sent",
       };
     } catch (error) {
-      this.logger.error('Password reset request failed', { error });
-      
+      this.logger.error("Password reset request failed", { error });
+
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: 'Validation failed',
+          error: "Validation failed",
           details: error.errors,
-          statusCode: 400
+          statusCode: 400,
         };
       }
 
@@ -225,26 +242,28 @@ export class AuthController extends BaseController {
    * Confirm password reset
    */
   async confirmPasswordReset(context: RequestContext) {
-    const tracker = PerformanceTracker.start('passwordResetConfirm');
+    const tracker = PerformanceTracker.start("passwordResetConfirm");
 
     try {
       // Validate input
-      const validatedData = AuthValidator.passwordResetConfirm.parse(context.body);
+      const validatedData = AuthValidator.passwordResetConfirm.parse(
+        context.body,
+      );
 
       // Find valid reset token
       const resetTokenRecord = await this.prisma.passwordResetToken.findFirst({
         where: {
           token: validatedData.token,
-          expiresAt: { gt: new Date() }
+          expiresAt: { gt: new Date() },
         },
-        include: { user: true }
+        include: { user: true },
       });
 
       if (!resetTokenRecord) {
         return {
           success: false,
-          error: 'Invalid or expired reset token',
-          statusCode: 400
+          error: "Invalid or expired reset token",
+          statusCode: 400,
         };
       }
 
@@ -254,29 +273,29 @@ export class AuthController extends BaseController {
       // Update user password
       await this.prisma.user.update({
         where: { id: resetTokenRecord.userId },
-        data: { passwordHash: newPasswordHash }
+        data: { passwordHash: newPasswordHash },
       });
 
       // Delete used reset token
       await this.prisma.passwordResetToken.delete({
-        where: { id: resetTokenRecord.id }
+        where: { id: resetTokenRecord.id },
       });
 
       tracker.stop();
 
       return {
         success: true,
-        message: 'Password reset successful'
+        message: "Password reset successful",
       };
     } catch (error) {
-      this.logger.error('Password reset confirmation failed', { error });
-      
+      this.logger.error("Password reset confirmation failed", { error });
+
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: 'Validation failed',
+          error: "Validation failed",
           details: error.errors,
-          statusCode: 400
+          statusCode: 400,
         };
       }
 
@@ -288,17 +307,14 @@ export class AuthController extends BaseController {
    * Generate a secure reset token
    */
   private generateResetToken(): string {
-    return Array(32)
-      .fill(0)
-      .map(() => Math.floor(Math.random() * 16).toString(16))
-      .join('');
+    return crypto.randomBytes(32).toString("hex");
   }
 
   /**
    * Get active user sessions
    */
   async getUserSessions(context: RequestContext) {
-    const tracker = PerformanceTracker.start('getUserSessions');
+    const tracker = PerformanceTracker.start("getUserSessions");
 
     try {
       // Validate query parameters
@@ -317,25 +333,26 @@ export class AuthController extends BaseController {
           };
 
           if (validatedQuery.status) query.status = validatedQuery.status;
-          if (validatedQuery.deviceType) query.deviceInfo = { contains: validatedQuery.deviceType };
+          if (validatedQuery.deviceType)
+            query.deviceInfo = { contains: validatedQuery.deviceType };
 
           return this.prisma.session.findMany({
             where: query,
             take: validatedQuery.limit,
             skip: (validatedQuery.page - 1) * validatedQuery.limit,
-            orderBy: { 
-              [validatedQuery.sortBy || 'createdAt']: validatedQuery.sortOrder 
+            orderBy: {
+              [validatedQuery.sortBy || "createdAt"]: validatedQuery.sortOrder,
             },
             select: {
               id: true,
               deviceInfo: true,
               createdAt: true,
               expiresAt: true,
-              status: true
-            }
+              status: true,
+            },
           });
         },
-        3600 // 1 hour cache
+        3600, // 1 hour cache
       );
 
       tracker.stop();
@@ -346,18 +363,20 @@ export class AuthController extends BaseController {
         meta: {
           page: validatedQuery.page,
           limit: validatedQuery.limit,
-          total: await this.prisma.session.count({ where: { userId: context.req.user.id } })
-        }
+          total: await this.prisma.session.count({
+            where: { userId: context.req.user.id },
+          }),
+        },
       };
     } catch (error) {
-      this.logger.error('Failed to retrieve user sessions', { error });
-      
+      this.logger.error("Failed to retrieve user sessions", { error });
+
       if (error instanceof z.ZodError) {
         return {
           success: false,
-          error: 'Invalid query parameters',
+          error: "Invalid query parameters",
           details: error.errors,
-          statusCode: 400
+          statusCode: 400,
         };
       }
 

@@ -1,17 +1,20 @@
-import type { Logger } from '@slack/bolt';
-import { insertSmsEvent } from './sms-event-store.js';
-import { upsertConversationFromEvent } from './conversation-projector.js';
-import { upsertInboxContactProfile } from './inbox-contact-profiles.js';
-import { enrichContactProfileFromAloware } from './inbox-contact-enrichment.js';
-import { updateConversationStatus } from './inbox-store.js';
-import { detectOptOutIntent } from './lead-watcher.js';
-import { resolveNeedsReplyOnOutbound, upsertNeedsReplyWorkItem } from './work-item-engine.js';
+import type { Logger } from "@slack/bolt";
+import { insertSmsEvent } from "./sms-event-store.js";
+import { upsertConversationFromEvent } from "./conversation-projector.js";
+import { upsertInboxContactProfile } from "./inbox-contact-profiles.js";
+import { enrichContactProfileFromAloware } from "./inbox-contact-enrichment.js";
+import { updateConversationStatus } from "./inbox-store.js";
+import { detectOptOutIntent } from "./lead-watcher.js";
+import {
+  resolveNeedsReplyOnOutbound,
+  upsertNeedsReplyWorkItem,
+} from "./work-item-engine.js";
 import {
   recordAlowareIngestSeen,
   recordAlowareIngestSuccess,
   recordAlowareIngestSkip,
   maybeLogAlowareIngestWarnings,
-} from './aloware-ingest-monitor.js';
+} from "./aloware-ingest-monitor.js";
 
 /**
  * Aloware webhook payload structure.
@@ -63,7 +66,7 @@ export type AlowareWebhookPayload = {
 };
 
 export type WebhookIngestResult = {
-  status: 'success' | 'skipped' | 'error';
+  status: "success" | "skipped" | "error";
   eventId?: string;
   conversationId?: string;
   reason?: string;
@@ -76,47 +79,67 @@ const slackTsFromDate = (dateStr?: string): string => {
   return `${Date.now() / 1000}`;
 };
 
-const normalizeDirection = (payload: AlowareWebhookPayload): 'inbound' | 'outbound' | 'unknown' => {
+const normalizeDirection = (
+  payload: AlowareWebhookPayload,
+): "inbound" | "outbound" | "unknown" => {
   // Check explicit direction field
   if (payload.direction) {
     const lower = payload.direction.toLowerCase();
-    if (lower.includes('inbound') || lower.includes('received') || lower === 'in') return 'inbound';
-    if (lower.includes('outbound') || lower.includes('sent') || lower === 'out') return 'outbound';
+    if (
+      lower.includes("inbound") ||
+      lower.includes("received") ||
+      lower === "in"
+    )
+      return "inbound";
+    if (lower.includes("outbound") || lower.includes("sent") || lower === "out")
+      return "outbound";
   }
 
   // Infer from event type
-  const eventType = (payload.event_type || payload.event || payload.type || '').toLowerCase();
-  if (eventType.includes('inbound') || eventType.includes('received')) return 'inbound';
-  if (eventType.includes('outbound') || eventType.includes('sent')) return 'outbound';
+  const eventType = (
+    payload.event_type ||
+    payload.event ||
+    payload.type ||
+    ""
+  ).toLowerCase();
+  if (eventType.includes("inbound") || eventType.includes("received"))
+    return "inbound";
+  if (eventType.includes("outbound") || eventType.includes("sent"))
+    return "outbound";
 
   // Communication events: check for direction indicators
-  if (eventType.includes('communication')) {
+  if (eventType.includes("communication")) {
     if (payload.line_phone_number && payload.contact_phone) {
       // If we have both, it's likely an SMS event - check body for clues
-      return 'unknown'; // Will be determined by body analysis
+      return "unknown"; // Will be determined by body analysis
     }
   }
 
-  return 'unknown';
+  return "unknown";
 };
 
-const inferDirectionFromBody = (body?: string): 'inbound' | 'outbound' | 'unknown' => {
-  if (!body) return 'unknown';
+const inferDirectionFromBody = (
+  body?: string,
+): "inbound" | "outbound" | "unknown" => {
+  if (!body) return "unknown";
   // Aloware SMS logs in Slack have patterns like "has received an SMS" or "has sent an SMS"
-  if (/\b(received|inbound|incoming)\b/i.test(body)) return 'inbound';
-  if (/\b(sent|outbound|outgoing)\b/i.test(body)) return 'outbound';
-  return 'unknown';
+  if (/\b(received|inbound|incoming)\b/i.test(body)) return "inbound";
+  if (/\b(sent|outbound|outgoing)\b/i.test(body)) return "outbound";
+  return "unknown";
 };
 
 const getWebhookChannelId = (): string => {
-  return (process.env.ALOWARE_CHANNEL_ID || 'C09ULGH1BEC').trim();
+  return (process.env.ALOWARE_CHANNEL_ID || "C09ULGH1BEC").trim();
 };
 
 const getWebhookSecret = (): string | undefined => {
   return process.env.ALOWARE_WEBHOOK_SECRET?.trim() || undefined;
 };
 
-export const validateWebhookSignature = (payload: string, signature?: string): boolean => {
+export const validateWebhookSignature = (
+  payload: string,
+  signature?: string,
+): boolean => {
   const secret = getWebhookSecret();
   if (!secret) return true; // Skip validation if no secret configured
   if (!signature) return false;
@@ -141,7 +164,7 @@ const extractPhone = (payload: AlowareWebhookPayload): string | null => {
 const extractName = (payload: AlowareWebhookPayload): string | null => {
   if (payload.contact_name) return payload.contact_name;
   const parts = [payload.first_name, payload.last_name].filter(Boolean);
-  if (parts.length > 0) return parts.join(' ');
+  if (parts.length > 0) return parts.join(" ");
   if (payload.user_name) return payload.user_name;
   if (payload.agent_name) return payload.agent_name;
   return null;
@@ -164,12 +187,7 @@ const extractBody = (payload: AlowareWebhookPayload): string | null => {
  * Extract timestamp from any field in the payload.
  */
 const extractTimestamp = (payload: AlowareWebhookPayload): string | null => {
-  return (
-    payload.timestamp ||
-    payload.created_at ||
-    payload.event_ts ||
-    null
-  );
+  return payload.timestamp || payload.created_at || payload.event_ts || null;
 };
 
 /**
@@ -177,25 +195,30 @@ const extractTimestamp = (payload: AlowareWebhookPayload): string | null => {
  * Aloware sends many event types; we only care about SMS communications.
  */
 const isSmsRelevantEvent = (payload: AlowareWebhookPayload): boolean => {
-  const eventType = (payload.event_type || payload.event || payload.type || '').toLowerCase();
+  const eventType = (
+    payload.event_type ||
+    payload.event ||
+    payload.type ||
+    ""
+  ).toLowerCase();
 
   // Direct SMS communication events
-  if (eventType.includes('communication')) return true;
-  if (eventType.includes('sms')) return true;
-  if (eventType.includes('message')) return true;
-  if (eventType.includes('text')) return true;
+  if (eventType.includes("communication")) return true;
+  if (eventType.includes("sms")) return true;
+  if (eventType.includes("message")) return true;
+  if (eventType.includes("text")) return true;
 
   // If there's a message body and phone number, it's likely SMS
   if (extractBody(payload) && extractPhone(payload)) return true;
 
   // Contact lifecycle events are not SMS events but may be useful for contact sync
-  if (eventType.includes('contact')) return false;
-  if (eventType.includes('appointment')) return false;
-  if (eventType.includes('call')) return false;
-  if (eventType.includes('voicemail')) return false;
-  if (eventType.includes('recording')) return false;
-  if (eventType.includes('transcription')) return false;
-  if (eventType.includes('summarized')) return false;
+  if (eventType.includes("contact")) return false;
+  if (eventType.includes("appointment")) return false;
+  if (eventType.includes("call")) return false;
+  if (eventType.includes("voicemail")) return false;
+  if (eventType.includes("recording")) return false;
+  if (eventType.includes("transcription")) return false;
+  if (eventType.includes("summarized")) return false;
 
   // Default: accept if it has message content
   return !!extractBody(payload);
@@ -203,22 +226,26 @@ const isSmsRelevantEvent = (payload: AlowareWebhookPayload): boolean => {
 
 export const handleAlowareWebhook = async (
   payload: AlowareWebhookPayload,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<WebhookIngestResult> => {
   recordAlowareIngestSeen();
 
-  const eventType = payload.event_type || payload.event || payload.type || 'unknown';
-  logger?.debug?.('Aloware webhook received', { eventType, payloadKeys: Object.keys(payload) });
+  const eventType =
+    payload.event_type || payload.event || payload.type || "unknown";
+  logger?.debug?.("Aloware webhook received", {
+    eventType,
+    payloadKeys: Object.keys(payload),
+  });
 
   // Check if this is an SMS-relevant event
   if (!isSmsRelevantEvent(payload)) {
     recordAlowareIngestSkip({
-      reason: 'other_app_post',
+      reason: "other_app_post",
       channelId: getWebhookChannelId(),
       text: `Event: ${eventType}`,
     });
     maybeLogAlowareIngestWarnings(logger);
-    return { status: 'skipped', reason: `Non-SMS event type: ${eventType}` };
+    return { status: "skipped", reason: `Non-SMS event type: ${eventType}` };
   }
 
   // Extract normalized fields
@@ -232,33 +259,36 @@ export const handleAlowareWebhook = async (
   const contactId = payload.contact_id ? String(payload.contact_id) : null;
   if (!contactId && !phone) {
     recordAlowareIngestSkip({
-      reason: 'missing_contact',
+      reason: "missing_contact",
       channelId: getWebhookChannelId(),
-      text: body || '',
+      text: body || "",
     });
     maybeLogAlowareIngestWarnings(logger);
-    return { status: 'skipped', reason: 'Missing contact info' };
+    return { status: "skipped", reason: "Missing contact info" };
   }
 
   // If direction is unknown, try to infer from body
-  const finalDirection = direction === 'unknown' ? inferDirectionFromBody(body || undefined) : direction;
-  if (finalDirection === 'unknown') {
+  const finalDirection =
+    direction === "unknown"
+      ? inferDirectionFromBody(body || undefined)
+      : direction;
+  if (finalDirection === "unknown") {
     recordAlowareIngestSkip({
-      reason: 'unknown_direction',
+      reason: "unknown_direction",
       channelId: getWebhookChannelId(),
-      text: body || '',
+      text: body || "",
     });
     maybeLogAlowareIngestWarnings(logger);
-    return { status: 'skipped', reason: 'Unknown direction' };
+    return { status: "skipped", reason: "Unknown direction" };
   }
 
   const channelId = getWebhookChannelId();
-  const messageTs = slackTsFromDate(timestamp);
+  const messageTs = slackTsFromDate(timestamp || undefined);
 
   try {
     const eventRow = await insertSmsEvent(
       {
-        slackTeamId: 'aloware-webhook',
+        slackTeamId: "aloware-webhook",
         slackChannelId: channelId,
         slackMessageTs: messageTs,
         eventTs: timestamp ? new Date(timestamp) : new Date(),
@@ -276,7 +306,7 @@ export const handleAlowareWebhook = async (
     );
 
     if (!eventRow) {
-      return { status: 'skipped', reason: 'Event insert returned null' };
+      return { status: "skipped", reason: "Event insert returned null" };
     }
 
     recordAlowareIngestSuccess();
@@ -284,7 +314,11 @@ export const handleAlowareWebhook = async (
     // Project conversation
     const conversation = await upsertConversationFromEvent(eventRow, logger);
     if (!conversation) {
-      return { status: 'success', eventId: eventRow.id, reason: 'No conversation projected' };
+      return {
+        status: "success",
+        eventId: eventRow.id,
+        reason: "No conversation projected",
+      };
     }
 
     // Upsert contact profile
@@ -311,34 +345,36 @@ export const handleAlowareWebhook = async (
         },
         logger,
       ).catch((error) => {
-        logger?.warn('Contact enrichment failed', error);
+        logger?.warn("Contact enrichment failed", error);
       });
     }
 
     // Handle work items based on direction
-    if (eventRow.direction === 'inbound') {
+    if (eventRow.direction === "inbound") {
       await upsertNeedsReplyWorkItem(conversation, eventRow, logger);
 
       if (eventRow.body) {
         const optOut = detectOptOutIntent(eventRow.body);
         if (optOut.isOptOut) {
-          logger?.info(`Opt-out detected for conversation ${conversation.id}: matched "${optOut.matchedPattern}"`);
-          await updateConversationStatus(conversation.id, 'dnc', logger);
+          logger?.info(
+            `Opt-out detected for conversation ${conversation.id}: matched "${optOut.matchedPattern}"`,
+          );
+          await updateConversationStatus(conversation.id, "dnc", logger);
         }
       }
-    } else if (eventRow.direction === 'outbound') {
+    } else if (eventRow.direction === "outbound") {
       await resolveNeedsReplyOnOutbound(conversation.id, eventRow, logger);
     }
 
     return {
-      status: 'success',
+      status: "success",
       eventId: eventRow.id,
       conversationId: conversation.id,
     };
   } catch (error) {
-    logger?.error('Aloware webhook ingest failed', error);
+    logger?.error("Aloware webhook ingest failed", error);
     return {
-      status: 'error',
+      status: "error",
       reason: error instanceof Error ? error.message : String(error),
     };
   }

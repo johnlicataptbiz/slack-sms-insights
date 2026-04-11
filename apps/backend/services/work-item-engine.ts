@@ -1,13 +1,18 @@
-import type { Logger } from '@slack/bolt';
-import type { ConversationRow } from './conversation-projector.js';
-import { getPrismaClient } from './prisma.js';
-import { publishRealtimeEvent } from './realtime.js';
-import type { SmsEventRow } from './sms-event-store.js';
+import type { Logger } from "@slack/bolt";
+import type { ConversationRow } from "./conversation-projector.js";
+import { getPrismaClient } from "./prisma.js";
+import { publishRealtimeEvent } from "./realtime.js";
+import type { SmsEventRow } from "./sms-event-store.js";
 
-const getPrisma = () => getPrismaClient();
+const getPrisma = () => getPrismaClient() as any;
 
-export type WorkItemType = 'needs_reply' | 'sla_breach' | 'hot_lead' | 'unowned' | 'followup_due';
-export type WorkItemSeverity = 'low' | 'med' | 'high';
+export type WorkItemType =
+  | "needs_reply"
+  | "sla_breach"
+  | "hot_lead"
+  | "unowned"
+  | "followup_due";
+export type WorkItemSeverity = "low" | "med" | "high";
 
 export type WorkItemRow = {
   id: string;
@@ -32,14 +37,14 @@ const computeNeedsReplyDueAt = (eventTs: Date): Date => {
 
 const computeSeverity = (event: SmsEventRow): WorkItemSeverity => {
   // v1 heuristic: treat unknown sequence/line as med; can be upgraded later.
-  if (event.sequence && /hot|urgent|high/i.test(event.sequence)) return 'high';
-  return 'med';
+  if (event.sequence && /hot|urgent|high/i.test(event.sequence)) return "high";
+  return "med";
 };
 
 export const upsertNeedsReplyWorkItem = async (
   conversation: ConversationRow,
   inboundEvent: SmsEventRow,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<WorkItemRow | null> => {
   const prisma = getPrisma();
   try {
@@ -51,30 +56,36 @@ export const upsertNeedsReplyWorkItem = async (
     // Note: for returning the updated row, updateMany doesn't help.
     // We'll use a transaction to find and update/create.
 
-    return await prisma.$transaction(async (tx) => {
-      const existing = await tx.workItems.findFirst({
+    return await prisma.$transaction(async (tx: any) => {
+      const existing = await tx.work_items.findFirst({
         where: {
-          type: 'needs_reply',
+          type: "needs_reply",
           conversation_id: conversation.id,
           resolved_at: null,
         },
       });
 
       if (existing) {
-        const updated = await tx.workItems.update({
+        const updated = await tx.work_items.update({
           where: { id: existing.id },
           data: {
             rep_id: existing.rep_id || conversation.current_rep_id,
-            severity: severity === 'high' || (existing as any).severity === 'high' ? 'high' : 'med',
-            due_at: (existing as any).due_at < dueAt ? (existing as any).due_at : dueAt,
+            severity:
+              severity === "high" || (existing as any).severity === "high"
+                ? "high"
+                : "med",
+            due_at:
+              (existing as any).due_at < dueAt
+                ? (existing as any).due_at
+                : dueAt,
           },
         });
         return updated as unknown as WorkItemRow;
       }
 
-      const inserted = await tx.workItems.create({
+      const inserted = await tx.work_items.create({
         data: {
-          type: 'needs_reply',
+          type: "needs_reply",
           conversation_id: conversation.id,
           rep_id: conversation.current_rep_id,
           severity: severity,
@@ -84,12 +95,19 @@ export const upsertNeedsReplyWorkItem = async (
       });
 
       if (inserted) {
-        publishRealtimeEvent({ type: 'work_item_created', id: inserted.id, ts: new Date().toISOString() }, logger);
+        publishRealtimeEvent(
+          {
+            type: "work_item_created",
+            id: inserted.id,
+            ts: new Date().toISOString(),
+          },
+          logger,
+        );
       }
       return inserted as unknown as WorkItemRow;
     });
   } catch (err) {
-    logger?.error('upsertNeedsReplyWorkItem failed', err);
+    logger?.error("upsertNeedsReplyWorkItem failed", err);
     throw err;
   }
 };
@@ -97,30 +115,37 @@ export const upsertNeedsReplyWorkItem = async (
 export const resolveNeedsReplyOnOutbound = async (
   conversationId: string,
   outboundEvent: SmsEventRow,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<number> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.workItems.updateMany({
       where: {
-        type: 'needs_reply',
+        type: "needs_reply",
         conversation_id: conversationId,
         resolved_at: null,
         created_at: { lte: new Date(outboundEvent.event_ts) },
       },
       data: {
         resolved_at: new Date(),
-        resolution: 'replied',
+        resolution: "replied",
       },
     });
 
     const count = result.count;
     if (count > 0) {
-      publishRealtimeEvent({ type: 'work_item_resolved', id: conversationId, ts: new Date().toISOString() }, logger);
+      publishRealtimeEvent(
+        {
+          type: "work_item_resolved",
+          id: conversationId,
+          ts: new Date().toISOString(),
+        },
+        logger,
+      );
     }
     return count;
   } catch (err) {
-    logger?.error('resolveNeedsReplyOnOutbound failed', err);
+    logger?.error("resolveNeedsReplyOnOutbound failed", err);
     throw err;
   }
 };

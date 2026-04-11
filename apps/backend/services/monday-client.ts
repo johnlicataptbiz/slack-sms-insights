@@ -1,20 +1,20 @@
-import type { Logger } from '@slack/bolt';
+import type { Logger } from "@slack/bolt";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MONDAY_API_URL = 'https://api.monday.com/v2';
+const MONDAY_API_URL = "https://api.monday.com/v2";
 const DEFAULT_TIMEOUT_MS = Number.parseInt(
-  process.env.MONDAY_API_TIMEOUT_MS || '12000',
+  process.env.MONDAY_API_TIMEOUT_MS || "12000",
   10,
 );
 const DEFAULT_MAX_RETRIES = Number.parseInt(
-  process.env.MONDAY_API_MAX_RETRIES || '2',
+  process.env.MONDAY_API_MAX_RETRIES || "2",
   10,
 );
 const DEFAULT_RETRY_BASE_MS = Number.parseInt(
-  process.env.MONDAY_API_RETRY_BASE_MS || '500',
+  process.env.MONDAY_API_RETRY_BASE_MS || "500",
   10,
 );
 
@@ -24,7 +24,7 @@ const DEFAULT_RETRY_BASE_MS = Number.parseInt(
  * Set to 0 to disable update posts entirely (column-only mode).
  */
 const UPDATE_COOLDOWN_HOURS = Number.parseInt(
-  process.env.MONDAY_UPDATE_COOLDOWN_HOURS || '24',
+  process.env.MONDAY_UPDATE_COOLDOWN_HOURS || "24",
   10,
 );
 
@@ -43,9 +43,9 @@ const sleep = async (ms: number) =>
   new Promise((resolve) => setTimeout(resolve, ms));
 
 const getMondayToken = (): string => {
-  const token = (process.env.MONDAY_API_TOKEN || '').trim();
+  const token = (process.env.MONDAY_API_TOKEN || "").trim();
   if (!token) {
-    throw new Error('MONDAY_API_TOKEN is not configured');
+    throw new Error("MONDAY_API_TOKEN is not configured");
   }
   return token;
 };
@@ -58,7 +58,7 @@ type MondayGraphQlResponse<T> = {
 const requestGraphQl = async <T>(
   query: string,
   variables: Record<string, unknown>,
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
 ): Promise<T> => {
   const token = getMondayToken();
   let attempt = 0;
@@ -69,10 +69,10 @@ const requestGraphQl = async <T>(
 
     try {
       const response = await fetch(MONDAY_API_URL, {
-        method: 'POST',
+        method: "POST",
         headers: {
           Authorization: token,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ query, variables }),
         signal: controller.signal,
@@ -84,24 +84,24 @@ const requestGraphQl = async <T>(
           payload.errors
             ?.map((err) => err.message)
             .filter(Boolean)
-            .join('; ') ||
+            .join("; ") ||
           `Monday API request failed with status ${response.status}`;
         throw new Error(errMsg);
       }
 
       if (!payload.data)
-        throw new Error('Monday API returned empty data payload');
+        throw new Error("Monday API returned empty data payload");
       return payload.data;
-    } catch (_error) {
+    } catch (error) {
       attempt += 1;
       const canRetry = attempt <= DEFAULT_MAX_RETRIES;
-      logger?.warn?.('Monday API request failed', {
+      logger?.warn?.("Monday API request failed", {
         attempt,
         canRetry,
         error: String(error),
       });
       if (!canRetry) {
-        logger?.error?.('Monday API request exhausted retries', error);
+        logger?.error?.("Monday API request exhausted retries", error);
         throw error;
       }
       const delay = DEFAULT_RETRY_BASE_MS * 2 ** (attempt - 1);
@@ -137,7 +137,7 @@ export type MondayItemsPage = {
 
 export const queryBoardColumns = async (
   boardId: string,
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
 ): Promise<MondayBoardColumn[]> => {
   const query = `
     query QueryBoardColumns($boardId: [ID!]) {
@@ -160,7 +160,7 @@ export const queryBoardColumns = async (
 export const queryBoardItems = async (
   boardId: string,
   updatedSinceCursor?: string | null,
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
 ): Promise<MondayItemsPage> => {
   const hasCursor = Boolean(updatedSinceCursor);
   const pageProjection = `
@@ -260,27 +260,37 @@ export const queryBoardItems = async (
  * Truncate raw text to a maximum length while preserving readability.
  * Cuts at the last complete sentence boundary when possible.
  */
-export const truncateText = (text: string, maxLength: number = MAX_TEXT_FIELD_LENGTH): string => {
+export const truncateText = (
+  text: string,
+  maxLength: number = MAX_TEXT_FIELD_LENGTH,
+): string => {
   if (text.length <= maxLength) return text;
   // Try to cut at sentence boundary
   const sub = text.slice(0, maxLength - 3);
-  const lastSentence = Math.max(sub.lastIndexOf('. '), sub.lastIndexOf('! '), sub.lastIndexOf('? '));
+  const lastSentence = Math.max(
+    sub.lastIndexOf(". "),
+    sub.lastIndexOf("! "),
+    sub.lastIndexOf("? "),
+  );
   if (lastSentence > maxLength * 0.5) {
-    return sub.slice(0, lastSentence + 1) + '...';
+    return sub.slice(0, lastSentence + 1) + "...";
   }
   // Fallback: cut at word boundary
-  const lastSpace = sub.lastIndexOf(' ');
+  const lastSpace = sub.lastIndexOf(" ");
   if (lastSpace > maxLength * 0.5) {
-    return sub.slice(0, lastSpace) + '...';
+    return sub.slice(0, lastSpace) + "...";
   }
-  return sub + '...';
+  return sub + "...";
 };
 
 /**
  * Truncate long text fields (summaries, notes) with structural formatting.
  * Preserves bullet points and line breaks where possible.
  */
-export const truncateLongText = (text: string, maxLength: number = MAX_LONG_TEXT_LENGTH): string => {
+export const truncateLongText = (
+  text: string,
+  maxLength: number = MAX_LONG_TEXT_LENGTH,
+): string => {
   if (text.length <= maxLength) return text;
   return truncateText(text, maxLength);
 };
@@ -289,16 +299,19 @@ export const truncateLongText = (text: string, maxLength: number = MAX_LONG_TEXT
  * Extract the first actionable sentence from a longer text.
  * Used to convert raw message bodies into meaningful snippets.
  */
-export const extractFirstSentence = (text: string, maxLength: number = MAX_TEXT_FIELD_LENGTH): string => {
+export const extractFirstSentence = (
+  text: string,
+  maxLength: number = MAX_TEXT_FIELD_LENGTH,
+): string => {
   const trimmed = text.trim();
   if (trimmed.length <= maxLength) return trimmed;
 
   // Find end of first sentence
   let end = -1;
   for (let i = 0; i < trimmed.length; i++) {
-    if ('.!?'.includes(trimmed[i])) {
+    if (".!?".includes(trimmed[i])) {
       const next = trimmed[i + 1];
-      if (next === ' ' || next === undefined) {
+      if (next === " " || next === undefined) {
         end = i + 1;
         break;
       }
@@ -320,7 +333,7 @@ export const extractFirstSentence = (text: string, maxLength: number = MAX_TEXT_
  */
 export const shouldPostUpdate = async (
   itemId: string,
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
 ): Promise<boolean> => {
   if (UPDATE_COOLDOWN_HOURS <= 0) {
     return false; // Updates disabled, use column-only mode
@@ -348,11 +361,13 @@ export const shouldPostUpdate = async (
     }
 
     // Sort by created_at descending and check the most recent
-    const latest = updates.sort((a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const latest = updates.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
     )[0];
 
-    const hoursSinceUpdate = (Date.now() - new Date(latest.created_at).getTime()) / (1000 * 60 * 60);
+    const hoursSinceUpdate =
+      (Date.now() - new Date(latest.created_at).getTime()) / (1000 * 60 * 60);
     return hoursSinceUpdate >= UPDATE_COOLDOWN_HOURS;
   } catch {
     // If we can't check, default to allowing the update (safe default)
@@ -381,11 +396,15 @@ export const upsertWeeklySummaryItem = async (
     columnValues?: Record<string, unknown>;
     existingItemId?: string | null;
   },
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
-): Promise<{ itemId: string; action: 'created' | 'updated'; updatePosted: boolean }> => {
+  logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
+): Promise<{
+  itemId: string;
+  action: "created" | "updated";
+  updatePosted: boolean;
+}> => {
   const itemName = payload.title || `PTBizSMS Weekly Summary - ${weekKey}`;
   let itemId = payload.existingItemId || null;
-  let action: 'created' | 'updated' = 'updated';
+  let action: "created" | "updated" = "updated";
   let updatePosted = false;
 
   if (!itemId) {
@@ -402,8 +421,8 @@ export const upsertWeeklySummaryItem = async (
       logger,
     );
     itemId = createData.create_item?.id || null;
-    if (!itemId) throw new Error('Failed to create monday weekly summary item');
-    action = 'created';
+    if (!itemId) throw new Error("Failed to create monday weekly summary item");
+    action = "created";
   }
 
   const columnValues = payload.columnValues || null;
@@ -427,11 +446,15 @@ export const upsertWeeklySummaryItem = async (
   }
 
   // Decide whether to post a human-readable update
-  const isCreateAndUpdate = action === 'created';
-  const shouldPost = isCreateAndUpdate || await shouldPostUpdate(itemId, logger);
+  const isCreateAndUpdate = action === "created";
+  const shouldPost =
+    isCreateAndUpdate || (await shouldPostUpdate(itemId, logger));
 
   if (itemId && shouldPost && payload.summaryMarkdown) {
-    const truncatedSummary = truncateLongText(payload.summaryMarkdown, MAX_LONG_TEXT_LENGTH);
+    const truncatedSummary = truncateLongText(
+      payload.summaryMarkdown,
+      MAX_LONG_TEXT_LENGTH,
+    );
     const updateMutation = `
       mutation AddWeeklySummaryUpdate($itemId: ID!, $body: String!) {
         create_update(item_id: $itemId, body: $body) {
@@ -439,9 +462,13 @@ export const upsertWeeklySummaryItem = async (
         }
       }
     `;
-    await requestGraphQl(updateMutation, { itemId, body: truncatedSummary }, logger);
+    await requestGraphQl(
+      updateMutation,
+      { itemId, body: truncatedSummary },
+      logger,
+    );
     updatePosted = true;
-    logger?.debug?.('Posted weekly summary update', { itemId, weekKey });
+    logger?.debug?.("Posted weekly summary update", { itemId, weekKey });
   }
 
   return { itemId, action, updatePosted };
@@ -463,7 +490,7 @@ export const upsertWeeklySummaryItem = async (
 const findExistingItemByBoardAndName = async (
   boardId: string,
   nameSubstring: string,
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
 ): Promise<string | null> => {
   const searchQuery = `
     query FindItemByBoardAndName($boardId: ID!, $searchTerm: String!) {
@@ -501,7 +528,7 @@ const findExistingItemByBoardAndName = async (
     }
   } catch {
     logger?.warn?.(
-      'Failed to search for existing Monday item; proceeding with create',
+      "Failed to search for existing Monday item; proceeding with create",
       {
         boardId,
         searchTerm: nameSubstring,
@@ -518,11 +545,11 @@ const findExistingItemByBoardAndName = async (
  * Returns the contact name or the full item name if no separator found.
  */
 const extractContactNameFromItemName = (itemName: string): string => {
-  const separatorIndex = itemName.indexOf(' - ');
+  const separatorIndex = itemName.indexOf(" - ");
   if (separatorIndex > 0) {
     return itemName.substring(0, separatorIndex).trim();
   }
-  const bulletIndex = itemName.indexOf(' • ');
+  const bulletIndex = itemName.indexOf(" • ");
   if (bulletIndex > 0) {
     return itemName.substring(0, bulletIndex).trim();
   }
@@ -545,8 +572,12 @@ export const upsertBookedCallItem = async (
     columnValues?: Record<string, unknown>;
     existingItemId?: string | null;
   },
-  logger?: Pick<Logger, 'info' | 'debug' | 'warn' | 'error'>,
-): Promise<{ itemId: string; action: 'created' | 'updated'; updatePosted: boolean }> => {
+  logger?: Pick<Logger, "info" | "debug" | "warn" | "error">,
+): Promise<{
+  itemId: string;
+  action: "created" | "updated";
+  updatePosted: boolean;
+}> => {
   const hasColumnValues = Boolean(
     payload.columnValues && Object.keys(payload.columnValues).length > 0,
   );
@@ -555,9 +586,9 @@ export const upsertBookedCallItem = async (
     : null;
 
   let itemId = payload.existingItemId || null;
-  let action: 'created' | 'updated' = payload.existingItemId
-    ? 'updated'
-    : 'created';
+  let action: "created" | "updated" = payload.existingItemId
+    ? "updated"
+    : "created";
   let updatePosted = false;
 
   // DEDUP FIX: Before creating a new item, search for an existing one with the same contact name.
@@ -566,7 +597,7 @@ export const upsertBookedCallItem = async (
     const contactName = extractContactNameFromItemName(payload.itemName);
     if (
       contactName &&
-      contactName !== 'Unknown Contact' &&
+      contactName !== "Unknown Contact" &&
       contactName.length > 2
     ) {
       const foundItemId = await findExistingItemByBoardAndName(
@@ -576,9 +607,9 @@ export const upsertBookedCallItem = async (
       );
       if (foundItemId) {
         itemId = foundItemId;
-        action = 'updated';
+        action = "updated";
         logger?.info?.(
-          'Found existing Monday item by name match; will update instead of creating duplicate',
+          "Found existing Monday item by name match; will update instead of creating duplicate",
           {
             boardId,
             contactName,
@@ -614,7 +645,7 @@ export const upsertBookedCallItem = async (
     } catch (error) {
       if (!hasColumnValues) throw error;
       logger?.warn?.(
-        'Booked call create_item with column values failed; retrying without columns',
+        "Booked call create_item with column values failed; retrying without columns",
         error,
       );
       const createData = await requestGraphQl<{
@@ -631,8 +662,8 @@ export const upsertBookedCallItem = async (
       itemId = createData.create_item?.id || null;
     }
 
-    if (!itemId) throw new Error('Failed to create monday booked call item');
-    action = 'created';
+    if (!itemId) throw new Error("Failed to create monday booked call item");
+    action = "created";
   } else {
     // board_id is required by Monday API v2 for change_simple_column_value
     const renameMutation = `
@@ -652,10 +683,10 @@ export const upsertBookedCallItem = async (
         },
         logger,
       );
-      action = 'updated';
+      action = "updated";
     } catch (error) {
       logger?.warn?.(
-        'Booked call item rename failed; continuing with update body/columns',
+        "Booked call item rename failed; continuing with update body/columns",
         error,
       );
     }
@@ -664,7 +695,7 @@ export const upsertBookedCallItem = async (
   let columnUpdateFailed = false;
 
   // Skip column update if we just created the item with columnValues already embedded.
-  const alreadyAppliedColumns = action === 'created' && hasColumnValues;
+  const alreadyAppliedColumns = action === "created" && hasColumnValues;
   if (itemId && hasColumnValues && !alreadyAppliedColumns) {
     const patchColumnsMutation = `
       mutation PatchBookedCallColumns($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
@@ -684,11 +715,11 @@ export const upsertBookedCallItem = async (
         },
         logger,
       );
-      action = 'updated';
+      action = "updated";
     } catch (error) {
       columnUpdateFailed = true;
       logger?.warn?.(
-        'Booked call column update failed; item update will still be posted',
+        "Booked call column update failed; item update will still be posted",
         error,
       );
     }
@@ -698,10 +729,11 @@ export const upsertBookedCallItem = async (
   // Only post an update if:
   // - Item was just created (action === 'created'), OR
   // - The last update exceeds the cooldown period
-  const shouldPost = action === 'created' || await shouldPostUpdate(itemId, logger);
+  const shouldPost =
+    action === "created" || (await shouldPostUpdate(itemId, logger));
 
   if (itemId && shouldPost) {
-    let body = payload.updateMarkdown || '';
+    let body = payload.updateMarkdown || "";
 
     // Apply truncation to prevent noise
     if (body.length > MAX_LONG_TEXT_LENGTH) {
@@ -723,12 +755,19 @@ export const upsertBookedCallItem = async (
           }
         }
       `;
-      await requestGraphQl(updateMutation, { itemId, body: trimmedBody }, logger);
+      await requestGraphQl(
+        updateMutation,
+        { itemId, body: trimmedBody },
+        logger,
+      );
       updatePosted = true;
-      logger?.debug?.('Posted item update', { itemId, bodyLength: trimmedBody.length });
+      logger?.debug?.("Posted item update", {
+        itemId,
+        bodyLength: trimmedBody.length,
+      });
     }
-  } else if (itemId && !shouldPost && action === 'updated') {
-    logger?.debug?.('Skipped update due to cooldown period', { itemId });
+  } else if (itemId && !shouldPost && action === "updated") {
+    logger?.debug?.("Skipped update due to cooldown period", { itemId });
   }
 
   return { itemId, action, updatePosted };

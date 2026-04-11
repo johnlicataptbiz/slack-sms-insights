@@ -1,19 +1,19 @@
-import type { Logger } from '@slack/bolt';
-import { upsertAttributionReviewItem } from './attribution-review-queue.js';
+import type { Logger } from "@slack/bolt";
+import { upsertAttributionReviewItem } from "./attribution-review-queue.js";
 import {
   type BookedCallAttributionSource,
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
   normalizeContactNameKey,
-} from './booked-calls.js';
-import { getPrismaClient } from './prisma.js';
+} from "./booked-calls.js";
+import { getPrismaClient } from "./prisma.js";
 
 const getPrisma = () => getPrismaClient();
 
 const normalizePhoneKey = (value: string | null | undefined): string | null => {
   if (!value) return null;
-  const digits = value.replace(/\D/g, '');
+  const digits = value.replace(/\D/g, "");
   if (!digits) return null;
   return digits.length > 10 ? digits.slice(-10) : digits;
 };
@@ -24,7 +24,11 @@ const normalizeEmailKey = (value: string | null | undefined): string | null => {
   return normalized.length > 0 ? normalized : null;
 };
 
-type ConversationEvidence = 'conversation_phone' | 'profile_phone' | 'profile_email' | 'profile_name';
+type ConversationEvidence =
+  | "conversation_phone"
+  | "profile_phone"
+  | "profile_email"
+  | "profile_name";
 
 type ConversationCandidate = {
   conversationId: string;
@@ -53,7 +57,9 @@ const PRIMARY_EVIDENCE_CONFIDENCE: Record<ConversationEvidence, number> = {
   profile_name: 0.78,
 };
 
-const choosePrimaryEvidence = (evidence: Set<ConversationEvidence>): ConversationEvidence | null => {
+const choosePrimaryEvidence = (
+  evidence: Set<ConversationEvidence>,
+): ConversationEvidence | null => {
   let best: ConversationEvidence | null = null;
   let bestPriority = -1;
   for (const item of evidence) {
@@ -95,24 +101,29 @@ export const resolveBestConversationCandidate = (
       ? Math.abs((candidate.lastTouchAtMs || 0) - bookingTs)
       : Number.POSITIVE_INFINITY;
     const hasPriorTouch =
-      Number.isFinite(candidate.lastTouchAtMs || Number.NaN) && (candidate.lastTouchAtMs || 0) <= bookingTs;
+      Number.isFinite(candidate.lastTouchAtMs || Number.NaN) &&
+      (candidate.lastTouchAtMs || 0) <= bookingTs;
     const evidenceBonus = Math.max(0, candidate.evidence.size - 1) * 1.5;
     const timingBonus = Number.isFinite(deltaMs)
       ? hasPriorTouch
         ? Math.max(0, 12 - deltaMs / (24 * 60 * 60 * 1000))
         : -Math.min(8, deltaMs / (12 * 60 * 60 * 1000))
       : -3;
-    const score = EVIDENCE_PRIORITY[primaryEvidence] * 100 + evidenceBonus + timingBonus;
+    const score =
+      EVIDENCE_PRIORITY[primaryEvidence] * 100 + evidenceBonus + timingBonus;
     const confidence = Math.min(
       0.995,
-      PRIMARY_EVIDENCE_CONFIDENCE[primaryEvidence] + Math.max(0, candidate.evidence.size - 1) * 0.015,
+      PRIMARY_EVIDENCE_CONFIDENCE[primaryEvidence] +
+        Math.max(0, candidate.evidence.size - 1) * 0.015,
     );
 
     if (
       !best ||
       score > best.score ||
       (score === best.score && deltaMs < best.deltaMs) ||
-      (score === best.score && deltaMs === best.deltaMs && candidate.conversationId < best.conversationId)
+      (score === best.score &&
+        deltaMs === best.deltaMs &&
+        candidate.conversationId < best.conversationId)
     ) {
       best = {
         conversationId: candidate.conversationId,
@@ -126,7 +137,10 @@ export const resolveBestConversationCandidate = (
 
   return {
     conversationId: best?.conversationId || null,
-    conversationMatchSeconds: best && Number.isFinite(best.deltaMs) ? Math.round(best.deltaMs / 1000) : null,
+    conversationMatchSeconds:
+      best && Number.isFinite(best.deltaMs)
+        ? Math.round(best.deltaMs / 1000)
+        : null,
     evidence: best?.evidence || null,
     confidence: best?.confidence || null,
   };
@@ -160,23 +174,27 @@ const buildSourceIdentity = (source: BookedCallAttributionSource) => ({
   nameKey: normalizeContactNameKey(source.contactName),
 });
 
-const mapSetterFromBucket = (bucket: 'jack' | 'brandon' | 'selfBooked'): string => {
-  if (bucket === 'jack') return 'Jack Licata';
-  if (bucket === 'brandon') return 'Brandon Erwin';
-  return 'Self Booked';
+const mapSetterFromBucket = (
+  bucket: "jack" | "brandon" | "selfBooked",
+): string => {
+  if (bucket === "jack") return "Jack Licata";
+  if (bucket === "brandon") return "Brandon Erwin";
+  return "Self Booked";
 };
 
-const mapSetterHint = (bucket: 'jack' | 'brandon' | 'selfBooked'): string | null => {
-  if (bucket === 'jack') return 'jack';
-  if (bucket === 'brandon') return 'brandon';
+const mapSetterHint = (
+  bucket: "jack" | "brandon" | "selfBooked",
+): string | null => {
+  if (bucket === "jack") return "jack";
+  if (bucket === "brandon") return "brandon";
   return null;
 };
 
 const confidenceBandFor = (confidence: number | null): string | null => {
   if (confidence == null || !Number.isFinite(confidence)) return null;
-  if (confidence >= 0.9) return 'high';
-  if (confidence >= 0.75) return 'medium';
-  return 'low';
+  if (confidence >= 0.9) return "high";
+  if (confidence >= 0.75) return "medium";
+  return "low";
 };
 
 const buildAttributionStatus = (args: {
@@ -194,20 +212,23 @@ const buildAttributionStatus = (args: {
 } => {
   const confidenceBand = confidenceBandFor(args.confidence);
   const fallbackUsed = !args.smsMatched || !args.replyLinked;
-  const needsReview = !args.hasConversation || (args.confidence != null && args.confidence < 0.8) || !args.smsMatched;
+  const needsReview =
+    !args.hasConversation ||
+    (args.confidence != null && args.confidence < 0.8) ||
+    !args.smsMatched;
   const reviewReason = !args.hasConversation
-    ? 'conversation_unresolved'
+    ? "conversation_unresolved"
     : !args.smsMatched
-      ? 'sms_sequence_unresolved'
+      ? "sms_sequence_unresolved"
       : args.confidence != null && args.confidence < 0.8
-        ? 'low_confidence'
+        ? "low_confidence"
         : null;
-  const attributionStatus = needsReview ? 'needs_review' : 'confirmed';
+  const attributionStatus = needsReview ? "needs_review" : "confirmed";
   const attributionPath = [
-    args.replyLinked ? 'reply_link' : 'no_reply_link',
-    args.smsMatched ? 'sms_lookup' : 'candidate_resolution',
-    confidenceBand || 'no_confidence',
-  ].join(' > ');
+    args.replyLinked ? "reply_link" : "no_reply_link",
+    args.smsMatched ? "sms_lookup" : "candidate_resolution",
+    confidenceBand || "no_confidence",
+  ].join(" > ");
 
   return {
     attributionStatus,
@@ -227,7 +248,7 @@ export type RefreshBookedCallAttributionResult = {
 
 export const refreshBookedCallAttribution = async (
   params: { from: Date; to: Date; channelId?: string },
-  logger?: Pick<Logger, 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "warn" | "error">,
 ): Promise<RefreshBookedCallAttributionResult> => {
   const prisma = getPrisma();
   const sources = await getBookedCallAttributionSources({
@@ -235,21 +256,29 @@ export const refreshBookedCallAttribution = async (
     to: params.to,
     channelId: params.channelId,
   });
-  const attributionLogger = logger ? { ...logger, debug: logger.info } : undefined;
+  const attributionLogger = logger
+    ? { ...logger, debug: logger.info }
+    : undefined;
   const [smsReplyLinks, smsSequenceLookup, sequenceRows] = await Promise.all([
     getBookedCallSmsReplyLinks(sources, attributionLogger),
     getBookedCallSequenceFromSmsEvents(sources, attributionLogger),
     prisma.sequence_registry.findMany({
-      select: { id: true, label: true, normalized_label: true },
+      select: { id: true, label: true, normalizedLabel: true },
     }),
   ]);
-  const sequenceIdByLabel = new Map(sequenceRows.map((row) => [row.normalized_label.trim().toLowerCase(), row.id]));
+  const sequenceIdByLabel = new Map(
+    sequenceRows
+      .filter((row) => row.normalizedLabel)
+      .map((row) => [row.normalizedLabel!.trim().toLowerCase(), row.id]),
+  );
   const existingRows =
     sources.length === 0
       ? []
       : await prisma.booked_call_attribution.findMany({
           where: {
-            booked_call_id: { in: sources.map((source) => source.bookedCallId) },
+            booked_call_id: {
+              in: sources.map((source) => source.bookedCallId),
+            },
           },
           select: {
             booked_call_id: true,
@@ -260,7 +289,9 @@ export const refreshBookedCallAttribution = async (
             resolved_sequence_label: true,
           },
         });
-  const existingByBookedCallId = new Map(existingRows.map((row) => [row.booked_call_id, row]));
+  const existingByBookedCallId = new Map(
+    existingRows.map((row) => [row.booked_call_id, row]),
+  );
 
   const phoneKeys = Array.from(
     new Set(
@@ -336,7 +367,10 @@ export const refreshBookedCallAttribution = async (
           nameKeys,
         );
 
-  const byPhone = new Map<string, Array<{ id: string; lastTouchAtMs: number | null }>>();
+  const byPhone = new Map<
+    string,
+    Array<{ id: string; lastTouchAtMs: number | null }>
+  >();
   for (const row of conversationRows) {
     const key = normalizePhoneKey(row.contact_phone);
     if (!key) continue;
@@ -348,12 +382,23 @@ export const refreshBookedCallAttribution = async (
     byPhone.set(key, list);
   }
 
-  const profileRowsByPhone = new Map<string, Array<{ id: string; lastTouchAtMs: number | null }>>();
-  const profileRowsByEmail = new Map<string, Array<{ id: string; lastTouchAtMs: number | null }>>();
-  const profileRowsByName = new Map<string, Array<{ id: string; lastTouchAtMs: number | null }>>();
+  const profileRowsByPhone = new Map<
+    string,
+    Array<{ id: string; lastTouchAtMs: number | null }>
+  >();
+  const profileRowsByEmail = new Map<
+    string,
+    Array<{ id: string; lastTouchAtMs: number | null }>
+  >();
+  const profileRowsByName = new Map<
+    string,
+    Array<{ id: string; lastTouchAtMs: number | null }>
+  >();
 
   for (const row of profileRows) {
-    const lastTouchAtMs = row.last_touch_at ? row.last_touch_at.getTime() : null;
+    const lastTouchAtMs = row.last_touch_at
+      ? row.last_touch_at.getTime()
+      : null;
     const phoneKey = normalizePhoneKey(row.profile_phone);
     const emailKey = normalizeEmailKey(row.profile_email);
     const nameKey = normalizeContactNameKey(row.profile_name);
@@ -390,14 +435,14 @@ export const refreshBookedCallAttribution = async (
           candidatesByConversationId,
           candidate.id,
           candidate.lastTouchAtMs,
-        ).evidence.add('conversation_phone');
+        ).evidence.add("conversation_phone");
       }
       for (const candidate of profileRowsByPhone.get(identity.phoneKey) || []) {
         getOrCreateConversationCandidate(
           candidatesByConversationId,
           candidate.id,
           candidate.lastTouchAtMs,
-        ).evidence.add('profile_phone');
+        ).evidence.add("profile_phone");
       }
     }
     if (identity.emailKey) {
@@ -406,7 +451,7 @@ export const refreshBookedCallAttribution = async (
           candidatesByConversationId,
           candidate.id,
           candidate.lastTouchAtMs,
-        ).evidence.add('profile_email');
+        ).evidence.add("profile_email");
       }
     }
     if (identity.nameKey) {
@@ -415,51 +460,74 @@ export const refreshBookedCallAttribution = async (
           candidatesByConversationId,
           candidate.id,
           candidate.lastTouchAtMs,
-        ).evidence.add('profile_name');
+        ).evidence.add("profile_name");
       }
     }
 
     const smsLookup = smsSequenceLookup.get(source.bookedCallId);
-    const replyLink = smsReplyLinks.get(`${source.slackChannelId}::${source.slackMessageTs}`);
+    const replyLink = smsReplyLinks.get(
+      `${source.slackChannelId}::${source.slackMessageTs}`,
+    );
     const existing = existingByBookedCallId.get(source.bookedCallId);
-    const candidateResolution = resolveBestConversationCandidate(bookingTs, [...candidatesByConversationId.values()]);
+    const candidateResolution = resolveBestConversationCandidate(bookingTs, [
+      ...candidatesByConversationId.values(),
+    ]);
 
     const resolvedConversationId =
-      smsLookup?.conversationId || candidateResolution.conversationId || existing?.conversation_id || null;
+      smsLookup?.conversationId ||
+      candidateResolution.conversationId ||
+      existing?.conversation_id ||
+      null;
     const resolvedConversationMatchSeconds =
       smsLookup?.conversationId === resolvedConversationId
         ? 0
-        : (candidateResolution.conversationMatchSeconds ?? existing?.conversation_match_seconds ?? null);
+        : (candidateResolution.conversationMatchSeconds ??
+          existing?.conversation_match_seconds ??
+          null);
     const resolvedFirstConversion =
-      source.firstConversion || smsLookup?.sequenceLabel || existing?.first_conversion || null;
+      source.firstConversion ||
+      smsLookup?.sequenceLabel ||
+      existing?.first_conversion ||
+      null;
     const smartConversationMethod =
       candidateResolution.evidence != null
         ? `reaction_bucket_v3_${candidateResolution.evidence}`
-        : 'reaction_bucket_v2';
+        : "reaction_bucket_v2";
     const mappingMethod =
-      smsLookup?.sequenceLabel || smsLookup?.conversationId ? 'reaction_bucket_v3_sms_lookup' : smartConversationMethod;
+      smsLookup?.sequenceLabel || smsLookup?.conversationId
+        ? "reaction_bucket_v3_sms_lookup"
+        : smartConversationMethod;
     const mapperVersion =
       smsLookup?.sequenceLabel || smsLookup?.conversationId
-        ? 'v3.reaction-bucket.sms-lookup'
+        ? "v3.reaction-bucket.sms-lookup"
         : candidateResolution.evidence
           ? `v3.reaction-bucket.${candidateResolution.evidence}`
-          : 'v2.reaction-bucket';
+          : "v2.reaction-bucket";
     const matchConfidence =
       smsLookup?.conversationId || smsLookup?.sequenceLabel
-        ? source.bucket === 'selfBooked'
+        ? source.bucket === "selfBooked"
           ? 0.82
           : 0.98
-        : (candidateResolution.confidence ?? (source.bucket === 'selfBooked' ? 0.7 : 0.95));
+        : (candidateResolution.confidence ??
+          (source.bucket === "selfBooked" ? 0.7 : 0.95));
     const attributionState = buildAttributionStatus({
       hasConversation: Boolean(resolvedConversationId),
       confidence: matchConfidence,
-      smsMatched: Boolean(smsLookup?.sequenceLabel || smsLookup?.conversationId),
+      smsMatched: Boolean(
+        smsLookup?.sequenceLabel || smsLookup?.conversationId,
+      ),
       replyLinked: Boolean(replyLink?.hasPriorReply),
     });
     const resolvedSequenceLabel =
-      smsLookup?.sequenceLabel || resolvedFirstConversion || existing?.resolved_sequence_label || null;
+      smsLookup?.sequenceLabel ||
+      resolvedFirstConversion ||
+      existing?.resolved_sequence_label ||
+      null;
     const resolvedSequenceId =
-      (resolvedSequenceLabel ? sequenceIdByLabel.get(resolvedSequenceLabel.trim().toLowerCase()) || null : null) ||
+      (resolvedSequenceLabel
+        ? sequenceIdByLabel.get(resolvedSequenceLabel.trim().toLowerCase()) ||
+          null
+        : null) ||
       existing?.resolved_sequence_id ||
       null;
 
@@ -483,12 +551,17 @@ export const refreshBookedCallAttribution = async (
         setter_final: mapSetterFromBucket(source.bucket),
         closer_final: null,
         first_conversion: resolvedFirstConversion,
-        source_bucket: source.bucket === 'selfBooked' ? 'self_booked' : 'setter_attributed',
+        source_bucket:
+          source.bucket === "selfBooked" ? "self_booked" : "setter_attributed",
         resolved_sequence_id: resolvedSequenceId,
         resolved_sequence_label: resolvedSequenceLabel,
         attribution_path: attributionState.attributionPath,
-        matched_via_phone: Boolean(source.contactPhone && smsLookup?.conversationId),
-        matched_via_fuzzy: Boolean(candidateResolution.evidence && !smsLookup?.conversationId),
+        matched_via_phone: Boolean(
+          source.contactPhone && smsLookup?.conversationId,
+        ),
+        matched_via_fuzzy: Boolean(
+          candidateResolution.evidence && !smsLookup?.conversationId,
+        ),
         matched_via_reply_link: Boolean(replyLink?.hasPriorReply),
         hubspot_contact_id: null,
         lead_score: null,
@@ -511,12 +584,17 @@ export const refreshBookedCallAttribution = async (
         setter_hint: mapSetterHint(source.bucket),
         setter_final: mapSetterFromBucket(source.bucket),
         first_conversion: resolvedFirstConversion,
-        source_bucket: source.bucket === 'selfBooked' ? 'self_booked' : 'setter_attributed',
+        source_bucket:
+          source.bucket === "selfBooked" ? "self_booked" : "setter_attributed",
         resolved_sequence_id: resolvedSequenceId,
         resolved_sequence_label: resolvedSequenceLabel,
         attribution_path: attributionState.attributionPath,
-        matched_via_phone: Boolean(source.contactPhone && smsLookup?.conversationId),
-        matched_via_fuzzy: Boolean(candidateResolution.evidence && !smsLookup?.conversationId),
+        matched_via_phone: Boolean(
+          source.contactPhone && smsLookup?.conversationId,
+        ),
+        matched_via_fuzzy: Boolean(
+          candidateResolution.evidence && !smsLookup?.conversationId,
+        ),
         matched_via_reply_link: Boolean(replyLink?.hasPriorReply),
         mapper_version: mapperVersion,
       },
@@ -526,7 +604,7 @@ export const refreshBookedCallAttribution = async (
       await upsertAttributionReviewItem({
         booked_call_id: source.bookedCallId,
         priority: matchConfidence != null && matchConfidence < 0.8 ? 80 : 50,
-        issue_type: attributionState.reviewReason || 'needs_review',
+        issue_type: attributionState.reviewReason || "needs_review",
         issue_summary: `Attribution needs review for ${source.contactName || source.contactPhone || source.bookedCallId}`,
         candidate_sequences: {
           booked_call_id: source.bookedCallId,
@@ -535,7 +613,7 @@ export const refreshBookedCallAttribution = async (
           confidence: matchConfidence,
           conversation_id: resolvedConversationId,
         },
-        status: 'open',
+        status: "open",
       });
     }
 
@@ -543,7 +621,7 @@ export const refreshBookedCallAttribution = async (
     if (resolvedConversationId) matchedConversations += 1;
   }
 
-  logger?.info?.('booked-call-attribution: refreshed', {
+  logger?.info?.("booked-call-attribution: refreshed", {
     from: params.from.toISOString(),
     to: params.to.toISOString(),
     processed: sources.length,

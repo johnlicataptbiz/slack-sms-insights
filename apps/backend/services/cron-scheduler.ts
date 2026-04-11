@@ -1,20 +1,16 @@
 import type { App } from '@slack/bolt';
-import {
-  getConversionTrends,
-  getSetterPerformance,
-  getSLATrends,
-  getTeamPerformanceTrends,
-} from './analytics-queries.js';
 import { getAttributionLagStatus } from './attribution-health.js';
 import { refreshBookedCallAttribution } from './booked-call-attribution-refresh.js';
-import { postDerekComment } from './bot-personality.js';
 import { autoAssignWorkItems } from './comprehensive-fixes.js';
 import { logDailyRun } from './daily-run-logger.js';
 import { refreshKpiFacts } from './kpi-facts.js';
 import { getDefaultLrnBackfillOptions, runLrnBackfill } from './lrn-refresh.js';
-import { refreshTeamContext } from './message-context.js';
 import { getPrismaClient } from './prisma.js';
-import { postProactiveAlert, quickAlertCheck, shouldSendAlert } from './proactive-alerts.js';
+import {
+  postProactiveAlert,
+  quickAlertCheck,
+  shouldSendAlert,
+} from './proactive-alerts.js';
 import { generateAndPostReport } from './report-poster.js';
 
 const BUSINESS_TIMEZONE = 'America/Chicago';
@@ -37,8 +33,8 @@ const REPORT_MINUTE_CT = 0;
 const LRN_REFRESH_DEFAULT_HOUR_CT = 2;
 const LRN_REFRESH_DEFAULT_MINUTE_CT = 15;
 const PROACTIVE_ALERTS_INTERVAL_MINUTES = 60;
-const PROACTIVE_ALERTS_CHECK_ENABLED = (process.env.PROACTIVE_ALERTS_ENABLED ?? 'true').toLowerCase() === 'true';
-const ALERTS_WEBHOOK_URL = process.env.ALERTS_WEBHOOK_URL || 'http://localhost:3000/api/alerts/webhook';
+const PROACTIVE_ALERTS_CHECK_ENABLED =
+  (process.env.PROACTIVE_ALERTS_ENABLED ?? 'true').toLowerCase() === 'true';
 
 let lastRunDate: string | null = null;
 let cronIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -52,7 +48,9 @@ let lastAttributionHealthSlot: string | null = null;
 let lastAttributionAlertAt = 0;
 let lastAttributionRefreshDate: string | null = null;
 let lastKpiRefreshDate: string | null = null;
+let kpiRefreshInFlight = false;
 let lastProactiveAlertsSlot: string | null = null;
+let kpiIntervalId: ReturnType<typeof setInterval> | null = null;
 
 const getPrisma = () => getPrismaClient();
 
@@ -98,9 +96,13 @@ const addDaysToYmd = (ymd: string, days: number): string => {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 };
 
-const resolveNextRunCt = (targetHour: number, targetMinute: number): { date: string; time: string } => {
+const resolveNextRunCt = (
+  targetHour: number,
+  targetMinute: number,
+): { date: string; time: string } => {
   const { date, hour, minute } = getCTDateParts();
-  const sameDayEligible = hour < targetHour || (hour === targetHour && minute < targetMinute);
+  const sameDayEligible =
+    hour < targetHour || (hour === targetHour && minute < targetMinute);
   const nextDate = sameDayEligible ? date : addDaysToYmd(date, 1);
   return {
     date: nextDate,
@@ -146,13 +148,19 @@ export const startDailyReportCron = async (app: App): Promise<void> => {
       try {
         await maybeAlertAttributionLag(app, date, hour, minute);
       } catch (error) {
-        app.logger.error('[cron] Attribution lag check failed (non-fatal):', error);
+        app.logger.error(
+          '[cron] Attribution lag check failed (non-fatal):',
+          error,
+        );
       }
 
       try {
         await maybeRefreshBookedCallAttribution(app, date, hour, minute);
       } catch (error) {
-        app.logger.error('[cron] Booked call attribution refresh failed (non-fatal):', error);
+        app.logger.error(
+          '[cron] Booked call attribution refresh failed (non-fatal):',
+          error,
+        );
       }
 
       try {
@@ -194,7 +202,8 @@ export const startDailyReportCron = async (app: App): Promise<void> => {
               channelName: DAILY_REPORT_CHANNEL_NAME,
               reportType: 'daily',
               status: 'error',
-              errorMessage: error instanceof Error ? error.message : String(error),
+              errorMessage:
+                error instanceof Error ? error.message : String(error),
             },
             app.logger,
           );
@@ -218,12 +227,22 @@ const parseIntOr = (value: string | undefined, fallback: number): number => {
 };
 
 const getInboxWatchThresholds = () => ({
-  critical: Math.max(1, parseIntOr(process.env.INBOX_ALERT_CRITICAL_THRESHOLD, 50)),
+  critical: Math.max(
+    1,
+    parseIntOr(process.env.INBOX_ALERT_CRITICAL_THRESHOLD, 50),
+  ),
   stale: Math.max(1, parseIntOr(process.env.INBOX_ALERT_STALE_THRESHOLD, 50)),
-  unassigned: Math.max(1, parseIntOr(process.env.INBOX_ALERT_UNASSIGNED_THRESHOLD, 10)),
+  unassigned: Math.max(
+    1,
+    parseIntOr(process.env.INBOX_ALERT_UNASSIGNED_THRESHOLD, 10),
+  ),
 });
 
-const shouldRunInboxWatch = (date: string, hour: number, minute: number): boolean => {
+const shouldRunInboxWatch = (
+  date: string,
+  hour: number,
+  minute: number,
+): boolean => {
   if (minute % INBOX_WATCH_INTERVAL_MINUTES !== 0) return false;
   const slot = `${date}-${pad2(hour)}:${pad2(minute)}`;
   if (lastInboxWatchSlot === slot) return false;
@@ -231,7 +250,11 @@ const shouldRunInboxWatch = (date: string, hour: number, minute: number): boolea
   return true;
 };
 
-const shouldRunAttributionHealthCheck = (date: string, hour: number, minute: number): boolean => {
+const shouldRunAttributionHealthCheck = (
+  date: string,
+  hour: number,
+  minute: number,
+): boolean => {
   if (minute % ATTRIBUTION_HEALTH_CHECK_INTERVAL_MINUTES !== 0) return false;
   const slot = `${date}-${pad2(hour)}:${pad2(minute)}`;
   if (lastAttributionHealthSlot === slot) return false;
@@ -239,7 +262,11 @@ const shouldRunAttributionHealthCheck = (date: string, hour: number, minute: num
   return true;
 };
 
-const shouldRunProactiveAlerts = (date: string, hour: number, minute: number): boolean => {
+const shouldRunProactiveAlerts = (
+  date: string,
+  hour: number,
+  minute: number,
+): boolean => {
   if (!PROACTIVE_ALERTS_CHECK_ENABLED) return false;
   if (minute % PROACTIVE_ALERTS_INTERVAL_MINUTES !== 0) return false;
   const slot = `${date}-${pad2(hour)}:${pad2(minute)}`;
@@ -266,14 +293,18 @@ const checkProactiveAlerts = async (app: App): Promise<void> => {
     }
 
     // Get the alerts channel
-    const alertsChannelId = process.env.ALERTS_CHANNEL_ID || DAILY_REPORT_CHANNEL_ID;
+    const alertsChannelId =
+      process.env.ALERTS_CHANNEL_ID || DAILY_REPORT_CHANNEL_ID;
 
     // Post the alert with rich Block Kit formatting
     await postProactiveAlert(app.client, alertsChannelId, alerts, app.logger);
 
     app.logger.info(`[cron] Posted ${alerts.length} proactive alert(s)`);
   } catch (error) {
-    app.logger.error('[cron] Proactive alerts check failed (non-fatal):', error);
+    app.logger.error(
+      '[cron] Proactive alerts check failed (non-fatal):',
+      error,
+    );
   }
 };
 
@@ -330,7 +361,9 @@ const postInboxWatchAlert = async (
   counts: InboxWatchCounts,
   thresholds: { critical: number; stale: number; unassigned: number },
 ): Promise<void> => {
-  const channelId = (process.env.INBOX_ALERT_CHANNEL_ID || DAILY_REPORT_CHANNEL_ID).trim();
+  const channelId = (
+    process.env.INBOX_ALERT_CHANNEL_ID || DAILY_REPORT_CHANNEL_ID
+  ).trim();
   const now = Date.now();
   const signature = `${counts.criticalCount}|${counts.staleCount}|${counts.unassignedCount}|${counts.needsReplyCount}`;
   const breached =
@@ -338,7 +371,11 @@ const postInboxWatchAlert = async (
     counts.staleCount >= thresholds.stale ||
     counts.unassignedCount >= thresholds.unassigned;
   if (!breached) return;
-  if (now - lastInboxAlertAt < INBOX_ALERT_COOLDOWN_MS && signature === lastInboxAlertSignature) return;
+  if (
+    now - lastInboxAlertAt < INBOX_ALERT_COOLDOWN_MS &&
+    signature === lastInboxAlertSignature
+  )
+    return;
 
   // Trigger webhook to alerts API (for Slack Workflow integration)
   const webhookUrl = `${process.env.SMS_INSIGHTS_API_BASE_URL || 'http://localhost:3000'}/api/alerts/inbox`;
@@ -411,11 +448,17 @@ const maybeRefreshBookedCallAttribution = async (
   hour: number,
   minute: number,
 ): Promise<void> => {
-  if (hour !== ATTRIBUTION_REFRESH_HOUR_CT || minute !== ATTRIBUTION_REFRESH_MINUTE_CT) return;
+  if (
+    hour !== ATTRIBUTION_REFRESH_HOUR_CT ||
+    minute !== ATTRIBUTION_REFRESH_MINUTE_CT
+  )
+    return;
   if (lastAttributionRefreshDate === date) return;
 
   const to = new Date();
-  const from = new Date(to.getTime() - ATTRIBUTION_REFRESH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const from = new Date(
+    to.getTime() - ATTRIBUTION_REFRESH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+  );
   const result = await refreshBookedCallAttribution(
     {
       from,
@@ -428,12 +471,20 @@ const maybeRefreshBookedCallAttribution = async (
   app.logger.info('[cron] booked_call_attribution refresh complete', result);
 };
 
-const maybeAlertAttributionLag = async (app: App, date: string, hour: number, minute: number): Promise<void> => {
+const maybeAlertAttributionLag = async (
+  app: App,
+  date: string,
+  hour: number,
+  minute: number,
+): Promise<void> => {
   if (!shouldRunAttributionHealthCheck(date, hour, minute)) return;
 
-  const lagStatus = await getAttributionLagStatus(ATTRIBUTION_LAG_THRESHOLD_HOURS);
+  const lagStatus = await getAttributionLagStatus(
+    ATTRIBUTION_LAG_THRESHOLD_HOURS,
+  );
   if (!lagStatus.isLagging) return;
-  if (Date.now() - lastAttributionAlertAt < ATTRIBUTION_ALERT_COOLDOWN_MS) return;
+  if (Date.now() - lastAttributionAlertAt < ATTRIBUTION_ALERT_COOLDOWN_MS)
+    return;
 
   // Trigger webhook to alerts API (for Slack Workflow integration)
   const webhookUrl = `${process.env.SMS_INSIGHTS_API_BASE_URL || 'http://localhost:3000'}/api/alerts/attribution`;
@@ -451,7 +502,9 @@ const maybeAlertAttributionLag = async (app: App, date: string, hour: number, mi
     app.logger.error('[cron] attribution alert webhook failed:', error);
   }
 
-  const channelId = (process.env.ATTRIBUTION_ALERT_CHANNEL_ID || DAILY_REPORT_CHANNEL_ID).trim();
+  const channelId = (
+    process.env.ATTRIBUTION_ALERT_CHANNEL_ID || DAILY_REPORT_CHANNEL_ID
+  ).trim();
   await app.client.chat.postMessage({
     channel: channelId,
     text:
@@ -474,21 +527,39 @@ const maybeAlertAttributionLag = async (app: App, date: string, hour: number, mi
   lastAttributionAlertAt = Date.now();
 };
 
-const maybeRefreshKpiFacts = async (app: App, date: string, hour: number, minute: number): Promise<void> => {
+const maybeRefreshKpiFacts = async (
+  app: App,
+  date: string,
+  hour: number,
+  minute: number,
+): Promise<void> => {
   if (hour !== KPI_REFRESH_HOUR_CT || minute !== KPI_REFRESH_MINUTE_CT) return;
-  if (lastKpiRefreshDate === date) return;
+  if (lastKpiRefreshDate === date || kpiRefreshInFlight) return;
 
-  const now = new Date();
-  const from = new Date(now.getTime() - KPI_REFRESH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
-  await refreshKpiFacts({ from, to: now, timeZone: BUSINESS_TIMEZONE }, app.logger);
-  lastKpiRefreshDate = date;
-  app.logger.info('[cron] KPI facts refresh complete', {
-    from: from.toISOString(),
-    to: now.toISOString(),
-  });
+  kpiRefreshInFlight = true;
+  try {
+    const now = new Date();
+    const from = new Date(
+      now.getTime() - KPI_REFRESH_LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+    );
+    await refreshKpiFacts(
+      { from, to: now, timeZone: BUSINESS_TIMEZONE },
+      app.logger,
+    );
+    lastKpiRefreshDate = date;
+    app.logger.info('[cron] KPI facts refresh complete', {
+      from: from.toISOString(),
+      to: now.toISOString(),
+    });
+  } catch (error) {
+    app.logger.error('[cron] KPI facts refresh failed:', error);
+  } finally {
+    kpiRefreshInFlight = false;
+  }
 };
 
-const isLrnRefreshEnabled = (): boolean => parseBool(process.env.ALOWARE_LRN_REFRESH_CRON_ENABLED, false);
+const isLrnRefreshEnabled = (): boolean =>
+  parseBool(process.env.ALOWARE_LRN_REFRESH_CRON_ENABLED, false);
 
 export const getCronStatusSnapshot = (): {
   timezone: string;
@@ -519,15 +590,42 @@ export const getCronStatusSnapshot = (): {
   const defaultOptions = getDefaultLrnBackfillOptions();
   const lrnTargetHour = Math.max(
     0,
-    Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)),
+    Math.min(
+      23,
+      parseIntOr(
+        process.env.ALOWARE_LRN_REFRESH_HOUR_CT,
+        LRN_REFRESH_DEFAULT_HOUR_CT,
+      ),
+    ),
   );
   const lrnTargetMinute = Math.max(
     0,
-    Math.min(59, parseIntOr(process.env.ALOWARE_LRN_REFRESH_MINUTE_CT, LRN_REFRESH_DEFAULT_MINUTE_CT)),
+    Math.min(
+      59,
+      parseIntOr(
+        process.env.ALOWARE_LRN_REFRESH_MINUTE_CT,
+        LRN_REFRESH_DEFAULT_MINUTE_CT,
+      ),
+    ),
   );
-  const limit = Math.max(1, parseIntOr(process.env.ALOWARE_LRN_REFRESH_LIMIT, defaultOptions.limit));
-  const delayMs = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_DELAY_MS, defaultOptions.delayMs));
-  const staleDays = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_STALE_DAYS, defaultOptions.staleDays));
+  const limit = Math.max(
+    1,
+    parseIntOr(process.env.ALOWARE_LRN_REFRESH_LIMIT, defaultOptions.limit),
+  );
+  const delayMs = Math.max(
+    0,
+    parseIntOr(
+      process.env.ALOWARE_LRN_REFRESH_DELAY_MS,
+      defaultOptions.delayMs,
+    ),
+  );
+  const staleDays = Math.max(
+    0,
+    parseIntOr(
+      process.env.ALOWARE_LRN_REFRESH_STALE_DAYS,
+      defaultOptions.staleDays,
+    ),
+  );
   const forceAll = parseBool(process.env.ALOWARE_LRN_REFRESH_FORCE_ALL, false);
 
   return {
@@ -559,22 +657,51 @@ export const getCronStatusSnapshot = (): {
 
 export const startLrnRefreshCron = (app: App): void => {
   if (!isLrnRefreshEnabled()) {
-    app.logger.info('[cron] LRN refresh cron disabled (ALOWARE_LRN_REFRESH_CRON_ENABLED=false)');
+    app.logger.info(
+      '[cron] LRN refresh cron disabled (ALOWARE_LRN_REFRESH_CRON_ENABLED=false)',
+    );
     return;
   }
 
   const targetHour = Math.max(
     0,
-    Math.min(23, parseIntOr(process.env.ALOWARE_LRN_REFRESH_HOUR_CT, LRN_REFRESH_DEFAULT_HOUR_CT)),
+    Math.min(
+      23,
+      parseIntOr(
+        process.env.ALOWARE_LRN_REFRESH_HOUR_CT,
+        LRN_REFRESH_DEFAULT_HOUR_CT,
+      ),
+    ),
   );
   const targetMinute = Math.max(
     0,
-    Math.min(59, parseIntOr(process.env.ALOWARE_LRN_REFRESH_MINUTE_CT, LRN_REFRESH_DEFAULT_MINUTE_CT)),
+    Math.min(
+      59,
+      parseIntOr(
+        process.env.ALOWARE_LRN_REFRESH_MINUTE_CT,
+        LRN_REFRESH_DEFAULT_MINUTE_CT,
+      ),
+    ),
   );
   const defaultOptions = getDefaultLrnBackfillOptions();
-  const limit = Math.max(1, parseIntOr(process.env.ALOWARE_LRN_REFRESH_LIMIT, defaultOptions.limit));
-  const delayMs = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_DELAY_MS, defaultOptions.delayMs));
-  const staleDays = Math.max(0, parseIntOr(process.env.ALOWARE_LRN_REFRESH_STALE_DAYS, defaultOptions.staleDays));
+  const limit = Math.max(
+    1,
+    parseIntOr(process.env.ALOWARE_LRN_REFRESH_LIMIT, defaultOptions.limit),
+  );
+  const delayMs = Math.max(
+    0,
+    parseIntOr(
+      process.env.ALOWARE_LRN_REFRESH_DELAY_MS,
+      defaultOptions.delayMs,
+    ),
+  );
+  const staleDays = Math.max(
+    0,
+    parseIntOr(
+      process.env.ALOWARE_LRN_REFRESH_STALE_DAYS,
+      defaultOptions.staleDays,
+    ),
+  );
   const forceAll = parseBool(process.env.ALOWARE_LRN_REFRESH_FORCE_ALL, false);
 
   app.logger.info(
@@ -613,6 +740,7 @@ export const startLrnRefreshCron = (app: App): void => {
   }, CHECK_INTERVAL_MS);
 };
 
+<<<<<<< HEAD
 type SimpleLogger = Pick<Console, 'info' | 'warn' | 'error'>;
 
 let kpiIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -655,6 +783,17 @@ export const startKpiRefreshCron = (logger: SimpleLogger = console): void => {
       } finally {
         kpiRefreshInFlight = false;
       }
+=======
+export const startKpiRefreshCron = (app: App): void => {
+  app.logger.info(
+    `[cron] KPI refresh cron started — fires at ${KPI_REFRESH_HOUR_CT}:${String(KPI_REFRESH_MINUTE_CT).padStart(2, '0')} CT`,
+  );
+
+  kpiIntervalId = setInterval(() => {
+    void (async () => {
+      const { date, hour, minute } = getCTDateParts();
+      await maybeRefreshKpiFacts(app, date, hour, minute);
+>>>>>>> 8636c4e3 (fix: stabilize backend prisma and deploy path)
     })();
   }, CHECK_INTERVAL_MS);
 };

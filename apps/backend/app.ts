@@ -8,6 +8,7 @@ import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleApiRoute } from './api/routes.js';
 import registerListeners from './listeners/index.js';
+import { startAlowareSmsPollingJobs } from './services/aloware-sms-poller.js';
 import { initDatabase } from './services/db.js';
 import { reportError } from './services/error-reporter.js';
 import { logger } from './services/logger.js';
@@ -15,17 +16,22 @@ import { startMondaySmsReportsSyncJobs } from './services/monday-sms-reports.js'
 import { startMondaySmsSequencesSyncJobs } from './services/monday-sms-sequences.js';
 import { startMondaySmsSyncJobs } from './services/monday-sms-sync.js';
 import { startMondaySyncJobs } from './services/monday-sync.js';
-import { startAlowareSmsPollingJobs } from './services/aloware-sms-poller.js';
 import { setSlackAuthRuntimeStatus } from './services/runtime-status.js';
-import { assertStreamTokenSecretConfigured, getStreamTokenSecretConfigStatus } from './services/stream-token.js';
+import {
+  assertStreamTokenSecretConfigured,
+  getStreamTokenSecretConfigStatus,
+} from './services/stream-token.js';
 import { HealthController } from './src/controllers/health.controller.js';
 
 const DEFAULT_APP_LOG_LEVEL = LogLevel.INFO;
-const safeEnvLen = (value: string | undefined): number => (value || '').trim().length;
-const isProduction = (): boolean => (process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
+const safeEnvLen = (value: string | undefined): number =>
+  (value || '').trim().length;
+const isProduction = (): boolean =>
+  (process.env.NODE_ENV || '').trim().toLowerCase() === 'production';
 
 const assertStartupSecurityConfig = (): void => {
-  const allowDummyAuthToken = (process.env.ALLOW_DUMMY_AUTH_TOKEN || '').trim().toLowerCase() === 'true';
+  const allowDummyAuthToken =
+    (process.env.ALLOW_DUMMY_AUTH_TOKEN || '').trim().toLowerCase() === 'true';
   if (allowDummyAuthToken && isProduction()) {
     throw new Error('ALLOW_DUMMY_AUTH_TOKEN cannot be enabled in production.');
   }
@@ -41,14 +47,22 @@ type SlackStartupErrorLike = {
   message?: string;
 };
 
-const parseSlackStartupError = (error: unknown): { invalidAuth: boolean; reason: string } => {
+const parseSlackStartupError = (
+  error: unknown,
+): { invalidAuth: boolean; reason: string } => {
   const fallback = error instanceof Error ? error.message : String(error);
   if (!error || typeof error !== 'object') {
     return { invalidAuth: false, reason: fallback };
   }
   const err = error as SlackStartupErrorLike;
-  if (err.data?.error === 'invalid_auth' || err.code === 'slack_webapi_platform_error') {
-    return { invalidAuth: true, reason: err.data?.error || err.message || fallback };
+  if (
+    err.data?.error === 'invalid_auth' ||
+    err.code === 'slack_webapi_platform_error'
+  ) {
+    return {
+      invalidAuth: true,
+      reason: err.data?.error || err.message || fallback,
+    };
   }
   return { invalidAuth: false, reason: err.message || fallback };
 };
@@ -129,7 +143,9 @@ app.error(async (error) => {
 
     // Frontend is deployed on Vercel in production. Only attempt to serve a local
     // `frontend/dist` bundle when explicitly enabled (useful for single-container dev).
-    const serveFrontendFromDisk = (process.env.SERVE_FRONTEND_FROM_DISK || '').trim().toLowerCase() === 'true';
+    const serveFrontendFromDisk =
+      (process.env.SERVE_FRONTEND_FROM_DISK || '').trim().toLowerCase() ===
+      'true';
 
     // Get frontend dist path
     const __filename = fileURLToPath(import.meta.url);
@@ -139,9 +155,14 @@ app.error(async (error) => {
 
     if (serveFrontendFromDisk) {
       try {
-        frontendIndex = readFileSync(join(frontendDistPath, 'index.html'), 'utf-8');
+        frontendIndex = readFileSync(
+          join(frontendDistPath, 'index.html'),
+          'utf-8',
+        );
       } catch {
-        logger.app.warn('Frontend dist not found; dashboard will be unavailable');
+        logger.app.warn(
+          'Frontend dist not found; dashboard will be unavailable',
+        );
       }
     }
 
@@ -155,29 +176,43 @@ app.error(async (error) => {
       compressionMiddleware(req, res, () => {
         // Continue with request handling
         void (async () => {
-          const pathname = new URL(req.url || '/', `http://${req.headers.host}`).pathname;
+          const pathname = new URL(req.url || '/', `http://${req.headers.host}`)
+            .pathname;
 
           // Handle health check
           if (pathname === '/health') {
             const controller = new HealthController();
-            await controller.execute({ req, res } as unknown as Parameters<typeof controller.execute>[0]);
+            await controller.execute({ req, res } as unknown as Parameters<
+              typeof controller.execute
+            >[0]);
             return;
           }
 
           // Handle API routes
           if (pathname.startsWith('/api/')) {
-            const handled = await handleApiRoute(req, res, pathname, app.logger);
+            const handled = await handleApiRoute(
+              req,
+              res,
+              pathname,
+              app.logger,
+            );
             if (handled) {
               return;
             }
           }
 
           // Serve static files from public directory
-          if (!pathname.startsWith('/api/') && !pathname.startsWith('/assets/')) {
+          if (
+            !pathname.startsWith('/api/') &&
+            !pathname.startsWith('/assets/')
+          ) {
             const __filename = fileURLToPath(import.meta.url);
             const __dirname = join(__filename, '..');
             const publicDir = join(__dirname, 'public');
-            const filePath = join(publicDir, pathname === '/' ? '/index.html' : pathname);
+            const filePath = join(
+              publicDir,
+              pathname === '/' ? '/index.html' : pathname,
+            );
 
             try {
               const stats = statSync(filePath);
@@ -228,12 +263,17 @@ app.error(async (error) => {
     // Start Bolt App
     let slackStarted = false;
     if (process.env.SLACK_BOT_TOKEN === 'dummy-token') {
-      setSlackAuthRuntimeStatus('disabled', 'Slack bot runtime disabled: dummy-token token in use');
+      setSlackAuthRuntimeStatus(
+        'disabled',
+        'Slack bot runtime disabled: dummy-token token in use',
+      );
       logger.app.info('⚡️ Bolt app skipped (dummy token detected)');
     } else {
       const missingSlackEnv: string[] = [];
-      if (!(process.env.SLACK_BOT_TOKEN || '').trim()) missingSlackEnv.push('SLACK_BOT_TOKEN');
-      if (!(process.env.SLACK_APP_TOKEN || '').trim()) missingSlackEnv.push('SLACK_APP_TOKEN');
+      if (!(process.env.SLACK_BOT_TOKEN || '').trim())
+        missingSlackEnv.push('SLACK_BOT_TOKEN');
+      if (!(process.env.SLACK_APP_TOKEN || '').trim())
+        missingSlackEnv.push('SLACK_APP_TOKEN');
 
       if (missingSlackEnv.length > 0) {
         const detail = `Slack runtime disabled: missing required env vars ${missingSlackEnv.join(', ')}`;
@@ -243,7 +283,10 @@ app.error(async (error) => {
         try {
           await app.start();
           slackStarted = true;
-          setSlackAuthRuntimeStatus('ok', 'Slack Bolt app started in Socket Mode');
+          setSlackAuthRuntimeStatus(
+            'ok',
+            'Slack Bolt app started in Socket Mode',
+          );
           logger.app.info('⚡️ Bolt app is running via Socket Mode!');
         } catch (error) {
           const parsed = parseSlackStartupError(error);
@@ -260,15 +303,25 @@ app.error(async (error) => {
     logger.app.info({
       msg: 'Token config diagnostics',
       alowareApiTokenLength: safeEnvLen(process.env.ALOWARE_API_TOKEN),
-      alowareWebhookTokenLength: safeEnvLen(process.env.ALOWARE_WEBHOOK_API_TOKEN),
+      alowareWebhookTokenLength: safeEnvLen(
+        process.env.ALOWARE_WEBHOOK_API_TOKEN,
+      ),
       alowareFormTokenLength: safeEnvLen(process.env.ALOWARE_FORM_API_TOKEN),
       mondayTokenLength: safeEnvLen(process.env.MONDAY_API_TOKEN),
     });
 
+<<<<<<< HEAD
     // 🕒 KPI facts refresh — runs independently of Slack auth.
     //    Keeps fact_sms_daily / fact_booking_daily current even when Slack is misconfigured.
     const { startKpiRefreshCron, startDailyReportCron, startLrnRefreshCron } = await import('./services/cron-scheduler.js');
     startKpiRefreshCron(logger.app);
+=======
+    const { startDailyReportCron, startKpiRefreshCron, startLrnRefreshCron } =
+      await import('./services/cron-scheduler.js');
+
+    // KPI refresh must stay alive even if Slack auth is unavailable.
+    startKpiRefreshCron(app);
+>>>>>>> 8636c4e3 (fix: stabilize backend prisma and deploy path)
 
     // 🕒 Daily Report Cron — fires at 6:00 AM CT every day via user token
     if (slackStarted) {
@@ -287,7 +340,9 @@ app.error(async (error) => {
     // Aloware SMS polling jobs (direct API polling, feature-flag gated)
     startAlowareSmsPollingJobs(app.logger);
   } catch (error) {
-    logger.app.error(`[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`);
+    logger.app.error(
+      `[startup] Fatal startup error: ${error instanceof Error ? error.message : String(error)}`,
+    );
     await reportError(app, error, 'Startup Failure');
   }
 })();

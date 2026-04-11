@@ -1,6 +1,6 @@
-import { getPrismaClient } from './prisma.js';
+import { getPrismaClient } from "./prisma.js";
 
-const getPrisma = () => getPrismaClient();
+const getPrisma = () => getPrismaClient() as any;
 
 export const hasRecentPersistentFeedback = async ({
   channelId,
@@ -14,7 +14,7 @@ export const hasRecentPersistentFeedback = async ({
   const prisma = getPrisma();
 
   try {
-    const feedback = await prisma.setterFeedbackDedupe.findUnique({
+    const feedback = await prisma.setter_feedback_dedupe.findUnique({
       where: {
         channel_id_thread_ts: {
           channel_id: channelId,
@@ -45,7 +45,7 @@ export const insertPersistentFeedback = async ({
   const prisma = getPrisma();
 
   try {
-    await prisma.setterFeedbackDedupe.upsert({
+    await prisma.setter_feedback_dedupe.upsert({
       where: {
         channel_id_thread_ts: {
           channel_id: channelId,

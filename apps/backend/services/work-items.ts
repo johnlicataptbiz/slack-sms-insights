@@ -1,13 +1,13 @@
-import type { Logger } from '@slack/bolt';
-import { getPrismaClient } from './prisma.js';
-import { publishRealtimeEvent } from './realtime.js';
+import type { Logger } from "@slack/bolt";
+import { getPrismaClient } from "./prisma.js";
+import { publishRealtimeEvent } from "./realtime.js";
 
-const getPrisma = () => getPrismaClient();
+const getPrisma = () => getPrismaClient() as any;
 
 export type WorkItemListRow = {
   id: string;
   type: string;
-  severity: 'low' | 'med' | 'high';
+  severity: "low" | "med" | "high";
   due_at: string;
   created_at: string;
   resolved_at: string | null;
@@ -31,7 +31,7 @@ export type WorkItemCursor = {
 export type ListOpenWorkItemsParams = {
   type?: string;
   repId?: string;
-  severity?: 'low' | 'med' | 'high';
+  severity?: "low" | "med" | "high";
   overdueOnly?: boolean;
   dueBefore?: string;
   limit: number;
@@ -45,21 +45,21 @@ export type ListOpenWorkItemsResult = {
 };
 
 const encodeCursor = (cursor: WorkItemCursor): string => {
-  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url');
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
 };
 
 const decodeCursor = (cursor: string): WorkItemCursor => {
-  const raw = Buffer.from(cursor, 'base64url').toString('utf8');
+  const raw = Buffer.from(cursor, "base64url").toString("utf8");
   const parsed = JSON.parse(raw) as { dueAt?: unknown; id?: unknown };
-  if (typeof parsed?.dueAt !== 'string' || typeof parsed?.id !== 'string') {
-    throw new Error('Invalid cursor');
+  if (typeof parsed?.dueAt !== "string" || typeof parsed?.id !== "string") {
+    throw new Error("Invalid cursor");
   }
   return { dueAt: parsed.dueAt, id: parsed.id };
 };
 
 export const listOpenWorkItems = async (
   params: ListOpenWorkItemsParams,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<ListOpenWorkItemsResult> => {
   const prisma = getPrisma();
   try {
@@ -74,12 +74,12 @@ export const listOpenWorkItems = async (
     if (params.overdueOnly) where.due_at = { lt: new Date() };
     if (params.dueBefore) where.due_at = { lt: new Date(params.dueBefore) };
 
-    const results = await prisma.workItems.findMany({
+    const results = await prisma.work_items.findMany({
       where,
       include: {
         conversation: true,
       },
-      orderBy: [{ due_at: 'asc' }, { id: 'asc' }],
+      orderBy: [{ due_at: "asc" }, { id: "asc" }],
       take: limit + 1,
       cursor: params.cursor ? { id: params.cursor.id } : undefined,
       skip: params.offset || (params.cursor ? 1 : undefined),
@@ -100,43 +100,54 @@ export const listOpenWorkItems = async (
       contact_key: wi.conversation.contactKey,
       contact_id: wi.conversation.contact_id,
       contact_phone: wi.conversation.contact_phone,
-      last_inbound_at: wi.conversation.last_inbound_at ? wi.conversation.last_inbound_at.toISOString() : null,
-      last_outbound_at: wi.conversation.last_outbound_at ? wi.conversation.last_outbound_at.toISOString() : null,
-      last_touch_at: wi.conversation.last_touch_at ? wi.conversation.last_touch_at.toISOString() : null,
+      last_inbound_at: wi.conversation.last_inbound_at
+        ? wi.conversation.last_inbound_at.toISOString()
+        : null,
+      last_outbound_at: wi.conversation.last_outbound_at
+        ? wi.conversation.last_outbound_at.toISOString()
+        : null,
+      last_touch_at: wi.conversation.last_touch_at
+        ? wi.conversation.last_touch_at.toISOString()
+        : null,
       unreplied_inbound_count: wi.conversation.unreplied_inbound_count,
     }));
 
     const last = items.at(-1);
-    const nextCursor: WorkItemCursor | null = hasMore && last ? { dueAt: last.due_at, id: last.id } : null;
+    const nextCursor: WorkItemCursor | null =
+      hasMore && last ? { dueAt: last.due_at, id: last.id } : null;
 
     return { items, nextCursor };
   } catch (err) {
-    logger?.error('listOpenWorkItems failed', err);
+    logger?.error("listOpenWorkItems failed", err);
     throw err;
   }
 };
 
 export const resolveWorkItem = async (
   id: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<boolean> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.workItems.updateMany({
+    const result = await prisma.work_items.updateMany({
       where: { id, resolved_at: null },
       data: { resolved_at: new Date() },
     });
 
     if (result.count > 0) {
       publishRealtimeEvent({
-        type: 'work-item-updated',
-        payload: { id, status: 'resolved', resolvedAt: new Date().toISOString() },
+        type: "work-item-updated",
+        payload: {
+          id,
+          status: "resolved",
+          resolvedAt: new Date().toISOString(),
+        },
       });
       return true;
     }
     return false;
   } catch (err) {
-    logger?.error('resolveWorkItem failed', err);
+    logger?.error("resolveWorkItem failed", err);
     throw err;
   }
 };
@@ -144,11 +155,11 @@ export const resolveWorkItem = async (
 export const assignWorkItem = async (
   id: string,
   repId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<boolean> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.workItems.update({
+    const result = await prisma.work_items.update({
       where: { id },
       data: { rep_id: repId },
       select: { id: true, rep_id: true },
@@ -156,17 +167,19 @@ export const assignWorkItem = async (
 
     if (result) {
       publishRealtimeEvent({
-        type: 'work-item-updated',
+        type: "work-item-updated",
         payload: { id: result.id, repId: result.rep_id },
       });
       return true;
     }
     return false;
   } catch (err) {
-    logger?.error('assignWorkItem failed', err);
+    logger?.error("assignWorkItem failed", err);
     throw err;
   }
 };
 
-export const encodeWorkItemCursor = (cursor: WorkItemCursor): string => encodeCursor(cursor);
-export const decodeWorkItemCursor = (cursor: string): WorkItemCursor => decodeCursor(cursor);
+export const encodeWorkItemCursor = (cursor: WorkItemCursor): string =>
+  encodeCursor(cursor);
+export const decodeWorkItemCursor = (cursor: string): WorkItemCursor =>
+  decodeCursor(cursor);

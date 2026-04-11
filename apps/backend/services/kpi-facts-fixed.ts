@@ -1,54 +1,65 @@
-import type { Logger } from '@slack/bolt';
+import type { Logger } from "@slack/bolt";
 import {
   getBookedCallAttributionSources,
   getBookedCallSequenceFromSmsEvents,
   getBookedCallSmsReplyLinks,
-} from './booked-calls.js';
-import { getPrismaClient } from './prisma.js';
-import { attributeSlackBookedCallsToSequences } from './sequence-booked-attribution.js';
+} from "./booked-calls.js";
+import { getPrismaClient } from "./prisma.js";
+import { attributeSlackBookedCallsToSequences } from "./sequence-booked-attribution.js";
 
 const getPrisma = () => getPrismaClient();
 
-const MANUAL_LABEL = 'No sequence (manual/direct)';
-const MONDAY_BACKFILL_LABEL = 'Monday backfill (sequence unresolved)';
-const SOCIAL_MEDIA_BACKFILL_LABEL = 'Social Media (Monday backfill)';
-const SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL = 'Social Media - Instagram (Monday backfill)';
-const SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL = 'Social Media - Facebook Ads (Monday backfill)';
-const SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL = 'Social Media - Facebook Group (Monday backfill)';
-const SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL = 'Social Media - LinkedIn (Monday backfill)';
-const SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL = 'Social Media - Organic (Monday backfill)';
-const DEFAULT_SALES_TEAM_BOARD_ID = '5077164868';
+const MANUAL_LABEL = "No sequence (manual/direct)";
+const MONDAY_BACKFILL_LABEL = "Monday backfill (sequence unresolved)";
+const SOCIAL_MEDIA_BACKFILL_LABEL = "Social Media (Monday backfill)";
+const SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL =
+  "Social Media - Instagram (Monday backfill)";
+const SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL =
+  "Social Media - Facebook Ads (Monday backfill)";
+const SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL =
+  "Social Media - Facebook Group (Monday backfill)";
+const SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL =
+  "Social Media - LinkedIn (Monday backfill)";
+const SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL =
+  "Social Media - Organic (Monday backfill)";
+const DEFAULT_SALES_TEAM_BOARD_ID = "5077164868";
 const HIGH_CONFIDENCE_BOOKING_PATTERN =
   /\b(call booked|booked call|booked for|appointment booked|appointment confirmed|scheduled (?:a )?call|strategy call booked)\b/i;
-const BOOKED_CONFIRMATION_LINK_PATTERN = /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
-const CANCELLATION_PATTERN = /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
+const BOOKED_CONFIRMATION_LINK_PATTERN =
+  /(?:https?:\/\/)?vip\.physicaltherapybiz\.com\/call-booked(?:[/?#][^\s]*)?/i;
+const CANCELLATION_PATTERN =
+  /\b(cancel|cancellation|delete me off your list|remove me|unsubscribe|stop)\b/i;
 
 const normalizeRep = (value: string | null | undefined): string => {
-  const normalized = (value || '').trim().toLowerCase();
-  if (!normalized) return 'unknown';
-  if (normalized.includes('jack')) return 'jack';
-  if (normalized.includes('brandon')) return 'brandon';
-  if (normalized.includes('john')) return 'john';
-  if (normalized.includes('toni') || normalized.includes('tony')) return 'toni';
+  const normalized = (value || "").trim().toLowerCase();
+  if (!normalized) return "unknown";
+  if (normalized.includes("jack")) return "jack";
+  if (normalized.includes("brandon")) return "brandon";
+  if (normalized.includes("john")) return "john";
+  if (normalized.includes("toni") || normalized.includes("tony")) return "toni";
   return normalized;
 };
 
-const contactKeyFor = (event: { contact_id: string | null; contact_phone: string | null }): string | null => {
+const contactKeyFor = (event: {
+  contact_id: string | null;
+  contact_phone: string | null;
+}): string | null => {
   if (event.contact_id) return `contact:${event.contact_id}`;
-  if (event.contact_phone) return `phone:${event.contact_phone.replace(/\D/g, '')}`;
+  if (event.contact_phone)
+    return `phone:${event.contact_phone.replace(/\D/g, "")}`;
   return null;
 };
 
 const dayKey = (value: Date, timeZone: string): string => {
-  const parts = new Intl.DateTimeFormat('en-US', {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).formatToParts(value);
-  const year = parts.find((part) => part.type === 'year')?.value || '1970';
-  const month = parts.find((part) => part.type === 'month')?.value || '01';
-  const day = parts.find((part) => part.type === 'day')?.value || '01';
+  const year = parts.find((part) => part.type === "year")?.value || "1970";
+  const month = parts.find((part) => part.type === "month")?.value || "01";
+  const day = parts.find((part) => part.type === "day")?.value || "01";
   return `${year}-${month}-${day}`;
 };
 
@@ -57,20 +68,31 @@ const toDayDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 const isBookingSignal = (direction: string, body: string): boolean => {
   if (!body) return false;
   if (BOOKED_CONFIRMATION_LINK_PATTERN.test(body)) return true;
-  return direction === 'inbound' && HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) && !CANCELLATION_PATTERN.test(body);
+  return (
+    direction === "inbound" &&
+    HIGH_CONFIDENCE_BOOKING_PATTERN.test(body) &&
+    !CANCELLATION_PATTERN.test(body)
+  );
 };
 
 const isOptOutSignal = (direction: string, body: string): boolean =>
-  direction === 'inbound' && CANCELLATION_PATTERN.test(body);
+  direction === "inbound" && CANCELLATION_PATTERN.test(body);
 
-const resolveSocialMondayBackfillLabel = (source: string | null | undefined): string => {
-  const normalized = (source || '').trim().toLowerCase();
+const resolveSocialMondayBackfillLabel = (
+  source: string | null | undefined,
+): string => {
+  const normalized = (source || "").trim().toLowerCase();
   if (!normalized) return SOCIAL_MEDIA_BACKFILL_LABEL;
-  if (normalized.includes('instagram')) return SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL;
-  if (normalized.includes('facebook group')) return SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL;
-  if (normalized.includes('facebook ads') || normalized === 'facebook') return SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL;
-  if (normalized.includes('linkedin')) return SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL;
-  if (normalized.includes('organic social')) return SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL;
+  if (normalized.includes("instagram"))
+    return SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL;
+  if (normalized.includes("facebook group"))
+    return SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL;
+  if (normalized.includes("facebook ads") || normalized === "facebook")
+    return SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL;
+  if (normalized.includes("linkedin"))
+    return SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL;
+  if (normalized.includes("organic social"))
+    return SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL;
   return SOCIAL_MEDIA_BACKFILL_LABEL;
 };
 
@@ -92,37 +114,48 @@ export type KpiFactRefreshResult = {
 
 export const refreshKpiFacts = async (
   params: FactRefreshParams,
-  logger?: Pick<Logger, 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "info" | "warn" | "error">,
 ): Promise<KpiFactRefreshResult> => {
-  const prisma = getPrisma();
-  const salesTeamBoardId = (process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID).trim();
+  const prisma = getPrisma() as any;
+  const salesTeamBoardId = (
+    process.env.MONDAY_SALES_TEAM_BOARD_ID || DEFAULT_SALES_TEAM_BOARD_ID
+  ).trim();
 
   const manual = await prisma.sequenceRegistry.upsert({
     where: { label: MANUAL_LABEL },
-    update: { isManualBucket: true, normalizedLabel: 'no sequence manual direct' },
+    update: {
+      isManualBucket: true,
+      normalizedLabel: "no sequence manual direct",
+    },
     create: {
       label: MANUAL_LABEL,
-      normalizedLabel: 'no sequence manual direct',
+      normalizedLabel: "no sequence manual direct",
       isManualBucket: true,
     },
     select: { id: true },
   });
   const mondayBackfill = await prisma.sequenceRegistry.upsert({
     where: { label: MONDAY_BACKFILL_LABEL },
-    update: { isManualBucket: false, normalizedLabel: 'monday backfill sequence unresolved' },
+    update: {
+      isManualBucket: false,
+      normalizedLabel: "monday backfill sequence unresolved",
+    },
     create: {
       label: MONDAY_BACKFILL_LABEL,
-      normalizedLabel: 'monday backfill sequence unresolved',
+      normalizedLabel: "monday backfill sequence unresolved",
       isManualBucket: false,
     },
     select: { id: true },
   });
   const socialMediaBackfill = await prisma.sequenceRegistry.upsert({
     where: { label: SOCIAL_MEDIA_BACKFILL_LABEL },
-    update: { isManualBucket: false, normalizedLabel: 'social media monday backfill' },
+    update: {
+      isManualBucket: false,
+      normalizedLabel: "social media monday backfill",
+    },
     create: {
       label: SOCIAL_MEDIA_BACKFILL_LABEL,
-      normalizedLabel: 'social media monday backfill',
+      normalizedLabel: "social media monday backfill",
       isManualBucket: false,
     },
     select: { id: true },
@@ -136,50 +169,65 @@ export const refreshKpiFacts = async (
   ] = await Promise.all([
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL },
-      update: { isManualBucket: false, normalizedLabel: 'social media instagram monday backfill' },
+      update: {
+        isManualBucket: false,
+        normalizedLabel: "social media instagram monday backfill",
+      },
       create: {
         label: SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
-        normalizedLabel: 'social media instagram monday backfill',
+        normalizedLabel: "social media instagram monday backfill",
         isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL },
-      update: { isManualBucket: false, normalizedLabel: 'social media facebook ads monday backfill' },
+      update: {
+        isManualBucket: false,
+        normalizedLabel: "social media facebook ads monday backfill",
+      },
       create: {
         label: SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
-        normalizedLabel: 'social media facebook ads monday backfill',
+        normalizedLabel: "social media facebook ads monday backfill",
         isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL },
-      update: { isManualBucket: false, normalizedLabel: 'social media facebook group monday backfill' },
+      update: {
+        isManualBucket: false,
+        normalizedLabel: "social media facebook group monday backfill",
+      },
       create: {
         label: SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
-        normalizedLabel: 'social media facebook group monday backfill',
+        normalizedLabel: "social media facebook group monday backfill",
         isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL },
-      update: { isManualBucket: false, normalizedLabel: 'social media linkedin monday backfill' },
+      update: {
+        isManualBucket: false,
+        normalizedLabel: "social media linkedin monday backfill",
+      },
       create: {
         label: SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
-        normalizedLabel: 'social media linkedin monday backfill',
+        normalizedLabel: "social media linkedin monday backfill",
         isManualBucket: false,
       },
       select: { id: true },
     }),
     prisma.sequenceRegistry.upsert({
       where: { label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL },
-      update: { isManualBucket: false, normalizedLabel: 'social media organic monday backfill' },
+      update: {
+        isManualBucket: false,
+        normalizedLabel: "social media organic monday backfill",
+      },
       create: {
         label: SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
-        normalizedLabel: 'social media organic monday backfill',
+        normalizedLabel: "social media organic monday backfill",
         isManualBucket: false,
       },
       select: { id: true },
@@ -193,9 +241,9 @@ export const refreshKpiFacts = async (
   const rows = await prisma.sms_events.findMany({
     where: {
       event_ts: { gte: scanFrom, lte: rangeTo },
-      direction: { in: ['inbound', 'outbound'] },
+      direction: { in: ["inbound", "outbound"] },
     },
-    orderBy: { event_ts: 'asc' },
+    orderBy: { event_ts: "asc" },
     select: {
       event_ts: true,
       direction: true,
@@ -208,7 +256,12 @@ export const refreshKpiFacts = async (
     },
   });
 
-  type Event = (typeof rows)[number] & { _contactKey: string; _rep: string; _seqId: string; _day: string };
+  type Event = (typeof rows)[number] & {
+    _contactKey: string;
+    _rep: string;
+    _seqId: string;
+    _day: string;
+  };
   const events: Event[] = [];
   for (const row of rows) {
     const key = contactKeyFor(row);
@@ -267,11 +320,12 @@ export const refreshKpiFacts = async (
   };
 
   const inRangeDay = (day: string): boolean =>
-    day >= dayKey(rangeFrom, params.timeZone) && day <= dayKey(rangeTo, params.timeZone);
+    day >= dayKey(rangeFrom, params.timeZone) &&
+    day <= dayKey(rangeTo, params.timeZone);
 
   for (const event of events) {
     if (!inRangeDay(event._day)) continue;
-    if (event.direction !== 'outbound') continue;
+    if (event.direction !== "outbound") continue;
     const stat = ensure(event._day, event._seqId, event._rep);
     stat.messagesSent += 1;
     stat.uniqueContactedSet.add(event._contactKey);
@@ -279,7 +333,8 @@ export const refreshKpiFacts = async (
 
   for (const contactEvents of eventsByContact.values()) {
     for (const inbound of contactEvents) {
-      if (!inRangeDay(inbound._day) || inbound.direction !== 'inbound') continue;
+      if (!inRangeDay(inbound._day) || inbound.direction !== "inbound")
+        continue;
 
       const inboundTs = inbound.event_ts.getTime();
       let attributed: Event | null = null;
@@ -287,12 +342,12 @@ export const refreshKpiFacts = async (
       let latestSequenced: Event | null = null;
 
       for (const candidate of contactEvents) {
-        if (candidate.direction !== 'outbound') continue;
+        if (candidate.direction !== "outbound") continue;
         const ts = candidate.event_ts.getTime();
         if (ts > inboundTs) break;
         if (inboundTs - ts > 14 * 24 * 60 * 60 * 1000) continue;
         latestAny = candidate;
-        if ((candidate.sequence || '').trim()) latestSequenced = candidate;
+        if ((candidate.sequence || "").trim()) latestSequenced = candidate;
       }
 
       attributed = latestSequenced || latestAny;
@@ -304,8 +359,11 @@ export const refreshKpiFacts = async (
         stat.repliesReceived += 1;
       }
 
-      const body = (inbound.body || '').trim();
-      if (isOptOutSignal(inbound.direction, body) && !stat.optOutSet.has(inbound._contactKey)) {
+      const body = (inbound.body || "").trim();
+      if (
+        isOptOutSignal(inbound.direction, body) &&
+        !stat.optOutSet.has(inbound._contactKey)
+      ) {
         stat.optOutSet.add(inbound._contactKey);
         stat.optOuts += 1;
       }
@@ -325,17 +383,16 @@ export const refreshKpiFacts = async (
     repliesReceived: row.repliesReceived,
     optOuts: row.optOuts,
     bookingSignalsSms: row.bookingSignalsSms,
-    replyRatePct: row.uniqueContactedSet.size > 0 ? (row.repliesReceived / row.uniqueContactedSet.size) * 100 : 0,
-    optOutRatePct: row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
+    replyRatePct:
+      row.uniqueContactedSet.size > 0
+        ? (row.repliesReceived / row.uniqueContactedSet.size) * 100
+        : 0,
+    optOutRatePct:
+      row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0,
   }));
 
   const fromDay = dayKey(rangeFrom, params.timeZone);
   const toDay = dayKey(rangeTo, params.timeZone);
-
-  interface SequenceRow {
-    id: string;
-    label: string;
-  }
 
   interface SequenceRowForAttribution {
     label: string;
@@ -347,9 +404,14 @@ export const refreshKpiFacts = async (
     optOuts: number;
   }
 
-  const sequenceRows = await prisma.sequenceRegistry.findMany({
+  type SequenceRegistryRow = {
+    id: string;
+    label: string;
+  };
+
+  const sequenceRows = (await prisma.sequenceRegistry.findMany({
     select: { id: true, label: true },
-  });
+  })) as SequenceRegistryRow[];
   const messagesSentBySequenceId = new Map<string, number>();
   for (const row of smsRows) {
     messagesSentBySequenceId.set(
@@ -358,21 +420,24 @@ export const refreshKpiFacts = async (
     );
   }
 
-  const sequenceRowsForAttribution: SequenceRowForAttribution[] = sequenceRows.map((row) => ({
-    label: row.label,
-    messagesSent: messagesSentBySequenceId.get(row.id) || 0,
-    repliesReceived: 0,
-    replyRatePct: 0,
-    bookingSignalsSms: 0,
-    booked: 0,
-    optOuts: 0,
-  }));
+  const sequenceRowsForAttribution: SequenceRowForAttribution[] =
+    sequenceRows.map((row) => ({
+      label: row.label,
+      messagesSent: messagesSentBySequenceId.get(row.id) || 0,
+      repliesReceived: 0,
+      replyRatePct: 0,
+      bookingSignalsSms: 0,
+      booked: 0,
+      optOuts: 0,
+    }));
 
   const bookedCallSources = await getBookedCallAttributionSources({
     from: rangeFrom,
     to: rangeTo,
   });
-  const attributionLogger = logger ? { ...logger, debug: logger.info } : undefined;
+  const attributionLogger = logger
+    ? { ...logger, debug: logger.info }
+    : undefined;
   const [smsReplyLinks, smsSequenceLookup] = await Promise.all([
     getBookedCallSmsReplyLinks(bookedCallSources, attributionLogger),
     getBookedCallSequenceFromSmsEvents(bookedCallSources, attributionLogger),
@@ -401,11 +466,16 @@ export const refreshKpiFacts = async (
   const bumpBookingRow = (input: {
     eventTs: string;
     sequenceLabel: string;
-    bucket: 'jack' | 'brandon' | 'selfBooked';
+    bucket: "jack" | "brandon" | "selfBooked";
     strictSmsReplyLinked: boolean;
   }) => {
     const dayKeyValue = dayKey(new Date(input.eventTs), params.timeZone);
-    const setter = input.bucket === 'jack' ? 'jack' : input.bucket === 'brandon' ? 'brandon' : 'unknown';
+    const setter =
+      input.bucket === "jack"
+        ? "jack"
+        : input.bucket === "brandon"
+          ? "brandon"
+          : "unknown";
     const key = `${dayKeyValue}|${input.sequenceLabel}|${setter}`;
     const row = bookingRowsMap.get(key) || {
       day_key: dayKeyValue,
@@ -418,14 +488,17 @@ export const refreshKpiFacts = async (
       booked_after_sms_reply: 0,
     };
     row.booked_total += 1;
-    if (input.bucket === 'jack') row.booked_jack += 1;
-    else if (input.bucket === 'brandon') row.booked_brandon += 1;
+    if (input.bucket === "jack") row.booked_jack += 1;
+    else if (input.bucket === "brandon") row.booked_brandon += 1;
     else row.booked_self += 1;
     if (input.strictSmsReplyLinked) row.booked_after_sms_reply += 1;
     bookingRowsMap.set(key, row);
   };
 
-  for (const [sequenceLabel, breakdown] of sequenceAttribution.byLabel.entries()) {
+  for (const [
+    sequenceLabel,
+    breakdown,
+  ] of sequenceAttribution.byLabel.entries()) {
     for (const auditRow of breakdown.auditRows) {
       bumpBookingRow({
         eventTs: auditRow.eventTs,
@@ -437,7 +510,9 @@ export const refreshKpiFacts = async (
   }
   for (const missing of sequenceAttribution.unattributedAuditRows) {
     const fallbackSequenceLabel =
-      missing.bucket === 'jack' || missing.bucket === 'brandon' ? SOCIAL_MEDIA_BACKFILL_LABEL : MANUAL_LABEL;
+      missing.bucket === "jack" || missing.bucket === "brandon"
+        ? SOCIAL_MEDIA_BACKFILL_LABEL
+        : MANUAL_LABEL;
     bumpBookingRow({
       eventTs: missing.eventTs,
       sequenceLabel: fallbackSequenceLabel,
@@ -448,42 +523,42 @@ export const refreshKpiFacts = async (
 
   const bookingRows = Array.from(bookingRowsMap.values());
 
-  const rawBookedFallbackRows = await prisma.$queryRawUnsafe<
-    Array<{
-      day_key: string;
-      booked_total: number;
-    }>
-  >(
+  type RawBookedFallbackRow = {
+    day_key: string;
+    booked_total: number;
+  };
+
+  const rawBookedFallbackRows = (await prisma.$queryRawUnsafe(
     `SELECT
-       to_char(date_trunc('day', event_ts AT TIME ZONE $${3}), 'YYYY-MM-DD') AS day_key,
+       to_char(date_trunc('day', event_ts AT TIME ZONE $3), 'YYYY-MM-DD') AS day_key,
        COUNT(*)::int AS booked_total
      FROM booked_calls
-     WHERE event_ts >= $${1}::timestamptz
-       AND event_ts <= $${2}::timestamptz
+     WHERE event_ts >= $1::timestamptz
+       AND event_ts <= $2::timestamptz
        AND (LOWER(COALESCE(text, '')) LIKE '%call booked%' OR LOWER(COALESCE(text, '')) LIKE '%appointment%' OR LOWER(COALESCE(text, '')) LIKE '%scheduled%' OR LOWER(COALESCE(text, '')) LIKE '%strategy call%')
      GROUP BY 1`,
     rangeFrom.toISOString(),
     rangeTo.toISOString(),
     params.timeZone,
-  );
+  )) as RawBookedFallbackRow[];
 
-  const mondayFallbackRows = await prisma.$queryRawUnsafe<
-    Array<{
-      day_key: string;
-      sequence_key: string;
-      source_key: string | null;
-      setter: string | null;
-      booked_total: number;
-    }>
-  >(
+  type MondayFallbackRow = {
+    day_key: string;
+    sequence_key: string;
+    source_key: string | null;
+    setter: string | null;
+    booked_total: number;
+  };
+
+  const mondayFallbackRows = (await prisma.$queryRawUnsafe(
     `
     SELECT
-      to_char(date_trunc('day', lo.call_date::timestamp AT TIME ZONE $${3}), 'YYYY-MM-DD') AS day_key,
+      to_char(date_trunc('day', lo.call_date::timestamp AT TIME ZONE $3), 'YYYY-MM-DD') AS day_key,
       COALESCE(
         NULLIF(BTRIM(la.sequence), ''),
         NULLIF(BTRIM(la.campaign), ''),
         NULLIF(BTRIM(sms_seq.sequence_key), ''),
-        $${4}
+        $4
       ) AS sequence_key,
       COALESCE(
         NULLIF(BTRIM(lo.source), ''),
@@ -501,7 +576,7 @@ export const refreshKpiFacts = async (
       ON la.board_id = lo.board_id
      AND la.item_id = lo.item_id
     LEFT JOIN LATERAL (
-      SELECT COALESCE(NULLIF(BTRIM(se.sequence), ''), $${4}) AS sequence_key
+      SELECT COALESCE(NULLIF(BTRIM(se.sequence), ''), $4) AS sequence_key
       FROM sms_events se
       WHERE se.direction = 'outbound'
         AND se.event_ts <= (lo.call_date::timestamp + INTERVAL '1 day')
@@ -523,10 +598,10 @@ export const refreshKpiFacts = async (
     ) sms_seq ON TRUE
     WHERE lo.is_booked = TRUE
       AND lo.call_date IS NOT NULL
-      AND lo.call_date >= $${1}::date
-      AND lo.call_date <= $${2}::date
+      AND lo.call_date >= $1::date
+      AND lo.call_date <= $2::date
       AND lo.call_date <= (CURRENT_DATE - INTERVAL '2 days')
-      AND lo.board_id = $${5}
+      AND lo.board_id = $5
     GROUP BY 1,2,3,4
     `,
     fromDay,
@@ -534,12 +609,17 @@ export const refreshKpiFacts = async (
     params.timeZone,
     MANUAL_LABEL,
     salesTeamBoardId,
-  );
+  )) as MondayFallbackRow[];
 
   // If Slack attribution is incomplete, backfill residual counts from Monday as historical source of truth.
-  const fallbackDayTotals = new Map(rawBookedFallbackRows.map((row) => [row.day_key, row.booked_total]));
+  const fallbackDayTotals = new Map(
+    rawBookedFallbackRows.map((row) => [row.day_key, row.booked_total]),
+  );
   for (const row of bookingRows) {
-    fallbackDayTotals.set(row.day_key, Math.max(0, (fallbackDayTotals.get(row.day_key) || 0) - row.booked_total));
+    fallbackDayTotals.set(
+      row.day_key,
+      Math.max(0, (fallbackDayTotals.get(row.day_key) || 0) - row.booked_total),
+    );
   }
   const mondayRowsByDay = new Map<
     string,
@@ -555,7 +635,7 @@ export const refreshKpiFacts = async (
     list.push({
       sequence_key: row.sequence_key || MANUAL_LABEL,
       source_key: row.source_key || null,
-      setter: normalizeRep(row.setter || 'unknown'),
+      setter: normalizeRep(row.setter || "unknown"),
       remaining: Math.max(0, row.booked_total || 0),
     });
     mondayRowsByDay.set(row.day_key, list);
@@ -578,7 +658,9 @@ export const refreshKpiFacts = async (
       if (take <= 0) continue;
 
       const setter = candidate.setter;
-      const isSocialSource = /social|instagram|facebook|linkedin/i.test(candidate.source_key || '');
+      const isSocialSource = /social|instagram|facebook|linkedin/i.test(
+        candidate.source_key || "",
+      );
       const mondayResolvedSequenceKey =
         candidate.sequence_key === MANUAL_LABEL
           ? isSocialSource
@@ -590,9 +672,9 @@ export const refreshKpiFacts = async (
         sequence_key: mondayResolvedSequenceKey,
         setter,
         booked_total: take,
-        booked_jack: setter === 'jack' ? take : 0,
-        booked_brandon: setter === 'brandon' ? take : 0,
-        booked_self: setter === 'jack' || setter === 'brandon' ? 0 : take,
+        booked_jack: setter === "jack" ? take : 0,
+        booked_brandon: setter === "brandon" ? take : 0,
+        booked_self: setter === "jack" || setter === "brandon" ? 0 : take,
         booked_after_sms_reply: 0,
       });
       candidate.remaining -= take;
@@ -605,7 +687,7 @@ export const refreshKpiFacts = async (
       bookingRows.push({
         day_key: dayKey,
         sequence_key: MANUAL_LABEL,
-        setter: 'unknown',
+        setter: "unknown",
         booked_total: residualBooked,
         booked_jack: 0,
         booked_brandon: 0,
@@ -645,26 +727,53 @@ export const refreshKpiFacts = async (
   }
   const mergedBookingRows = Array.from(mergedBookingRowsMap.values());
 
-  const bookingAliases = Array.from(new Set(mergedBookingRows.map((row) => row.sequence_key).filter(Boolean)));
+  const bookingAliases = Array.from(
+    new Set(mergedBookingRows.map((row) => row.sequence_key).filter(Boolean)),
+  );
+  type AliasRow = {
+    rawLabel: string;
+    sequenceId: string;
+  };
+
   const aliasRows =
     bookingAliases.length > 0
-      ? await prisma.sequence_aliases.findMany({
-          where: { raw_label: { in: bookingAliases } },
-          select: { raw_label: true, sequence_id: true },
-        })
+      ? ((await prisma.sequence_aliases.findMany({
+          where: { rawLabel: { in: bookingAliases } },
+          select: { rawLabel: true, sequenceId: true },
+        })) as AliasRow[])
       : [];
-  const aliasByRawLabel = new Map(aliasRows.map((row) => [row.raw_label, row.sequence_id]));
+  const aliasByRawLabel = new Map(
+    aliasRows.map((row) => [row.rawLabel, row.sequenceId]),
+  );
   aliasByRawLabel.set(MONDAY_BACKFILL_LABEL, mondayBackfill.id);
   aliasByRawLabel.set(SOCIAL_MEDIA_BACKFILL_LABEL, socialMediaBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL, socialInstagramBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL, socialFacebookAdsBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL, socialFacebookGroupBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL, socialLinkedInBackfill.id);
-  aliasByRawLabel.set(SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL, socialOrganicBackfill.id);
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_INSTAGRAM_BACKFILL_LABEL,
+    socialInstagramBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_FACEBOOK_ADS_BACKFILL_LABEL,
+    socialFacebookAdsBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_FACEBOOK_GROUP_BACKFILL_LABEL,
+    socialFacebookGroupBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_LINKEDIN_BACKFILL_LABEL,
+    socialLinkedInBackfill.id,
+  );
+  aliasByRawLabel.set(
+    SOCIAL_MEDIA_ORGANIC_BACKFILL_LABEL,
+    socialOrganicBackfill.id,
+  );
   const smsBaseMap = new Map(
     smsRows.map((row) => [
       `${row.day}|${row.sequenceId}|${row.repId}`,
-      { uniqueContacted: row.uniqueContacted, bookingSignalsSms: row.bookingSignalsSms },
+      {
+        uniqueContacted: row.uniqueContacted,
+        bookingSignalsSms: row.bookingSignalsSms,
+      },
     ]),
   );
 
@@ -682,39 +791,40 @@ export const refreshKpiFacts = async (
       booked_brandon: row.booked_brandon,
       booked_self: row.booked_self,
       booked_after_sms_reply: row.booked_after_sms_reply,
-      booking_rate_pct: uniqueContacted > 0 ? (row.booked_total / uniqueContacted) * 100 : 0,
+      booking_rate_pct:
+        uniqueContacted > 0 ? (row.booked_total / uniqueContacted) * 100 : 0,
       diagnostic_booking_signals: smsBase?.bookingSignalsSms || 0,
     };
   });
 
-  const leadRows = await prisma.$queryRawUnsafe<
-    Array<{
-      day_key: string;
-      sequence_id: string;
-      rep_id: string;
-      leads_count: number;
-      p0: number;
-      p1: number;
-      p2: number;
-      p3: number;
-      p4: number;
-      rm_cash: number;
-      rm_ins: number;
-      rm_bal: number;
-      rm_unknown: number;
-      emp_full: number;
-      emp_part: number;
-      emp_unknown: number;
-      ci_high: number;
-      ci_med: number;
-      ci_low: number;
-      ci_unknown: number;
-    }>
-  >(
+  type LeadRow = {
+    day_key: string;
+    sequence_id: string;
+    rep_id: string;
+    leads_count: number;
+    p0: number;
+    p1: number;
+    p2: number;
+    p3: number;
+    p4: number;
+    rm_cash: number;
+    rm_ins: number;
+    rm_bal: number;
+    rm_unknown: number;
+    emp_full: number;
+    emp_part: number;
+    emp_unknown: number;
+    ci_high: number;
+    ci_med: number;
+    ci_low: number;
+    ci_unknown: number;
+  };
+
+  const leadRows = (await prisma.$queryRawUnsafe(
     `WITH latest_touch AS (
        SELECT
          c.id AS conversation_id,
-         COALESCE(se.sequence_id, $${3}::uuid) AS sequence_id,
+         COALESCE(se.sequence_id, $3::uuid) AS sequence_id,
          COALESCE(NULLIF(lower(trim(se.aloware_user)), ''), 'unknown') AS rep_id
        FROM conversations c
        LEFT JOIN LATERAL (
@@ -727,7 +837,7 @@ export const refreshKpiFacts = async (
        ) se ON TRUE
      )
      SELECT
-       to_char(date_trunc('day', cs.updated_at AT TIME ZONE $${4}), 'YYYY-MM-DD') AS day_key,
+       to_char(date_trunc('day', cs.updated_at AT TIME ZONE $4), 'YYYY-MM-DD') AS day_key,
        lt.sequence_id,
        lt.rep_id,
        COUNT(*)::int AS leads_count,
@@ -749,14 +859,14 @@ export const refreshKpiFacts = async (
        COUNT(*) FILTER (WHERE cs.qualification_coaching_interest = 'unknown' OR cs.qualification_coaching_interest IS NULL)::int AS ci_unknown
      FROM conversation_state cs
      JOIN latest_touch lt ON lt.conversation_id = cs.conversation_id
-     WHERE cs.updated_at >= $${1}::timestamptz
-       AND cs.updated_at <= $${2}::timestamptz
+     WHERE cs.updated_at >= $1::timestamptz
+       AND cs.updated_at <= $2::timestamptz
      GROUP BY 1,2,3`,
     rangeFrom.toISOString(),
     rangeTo.toISOString(),
     manual.id,
     params.timeZone,
-  );
+  )) as LeadRow[];
 
   const leadFactRows = leadRows.map((row) => ({
     day: toDayDate(row.day_key),
@@ -829,7 +939,11 @@ export const refreshKpiFacts = async (
   }
 
   for (const row of bookingFactRows) {
-    const funnel = ensureFunnelRow(row.day.toISOString().slice(0, 10), row.sequence_id, row.rep_id);
+    const funnel = ensureFunnelRow(
+      row.day.toISOString().slice(0, 10),
+      row.sequence_id,
+      row.rep_id,
+    );
     funnel.booked_calls = row.booked_total;
   }
 
@@ -870,8 +984,8 @@ export const refreshKpiFacts = async (
         COALESCE(NULLIF(LOWER(BTRIM(se.aloware_user)), ''), 'unknown') AS rep_id
       FROM sms_events se
       WHERE se.conversation_id IS NOT NULL
-        AND se.event_ts >= $${1}::timestamptz
-        AND se.event_ts <= $${2}::timestamptz
+        AND se.event_ts >= $1::timestamptz
+        AND se.event_ts <= $2::timestamptz
         AND se.direction IN ('inbound', 'outbound')
     ),
     first_outbound AS (
@@ -890,7 +1004,7 @@ export const refreshKpiFacts = async (
     ),
     sequence_rep AS (
       SELECT se.conversation_id,
-        COALESCE(se.sequence_id, $${3}::uuid) AS sequence_id,
+        COALESCE(se.sequence_id, $3::uuid) AS sequence_id,
         se.rep_id
       FROM scoped_events se
       JOIN first_outbound fo
@@ -901,8 +1015,8 @@ export const refreshKpiFacts = async (
       SELECT conversation_id, MIN(booked_event_ts) AS first_booked_at
       FROM booked_call_attribution
       WHERE conversation_id IS NOT NULL
-        AND booked_event_ts >= $${1}::timestamptz
-        AND booked_event_ts <= $${2}::timestamptz
+        AND booked_event_ts >= $1::timestamptz
+        AND booked_event_ts <= $2::timestamptz
       GROUP BY conversation_id
     ),
     qualified AS (
@@ -910,8 +1024,8 @@ export const refreshKpiFacts = async (
       FROM conversation_state cs
       JOIN first_outbound fo ON fo.conversation_id = cs.conversation_id
       WHERE cs.qualification_progress_step >= 3
-        AND cs.updated_at >= $${1}::timestamptz
-        AND cs.updated_at <= $${2}::timestamptz
+        AND cs.updated_at >= $1::timestamptz
+        AND cs.updated_at <= $2::timestamptz
       GROUP BY cs.conversation_id
     ),
     outbound_counts AS (
@@ -997,7 +1111,7 @@ export const refreshKpiFacts = async (
     SELECT
       date_trunc('day', booked_event_ts)::date AS day,
       COUNT(*) FILTER (WHERE resolved_sequence_id IS NOT NULL) AS matched_calls,
-      COUNT(*) FILTER (WHERE resolved_sequence_label = $${3}) AS manual_direct_calls,
+      COUNT(*) FILTER (WHERE resolved_sequence_label = $3) AS manual_direct_calls,
       COUNT(*) FILTER (WHERE resolved_sequence_id IS NULL) AS unattributed_calls,
       COUNT(*) FILTER (WHERE matched_via_phone IS TRUE) AS sms_phone_match_calls,
       COUNT(*) FILTER (WHERE matched_via_fuzzy IS TRUE) AS fuzzy_match_calls,
@@ -1005,8 +1119,8 @@ export const refreshKpiFacts = async (
       NOW(),
       NOW()
     FROM booked_call_attribution
-    WHERE booked_event_ts >= $${1}::timestamptz
-      AND booked_event_ts <= $${2}::timestamptz
+    WHERE booked_event_ts >= $1::timestamptz
+      AND booked_event_ts <= $2::timestamptz
     GROUP BY 1
     ON CONFLICT (day) DO UPDATE SET
       matched_calls = EXCLUDED.matched_calls,
@@ -1046,8 +1160,8 @@ export const refreshKpiFacts = async (
       NOW(),
       NOW()
     FROM conversation_journey
-    WHERE window_start >= $${1}::timestamptz
-      AND window_start < ($${2}::timestamptz + INTERVAL '1 day')
+    WHERE window_start >= $1::timestamptz
+      AND window_start < ($2::timestamptz + INTERVAL '1 day')
     GROUP BY 1, 2
     ON CONFLICT (day, rep_id) DO UPDATE SET
       new_leads_contacted = EXCLUDED.new_leads_contacted,
@@ -1061,20 +1175,20 @@ export const refreshKpiFacts = async (
     rangeTo.toISOString(),
   );
 
-  const mondayRows = await prisma.$queryRawUnsafe<
-    Array<{
-      board_id: string;
-      board_class: string;
-      sync_status: string | null;
-      source_coverage_pct: number;
-      campaign_coverage_pct: number;
-      set_by_coverage_pct: number;
-      touchpoints_coverage_pct: number;
-      snapshot_count: number;
-      lead_attribution_count: number;
-      metric_fact_count: number;
-    }>
-  >(
+  type MondayFactQueryRow = {
+    board_id: string;
+    board_class: string;
+    sync_status: string | null;
+    source_coverage_pct: number;
+    campaign_coverage_pct: number;
+    set_by_coverage_pct: number;
+    touchpoints_coverage_pct: number;
+    snapshot_count: number;
+    lead_attribution_count: number;
+    metric_fact_count: number;
+  };
+
+  const mondayRows = (await prisma.$queryRawUnsafe(
     `SELECT
        board_id,
        board_class,
@@ -1087,7 +1201,7 @@ export const refreshKpiFacts = async (
        lead_attribution_count,
        metric_fact_count
      FROM analytics_data_quality_v`,
-  );
+  )) as MondayFactQueryRow[];
 
   const mondayDayDate = toDayDate(toDay);
   const mondayFactRows = mondayRows.map((row) => ({
@@ -1095,7 +1209,7 @@ export const refreshKpiFacts = async (
     board_id: row.board_id,
     board_class: row.board_class,
     sync_status: row.sync_status,
-    is_stale: row.sync_status !== 'success',
+    is_stale: row.sync_status !== "success",
     source_coverage_pct: Number(row.source_coverage_pct || 0),
     campaign_coverage_pct: Number(row.campaign_coverage_pct || 0),
     set_by_coverage_pct: Number(row.set_by_coverage_pct || 0),
@@ -1107,13 +1221,13 @@ export const refreshKpiFacts = async (
 
   const writes = [
     prisma.$executeRawUnsafe(
-      `DELETE FROM conversation_journey WHERE window_start >= $${1}::timestamptz AND window_start < ($${2}::timestamptz + INTERVAL '1 day')`,
+      `DELETE FROM conversation_journey WHERE window_start >= $1::timestamptz AND window_start < ($2::timestamptz + INTERVAL '1 day')`,
       rangeFrom.toISOString(),
       rangeTo.toISOString(),
     ),
     conversationJourneyInsert,
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_sms_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      "DELETE FROM fact_sms_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1137,7 +1251,7 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_booking_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      "DELETE FROM fact_booking_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1150,7 +1264,7 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_lead_quality_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      "DELETE FROM fact_lead_quality_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1163,7 +1277,7 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_sequence_funnel_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      "DELETE FROM fact_sequence_funnel_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1176,19 +1290,19 @@ export const refreshKpiFacts = async (
         ]
       : []),
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_attribution_method_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      "DELETE FROM fact_attribution_method_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
     attributionMethodInsert,
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_rep_response_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      "DELETE FROM fact_rep_response_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
     repResponseInsert,
     prisma.$executeRawUnsafe(
-      'DELETE FROM fact_monday_health_daily WHERE day >= $${1}::date AND day <= $${2}::date',
+      "DELETE FROM fact_monday_health_daily WHERE day >= $1::date AND day <= $2::date",
       fromDay,
       toDay,
     ),
@@ -1204,7 +1318,7 @@ export const refreshKpiFacts = async (
 
   await prisma.$transaction(writes);
 
-  logger?.info?.('kpi-facts: refreshed daily facts', {
+  logger?.info?.("kpi-facts: refreshed daily facts", {
     fromDay,
     toDay,
     smsRows: smsRows.length,

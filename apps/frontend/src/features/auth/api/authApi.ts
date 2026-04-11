@@ -1,4 +1,4 @@
-import { client } from '@/api/client';
+import { client } from "@/api/client";
 
 export interface LoginRequest {
   password: string;
@@ -11,17 +11,14 @@ export interface AuthResponse {
 
 export const authApi = {
   async verify(): Promise<AuthResponse> {
-    const response = await client.get('/api/auth/verify');
-    return response.data;
+    return client.get("/api/auth/verify");
   },
 
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await client.post('/api/auth/login', data);
-    return response.data;
+    return client.post("/api/auth/login", data);
   },
 
   async logout(): Promise<AuthResponse> {
-    const response = await client.post('/api/auth/logout');
-    return response.data;
+    return client.post("/api/auth/logout", {});
   },
 };

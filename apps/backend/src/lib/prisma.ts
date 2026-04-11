@@ -1,15 +1,15 @@
-import { randomUUID } from 'node:crypto';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '@prisma/client';
-import { withAccelerate } from '@prisma/extension-accelerate';
-import { Pool } from 'pg';
+import { randomUUID } from "node:crypto";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@prisma/client";
+import { withAccelerate } from "@prisma/extension-accelerate";
+import { Pool } from "pg";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   prismaCompatStore?: CompatStore;
 };
 
-type PrismaMode = 'accelerate' | 'direct' | 'local';
+type PrismaMode = "accelerate" | "direct" | "local";
 
 type CompatUser = {
   id: string;
@@ -74,22 +74,22 @@ type CompatStore = {
 };
 
 const resolvePrismaConfig = (): { mode: PrismaMode; url?: string } => {
-  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || '').trim();
-  const databaseUrl = (process.env.DATABASE_URL || '').trim();
+  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || "").trim();
+  const databaseUrl = (process.env.DATABASE_URL || "").trim();
 
-  if (accelerateUrl && accelerateUrl.startsWith('prisma+postgres://')) {
-    return { mode: 'accelerate', url: accelerateUrl };
+  if (accelerateUrl && accelerateUrl.startsWith("prisma+postgres://")) {
+    return { mode: "accelerate", url: accelerateUrl };
   }
 
-  if (databaseUrl && databaseUrl.startsWith('prisma+postgres://')) {
-    return { mode: 'accelerate', url: databaseUrl };
+  if (databaseUrl && databaseUrl.startsWith("prisma+postgres://")) {
+    return { mode: "accelerate", url: databaseUrl };
   }
 
   if (databaseUrl) {
-    return { mode: 'direct', url: databaseUrl };
+    return { mode: "direct", url: databaseUrl };
   }
 
-  return { mode: 'local' };
+  return { mode: "local" };
 };
 
 const getCompatStore = (): CompatStore => {
@@ -106,7 +106,10 @@ const getCompatStore = (): CompatStore => {
   return globalForPrisma.prismaCompatStore;
 };
 
-const applySelect = <T extends Record<string, unknown>>(row: T, select?: Record<string, boolean>) => {
+const applySelect = <T extends Record<string, unknown>>(
+  row: T,
+  select?: Record<string, boolean>,
+) => {
   if (!select) {
     return row;
   }
@@ -121,11 +124,17 @@ const applySelect = <T extends Record<string, unknown>>(row: T, select?: Record<
   return selected;
 };
 
-const containsInsensitive = (value: string | null | undefined, needle: string) => {
-  return (value || '').toLowerCase().includes(needle.toLowerCase());
+const containsInsensitive = (
+  value: string | null | undefined,
+  needle: string,
+) => {
+  return (value || "").toLowerCase().includes(needle.toLowerCase());
 };
 
-const applyOrdering = <T extends Record<string, unknown>>(rows: T[], orderBy?: Record<string, 'asc' | 'desc'>) => {
+const applyOrdering = <T extends Record<string, unknown>>(
+  rows: T[],
+  orderBy?: Record<string, "asc" | "desc">,
+) => {
   if (!orderBy) {
     return rows;
   }
@@ -142,12 +151,18 @@ const applyOrdering = <T extends Record<string, unknown>>(rows: T[], orderBy?: R
       return 0;
     }
     if (left === undefined || left === null) {
-      return direction === 'asc' ? -1 : 1;
+      return direction === "asc" ? -1 : 1;
     }
     if (right === undefined || right === null) {
-      return direction === 'asc' ? 1 : -1;
+      return direction === "asc" ? 1 : -1;
     }
-    return left < right ? (direction === 'asc' ? -1 : 1) : (direction === 'asc' ? 1 : -1);
+    return left < right
+      ? direction === "asc"
+        ? -1
+        : 1
+      : direction === "asc"
+        ? 1
+        : -1;
   });
 };
 
@@ -159,28 +174,64 @@ const applyPagination = <T>(rows: T[], skip?: number, take?: number) => {
 
 const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
   const prismaAny = client as any;
+
+  // In production, do NOT silently create in-memory stores for missing models.
+  // Missing models should fail explicitly so the schema gets fixed.
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ENABLE_PRISMA_COMPAT !== "true"
+  ) {
+    // Only apply camelCase aliases for models that actually exist in the schema
+    const delegateAliases: Array<[legacy: string, current: string]> = [
+      ["conversation", "conversations"],
+      ["sequenceRegistry", "sequence_registry"],
+      ["dailyRun", "daily_runs"],
+      ["mondaySyncState", "monday_sync_state"],
+      ["mondayColumnMapping", "monday_column_mappings"],
+      ["mondayBoardRegistry", "monday_board_registry"],
+      ["mondayBookedCallPushes", "monday_booked_call_pushes"],
+      ["mondayCallSnapshots", "monday_call_snapshots"],
+      ["mondayWeeklyReports", "monday_weekly_reports"],
+      ["mondayMetricFacts", "monday_metric_facts"],
+      ["actorDirectory", "actor_directory"],
+      ["leadOutcomes", "lead_outcomes"],
+      ["leadAttribution", "lead_attribution"],
+      ["setterActivity", "setter_activity"],
+      ["mondayCallColumnLatest", "monday_call_column_latest"],
+      ["mondayCallColumnHistory", "monday_call_column_history"],
+      ["workItem", "work_items"],
+      ["smsEvent", "sms_events"],
+    ];
+    for (const [legacy, current] of delegateAliases) {
+      if (!prismaAny[legacy] && prismaAny[current]) {
+        prismaAny[legacy] = prismaAny[current];
+      }
+    }
+    return client;
+  }
+
   const store = getCompatStore();
 
   // Bridge legacy camelCase delegate usage to current snake_case Prisma models.
   const delegateAliases: Array<[legacy: string, current: string]> = [
-    ['conversation', 'conversations'],
-    ['sequenceRegistry', 'sequence_registry'],
-    ['dailyRun', 'daily_runs'],
-    ['mondaySyncState', 'monday_sync_state'],
-    ['mondayColumnMapping', 'monday_column_mappings'],
-    ['mondayBoardRegistry', 'monday_board_registry'],
-    ['mondayBookedCallPushes', 'monday_booked_call_pushes'],
-    ['mondayCallSnapshots', 'monday_call_snapshots'],
-    ['mondayWeeklyReports', 'monday_weekly_reports'],
-    ['mondayMetricFacts', 'monday_metric_facts'],
-    ['actorDirectory', 'actor_directory'],
-    ['leadOutcomes', 'lead_outcomes'],
-    ['leadAttribution', 'lead_attribution'],
-    ['setterActivity', 'setter_activity'],
-    ['mondayCallColumnLatest', 'monday_call_column_latest'],
-    ['mondayCallColumnHistory', 'monday_call_column_history'],
-    ['workItem', 'work_items'],
-    ['smsEvent', 'sms_events'],
+    ["conversation", "conversations"],
+    ["sequenceRegistry", "sequence_registry"],
+    ["dailyRun", "daily_runs"],
+    ["mondaySyncState", "monday_sync_state"],
+    ["mondayColumnMapping", "monday_column_mappings"],
+    ["mondayBoardRegistry", "monday_board_registry"],
+    ["mondayBookedCallPushes", "monday_booked_call_pushes"],
+    ["mondayCallSnapshots", "monday_call_snapshots"],
+    ["mondayWeeklyReports", "monday_weekly_reports"],
+    ["mondayMetricFacts", "monday_metric_facts"],
+    ["actorDirectory", "actor_directory"],
+    ["leadOutcomes", "lead_outcomes"],
+    ["leadAttribution", "lead_attribution"],
+    ["setterActivity", "setter_activity"],
+    ["mondayCallColumnLatest", "monday_call_column_latest"],
+    ["mondayCallColumnHistory", "monday_call_column_history"],
+    ["workItem", "work_items"],
+    ["smsEvent", "sms_events"],
   ];
 
   for (const [legacy, current] of delegateAliases) {
@@ -192,10 +243,14 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
   if (!prismaAny.user) {
     const matchesUserWhere = (user: CompatUser, where: any = {}) => {
       if (where.id) {
-        if (typeof where.id === 'string' && user.id !== where.id) {
+        if (typeof where.id === "string" && user.id !== where.id) {
           return false;
         }
-        if (where.id.in && Array.isArray(where.id.in) && !where.id.in.includes(user.id)) {
+        if (
+          where.id.in &&
+          Array.isArray(where.id.in) &&
+          !where.id.in.includes(user.id)
+        ) {
           return false;
         }
       }
@@ -218,10 +273,16 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
             return containsInsensitive(user.email, candidate.email.contains);
           }
           if (candidate.firstName?.contains) {
-            return containsInsensitive(user.firstName, candidate.firstName.contains);
+            return containsInsensitive(
+              user.firstName,
+              candidate.firstName.contains,
+            );
           }
           if (candidate.lastName?.contains) {
-            return containsInsensitive(user.lastName, candidate.lastName.contains);
+            return containsInsensitive(
+              user.lastName,
+              candidate.lastName.contains,
+            );
           }
           return false;
         });
@@ -241,10 +302,10 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
           id: args?.data?.id || randomUUID(),
           email: args?.data?.email,
           passwordHash: args?.data?.passwordHash,
-          firstName: args?.data?.firstName || '',
-          lastName: args?.data?.lastName || '',
-          role: args?.data?.role || 'user',
-          status: args?.data?.status || 'active',
+          firstName: args?.data?.firstName || "",
+          lastName: args?.data?.lastName || "",
+          role: args?.data?.role || "user",
+          status: args?.data?.status || "active",
           department: args?.data?.department ?? null,
           teamId: args?.data?.teamId ?? null,
           lastLogin: args?.data?.lastLogin ?? null,
@@ -256,7 +317,9 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
         return user;
       },
       async createMany(args: any) {
-        const rows = Array.isArray(args?.data) ? args.data : [args?.data].filter(Boolean);
+        const rows = Array.isArray(args?.data)
+          ? args.data
+          : [args?.data].filter(Boolean);
         for (const row of rows) {
           await this.create({ data: row });
         }
@@ -276,28 +339,47 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
         );
       },
       async findMany(args: any = {}) {
-        const filtered = store.users.filter((user) => matchesUserWhere(user, args.where));
+        const filtered = store.users.filter((user) =>
+          matchesUserWhere(user, args.where),
+        );
         const ordered = applyOrdering(filtered, args.orderBy);
         const paged = applyPagination(ordered, args.skip, args.take);
         return paged.map((user) => applySelect(user, args.select));
       },
       async count(args: any = {}) {
-        return store.users.filter((user) => matchesUserWhere(user, args.where)).length;
+        return store.users.filter((user) => matchesUserWhere(user, args.where))
+          .length;
       },
       async update(args: any) {
         const user = store.users.find((row) => row.id === args?.where?.id);
         if (!user) {
-          throw new Error('User not found');
+          throw new Error("User not found");
         }
 
-        Object.assign(user, Object.fromEntries(Object.entries(args?.data || {}).filter(([, value]) => value !== undefined)));
+        Object.assign(
+          user,
+          Object.fromEntries(
+            Object.entries(args?.data || {}).filter(
+              ([, value]) => value !== undefined,
+            ),
+          ),
+        );
         user.updatedAt = new Date();
         return user;
       },
       async updateMany(args: any) {
-        const rows = store.users.filter((user) => matchesUserWhere(user, args.where));
+        const rows = store.users.filter((user) =>
+          matchesUserWhere(user, args.where),
+        );
         for (const row of rows) {
-          Object.assign(row, Object.fromEntries(Object.entries(args?.data || {}).filter(([, value]) => value !== undefined)));
+          Object.assign(
+            row,
+            Object.fromEntries(
+              Object.entries(args?.data || {}).filter(
+                ([, value]) => value !== undefined,
+              ),
+            ),
+          );
           row.updatedAt = new Date();
         }
         return { count: rows.length };
@@ -309,7 +391,9 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
           return { count };
         }
 
-        const keep = store.users.filter((user) => !matchesUserWhere(user, args.where));
+        const keep = store.users.filter(
+          (user) => !matchesUserWhere(user, args.where),
+        );
         const count = store.users.length - keep.length;
         store.users = keep;
         return { count };
@@ -325,7 +409,10 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
       if (where.status && session.status !== where.status) {
         return false;
       }
-      if (where.deviceInfo?.contains && !containsInsensitive(session.deviceInfo, where.deviceInfo.contains)) {
+      if (
+        where.deviceInfo?.contains &&
+        !containsInsensitive(session.deviceInfo, where.deviceInfo.contains)
+      ) {
         return false;
       }
       return true;
@@ -338,9 +425,10 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
           id: args?.data?.id || randomUUID(),
           userId: args?.data?.userId,
           token: args?.data?.token || randomUUID(),
-          expiresAt: args?.data?.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000),
-          deviceInfo: args?.data?.deviceInfo || 'Unknown',
-          status: args?.data?.status || 'active',
+          expiresAt:
+            args?.data?.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000),
+          deviceInfo: args?.data?.deviceInfo || "Unknown",
+          status: args?.data?.status || "active",
           createdAt: args?.data?.createdAt || now,
           updatedAt: args?.data?.updatedAt || now,
         };
@@ -348,13 +436,17 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
         return session;
       },
       async findMany(args: any = {}) {
-        const filtered = store.sessions.filter((session) => matchesSessionWhere(session, args.where));
+        const filtered = store.sessions.filter((session) =>
+          matchesSessionWhere(session, args.where),
+        );
         const ordered = applyOrdering(filtered, args.orderBy);
         const paged = applyPagination(ordered, args.skip, args.take);
         return paged.map((session) => applySelect(session, args.select));
       },
       async count(args: any = {}) {
-        return store.sessions.filter((session) => matchesSessionWhere(session, args.where)).length;
+        return store.sessions.filter((session) =>
+          matchesSessionWhere(session, args.where),
+        ).length;
       },
       async deleteMany(args: any = {}) {
         if (!args.where) {
@@ -362,7 +454,9 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
           store.sessions = [];
           return { count };
         }
-        const keep = store.sessions.filter((session) => !matchesSessionWhere(session, args.where));
+        const keep = store.sessions.filter(
+          (session) => !matchesSessionWhere(session, args.where),
+        );
         const count = store.sessions.length - keep.length;
         store.sessions = keep;
         return { count };
@@ -410,9 +504,11 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
         return token;
       },
       async delete(args: any) {
-        const index = store.passwordResetTokens.findIndex((row) => row.id === args?.where?.id);
+        const index = store.passwordResetTokens.findIndex(
+          (row) => row.id === args?.where?.id,
+        );
         if (index === -1) {
-          throw new Error('Password reset token not found');
+          throw new Error("Password reset token not found");
         }
         const [deleted] = store.passwordResetTokens.splice(index, 1);
         return deleted;
@@ -426,7 +522,10 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
   }
 
   if (!prismaAny.systemConfig) {
-    const matchesSystemConfigWhere = (config: CompatSystemConfig, where: any = {}) => {
+    const matchesSystemConfigWhere = (
+      config: CompatSystemConfig,
+      where: any = {},
+    ) => {
       if (where.category && config.category !== where.category) {
         return false;
       }
@@ -438,7 +537,9 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
 
     prismaAny.systemConfig = {
       async createMany(args: any) {
-        const rows = Array.isArray(args?.data) ? args.data : [args?.data].filter(Boolean);
+        const rows = Array.isArray(args?.data)
+          ? args.data
+          : [args?.data].filter(Boolean);
         for (const row of rows) {
           const now = new Date();
           store.systemConfigs.push({
@@ -453,19 +554,32 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
         return { count: rows.length };
       },
       async findMany(args: any = {}) {
-        const filtered = store.systemConfigs.filter((row) => matchesSystemConfigWhere(row, args.where));
+        const filtered = store.systemConfigs.filter((row) =>
+          matchesSystemConfigWhere(row, args.where),
+        );
         const paged = applyPagination(filtered, args.skip, args.take);
         return paged.map((row) => applySelect(row, args.select));
       },
       async count(args: any = {}) {
-        return store.systemConfigs.filter((row) => matchesSystemConfigWhere(row, args.where)).length;
+        return store.systemConfigs.filter((row) =>
+          matchesSystemConfigWhere(row, args.where),
+        ).length;
       },
       async upsert(args: any) {
         const category = args?.where?.category_key?.category;
         const key = args?.where?.category_key?.key;
-        const existing = store.systemConfigs.find((row) => row.category === category && row.key === key);
+        const existing = store.systemConfigs.find(
+          (row) => row.category === category && row.key === key,
+        );
         if (existing) {
-          Object.assign(existing, Object.fromEntries(Object.entries(args.update || {}).filter(([, value]) => value !== undefined)));
+          Object.assign(
+            existing,
+            Object.fromEntries(
+              Object.entries(args.update || {}).filter(
+                ([, value]) => value !== undefined,
+              ),
+            ),
+          );
           existing.updatedAt = new Date();
           return existing;
         }
@@ -514,14 +628,16 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
 
     prismaAny.auditLog = {
       async createMany(args: any) {
-        const rows = Array.isArray(args?.data) ? args.data : [args?.data].filter(Boolean);
+        const rows = Array.isArray(args?.data)
+          ? args.data
+          : [args?.data].filter(Boolean);
         for (const row of rows) {
           store.auditLogs.push({
             id: row.id || randomUUID(),
             userId: row.userId ?? null,
             action: row.action,
             resourceType: row.resourceType,
-            resourceId: row.resourceId || '',
+            resourceId: row.resourceId || "",
             details: row.details || {},
             ipAddress: row.ipAddress ?? null,
             createdAt: row.createdAt || new Date(),
@@ -530,13 +646,17 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
         return { count: rows.length };
       },
       async findMany(args: any = {}) {
-        const filtered = store.auditLogs.filter((row) => matchesAuditLogWhere(row, args.where));
+        const filtered = store.auditLogs.filter((row) =>
+          matchesAuditLogWhere(row, args.where),
+        );
         const ordered = applyOrdering(filtered, args.orderBy);
         const paged = applyPagination(ordered, args.skip, args.take);
         return paged.map((row) => applySelect(row, args.select));
       },
       async count(args: any = {}) {
-        return store.auditLogs.filter((row) => matchesAuditLogWhere(row, args.where)).length;
+        return store.auditLogs.filter((row) =>
+          matchesAuditLogWhere(row, args.where),
+        ).length;
       },
       async deleteMany() {
         const count = store.auditLogs.length;
@@ -552,38 +672,44 @@ const attachCompatDelegates = (client: PrismaClient): PrismaClient => {
 const createPrismaClient = (): PrismaClient => {
   const config = resolvePrismaConfig();
 
-  if (config.mode === 'accelerate' && config.url) {
+  if (config.mode === "accelerate" && config.url) {
     const client = new PrismaClient({ accelerateUrl: config.url });
-    return attachCompatDelegates(client.$extends(withAccelerate()) as unknown as PrismaClient);
+    return attachCompatDelegates(
+      client.$extends(withAccelerate()) as unknown as PrismaClient,
+    );
   }
 
-  if (config.mode === 'direct' && config.url) {
+  if (config.mode === "direct" && config.url) {
     const pool = new Pool({ connectionString: config.url });
     const adapter = new PrismaPg(pool);
     return attachCompatDelegates(
       new PrismaClient({
         adapter,
-        log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
+        log:
+          process.env.NODE_ENV === "development"
+            ? ["query", "info", "warn", "error"]
+            : ["error"],
       }),
     );
   }
 
   const localPool = new Pool({
-    connectionString: 'postgresql://postgres:postgres@localhost:5432/postgres?schema=public',
+    connectionString:
+      "postgresql://postgres:postgres@localhost:5432/postgres?schema=public",
   });
   const localAdapter = new PrismaPg(localPool);
 
   return attachCompatDelegates(
     new PrismaClient({
       adapter: localAdapter,
-      log: ['warn', 'error'],
+      log: ["warn", "error"],
     }),
   );
 };
 
 const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
@@ -597,21 +723,21 @@ export const connectPrisma = async () => {
 export default prisma;
 
 export type PrismaStatus = {
-  status: 'ok' | 'warn' | 'error';
+  status: "ok" | "warn" | "error";
   configured: boolean;
   detail: string;
 };
 
 export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
-  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || '').trim();
-  const databaseUrl = (process.env.DATABASE_URL || '').trim();
+  const accelerateUrl = (process.env.PRISMA_ACCELERATE_URL || "").trim();
+  const databaseUrl = (process.env.DATABASE_URL || "").trim();
   const configured = accelerateUrl || databaseUrl;
 
   if (!configured) {
     return {
-      status: 'warn',
+      status: "warn",
       configured: false,
-      detail: 'Prisma database URL is not configured',
+      detail: "Prisma database URL is not configured",
     };
   }
 
@@ -624,14 +750,14 @@ export const getPrismaRuntimeStatus = async (): Promise<PrismaStatus> => {
     }
 
     return {
-      status: 'ok',
+      status: "ok",
       configured: true,
-      detail: 'Prisma query check passed',
+      detail: "Prisma query check passed",
     };
   } catch (error) {
-    console.error('Prisma runtime status check failed:', error);
+    console.error("Prisma runtime status check failed:", error);
     return {
-      status: 'error',
+      status: "error",
       configured: true,
       detail: `Prisma query failed: ${error instanceof Error ? error.message : String(error)}`,
     };

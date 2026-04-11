@@ -16,6 +16,28 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "types/**/*.ts", "services/**/*.ts", "api/**/*.ts", "listeners/**/*.ts", "utils/**/*.ts"],
-  "exclude": ["tests/**/*", "dist/**/*", "node_modules/**/*", "scripts/**/*", "src/routes/v2.routes.ts"]
+  "include": [
+    "src/**/*.ts",
+    "types/**/*.ts",
+    "services/**/*.ts",
+    "api/**/*.ts",
+    "listeners/**/*.ts",
+    "utils/**/*.ts"
+  ],
+  "exclude": [
+    "tests/**/*",
+    "dist/**/*",
+    "node_modules/**/*",
+    "scripts/**/*",
+    "src/app.ts",
+    "src/middleware/**/*",
+    "src/repositories/**/*",
+    "src/routes/**/*",
+    "src/validators/**/*",
+    "src/controllers/admin.controller.ts",
+    "src/controllers/auth.controller.ts",
+    "src/controllers/conversation.controller.ts",
+    "src/controllers/integration.controller.ts",
+    "src/controllers/metrics.controller.ts"
+  ]
 }

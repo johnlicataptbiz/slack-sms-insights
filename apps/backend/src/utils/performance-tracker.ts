@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
 
 /**
  * Performance tracking utility
@@ -33,10 +33,10 @@ export class PerformanceTracker {
   stop(): number {
     this.endTime = performance.now();
     const duration = this.endTime - this.startTime;
-    
+
     // Log performance metrics
     console.log(`Performance: ${this.name} took ${duration.toFixed(2)}ms`);
-    
+
     return duration;
   }
 
@@ -47,12 +47,12 @@ export class PerformanceTracker {
   static middleware() {
     return (req: Request, res: Response, next: NextFunction) => {
       const tracker = PerformanceTracker.start(`${req.method} ${req.path}`);
-      
+
       // Patch the response end method to stop tracking
       const originalEnd = res.end;
-      res.end = function(...args: any[]) {
+      res.end = function (...args: any[]) {
         tracker.stop();
-        return originalEnd.apply(this, args);
+        return (originalEnd as any).apply(this, args);
       };
 
       next();

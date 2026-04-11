@@ -1,5 +1,6 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { getPrismaClient } from '../../services/prisma';
+import type { IncomingMessage, ServerResponse } from "node:http";
+import type { Request, Response } from "express";
+import { getPrismaClient } from "../../services/prisma";
 
 export interface ApiResponse<T = unknown> {
   success: boolean;
@@ -8,13 +9,22 @@ export interface ApiResponse<T = unknown> {
   message?: string;
 }
 
+/**
+ * Request context that can handle both node:http and Express requests.
+ * We keep IncomingMessage and ServerResponse as base types to maintain
+ * compatibility with legacy handleApiRoute in api/routes.ts.
+ */
 export interface RequestContext {
-  req: IncomingMessage;
-  res: ServerResponse;
+  req: IncomingMessage | Request;
+  res: ServerResponse | Response;
   logger: Console;
   params: Record<string, string>;
-  query: Record<string, string>;
-  body?: unknown;
+  query: Record<string, any>;
+  body?: any;
+  user?: {
+    id: string;
+    role: string;
+  };
 }
 
 export abstract class BaseController {
@@ -50,31 +60,47 @@ export abstract class BaseController {
 
   protected abstract execute(context: RequestContext): Promise<void>;
 
-  protected async handleError(context: RequestContext, error: unknown): Promise<void> {
+  protected async handleError(
+    context: RequestContext,
+    error: unknown,
+  ): Promise<void> {
     const { res, logger } = context;
 
-    logger.error('Controller error:', error);
+    logger.error("Controller error:", error);
 
     const statusCode = error instanceof HttpError ? error.statusCode : 500;
-    const message = error instanceof Error ? error.message : 'Internal server error';
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
 
     this.sendJsonResponse(res, { success: false, error: message }, statusCode);
   }
 
-  protected sendJsonResponse<T>(res: ServerResponse, data: ApiResponse<T>, statusCode = 200): void {
+  protected sendJsonResponse<T>(
+    res: ServerResponse,
+    data: ApiResponse<T>,
+    statusCode = 200,
+  ): void {
     res.writeHead(statusCode, {
-      'Content-Type': 'application/json',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'DENY',
+      "Content-Type": "application/json",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
     });
     res.end(JSON.stringify(data));
   }
 
-  protected sendSuccessResponse<T>(res: ServerResponse, data: T, statusCode = 200): void {
+  protected sendSuccessResponse<T>(
+    res: ServerResponse,
+    data: T,
+    statusCode = 200,
+  ): void {
     this.sendJsonResponse(res, { success: true, data }, statusCode);
   }
 
-  protected sendErrorResponse(res: ServerResponse, message: string, statusCode = 400): void {
+  protected sendErrorResponse(
+    res: ServerResponse,
+    message: string,
+    statusCode = 400,
+  ): void {
     this.sendJsonResponse(res, { success: false, error: message }, statusCode);
   }
 }
@@ -85,7 +111,7 @@ export class HttpError extends Error {
     message: string,
   ) {
     super(message);
-    this.name = 'HttpError';
+    this.name = "HttpError";
   }
 }
 
@@ -102,7 +128,7 @@ export class ValidationError extends HttpError {
 }
 
 export class UnauthorizedError extends HttpError {
-  constructor(message = 'Unauthorized') {
+  constructor(message = "Unauthorized") {
     super(401, message);
   }
 }

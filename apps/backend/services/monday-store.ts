@@ -1,10 +1,12 @@
-import { Prisma } from '@prisma/client';
-import type { Logger } from '@slack/bolt';
-import { getPrismaClient } from './prisma.js';
+import { Prisma } from "@prisma/client";
+import type { Logger } from "@slack/bolt";
+import { getPrismaClient } from "./prisma.js";
 
-const getPrisma = () => getPrismaClient();
+const getPrisma = () => getPrismaClient() as any;
 
-const toNullableJson = (value: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull => {
+const toNullableJson = (
+  value: unknown,
+): Prisma.InputJsonValue | typeof Prisma.DbNull => {
   if (value == null) return Prisma.DbNull;
   return value as Prisma.InputJsonValue;
 };
@@ -14,19 +16,24 @@ const toJsonValue = (value: unknown): Prisma.InputJsonValue => {
   return value as Prisma.InputJsonValue;
 };
 
-export type MondaySyncStatus = 'idle' | 'running' | 'success' | 'error';
+export type MondaySyncStatus = "idle" | "running" | "success" | "error";
 export type MondayBoardClass =
-  | 'lead_funnel'
-  | 'personal_calls'
-  | 'sales_scorecard'
-  | 'marketing_scorecard'
-  | 'retention_scorecard'
-  | 'sms_events'
-  | 'sms_sequences'
-  | 'sms_reports'
-  | 'other'
-  | 'inactive';
-export type MondayMetricGrain = 'lead_item' | 'aggregate_metric' | 'event_item' | 'sequence_item' | 'report_item';
+  | "lead_funnel"
+  | "personal_calls"
+  | "sales_scorecard"
+  | "marketing_scorecard"
+  | "retention_scorecard"
+  | "sms_events"
+  | "sms_sequences"
+  | "sms_reports"
+  | "other"
+  | "inactive";
+export type MondayMetricGrain =
+  | "lead_item"
+  | "aggregate_metric"
+  | "event_item"
+  | "sequence_item"
+  | "report_item";
 
 export type MondaySyncStateRow = {
   board_id: string;
@@ -53,7 +60,7 @@ export type MondayBoardRegistryRow = {
 
 export type ActorDirectoryRow = {
   canonical_name: string;
-  role: 'setter' | 'closer' | 'other';
+  role: "setter" | "closer" | "other";
   aliases: string[];
   active: boolean;
   notes: string | null;
@@ -61,7 +68,11 @@ export type ActorDirectoryRow = {
   updated_at: string;
 };
 
-export type MondayCallDisposition = 'booked' | 'no_show' | 'cancelled' | 'other';
+export type MondayCallDisposition =
+  | "booked"
+  | "no_show"
+  | "cancelled"
+  | "other";
 
 export type MondayCallSnapshotInput = {
   boardId: string;
@@ -125,17 +136,21 @@ export type MondayWeeklyReportRow = {
   synced_at: string;
 };
 
-export type MondayBookedCallPushStatus = 'pending' | 'synced' | 'error' | 'skipped';
+export type MondayBookedCallPushStatus =
+  | "pending"
+  | "synced"
+  | "error"
+  | "skipped";
 export type MondayOutcomeCategory =
-  | 'closed_won'
-  | 'closed_lost'
-  | 'bad_timing'
-  | 'bad_fit'
-  | 'no_show'
-  | 'cancelled'
-  | 'booked'
-  | 'other'
-  | 'unknown';
+  | "closed_won"
+  | "closed_lost"
+  | "bad_timing"
+  | "bad_fit"
+  | "no_show"
+  | "cancelled"
+  | "booked"
+  | "other"
+  | "unknown";
 
 export type MondayBookedCallPushRow = {
   board_id: string;
@@ -173,7 +188,8 @@ const normalizeText = (value: string | null | undefined): string | null => {
   return trimmed.length > 0 ? trimmed : null;
 };
 
-const normalizeForMatch = (value: string | null | undefined): string => (value || '').trim().toLowerCase();
+const normalizeForMatch = (value: string | null | undefined): string =>
+  (value || "").trim().toLowerCase();
 
 const parseIsoDate = (candidate: string | null | undefined): string | null => {
   const text = normalizeText(candidate);
@@ -196,25 +212,37 @@ const toPrismaDate = (candidate: string | null | undefined): Date | null => {
   return parsed;
 };
 
-const parseNumericMetric = (value: string | null | undefined): number | null => {
+const parseNumericMetric = (
+  value: string | null | undefined,
+): number | null => {
   const text = normalizeText(value);
   if (!text) return null;
-  const normalized = text.replace(/,/g, '').replace(/\$/g, '').replace(/%/g, '').trim();
+  const normalized = text
+    .replace(/,/g, "")
+    .replace(/\$/g, "")
+    .replace(/%/g, "")
+    .trim();
   if (!normalized) return null;
   if (!/^-?\d+(\.\d+)?$/.test(normalized)) return null;
   const numeric = Number.parseFloat(normalized);
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-const parseDateFromColumn = (column: MondayCallColumnValueInput | null): string | null => {
+const parseDateFromColumn = (
+  column: MondayCallColumnValueInput | null,
+): string | null => {
   if (!column) return null;
   const fromText = parseIsoDate(column.textValue ?? null);
   if (fromText) return fromText;
-  if (!column.valueJson || typeof column.valueJson !== 'object') return null;
+  if (!column.valueJson || typeof column.valueJson !== "object") return null;
   const payload = column.valueJson as Record<string, unknown>;
-  const fromDate = typeof payload.date === 'string' ? parseIsoDate(payload.date) : null;
+  const fromDate =
+    typeof payload.date === "string" ? parseIsoDate(payload.date) : null;
   if (fromDate) return fromDate;
-  const fromChangedAt = typeof payload.changed_at === 'string' ? parseIsoDate(payload.changed_at) : null;
+  const fromChangedAt =
+    typeof payload.changed_at === "string"
+      ? parseIsoDate(payload.changed_at)
+      : null;
   if (fromChangedAt) return fromChangedAt;
   return null;
 };
@@ -233,8 +261,13 @@ const findColumnBySignals = (
   return null;
 };
 
-const findTextBySignals = (columns: MondayCallColumnValueInput[], signals: string[]): string | null => {
-  return normalizeText(findColumnBySignals(columns, signals)?.textValue ?? null);
+const findTextBySignals = (
+  columns: MondayCallColumnValueInput[],
+  signals: string[],
+): string | null => {
+  return normalizeText(
+    findColumnBySignals(columns, signals)?.textValue ?? null,
+  );
 };
 
 const classifyOutcomeCategory = (
@@ -244,22 +277,34 @@ const classifyOutcomeCategory = (
   disposition: MondayCallDisposition | null | undefined,
   isBooked: boolean,
 ): MondayOutcomeCategory => {
-  const text = `${stage || ''} ${outcomeLabel || ''} ${outcomeReason || ''}`.toLowerCase();
+  const text =
+    `${stage || ""} ${outcomeLabel || ""} ${outcomeReason || ""}`.toLowerCase();
 
-  if (/\bbad timing\b/.test(text)) return 'bad_timing';
-  if (/\bbad fit\b/.test(text)) return 'bad_fit';
-  if (/\bclosed won\b|\bwon\b|\bsale\b|\bsigned\b|\benrolled\b/.test(text)) return 'closed_won';
-  if (/\bclosed lost\b|\blost\b/.test(text)) return 'closed_lost';
-  if (disposition === 'no_show' || /\bno[\s-]?show\b/.test(text)) return 'no_show';
-  if (disposition === 'cancelled' || /\bcancel|cancelled|canceled|resched/i.test(text)) return 'cancelled';
-  if (disposition === 'booked' || isBooked || /\bbooked|appointment|strategy call\b/.test(text)) return 'booked';
-  if (!text.trim()) return 'unknown';
-  return 'other';
+  if (/\bbad timing\b/.test(text)) return "bad_timing";
+  if (/\bbad fit\b/.test(text)) return "bad_fit";
+  if (/\bclosed won\b|\bwon\b|\bsale\b|\bsigned\b|\benrolled\b/.test(text))
+    return "closed_won";
+  if (/\bclosed lost\b|\blost\b/.test(text)) return "closed_lost";
+  if (disposition === "no_show" || /\bno[\s-]?show\b/.test(text))
+    return "no_show";
+  if (
+    disposition === "cancelled" ||
+    /\bcancel|cancelled|canceled|resched/i.test(text)
+  )
+    return "cancelled";
+  if (
+    disposition === "booked" ||
+    isBooked ||
+    /\bbooked|appointment|strategy call\b/.test(text)
+  )
+    return "booked";
+  if (!text.trim()) return "unknown";
+  return "other";
 };
 
 export const getMondaySyncState = async (
   boardId: string,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<MondaySyncStateRow | null> => {
   const prisma = getPrisma();
   try {
@@ -276,14 +321,14 @@ export const getMondaySyncState = async (
     });
     return result as unknown as MondaySyncStateRow | null;
   } catch (error) {
-    logger?.warn?.('Failed to read monday sync state', error);
+    logger?.warn?.("Failed to read monday sync state", error);
     return null;
   }
 };
 
 export const getMondayBoardRegistry = async (
   boardId: string,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<MondayBoardRegistryRow | null> => {
   const prisma = getPrisma();
   try {
@@ -310,8 +355,8 @@ export const getMondayBoardRegistry = async (
         data: {
           board_id: boardId,
           board_label: `Unnamed Board ${boardId}`,
-          board_class: 'other',
-          metric_grain: 'lead_item',
+          board_class: "other",
+          metric_grain: "lead_item",
           include_in_funnel: false,
           include_in_exec: false,
           active: true,
@@ -336,7 +381,7 @@ export const getMondayBoardRegistry = async (
 
     return result as unknown as MondayBoardRegistryRow | null;
   } catch (error) {
-    logger?.warn?.('Failed to read or create monday board registry row', error);
+    logger?.warn?.("Failed to read or create monday board registry row", error);
     return null;
   }
 };
@@ -353,7 +398,7 @@ export const upsertMondayBoardRegistry = async (
     ownerTeam?: string | null;
     notes?: string | null;
   },
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
@@ -384,18 +429,18 @@ export const upsertMondayBoardRegistry = async (
       },
     });
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday board registry row', error);
+    logger?.warn?.("Failed to upsert monday board registry row", error);
   }
 };
 
 export const listPendingMondayBookedCallPushes = async (
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<MondayBookedCallPushRow[]> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.mondayBookedCallPushes.findMany({
-      where: { status: 'pending' },
-      orderBy: { updated_at: 'asc' },
+      where: { status: "pending" },
+      orderBy: { updated_at: "asc" },
       select: {
         board_id: true,
         slack_channel_id: true,
@@ -411,16 +456,22 @@ export const listPendingMondayBookedCallPushes = async (
     });
     return result as unknown as MondayBookedCallPushRow[];
   } catch (error) {
-    logger?.warn?.('Failed to list pending monday booked call pushes', error);
+    logger?.warn?.("Failed to list pending monday booked call pushes", error);
     return [];
   }
 };
 
-export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Promise<MondayBoardRegistryRow[]> => {
+export const listMondayBoardRegistry = async (
+  logger?: Pick<Logger, "warn">,
+): Promise<MondayBoardRegistryRow[]> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.mondayBoardRegistry.findMany({
-      orderBy: [{ board_class: 'asc' }, { board_label: 'asc' }, { board_id: 'asc' }],
+      orderBy: [
+        { board_class: "asc" },
+        { board_label: "asc" },
+        { board_id: "asc" },
+      ],
       select: {
         board_id: true,
         board_label: true,
@@ -437,16 +488,18 @@ export const listMondayBoardRegistry = async (logger?: Pick<Logger, 'warn'>): Pr
     });
     return result as unknown as MondayBoardRegistryRow[];
   } catch (error) {
-    logger?.warn?.('Failed to list monday board registry', error);
+    logger?.warn?.("Failed to list monday board registry", error);
     return [];
   }
 };
 
-export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): Promise<ActorDirectoryRow[]> => {
+export const listMondayActorDirectory = async (
+  logger?: Pick<Logger, "warn">,
+): Promise<ActorDirectoryRow[]> => {
   const prisma = getPrisma();
   try {
     let result = await prisma.actorDirectory.findMany({
-      orderBy: [{ role: 'asc' }, { canonical_name: 'asc' }],
+      orderBy: [{ role: "asc" }, { canonical_name: "asc" }],
       select: {
         canonical_name: true,
         role: true,
@@ -462,20 +515,20 @@ export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): P
     if (result.length === 0) {
       const defaultActors = [
         {
-          canonical_name: 'Jack',
-          role: 'setter',
-          aliases: ['jack', 'jack licata'],
+          canonical_name: "Jack",
+          role: "setter",
+          aliases: ["jack", "jack licata"],
           active: true,
-          notes: 'Default setter',
+          notes: "Default setter",
           created_at: new Date(),
           updated_at: new Date(),
         },
         {
-          canonical_name: 'Brandon',
-          role: 'setter',
-          aliases: ['brandon', 'brandon licata'],
+          canonical_name: "Brandon",
+          role: "setter",
+          aliases: ["brandon", "brandon licata"],
           active: true,
-          notes: 'Default setter',
+          notes: "Default setter",
           created_at: new Date(),
           updated_at: new Date(),
         },
@@ -486,7 +539,7 @@ export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): P
       });
 
       result = await prisma.actorDirectory.findMany({
-        orderBy: [{ role: 'asc' }, { canonical_name: 'asc' }],
+        orderBy: [{ role: "asc" }, { canonical_name: "asc" }],
         select: {
           canonical_name: true,
           role: true,
@@ -501,7 +554,7 @@ export const listMondayActorDirectory = async (logger?: Pick<Logger, 'warn'>): P
 
     return result as unknown as ActorDirectoryRow[];
   } catch (error) {
-    logger?.warn?.('Failed to list actor directory', error);
+    logger?.warn?.("Failed to list actor directory", error);
     return [];
   }
 };
@@ -514,7 +567,7 @@ export const upsertMondaySyncState = async (
     status?: MondaySyncStatus | null;
     error?: string | null;
   },
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
@@ -537,14 +590,14 @@ export const upsertMondaySyncState = async (
       },
     });
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday sync state', error);
+    logger?.warn?.("Failed to upsert monday sync state", error);
   }
 };
 
 export const saveMondayColumnMapping = async (
   boardId: string,
   mapping: unknown,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
@@ -561,13 +614,13 @@ export const saveMondayColumnMapping = async (
       },
     });
   } catch (error) {
-    logger?.warn?.('Failed to save monday column mapping', error);
+    logger?.warn?.("Failed to save monday column mapping", error);
   }
 };
 
 export const getMondayColumnMapping = async (
   boardId: string,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<unknown | null> => {
   const prisma = getPrisma();
   try {
@@ -577,7 +630,7 @@ export const getMondayColumnMapping = async (
     });
     return result?.mapping_json ?? null;
   } catch (error) {
-    logger?.warn?.('Failed to read monday column mapping', error);
+    logger?.warn?.("Failed to read monday column mapping", error);
     return null;
   }
 };
@@ -585,7 +638,7 @@ export const getMondayColumnMapping = async (
 export const deleteMondayCallSnapshots = async (
   boardId: string,
   itemIds: string[],
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
   if (!itemIds.length) return;
@@ -597,12 +650,12 @@ export const deleteMondayCallSnapshots = async (
       },
     });
   } catch (error) {
-    logger?.warn?.('Failed to delete monday call snapshots', error);
+    logger?.warn?.("Failed to delete monday call snapshots", error);
   }
 };
 export const upsertMondayCallSnapshot = async (
   input: MondayCallSnapshotInput,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
   const callDate = toPrismaDate(input.callDate);
@@ -642,13 +695,13 @@ export const upsertMondayCallSnapshot = async (
       },
     });
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday call snapshot', error);
+    logger?.warn?.("Failed to upsert monday call snapshot", error);
   }
 };
 
 export const upsertMondayCallColumnValues = async (
   input: MondayCallColumnValuesUpsertInput,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
   if (!input.values.length) return;
@@ -662,7 +715,7 @@ export const upsertMondayCallColumnValues = async (
   }));
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.$queryRawUnsafe(
         `
         WITH incoming AS (
@@ -761,37 +814,82 @@ export const upsertMondayCallColumnValues = async (
       );
     });
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday call column values', error);
+    logger?.warn?.("Failed to upsert monday call column values", error);
   }
 };
 
 export const upsertNormalizedMondayLeadRecords = async (
   input: MondayNormalizedLeadInput,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
 
   const outcomeLabel =
-    findTextBySignals(input.columns, ['outcome', 'result', 'disposition', 'status']) || input.stage || null;
-  const outcomeReason = findTextBySignals(input.columns, ['reason', 'lost reason', 'disqual', 'close reason', 'notes']);
-  const source = findTextBySignals(input.columns, ['lead source', 'source', 'channel', 'utm']);
-  const setBy = findTextBySignals(input.columns, ['set by', 'booked by', 'setter']);
+    findTextBySignals(input.columns, [
+      "outcome",
+      "result",
+      "disposition",
+      "status",
+    ]) ||
+    input.stage ||
+    null;
+  const outcomeReason = findTextBySignals(input.columns, [
+    "reason",
+    "lost reason",
+    "disqual",
+    "close reason",
+    "notes",
+  ]);
+  const source = findTextBySignals(input.columns, [
+    "lead source",
+    "source",
+    "channel",
+    "utm",
+  ]);
+  const setBy = findTextBySignals(input.columns, [
+    "set by",
+    "booked by",
+    "setter",
+  ]);
   const setter = normalizeText(input.setter) || setBy;
   const stage = normalizeText(input.stage);
-  const campaign = findTextBySignals(input.columns, ['campaign', 'offer', 'adset', 'ad set', 'funnel']);
-  const sequence = findTextBySignals(input.columns, ['sequence', 'cadence']);
-  const leadStatus = findTextBySignals(input.columns, ['lead status', 'status']) || stage;
+  const campaign = findTextBySignals(input.columns, [
+    "campaign",
+    "offer",
+    "adset",
+    "ad set",
+    "funnel",
+  ]);
+  const sequence = findTextBySignals(input.columns, ["sequence", "cadence"]);
+  const leadStatus =
+    findTextBySignals(input.columns, ["lead status", "status"]) || stage;
 
   const firstTouchDate =
     parseDateFromColumn(
-      findColumnBySignals(input.columns, ['first touch', 'created date', 'lead date', 'inbound date']),
+      findColumnBySignals(input.columns, [
+        "first touch",
+        "created date",
+        "lead date",
+        "inbound date",
+      ]),
     ) || null;
   const callDate =
     normalizeText(input.callDate) ||
-    parseDateFromColumn(findColumnBySignals(input.columns, ['call date', 'appointment date', 'meeting date'])) ||
+    parseDateFromColumn(
+      findColumnBySignals(input.columns, [
+        "call date",
+        "appointment date",
+        "meeting date",
+      ]),
+    ) ||
     null;
   const closedDate = parseDateFromColumn(
-    findColumnBySignals(input.columns, ['closed date', 'won date', 'lost date', 'decision date']),
+    findColumnBySignals(input.columns, [
+      "closed date",
+      "won date",
+      "lost date",
+      "decision date",
+    ]),
   );
 
   const outcomeCategory = classifyOutcomeCategory(
@@ -801,10 +899,14 @@ export const upsertNormalizedMondayLeadRecords = async (
     input.disposition,
     input.isBooked === true,
   );
-  const activityDate = callDate || closedDate || firstTouchDate || input.itemUpdatedAt.toISOString().slice(0, 10);
+  const activityDate =
+    callDate ||
+    closedDate ||
+    firstTouchDate ||
+    input.itemUpdatedAt.toISOString().slice(0, 10);
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       await tx.$queryRawUnsafe(
         `
         INSERT INTO lead_outcomes (
@@ -970,53 +1072,63 @@ export const upsertNormalizedMondayLeadRecords = async (
         stage,
         outcomeCategory,
         input.isBooked === true,
-        outcomeCategory === 'closed_won',
-        outcomeCategory === 'closed_lost',
-        outcomeCategory === 'bad_timing',
-        outcomeCategory === 'bad_fit',
-        outcomeCategory === 'no_show',
-        outcomeCategory === 'cancelled',
+        outcomeCategory === "closed_won",
+        outcomeCategory === "closed_lost",
+        outcomeCategory === "bad_timing",
+        outcomeCategory === "bad_fit",
+        outcomeCategory === "no_show",
+        outcomeCategory === "cancelled",
         input.itemUpdatedAt,
         JSON.stringify(input.raw ?? null),
       );
     });
   } catch (error) {
-    logger?.warn?.('Failed to upsert normalized monday lead records', error);
+    logger?.warn?.("Failed to upsert normalized monday lead records", error);
   }
 };
 
 const IGNORED_SCORECARD_METRIC_TITLES = new Set([
-  'subitems',
-  'date',
-  'metric owner',
-  'playbook',
-  'progress',
-  'plan to correct',
+  "subitems",
+  "date",
+  "metric owner",
+  "playbook",
+  "progress",
+  "plan to correct",
 ]);
 
 export const upsertMondayMetricFacts = async (
   input: MondayMetricFactInput,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
 
   const metricDate =
     parseIsoDate(input.callDate) ||
-    parseDateFromColumn(findColumnBySignals(input.columns, ['date', 'week', 'day', 'period'])) ||
+    parseDateFromColumn(
+      findColumnBySignals(input.columns, ["date", "week", "day", "period"]),
+    ) ||
     null;
   const metricOwner =
-    normalizeText(input.setter) || findTextBySignals(input.columns, ['metric owner', 'owner', 'setter']);
+    normalizeText(input.setter) ||
+    findTextBySignals(input.columns, ["metric owner", "owner", "setter"]);
 
   const payload = input.columns
     .map((column) => {
       const metricName = normalizeText(column.columnTitle);
       const metricNameNormalized = normalizeForMatch(metricName);
-      if (!metricName || IGNORED_SCORECARD_METRIC_TITLES.has(metricNameNormalized)) return null;
+      if (
+        !metricName ||
+        IGNORED_SCORECARD_METRIC_TITLES.has(metricNameNormalized)
+      )
+        return null;
 
       const metricText = normalizeText(column.textValue);
       const metricNumber = parseNumericMetric(metricText);
       const statusValue =
-        metricText && (column.columnType === 'status' || column.columnType === 'dropdown' || metricNumber === null)
+        metricText &&
+        (column.columnType === "status" ||
+          column.columnType === "dropdown" ||
+          metricNumber === null)
           ? metricText
           : null;
 
@@ -1097,12 +1209,12 @@ export const upsertMondayMetricFacts = async (
       input.itemUpdatedAt,
     );
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday metric facts', error);
+    logger?.warn?.("Failed to upsert monday metric facts", error);
   }
 };
 
 export const purgeMondayNormalizedRowsForNonFunnelBoards = async (
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<{
   leadOutcomesDeleted: number;
   leadAttributionDeleted: number;
@@ -1110,8 +1222,8 @@ export const purgeMondayNormalizedRowsForNonFunnelBoards = async (
 }> => {
   const prisma = getPrisma();
   try {
-    return await prisma.$transaction(async (tx) => {
-      const leadOutcomes = await tx.$queryRawUnsafe<{ count: string }>(`
+    return await prisma.$transaction(async (tx: any) => {
+      const leadOutcomes = (await tx.$queryRawUnsafe(`
         DELETE FROM lead_outcomes lo
         WHERE EXISTS (
           SELECT 1
@@ -1120,8 +1232,8 @@ export const purgeMondayNormalizedRowsForNonFunnelBoards = async (
             AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
         )
         RETURNING 1
-      `);
-      const leadAttribution = await tx.$queryRawUnsafe<{ count: string }>(`
+      `)) as Array<{ count: string }>;
+      const leadAttribution = (await tx.$queryRawUnsafe(`
         DELETE FROM lead_attribution la
         WHERE EXISTS (
           SELECT 1
@@ -1130,8 +1242,8 @@ export const purgeMondayNormalizedRowsForNonFunnelBoards = async (
             AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
         )
         RETURNING 1
-      `);
-      const setterActivity = await tx.$queryRawUnsafe<{ count: string }>(`
+      `)) as Array<{ count: string }>;
+      const setterActivity = (await tx.$queryRawUnsafe(`
         DELETE FROM setter_activity sa
         WHERE EXISTS (
           SELECT 1
@@ -1140,16 +1252,22 @@ export const purgeMondayNormalizedRowsForNonFunnelBoards = async (
             AND (br.active = FALSE OR br.metric_grain <> 'lead_item' OR br.include_in_funnel = FALSE)
         )
         RETURNING 1
-      `);
+      `)) as Array<{ count: string }>;
 
       return {
-        leadOutcomesDeleted: Array.isArray(leadOutcomes) ? leadOutcomes.length : 0,
-        leadAttributionDeleted: Array.isArray(leadAttribution) ? leadAttribution.length : 0,
-        setterActivityDeleted: Array.isArray(setterActivity) ? setterActivity.length : 0,
+        leadOutcomesDeleted: Array.isArray(leadOutcomes)
+          ? leadOutcomes.length
+          : 0,
+        leadAttributionDeleted: Array.isArray(leadAttribution)
+          ? leadAttribution.length
+          : 0,
+        setterActivityDeleted: Array.isArray(setterActivity)
+          ? setterActivity.length
+          : 0,
       };
     });
   } catch (error) {
-    logger?.warn?.('Failed to purge non-funnel monday normalized rows', error);
+    logger?.warn?.("Failed to purge non-funnel monday normalized rows", error);
     return {
       leadOutcomesDeleted: 0,
       leadAttributionDeleted: 0,
@@ -1164,11 +1282,11 @@ export const listMondayCallSnapshotsInRange = async (
     from: Date;
     to: Date;
   },
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<MondayCallSnapshotRow[]> => {
   const prisma = getPrisma();
   try {
-    const where: Prisma.MondayCallSnapshotsWhereInput = {
+    const where: Prisma.monday_call_snapshotsWhereInput = {
       updated_at: {
         gte: params.from,
         lte: params.to,
@@ -1176,9 +1294,9 @@ export const listMondayCallSnapshotsInRange = async (
     };
     if (params.boardId) where.board_id = params.boardId;
 
-    const result = await prisma.mondayCallSnapshots.findMany({
+    const result = await prisma.monday_call_snapshots.findMany({
       where,
-      orderBy: { updated_at: 'desc' },
+      orderBy: { updated_at: "desc" },
       select: {
         board_id: true,
         item_id: true,
@@ -1194,20 +1312,20 @@ export const listMondayCallSnapshotsInRange = async (
     });
     return result as unknown as MondayCallSnapshotRow[];
   } catch (error) {
-    logger?.warn?.('Failed to list monday call snapshots', error);
+    logger?.warn?.("Failed to list monday call snapshots", error);
     return [];
   }
 };
 
 export const getLatestMondaySyncStatus = async (
   boardId?: string,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<MondaySyncStateRow | null> => {
   const prisma = getPrisma();
   try {
     const result = await prisma.mondaySyncState.findMany({
       where: boardId ? { board_id: boardId } : {},
-      orderBy: { updated_at: 'desc' },
+      orderBy: { updated_at: "desc" },
       take: 1,
       select: {
         board_id: true,
@@ -1220,7 +1338,7 @@ export const getLatestMondaySyncStatus = async (
     });
     return (result[0] as unknown as MondaySyncStateRow) || null;
   } catch (error) {
-    logger?.warn?.('Failed to read monday sync status', error);
+    logger?.warn?.("Failed to read monday sync status", error);
     return null;
   }
 };
@@ -1233,7 +1351,7 @@ export const upsertMondayWeeklyReport = async (
     mondayItemId?: string | null;
     syncedAt?: Date;
   },
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<void> => {
   const prisma = getPrisma();
   try {
@@ -1254,13 +1372,13 @@ export const upsertMondayWeeklyReport = async (
       },
     });
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday weekly report', error);
+    logger?.warn?.("Failed to upsert monday weekly report", error);
   }
 };
 
 export const getMondayWeeklyReport = async (
   weekStart: string,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<MondayWeeklyReportRow | null> => {
   const prisma = getPrisma();
   try {
@@ -1276,7 +1394,7 @@ export const getMondayWeeklyReport = async (
     });
     return result as unknown as MondayWeeklyReportRow | null;
   } catch (error) {
-    logger?.warn?.('Failed to read monday weekly report', error);
+    logger?.warn?.("Failed to read monday weekly report", error);
     return null;
   }
 };
@@ -1284,7 +1402,7 @@ export const getMondayWeeklyReport = async (
 export const getMondayBookedCallPush = async (
   slackChannelId: string,
   slackMessageTs: string,
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<MondayBookedCallPushRow | null> => {
   const prisma = getPrisma();
   try {
@@ -1296,7 +1414,7 @@ export const getMondayBookedCallPush = async (
     });
     return result as unknown as MondayBookedCallPushRow | null;
   } catch (error) {
-    logger?.warn?.('Failed to read monday booked call push', error);
+    logger?.warn?.("Failed to read monday booked call push", error);
     return null;
   }
 };
@@ -1313,7 +1431,7 @@ export const upsertMondayBookedCallPush = async (
     payloadJson: unknown;
     pushedAt?: Date | null;
   },
-  logger?: Pick<Logger, 'warn'>,
+  logger?: Pick<Logger, "warn">,
 ): Promise<boolean> => {
   const prisma = getPrisma();
   try {
@@ -1349,7 +1467,7 @@ export const upsertMondayBookedCallPush = async (
     });
     return true;
   } catch (error) {
-    logger?.warn?.('Failed to upsert monday booked call push', error);
+    logger?.warn?.("Failed to upsert monday booked call push", error);
     try {
       await prisma.$executeRawUnsafe(
         `
@@ -1389,7 +1507,10 @@ export const upsertMondayBookedCallPush = async (
       );
       return true;
     } catch (fallbackError) {
-      logger?.warn?.('Fallback SQL upsert for monday booked call push failed', fallbackError);
+      logger?.warn?.(
+        "Fallback SQL upsert for monday booked call push failed",
+        fallbackError,
+      );
       return false;
     }
   }

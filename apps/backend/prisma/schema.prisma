@@ -184,7 +184,7 @@ model conversations {
   contactId               String?                  @map("contact_id")
   contactPhone            String?                  @map("contact_phone")
   currentRepId            String?                  @map("current_rep_id")
-  status                  String                   @default("open")
+  status                  ConversationStatus       @default(open)
   lastInboundAt           DateTime?                @map("last_inbound_at") @db.Timestamptz(6)
   lastOutboundAt          DateTime?                @map("last_outbound_at") @db.Timestamptz(6)
   lastTouchAt             DateTime?                @map("last_touch_at") @db.Timestamptz(6)
@@ -233,7 +233,7 @@ model daily_runs {
   channel_id    String
   channel_name  String?
   report_type   String
-  status        String
+  status        DailyRunStatus
   error_message String?
   summary_text  String?
   full_report   String?
@@ -300,103 +300,143 @@ model fact_rep_response_daily {
 }
 
 model fact_sequence_funnel_daily {
-  day                   DateTime @db.Date
-  sequence_id           String   @db.Uuid
-  rep_id                String   @db.Uuid
-  new_leads_contacted   Int      @default(0)
-  leads_replied         Int      @default(0)
-  qualified_leads       Int      @default(0)
-  booked_calls          Int      @default(0)
-  opt_outs              Int      @default(0)
-  created_at            DateTime @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+  day                 DateTime @db.Date
+  sequence_id         String   @db.Uuid
+  rep_id              String
+  new_leads_contacted Int      @default(0)
+  leads_replied       Int      @default(0)
+  qualified_leads     Int      @default(0)
+  booked_calls        Int      @default(0)
+  opt_outs            Int      @default(0)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
 
   @@id([day, sequence_id, rep_id])
   @@index([day], map: "idx_fact_sequence_funnel_daily_day")
 }
 
 model fact_sms_daily {
-  day             DateTime @db.Date
-  rep_id          String   @default("")
-  total_sms       Int      @default(0)
-  inbound_count   Int      @default(0)
-  outbound_count  Int      @default(0)
-  unique_contacts Int      @default(0)
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @db.Timestamptz(6)
+  day                 DateTime @db.Date
+  sequence_id         String   @db.Uuid
+  rep_id              String
+  messages_sent       Int      @default(0)
+  unique_contacted    Int      @default(0)
+  replies_received    Int      @default(0)
+  opt_outs            Int      @default(0)
+  reply_rate_pct      Float    @default(0)
+  opt_out_rate_pct    Float    @default(0)
+  booking_signals_sms Int      @default(0)
+  created_at          DateTime @default(now()) @db.Timestamptz(6)
+  updated_at          DateTime @default(now()) @db.Timestamptz(6)
 
-  @@id([day, rep_id])
+  @@id([day, sequence_id, rep_id])
   @@index([day], map: "idx_fact_sms_daily_day")
+  @@index([sequence_id, day], map: "idx_fact_sms_daily_sequence_day")
+  @@index([rep_id, day], map: "idx_fact_sms_daily_rep_day")
 }
 
 model fact_booking_daily {
-  day             DateTime @db.Date
-  rep_id          String   @default("")
-  booked_total    Int      @default(0)
-  booked_jack     Int      @default(0)
-  booked_brandon  Int      @default(0)
-  booked_self     Int      @default(0)
-  booked_after_sms_reply Int @default(0)
-  diagnostic_booking_signals Int @default(0)
-  created_at      DateTime @default(now()) @db.Timestamptz(6)
-  updated_at      DateTime @default(now()) @db.Timestamptz(6)
-
-  @@id([day, rep_id])
-  @@index([day], map: "idx_fact_booking_daily_day")
-}
-
-model fact_lead_quality_daily {
   day                        DateTime @db.Date
-  rep_id                     String   @default("")
-  leads_count                Int      @default(0)
-  coaching_interest_high     Int      @default(0)
-  employment_full_time       Int      @default(0)
-  revenue_mix_mostly_cash    Int      @default(0)
-  progress_step_3_count      Int      @default(0)
-  progress_step_4_count      Int      @default(0)
+  sequence_id                String   @db.Uuid
+  rep_id                     String
+  booked_total               Int      @default(0)
+  booked_jack                Int      @default(0)
+  booked_brandon             Int      @default(0)
+  booked_self                Int      @default(0)
+  booked_after_sms_reply     Int      @default(0)
+  booking_rate_pct           Float    @default(0)
+  diagnostic_booking_signals Int      @default(0)
   created_at                 DateTime @default(now()) @db.Timestamptz(6)
   updated_at                 DateTime @default(now()) @db.Timestamptz(6)
 
-  @@id([day, rep_id])
+  @@id([day, sequence_id, rep_id])
+  @@index([day], map: "idx_fact_booking_daily_day")
+  @@index([sequence_id, day], map: "idx_fact_booking_daily_sequence_day")
+  @@index([rep_id, day], map: "idx_fact_booking_daily_rep_day")
+}
+
+model fact_lead_quality_daily {
+  day                      DateTime @db.Date
+  sequence_id              String   @db.Uuid
+  rep_id                   String
+  leads_count              Int      @default(0)
+  progress_step_0_count    Int      @default(0)
+  progress_step_1_count    Int      @default(0)
+  progress_step_2_count    Int      @default(0)
+  progress_step_3_count    Int      @default(0)
+  progress_step_4_count    Int      @default(0)
+  revenue_mix_mostly_cash  Int      @default(0)
+  revenue_mix_mostly_ins   Int      @default(0)
+  revenue_mix_balanced     Int      @default(0)
+  revenue_mix_unknown      Int      @default(0)
+  employment_full_time     Int      @default(0)
+  employment_part_time     Int      @default(0)
+  employment_unknown       Int      @default(0)
+  coaching_interest_high   Int      @default(0)
+  coaching_interest_medium Int      @default(0)
+  coaching_interest_low    Int      @default(0)
+  coaching_interest_unknown Int     @default(0)
+  avg_lead_score           Float?
+  source_bucket_unknown    Int      @default(0)
+  source_bucket_known      Int      @default(0)
+  created_at               DateTime @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([day, sequence_id, rep_id])
   @@index([day], map: "idx_fact_lead_quality_daily_day")
+  @@index([sequence_id, day], map: "idx_fact_lead_quality_daily_sequence_day")
+  @@index([rep_id, day], map: "idx_fact_lead_quality_daily_rep_day")
 }
 
 model fact_monday_health_daily {
-  day                   DateTime @db.Date
-  board_id              String
-  board_name            String?
-  sync_status           String?  @default("ok")
-  is_stale              Boolean  @default(false)
-  last_sync_at          DateTime? @db.Timestamptz(6)
-  items_count           Int      @default(0)
-  errors_count          Int      @default(0)
-  source_coverage_pct   Decimal? @db.Decimal(5, 2)
-  campaign_coverage_pct Decimal? @db.Decimal(5, 2)
-  set_by_coverage_pct   Decimal? @db.Decimal(5, 2)
+  day                     DateTime @db.Date
+  board_id                String
+  board_class             String
+  sync_status             String?
+  is_stale                Boolean  @default(false)
+  source_coverage_pct     Float    @default(0)
+  campaign_coverage_pct   Float    @default(0)
+  set_by_coverage_pct     Float    @default(0)
   touchpoints_coverage_pct Decimal? @db.Decimal(5, 2)
-  created_at            DateTime @default(now()) @db.Timestamptz(6)
-  updated_at            DateTime @default(now()) @db.Timestamptz(6)
+  snapshot_count          Int      @default(0)
+  lead_attribution_count   Int      @default(0)
+  metric_fact_count        Int      @default(0)
+  created_at              DateTime @default(now()) @db.Timestamptz(6)
+  updated_at              DateTime @default(now()) @db.Timestamptz(6)
 
   @@id([day, board_id])
   @@index([day], map: "idx_fact_monday_health_daily_day")
 }
 
 model sequence_registry {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  label            String   @unique
-  normalizedLabel  String?  @map("normalized_label")
-  leadMagnet       String?  @map("lead_magnet")
-  versionTag       String?  @map("version_tag")
-  status           String   @default("active")
-  ownerRep         String?  @map("owner_rep")
-  isManualBucket   Boolean  @default(false) @map("is_manual_bucket")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label            String            @unique
+  normalizedLabel  String?           @map("normalized_label")
+  leadMagnet       String?           @map("lead_magnet")
+  versionTag       String?           @map("version_tag")
+  status           String            @default("active")
+  ownerRep         String?           @map("owner_rep")
+  isManualBucket   Boolean           @default(false) @map("is_manual_bucket")
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @default(now()) @map("updated_at") @db.Timestamptz(6)
+  sequenceAliases  sequence_aliases[]
 
   @@index([status], map: "idx_sequence_registry_status")
   @@index([normalizedLabel], map: "idx_sequence_registry_normalized_label")
 
   @@map("sequence_registry")
+}
+
+model sequence_aliases {
+  rawLabel         String            @id @map("raw_label")
+  normalizedLabel  String            @map("normalized_label")
+  sequenceId       String            @map("sequence_id") @db.Uuid
+  createdAt        DateTime?         @default(now()) @map("created_at") @db.Timestamptz(6)
+  sequenceRegistry sequence_registry  @relation(fields: [sequenceId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([sequenceId], map: "idx_sequence_aliases_sequence_id")
+  @@index([normalizedLabel], map: "idx_sequence_aliases_normalized_label")
+  @@map("sequence_aliases")
 }
 
 
@@ -543,7 +583,7 @@ model monday_booked_call_pushes {
   slack_message_ts String
   setter_bucket    String
   monday_item_id   String?
-  status           String
+  status           MondayBookedCallPushStatus
   error            String?
   payload_json     Json?
   pushed_at        DateTime? @db.Timestamptz(6)
@@ -730,7 +770,7 @@ model sms_events {
   slack_channel_id  String
   slack_message_ts  String
   event_ts          DateTime             @db.Timestamptz(6)
-  direction         String
+  direction         SmsDirection
   contact_id        String?
   contact_phone     String?
   contact_name      String?

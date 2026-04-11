@@ -8,7 +8,10 @@ import {
 import { getPrismaClient } from './prisma.js';
 import { getSalesMetricsSummary } from './sales-metrics.js';
 import { parseLeadMagnetAndVersion } from './scoreboard.js';
-import { attributeSlackBookedCallsToSequences, type SequenceBookedBreakdown } from './sequence-booked-attribution.js';
+import {
+  attributeSlackBookedCallsToSequences,
+  type SequenceBookedBreakdown,
+} from './sequence-booked-attribution.js';
 import { DEFAULT_BUSINESS_TIMEZONE, resolveTimeZone } from './time-range.js';
 
 export type SequenceKpiRow = {
@@ -56,7 +59,9 @@ const buildPeopleContactedBySequence = async (
 ): Promise<Map<string, number>> => {
   const prisma = getPrisma();
   try {
-    const rows = await prisma.$queryRawUnsafe<{ label: string; unique_contacts: number | bigint }[]>(
+    const rows = await prisma.$queryRawUnsafe<
+      { label: string; unique_contacts: number | bigint }[]
+    >(
       `SELECT
          COALESCE(sr.label, COALESCE(NULLIF(TRIM(e.sequence), ''), 'No sequence (manual/direct)')) AS label,
          COUNT(DISTINCT COALESCE(contact_id, regexp_replace(contact_phone, '\\D', '', 'g'))) AS unique_contacts
@@ -71,48 +76,72 @@ const buildPeopleContactedBySequence = async (
     );
     return new Map(rows.map((r) => [r.label, Number(r.unique_contacts) || 0]));
   } catch (error) {
-    logger?.error?.('sequence-kpis: failed to build people-contacted-by-sequence', error);
+    logger?.error?.(
+      'sequence-kpis: failed to build people-contacted-by-sequence',
+      error,
+    );
     return new Map();
   }
 };
 
-const resolveCanonicalSequenceLabels = async (labels: string[]): Promise<Map<string, string>> => {
+const resolveCanonicalSequenceLabels = async (
+  labels: string[],
+): Promise<Map<string, string>> => {
   const prisma = getPrisma();
   const trimmed = labels.map((label) => label.trim()).filter(Boolean);
   if (trimmed.length === 0) return new Map();
 
   const rows = await prisma.sequence_aliases.findMany({
-    where: { raw_label: { in: trimmed } },
-    select: { raw_label: true, sequence: { select: { label: true } } },
+    where: { rawLabel: { in: trimmed } },
+    select: { rawLabel: true, sequenceRegistry: { select: { label: true } } },
   });
 
-  return new Map(rows.map((row) => [row.raw_label, row.sequence.label]));
+  return new Map(rows.map((row) => [row.rawLabel, row.sequenceRegistry.label]));
 };
 
 export const getSequenceKpis = async (
-  params: { from: Date; to: Date; timeZone?: string; channelId?: string | null },
+  params: {
+    from: Date;
+    to: Date;
+    timeZone?: string;
+    channelId?: string | null;
+  },
   logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
 ): Promise<SequenceKpis> => {
   const tz = resolveTimeZone(params.timeZone) || DEFAULT_BUSINESS_TIMEZONE;
   const fromIso = params.from.toISOString();
   const toIso = params.to.toISOString();
-  const channelId = params.channelId ?? process.env.BOOKED_CALLS_CHANNEL_ID ?? null;
+  const channelId =
+    params.channelId ?? process.env.BOOKED_CALLS_CHANNEL_ID ?? null;
 
   const [summary, attributionSources, peopleBySeq] = await Promise.all([
-    getSalesMetricsSummary({ from: params.from, to: params.to, timeZone: tz }, logger),
-    getBookedCallAttributionSources({ from: params.from, to: params.to, channelId: channelId || undefined }),
+    getSalesMetricsSummary(
+      { from: params.from, to: params.to, timeZone: tz },
+      logger,
+    ),
+    getBookedCallAttributionSources({
+      from: params.from,
+      to: params.to,
+      channelId: channelId || undefined,
+    }),
     buildPeopleContactedBySequence(fromIso, toIso, logger),
   ]);
 
   const smsLinks = await getBookedCallSmsReplyLinks(attributionSources, logger);
-  const smsSeqLookup = await getBookedCallSequenceFromSmsEvents(attributionSources, logger, smsLinks);
+  const smsSeqLookup = await getBookedCallSequenceFromSmsEvents(
+    attributionSources,
+    logger,
+    smsLinks,
+  );
   const seqAttribution = attributeSlackBookedCallsToSequences(
     summary.topSequences,
     attributionSources,
     smsLinks,
     smsSeqLookup,
   );
-  const canonicalMap = await resolveCanonicalSequenceLabels(summary.topSequences.map((row) => row.label));
+  const canonicalMap = await resolveCanonicalSequenceLabels(
+    summary.topSequences.map((row) => row.label),
+  );
 
   const bookedByCanonical = new Map<string, SequenceBookedBreakdown>();
   for (const [label, booked] of seqAttribution.byLabel.entries()) {
@@ -170,7 +199,10 @@ export const getSequenceKpis = async (
     existing.bookingSignalsSms += row.bookingSignalsSms;
     existing.bookingSignals += row.bookingSignalsSms;
     existing.bookedCalls += row.booked ?? 0;
-    if (row.firstSeenAt && (!existing.firstSeenAt || row.firstSeenAt < existing.firstSeenAt)) {
+    if (
+      row.firstSeenAt &&
+      (!existing.firstSeenAt || row.firstSeenAt < existing.firstSeenAt)
+    ) {
       existing.firstSeenAt = row.firstSeenAt;
     }
   }
@@ -199,9 +231,12 @@ export const getSequenceKpis = async (
     const booked = bookedByCanonical.get(row.label);
     const uniqueContacted = peopleBySeq.get(row.label) ?? row.messagesSent;
     const { leadMagnet, version } = parseLeadMagnetAndVersion(row.label);
-    const replyRatePct = uniqueContacted > 0 ? (row.repliesReceived / uniqueContacted) * 100 : 0;
-    const bookingRatePct = uniqueContacted > 0 ? ((booked?.booked ?? 0) / uniqueContacted) * 100 : 0;
-    const optOutRatePct = row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0;
+    const replyRatePct =
+      uniqueContacted > 0 ? (row.repliesReceived / uniqueContacted) * 100 : 0;
+    const bookingRatePct =
+      uniqueContacted > 0 ? ((booked?.booked ?? 0) / uniqueContacted) * 100 : 0;
+    const optOutRatePct =
+      row.messagesSent > 0 ? (row.optOuts / row.messagesSent) * 100 : 0;
 
     return {
       label: row.label,
@@ -233,7 +268,8 @@ export const getSequenceKpis = async (
     matchedCalls: seqAttribution.totals.matchedCalls,
     unattributedCalls: seqAttribution.totals.unattributedCalls,
     manualDirectBooked,
-    manualDirectSharePct: slackBookedTotal > 0 ? (manualDirectBooked / slackBookedTotal) * 100 : 0,
+    manualDirectSharePct:
+      slackBookedTotal > 0 ? (manualDirectBooked / slackBookedTotal) * 100 : 0,
     smsPhoneMatchedCalls: seqAttribution.totals.smsPhoneMatchedCalls,
     fuzzyTextMatchedCalls: seqAttribution.totals.fuzzyTextMatchedCalls,
   };

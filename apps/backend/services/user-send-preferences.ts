@@ -1,5 +1,5 @@
-import type { Logger } from '@slack/bolt';
-import { getPrismaClient } from './prisma.js';
+import type { Logger } from "@slack/bolt";
+import { getPrismaClient } from "./prisma.js";
 
 export type UserSendPreferencesRow = {
   user_id: string;
@@ -9,21 +9,21 @@ export type UserSendPreferencesRow = {
   updated_at: Date;
 };
 
-const getPrisma = () => getPrismaClient();
+const getPrisma = () => getPrismaClient() as any;
 
 export const getUserSendPreferences = async (
   userId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<UserSendPreferencesRow | null> => {
   const prisma = getPrisma();
   try {
-    const result = await prisma.userSendPreferences.findUnique({
+    const result = await prisma.user_send_preferences.findUnique({
       where: { user_id: userId },
     });
 
     return result as unknown as UserSendPreferencesRow | null;
   } catch (err) {
-    logger?.error('getUserSendPreferences failed', err);
+    logger?.error("getUserSendPreferences failed", err);
     throw err;
   }
 };
@@ -34,12 +34,12 @@ export const upsertUserSendPreferences = async (
     defaultLineId?: number | null;
     defaultFromNumber?: string | null;
   },
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<UserSendPreferencesRow> => {
   const prisma = getPrisma();
 
   try {
-    const result = await prisma.userSendPreferences.upsert({
+    const result = await prisma.user_send_preferences.upsert({
       where: { user_id: params.userId },
       create: {
         user_id: params.userId,
@@ -55,7 +55,7 @@ export const upsertUserSendPreferences = async (
 
     return result as unknown as UserSendPreferencesRow;
   } catch (err) {
-    logger?.error('upsertUserSendPreferences failed', err);
+    logger?.error("upsertUserSendPreferences failed", err);
     throw err;
   }
 };

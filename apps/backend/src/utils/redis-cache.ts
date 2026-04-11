@@ -1,4 +1,4 @@
-import { createClient, RedisClientType } from 'redis';
+import { createClient, RedisClientType } from "redis";
 
 /**
  * Redis Caching Utility
@@ -10,9 +10,9 @@ export class RedisCache {
 
   private constructor() {
     // Use environment variable for Redis connection
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    
-    this.client = createClient({ 
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+
+    this.client = createClient({
       url: redisUrl,
       // Add additional configuration options as needed
       socket: {
@@ -20,17 +20,17 @@ export class RedisCache {
         reconnectStrategy: (retries) => {
           // Exponential backoff with max retry limit
           return Math.min(retries * 50, 5000);
-        }
-      }
+        },
+      },
     });
 
     // Handle connection events
-    this.client.on('error', (err) => {
-      console.error('Redis Client Error', err);
+    this.client.on("error", (err) => {
+      console.error("Redis Client Error", err);
     });
 
-    this.client.on('connect', () => {
-      console.log('Redis client connected');
+    this.client.on("connect", () => {
+      console.log("Redis client connected");
     });
   }
 
@@ -69,15 +69,14 @@ export class RedisCache {
    * @param ttl Time to live in seconds (optional)
    */
   public async set(
-    key: string, 
-    value: string | number | object, 
-    ttl?: number
+    key: string,
+    value: string | number | object,
+    ttl?: number,
   ): Promise<void> {
     await this.connect();
-    
-    const serializedValue = typeof value === 'object' 
-      ? JSON.stringify(value) 
-      : String(value);
+
+    const serializedValue =
+      typeof value === "object" ? JSON.stringify(value) : String(value);
 
     if (ttl) {
       await this.client.set(key, serializedValue, { EX: ttl });
@@ -93,9 +92,9 @@ export class RedisCache {
    */
   public async get<T = string>(key: string): Promise<T | null> {
     await this.connect();
-    
+
     const value = await this.client.get(key);
-    
+
     if (!value) return null;
 
     try {
@@ -145,22 +144,28 @@ export class RedisCache {
    * @param ttl Time to live in seconds
    */
   public async cachedFetch<T>(
-    key: string, 
-    fetchFn: () => Promise<T>, 
-    ttl: number = 3600
+    key: string,
+    fetchFn: () => Promise<T>,
+    ttl: number = 3600,
   ): Promise<T> {
     // Try to get from cache first
     const cachedData = await this.get<T>(key);
-    
+
     if (cachedData !== null) {
       return cachedData;
     }
 
     // Fetch data if not in cache
     const freshData = await fetchFn();
-    
+
     // Store in cache
-    await this.set(key, freshData, ttl);
+    if (freshData != null) {
+      await this.set(
+        key,
+        freshData as unknown as string | number | object,
+        ttl,
+      );
+    }
 
     return freshData;
   }

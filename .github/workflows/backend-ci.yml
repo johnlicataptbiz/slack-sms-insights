@@ -2,24 +2,24 @@ name: Backend CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'apps/backend/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'tsconfig.json'
-      - '.github/workflows/backend-ci.yml'
+      - "apps/backend/**"
+      - "package.json"
+      - "package-lock.json"
+      - "tsconfig.json"
+      - ".github/workflows/backend-ci.yml"
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
     paths:
-      - 'apps/backend/**'
-      - 'package.json'
-      - 'tsconfig.json'
+      - "apps/backend/**"
+      - "package.json"
+      - "tsconfig.json"
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:13
@@ -35,110 +35,107 @@ jobs:
           --health-retries 5
 
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '22'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Generate Prisma Client
-      run: npx prisma generate --schema=apps/backend/prisma/schema.prisma
-      env:
-        DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/testdb
-    
-    - name: Run Backend Tests
-      run: npm run test:backend:coverage
-      env:
-        DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/testdb
-        NODE_ENV: test
-      continue-on-error: true
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        files: ./coverage/backend-coverage-report.json
-        flags: backend
-        fail_ci_if_error: true
-      continue-on-error: true
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema=apps/backend/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/testdb
+
+      - name: Run Backend Tests
+        run: npm run test:backend:coverage
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/testdb
+          NODE_ENV: test
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/backend-coverage-report.json
+          flags: backend
+          fail_ci_if_error: true
+        continue-on-error: true
 
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Run Linter
-      run: npm run lint:backend
-      continue-on-error: true
-    
-    - name: Run Type Check
-      run: npm run typecheck:backend
-      continue-on-error: true
+      - uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Linter
+        run: npm run lint:backend
+
+      - name: Run Type Check
+        run: npm run typecheck:backend
 
   security-scan:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
-    
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20.x'
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Run Dependency Audit
-      run: npm audit --audit-level=high
-      continue-on-error: true
-    
-    - name: Scan for Secrets
-      uses: gitleaks/gitleaks-action@v2
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Dependency Audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Scan for Secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   deploy-staging:
     needs: [test, lint, security-scan]
     if: github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Install Railway CLI
-      run: npm install -g @railway/cli
-    
-    - name: Deploy to Staging
-      run: railway up --detach --service=sms-insights --project=${{ vars.RAILWAY_PROJECT_ID }} --environment=${{ vars.RAILWAY_ENVIRONMENT }}
-      env:
-        RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Staging
+        run: railway up --detach --service=sms-insights --project=${{ vars.RAILWAY_PROJECT_ID }} --environment=${{ vars.RAILWAY_ENVIRONMENT }}
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   deploy-production:
     needs: [test, lint, security-scan]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Install Railway CLI
-      run: npm install -g @railway/cli
-    
-    - name: Deploy to Production
-      run: railway up --detach --service=sms-insights --project=${{ vars.RAILWAY_PROJECT_ID }} --environment=${{ vars.RAILWAY_ENVIRONMENT }}
-      env:
-        RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_PRODUCTION_TOKEN || secrets.RAILWAY_TOKEN }}
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy to Production
+        run: railway up --detach --service=sms-insights --project=${{ vars.RAILWAY_PROJECT_ID }} --environment=${{ vars.RAILWAY_ENVIRONMENT }}
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

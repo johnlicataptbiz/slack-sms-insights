@@ -9,6 +9,7 @@
     "dev": "concurrently \"npm run dev --workspace=ptbizsms-api\" \"npm run dev --workspace=ptbizsms-dashboard-unified\"",
     "dev:backend": "npm run dev --workspace=ptbizsms-api",
     "dev:frontend": "npm run dev --workspace=ptbizsms-dashboard-unified",
+    "start": "npm run start --workspace=ptbizsms-api",
     "build": "npm run --workspace=ptbizsms-api build && npm run --workspace=ptbizsms-dashboard-unified build",
     "build:backend": "npm run --workspace=ptbizsms-api build",
     "build:frontend": "npm run --workspace=ptbizsms-dashboard-unified build",

@@ -1,11 +1,11 @@
-import { Prisma } from '@prisma/client';
-import type { Logger } from '@slack/bolt';
-import { getPrismaClient } from './prisma.js';
-import { resolveSequenceId } from './sequence-registry.js';
+import { Prisma } from "@prisma/client";
+import type { Logger } from "@slack/bolt";
+import { getPrismaClient } from "./prisma.js";
+import { resolveSequenceId } from "./sequence-registry.js";
 
-const getPrisma = () => getPrismaClient();
+const getPrisma = () => getPrismaClient() as any;
 
-export type SmsEventDirection = 'inbound' | 'outbound' | 'unknown';
+export type SmsEventDirection = "inbound" | "outbound" | "unknown";
 
 export type NewSmsEvent = {
   slackTeamId: string;
@@ -48,7 +48,7 @@ export type SmsEventRow = {
 
 export const insertSmsEvent = async (
   event: NewSmsEvent,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<SmsEventRow | null> => {
   const prisma = getPrisma();
 
@@ -64,12 +64,15 @@ export const insertSmsEvent = async (
       contact_phone: event.contactPhone ?? null,
       contact_name: event.contactName ?? null,
       aloware_user: event.alowareUser ?? null,
-      body: event.body ?? null,
+      body: event.body ?? "",
       line: event.line ?? null,
       sequence: event.sequence ?? null,
       sequence_id: sequenceId,
       conversation_id: event.conversationId ?? null,
-      raw: event.raw != null ? (event.raw as Prisma.InputJsonValue) : Prisma.DbNull,
+      raw:
+        event.raw != null
+          ? (event.raw as Prisma.InputJsonValue)
+          : Prisma.DbNull,
     };
 
     const result = await prisma.sms_events.upsert({
@@ -85,7 +88,7 @@ export const insertSmsEvent = async (
         contact_phone: data.contact_phone,
         contact_name: data.contact_name,
         aloware_user: data.aloware_user,
-        body: data.body,
+        body: data.body || "",
         line: data.line,
         sequence: data.sequence,
         sequence_id: data.sequence_id,
@@ -96,7 +99,7 @@ export const insertSmsEvent = async (
 
     return result as unknown as SmsEventRow;
   } catch (err) {
-    logger?.error('insertSmsEvent failed', err);
+    logger?.error("insertSmsEvent failed", err);
     throw err;
   }
 };
@@ -104,7 +107,7 @@ export const insertSmsEvent = async (
 export const linkSmsEventToConversation = async (
   eventId: string,
   conversationId: string,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
 ): Promise<void> => {
   const prisma = getPrisma();
 
@@ -119,7 +122,7 @@ export const linkSmsEventToConversation = async (
       },
     });
   } catch (err) {
-    logger?.error('linkSmsEventToConversation failed', err);
+    logger?.error("linkSmsEventToConversation failed", err);
     throw err;
   }
 };
@@ -127,14 +130,14 @@ export const linkSmsEventToConversation = async (
 export const listWorkItemPreviewEventsByConversation = async (
   conversationId: string,
   limit: number,
-  logger?: Pick<Logger, 'debug' | 'info' | 'warn' | 'error'>,
-): Promise<Array<Pick<SmsEventRow, 'direction' | 'body' | 'event_ts'>>> => {
+  logger?: Pick<Logger, "debug" | "info" | "warn" | "error">,
+): Promise<Array<Pick<SmsEventRow, "direction" | "body" | "event_ts">>> => {
   const prisma = getPrisma();
 
   try {
     const results = await prisma.sms_events.findMany({
       where: { conversation_id: conversationId },
-      orderBy: { event_ts: 'desc' },
+      orderBy: { event_ts: "desc" },
       take: limit,
       select: {
         direction: true,
@@ -142,9 +145,11 @@ export const listWorkItemPreviewEventsByConversation = async (
         event_ts: true,
       },
     });
-    return results as unknown as Array<Pick<SmsEventRow, 'direction' | 'body' | 'event_ts'>>;
+    return results as unknown as Array<
+      Pick<SmsEventRow, "direction" | "body" | "event_ts">
+    >;
   } catch (err) {
-    logger?.error('listWorkItemPreviewEventsByConversation failed', err);
+    logger?.error("listWorkItemPreviewEventsByConversation failed", err);
     return [];
   }
 };
